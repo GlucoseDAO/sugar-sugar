@@ -1,0 +1,29 @@
+[tool.poetry]
+name = "sugar-sugar"
+version = "0.1.0"
+description = "A data access and visualization tool for glucose monitoring data"
+authors = ["Anton Kulaga <Antonkulaga@gmail.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+dash = "^2.18.2"
+plotly = "^5.24.1"
+polars = "^1.20.0"
+pandas = ">=2.2.3"
+typer = ">=0.15.1"
+
+[tool.poetry.scripts]
+start = "sugar_sugar.app:main"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.1.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
