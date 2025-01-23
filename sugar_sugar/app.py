@@ -730,11 +730,10 @@ def calculate_error_metrics(df: pl.DataFrame, prediction_row: Dict[str, str]) ->
 
 def add_event_markers(fig: Figure, events_df: pl.DataFrame, df: pl.DataFrame) -> None:
     """Adds event markers (insulin, exercise, carbs) to the figure."""
-    # Create a mapping of event types to symbols and colors
     event_styles = {
-        'Insulin': {'symbol': 'triangle-down', 'color': 'purple', 'size': 20},  # Increased from 12
-        'Exercise': {'symbol': 'star', 'color': 'orange', 'size': 20},         # Increased from 12
-        'Carbohydrates': {'symbol': 'square', 'color': 'green', 'size': 20}    # Increased from 12
+        'Insulin': {'symbol': 'triangle-down', 'color': 'purple', 'size': 20},
+        'Exercise': {'symbol': 'star', 'color': 'orange', 'size': 20},
+        'Carbohydrates': {'symbol': 'square', 'color': 'green', 'size': 20}
     }
     
     # Filter events to only those within the current time window
@@ -750,22 +749,52 @@ def add_event_markers(fig: Figure, events_df: pl.DataFrame, df: pl.DataFrame) ->
     for event_type, style in event_styles.items():
         events = window_events.filter(pl.col("event_type") == event_type)
         if events.height > 0:
-            # Get corresponding glucose values for y-position
             event_times = events.get_column("time")
             y_positions = []
             hover_texts = []
             x_positions = []
             
             for event_time in event_times:
-                # Find nearest glucose reading time
-                nearest_idx = df.with_columns(
-                    (pl.col("time").cast(pl.Int64) - pl.lit(int(event_time.timestamp() * 1000)))
-                    .abs()
-                    .alias("diff")
-                ).select(pl.col("diff").arg_min()).item()
+                # Find the glucose readings before and after the event
+                df_times = df.get_column("time")
                 
-                glucose_value = df.get_column("gl")[nearest_idx]
-                x_pos = get_time_position(df.get_column("time")[nearest_idx])
+                # Find indices of surrounding glucose readings
+                before_idx = None
+                after_idx = None
+                
+                for i, t in enumerate(df_times):
+                    if t <= event_time:
+                        before_idx = i
+                    if t >= event_time and after_idx is None:
+                        after_idx = i
+                
+                # Handle edge cases
+                if before_idx is None:
+                    before_idx = 0
+                if after_idx is None:
+                    after_idx = len(df_times) - 1
+                
+                # If event is exactly at a glucose reading time
+                if df_times[before_idx] == event_time:
+                    x_pos = before_idx
+                    glucose_value = df.get_column("gl")[before_idx]
+                # If event is between readings, interpolate position
+                elif before_idx == after_idx:
+                    x_pos = before_idx
+                    glucose_value = df.get_column("gl")[before_idx]
+                else:
+                    # Calculate interpolation factor
+                    before_time = df_times[before_idx].timestamp()
+                    after_time = df_times[after_idx].timestamp()
+                    event_timestamp = event_time.timestamp()
+                    
+                    factor = (event_timestamp - before_time) / (after_time - before_time)
+                    x_pos = before_idx + factor
+                    
+                    # Interpolate glucose value
+                    before_glucose = df.get_column("gl")[before_idx]
+                    after_glucose = df.get_column("gl")[after_idx]
+                    glucose_value = before_glucose + (after_glucose - before_glucose) * factor
                 
                 y_positions.append(glucose_value)
                 x_positions.append(x_pos)
@@ -787,8 +816,8 @@ def add_event_markers(fig: Figure, events_df: pl.DataFrame, df: pl.DataFrame) ->
                     symbol=style['symbol'],
                     size=style['size'],
                     color=style['color'],
-                    line=dict(width=2, color='white'),  # Added white outline
-                    opacity=0.8  # Added slight transparency
+                    line=dict(width=2, color='white'),
+                    opacity=0.8
                 ),
                 text=hover_texts,
                 hoverinfo='text'
