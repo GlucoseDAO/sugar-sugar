@@ -27,12 +27,13 @@ full_df = None  # Store complete dataset
 df = None  # Initial window view
 
 # Modify load_glucose_data to load all data without limit
-def load_glucose_data(file_path: Path = Path("data/example.csv")) -> pl.DataFrame:
+def load_glucose_data(file_path: Path = Path("data/example.csv")) -> Tuple[pl.DataFrame, pl.DataFrame]:
     df = pl.read_csv(
         file_path,
         null_values=["Low", "High"]
     )
-    # Filter only EGV rows and required columns
+    
+    # Filter glucose data (EGV rows)
     glucose_data = (df
         .filter(pl.col("Event Type") == "EGV")
         .select([
@@ -45,11 +46,32 @@ def load_glucose_data(file_path: Path = Path("data/example.csv")) -> pl.DataFram
         ])
         .sort("time")
     )
-    return glucose_data
+    
+    # Filter event data (non-EGV rows we want to show)
+    events_data = (df
+        .filter(
+            (pl.col("Event Type") == "Insulin") |
+            (pl.col("Event Type") == "Exercise") |
+            (pl.col("Event Type") == "Carbohydrates")
+        )
+        .select([
+            pl.col("Timestamp (YYYY-MM-DDThh:mm:ss)").alias("time"),
+            pl.col("Event Type").alias("event_type"),
+            pl.col("Event Subtype").alias("event_subtype"),
+            pl.col("Insulin Value (u)").alias("insulin_value")
+        ])
+        .with_columns([
+            pl.col("time").str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S")
+        ])
+        .sort("time")
+    )
+    
+    return glucose_data, events_data
 
-# Load the initial data
-full_df = load_glucose_data()
-df = full_df.slice(0, DEFAULT_POINTS)
+# Update initial loading
+full_df, events_df = load_glucose_data()  # Unpack both dataframes
+df = full_df.slice(0, DEFAULT_POINTS)  # Now this will work
+events_window = events_df  # Store events
 is_example_data = True  # Track if we're using example data
 
 external_stylesheets: List[str] = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
@@ -361,9 +383,7 @@ def handle_click(
                     start_time = find_nearest_time(start_x)
                     end_time = find_nearest_time(end_x)
                     
-                    print(f"Drawing line from ({start_x}, {start_y}) to ({end_x}, {end_y})")
-                    print(f"Snapped times: {start_time} to {end_time}")
-                    
+                   
                     # Update both points using Polars syntax
                     df = df.with_columns(
                         pl.when(pl.col("time").is_in([start_time, end_time]))
@@ -708,13 +728,79 @@ def calculate_error_metrics(df: pl.DataFrame, prediction_row: Dict[str, str]) ->
     
     return metrics_div
 
+def add_event_markers(fig: Figure, events_df: pl.DataFrame, df: pl.DataFrame) -> None:
+    """Adds event markers (insulin, exercise, carbs) to the figure."""
+    # Create a mapping of event types to symbols and colors
+    event_styles = {
+        'Insulin': {'symbol': 'triangle-down', 'color': 'purple', 'size': 20},  # Increased from 12
+        'Exercise': {'symbol': 'star', 'color': 'orange', 'size': 20},         # Increased from 12
+        'Carbohydrates': {'symbol': 'square', 'color': 'green', 'size': 20}    # Increased from 12
+    }
+    
+    # Filter events to only those within the current time window
+    start_time = df.get_column("time")[0]
+    end_time = df.get_column("time")[-1]
+    
+    window_events = events_df.filter(
+        (pl.col("time") >= start_time) & 
+        (pl.col("time") <= end_time)
+    )
+    
+    # Add traces for each event type
+    for event_type, style in event_styles.items():
+        events = window_events.filter(pl.col("event_type") == event_type)
+        if events.height > 0:
+            # Get corresponding glucose values for y-position
+            event_times = events.get_column("time")
+            y_positions = []
+            hover_texts = []
+            x_positions = []
+            
+            for event_time in event_times:
+                # Find nearest glucose reading time
+                nearest_idx = df.with_columns(
+                    (pl.col("time").cast(pl.Int64) - pl.lit(int(event_time.timestamp() * 1000)))
+                    .abs()
+                    .alias("diff")
+                ).select(pl.col("diff").arg_min()).item()
+                
+                glucose_value = df.get_column("gl")[nearest_idx]
+                x_pos = get_time_position(df.get_column("time")[nearest_idx])
+                
+                y_positions.append(glucose_value)
+                x_positions.append(x_pos)
+                
+                # Create hover text
+                event_row = events.filter(pl.col("time") == event_time)
+                if event_type == 'Insulin':
+                    hover_text = f"Insulin: {event_row.get_column('insulin_value')[0]}u<br>{event_time.strftime('%H:%M')}"
+                else:
+                    hover_text = f"{event_type}<br>{event_time.strftime('%H:%M')}"
+                hover_texts.append(hover_text)
+            
+            fig.add_trace(go.Scatter(
+                x=x_positions,
+                y=y_positions,
+                mode='markers',
+                name=event_type,
+                marker=dict(
+                    symbol=style['symbol'],
+                    size=style['size'],
+                    color=style['color'],
+                    line=dict(width=2, color='white'),  # Added white outline
+                    opacity=0.8  # Added slight transparency
+                ),
+                text=hover_texts,
+                hoverinfo='text'
+            ))
+
 @app.callback(
     Output('glucose-graph', 'figure'),
     [Input('last-click-time', 'data')]
 )
 def update_graph(last_click_time: int) -> Figure:
     """Updates the graph based on the DataFrame state."""
-    global df
+    global df, events_df
     
     # Create new figure (completely fresh)
     fig = go.Figure()
@@ -740,6 +826,9 @@ def update_graph(last_click_time: int) -> Figure:
     
     # Add predictions if any
     add_prediction_traces(fig, plot_df)
+    
+    # Add event markers
+    add_event_markers(fig, events_df, plot_df)
     
     # Update layout
     update_figure_layout(fig, plot_df)
@@ -797,8 +886,9 @@ def update_data_source(contents: Optional[str], filename: Optional[str]) -> Tupl
             tmp_path = Path(tmp_file.name)
         
         # Load the new data
-        full_df = load_glucose_data(tmp_path)
+        full_df, events_df = load_glucose_data(tmp_path)
         df = full_df.slice(0, DEFAULT_POINTS)
+        events_window = events_df  # Store events
         is_example_data = False
         
         # Clean up temporary file
