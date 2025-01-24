@@ -183,13 +183,19 @@ def update_graph(last_click_time: int) -> Figure:
 )
 def update_metrics(last_click_time: int) -> Tuple[TableData, Union[List[html.Div], html.Div]]:
     """Updates the predictions table and error metrics based on the DataFrame state."""
-    # Generate table data
-    table_data = generate_table_data(df)
+    # Create metrics component instance
+    metrics = MetricsComponent(df)
     
-    # Calculate and format error metrics
-    metrics = calculate_error_metrics(df, table_data[1])
+    # Generate table data using the component's method
+    table_data = metrics.generate_table_data(df)
     
-    return table_data, metrics
+    # Get prediction row from table data for error metrics calculation
+    prediction_row = table_data[1]  # Index 1 contains predictions
+    
+    # Calculate error metrics
+    error_metrics = metrics.calculate_error_metrics(df, prediction_row)
+    
+    return table_data, error_metrics
 
 
 # Add new callback for file upload
