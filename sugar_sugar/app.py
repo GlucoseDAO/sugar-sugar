@@ -12,8 +12,8 @@ import tempfile
 from .data import load_glucose_data
 from .layout import create_layout
 from .config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS, DOUBLE_CLICK_THRESHOLD
-from .figures import GlucoseChart  # Replace build_figure import with GlucoseChart
-from .metrics import generate_table_data, calculate_error_metrics
+from .components.glucose_chart import GlucoseChart
+from .components.metrics import MetricsComponent
 
 # Type aliases for clarity
 TimePoint = Dict[str, Union[datetime, float]]  # Represents a single point with time and glucose value
