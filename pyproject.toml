@@ -13,6 +13,7 @@ plotly = "^5.24.1"
 polars = "^1.20.0"
 pandas = ">=2.2.3"
 typer = ">=0.15.1"
+numpy = "^2.2.2"
 
 [tool.poetry.scripts]
 start = "sugar_sugar.app:main"
