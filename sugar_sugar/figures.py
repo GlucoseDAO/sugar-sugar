@@ -7,58 +7,75 @@ from datetime import datetime
 creating the figures that wil be uploaded interactively
 """
 
-def create_base_figure() -> go.Figure:
-        """Creates the base figure with glucose range rectangles."""
-        fig = go.Figure()
-        
-        # Dangerous low range (below 70)
-        fig.add_hrect(
-            y0=0, y1=70,
-            fillcolor="rgba(255, 200, 200, 0.5)",  # Light red
-            line=dict(color="rgba(200, 0, 0, 0.5)", width=1),
-            layer="below",
-            name="Low Range"
-        )
-        
-        # Normal range (70-180)
-        fig.add_hrect(
-            y0=70, y1=180,
-            fillcolor="rgba(200, 240, 200, 0.5)",  # Light green
-            line=dict(color="rgba(0, 100, 0, 0.5)", width=1),
-            layer="below",
-            name="Normal Range"
-        )
-        
-        # High range (180-250)
-        fig.add_hrect(
-            y0=180, y1=250,
-            fillcolor="rgba(255, 255, 200, 0.5)",  # Light yellow
-            line=dict(color="rgba(200, 200, 0, 0.5)", width=1),
-            layer="below",
-            name="High Range"
-        )
-        
-        # Dangerous high range (above 250)
-        fig.add_hrect(
-            y0=250, y1=400,
-            fillcolor="rgba(255, 200, 200, 0.5)",  # Light red
-            line=dict(color="rgba(200, 0, 0, 0.5)", width=1),
-            layer="below",
-            name="Very High Range"
-        )
-        
-        return fig
+class GlucoseChart(go.Figure):
+    RANGE_COLORS = {
+        "dangerous_low": {"fill": "rgba(255, 200, 200, 0.5)", "line": "rgba(200, 0, 0, 0.5)"},
+        "normal": {"fill": "rgba(200, 240, 200, 0.5)", "line": "rgba(0, 100, 0, 0.5)"},
+        "high": {"fill": "rgba(255, 255, 200, 0.5)", "line": "rgba(200, 200, 0, 0.5)"},
+        "dangerous_high": {"fill": "rgba(255, 200, 200, 0.5)", "line": "rgba(200, 0, 0, 0.5)"}
+    }
+    
+    EVENT_STYLES = {
+        'Insulin': {'symbol': 'triangle-down', 'color': 'purple', 'size': 20},
+        'Exercise': {'symbol': 'star', 'color': 'orange', 'size': 20},
+        'Carbohydrates': {'symbol': 'square', 'color': 'green', 'size': 20}
+    }
 
-def calculate_y_axis_range(df: pl.DataFrame) -> Tuple[float, float]:
+    def __init__(self, df: pl.DataFrame, events_df: pl.DataFrame):
+        # Initialize the parent class first
+        super().__init__()
+        # Store data as private attributes in the figure's _data dictionary
+        self._data_store = {
+            'glucose_data': df,
+            'events_data': events_df
+        }
+        self._build()
+    
+    @property
+    def df(self) -> pl.DataFrame:
+        return self._data_store['glucose_data']
+    
+    @property
+    def events_df(self) -> pl.DataFrame:
+        return self._data_store['events_data']
+
+    def _build(self):
+        """Builds complete figure with all components."""
+        self._add_range_rectangles()
+        self._add_glucose_trace()
+        self._add_prediction_traces()
+        self._add_event_markers()
+        self._update_layout()
+
+    def _add_range_rectangles(self):
+        """Adds the glucose range rectangles to the figure."""
+        ranges = [
+            (0, 70, "dangerous_low", "Low Range"),
+            (70, 180, "normal", "Normal Range"),
+            (180, 250, "high", "High Range"),
+            (250, 400, "dangerous_high", "Very High Range")
+        ]
+
+        for y0, y1, style_key, name in ranges:
+            colors = self.RANGE_COLORS[style_key]
+            self.add_hrect(
+                y0=y0, y1=y1,
+                fillcolor=colors["fill"],
+                line=dict(color=colors["line"], width=1),
+                layer="below",
+                name=name
+            )
+
+    def calculate_y_axis_range(self) -> Tuple[float, float]:
         """Calculates the y-axis range based on glucose and prediction values."""
         STANDARD_MIN = 40  # Standard lower bound for CGM charts
         STANDARD_MAX = 300  # Upper bound for CGM chart
         
-        line_points = df.filter(pl.col("prediction") != 0.0)
+        line_points = self.df.filter(pl.col("prediction") != 0.0)
         
         # Get actual data ranges
-        data_min = df.get_column("gl").min()
-        data_max = df.get_column("gl").max()
+        data_min = self.df.get_column("gl").min()
+        data_max = self.df.get_column("gl").max()
         
         # Include prediction values in range calculation if they exist
         if line_points.height > 0:
@@ -71,34 +88,34 @@ def calculate_y_axis_range(df: pl.DataFrame) -> Tuple[float, float]:
         
         return lower_bound, upper_bound
 
-def add_glucose_trace(fig: go.Figure, df: pl.DataFrame) -> None:
+    def _add_glucose_trace(self):
         """Adds the main glucose data line to the figure."""
-        x_indices = list(range(len(df)))
+        x_indices = list(range(len(self.df)))
         
-        fig.add_trace(go.Scatter(
+        self.add_trace(go.Scatter(
             x=x_indices,
-            y=df['gl'],
+            y=self.df['gl'],
             mode='lines+markers',
             name='Glucose Level',
             line=dict(color='blue'),
         ))
 
-def get_time_position(df: pl.DataFrame, time_point: datetime) -> float:
+    def get_time_position(self, time_point: datetime) -> float:
         """Converts a datetime to its corresponding x-axis position."""
-        time_series = df.get_column("time")
+        time_series = self.df.get_column("time")
         for idx, t in enumerate(time_series):
             if t == time_point:
                 return idx
         return 0
 
-def add_prediction_traces(fig: go.Figure, df: pl.DataFrame) -> None:
+    def _add_prediction_traces(self):
         """Adds prediction points and connecting lines to the figure."""
-        line_points = df.filter(pl.col("prediction") != 0.0)
+        line_points = self.df.filter(pl.col("prediction") != 0.0)
         if line_points.height > 0:
-            x_positions = [get_time_position(df, t) for t in line_points.get_column("time")]
+            x_positions = [self.get_time_position(t) for t in line_points.get_column("time")]
             
             # Add prediction points
-            fig.add_trace(go.Scatter(
+            self.add_trace(go.Scatter(
                 x=x_positions,
                 y=line_points.get_column("prediction"),
                 mode='markers',
@@ -113,10 +130,10 @@ def add_prediction_traces(fig: go.Figure, df: pl.DataFrame) -> None:
                 predictions = line_points_sorted.get_column("prediction")
                 
                 for i in range(line_points.height - 1):
-                    start_pos = get_time_position(df, times[i])
-                    end_pos = get_time_position(df, times[i + 1])
+                    start_pos = self.get_time_position(times[i])
+                    end_pos = self.get_time_position(times[i + 1])
                     
-                    fig.add_trace(go.Scatter(
+                    self.add_trace(go.Scatter(
                         x=[start_pos, end_pos],
                         y=[predictions[i], predictions[i + 1]],
                         mode='lines',
@@ -124,27 +141,19 @@ def add_prediction_traces(fig: go.Figure, df: pl.DataFrame) -> None:
                         showlegend=False
                     ))
 
-def add_event_markers(fig: go.Figure, events_df: pl.DataFrame, df: pl.DataFrame) -> None:
+    def _add_event_markers(self):
         """Adds event markers (insulin, exercise, carbs) to the figure."""
-        event_styles = {
-            'Insulin': {'symbol': 'triangle-down', 'color': 'purple', 'size': 20},
-            'Exercise': {'symbol': 'star', 'color': 'orange', 'size': 20},
-            'Carbohydrates': {'symbol': 'square', 'color': 'green', 'size': 20}
-        }
-
-
-
         # Filter events to only those within the current time window
-        start_time = df.get_column("time")[0]
-        end_time = df.get_column("time")[-1]
+        start_time = self.df.get_column("time")[0]
+        end_time = self.df.get_column("time")[-1]
         
-        window_events = events_df.filter(
+        window_events = self.events_df.filter(
             (pl.col("time") >= start_time) & 
             (pl.col("time") <= end_time)
         )
         
         # Add traces for each event type
-        for event_type,style in event_styles.items():
+        for event_type,style in self.EVENT_STYLES.items():
             events = window_events.filter(pl.col("event_type") == event_type)
             if events.height > 0:
                 event_times = events.get_column("time")
@@ -154,7 +163,7 @@ def add_event_markers(fig: go.Figure, events_df: pl.DataFrame, df: pl.DataFrame)
                 
                 for event_time in event_times:
                     # Find the glucose readings before and after the event
-                    df_times = df.get_column("time")
+                    df_times = self.df.get_column("time")
                     
                     # Find indices of surrounding glucose readings
                     before_idx = None
@@ -175,10 +184,10 @@ def add_event_markers(fig: go.Figure, events_df: pl.DataFrame, df: pl.DataFrame)
                     # Calculate position and glucose value
                     if df_times[before_idx] == event_time:
                         x_pos = before_idx
-                        glucose_value = df.get_column("gl")[before_idx]
+                        glucose_value = self.df.get_column("gl")[before_idx]
                     elif before_idx == after_idx:
                         x_pos = before_idx
-                        glucose_value = df.get_column("gl")[before_idx]
+                        glucose_value = self.df.get_column("gl")[before_idx]
                     else:
                         # Interpolate position and glucose value
                         before_time = df_times[before_idx].timestamp()
@@ -188,8 +197,8 @@ def add_event_markers(fig: go.Figure, events_df: pl.DataFrame, df: pl.DataFrame)
                         factor = (event_timestamp - before_time) / (after_time - before_time)
                         x_pos = before_idx + factor
                         
-                        before_glucose = df.get_column("gl")[before_idx]
-                        after_glucose = df.get_column("gl")[after_idx]
+                        before_glucose = self.df.get_column("gl")[before_idx]
+                        after_glucose = self.df.get_column("gl")[after_idx]
                         glucose_value = before_glucose + (after_glucose - before_glucose) * factor
                     
                     y_positions.append(glucose_value)
@@ -203,7 +212,7 @@ def add_event_markers(fig: go.Figure, events_df: pl.DataFrame, df: pl.DataFrame)
                         hover_text = f"{event_type}<br>{event_time.strftime('%H:%M')}"
                     hover_texts.append(hover_text)
                 
-                fig.add_trace(go.Scatter(
+                self.add_trace(go.Scatter(
                     x=x_positions,
                     y=y_positions,
                     mode='markers',
@@ -219,29 +228,29 @@ def add_event_markers(fig: go.Figure, events_df: pl.DataFrame, df: pl.DataFrame)
                     hoverinfo='text'
                 ))
 
-def update_figure_layout(fig: go.Figure, df: pl.DataFrame) -> None:
+    def _update_layout(self):
         """Updates the figure layout with axes, margins, and interaction settings."""
-        y_range = calculate_y_axis_range(df)
+        y_range = self.calculate_y_axis_range()
         
         # Calculate window info for title
-        start_time = df.get_column("time")[0].strftime('%Y-%m-%d %H:%M')
-        end_time = df.get_column("time")[-1].strftime('%Y-%m-%d %H:%M')
+        start_time = self.df.get_column("time")[0].strftime('%Y-%m-%d %H:%M')
+        end_time = self.df.get_column("time")[-1].strftime('%Y-%m-%d %H:%M')
         
-        fig.update_layout(
+        self.update_layout(
             title=f'Glucose Levels ({start_time} to {end_time})',
             autosize=True,
             xaxis=dict(
                 title='Time',
                 tickmode='array',
-                tickvals=list(range(len(df))),
-                ticktext=[t.strftime('%Y-%m-%d %H:%M') for t in df.get_column("time")],
+                tickvals=list(range(len(self.df))),
+                ticktext=[t.strftime('%Y-%m-%d %H:%M') for t in self.df.get_column("time")],
                 fixedrange=True,
                 showspikes=True,
                 spikemode='across',
                 spikesnap='cursor',
                 gridcolor='rgba(128, 128, 128, 0.2)',
                 showgrid=True,
-                range=[-0.5, len(df) - 0.5]
+                range=[-0.5, len(self.df) - 0.5]
             ),
             yaxis=dict(
                 title='Glucose Level (mg/dL)',
@@ -260,12 +269,3 @@ def update_figure_layout(fig: go.Figure, df: pl.DataFrame) -> None:
             plot_bgcolor='white',
             paper_bgcolor='white'
         )
-
-def build_figure(df: pl.DataFrame, events_df: pl.DataFrame) -> go.Figure:
-        """Builds complete figure with all components."""
-        fig = create_base_figure()
-        add_glucose_trace(fig, df)
-        add_prediction_traces(fig, df)
-        add_event_markers(fig, events_df, df)
-        update_figure_layout(fig, df)
-        return fig

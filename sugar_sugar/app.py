@@ -12,7 +12,7 @@ import tempfile
 from .data import load_glucose_data
 from .layout import create_layout
 from .config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS, DOUBLE_CLICK_THRESHOLD
-from .figures import build_figure
+from .figures import GlucoseChart  # Replace build_figure import with GlucoseChart
 from .metrics import generate_table_data, calculate_error_metrics
 
 # Type aliases for clarity
@@ -79,7 +79,7 @@ def handle_click(
     relayout_data: Optional[Dict[str, Any]], 
     last_click_time: int,
 ) -> int:
-    global df
+    global df, full_df
     current_time: int = int(time.time() * 1000)
     
     ctx = dash.callback_context
@@ -92,6 +92,7 @@ def handle_click(
     if trigger_id == 'glucose-graph' and click_data:
         if current_time - last_click_time <= DOUBLE_CLICK_THRESHOLD:
             print("Double-click detected: Resetting drawn lines.")
+            full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
             df = df.with_columns(pl.lit(0.0).alias("prediction"))
             return current_time
         
@@ -101,7 +102,13 @@ def handle_click(
         click_y = point_data['y']
         
         nearest_time = find_nearest_time(click_x)
-        # Update using Polars syntax
+        # Update both full_df and current window
+        full_df = full_df.with_columns(
+            pl.when(pl.col("time") == nearest_time)
+            .then(click_y)
+            .otherwise(pl.col("prediction"))
+            .alias("prediction")
+        )
         df = df.with_columns(
             pl.when(pl.col("time") == nearest_time)
             .then(click_y)
@@ -128,8 +135,17 @@ def handle_click(
                     start_time = find_nearest_time(start_x)
                     end_time = find_nearest_time(end_x)
                     
-                   
-                    # Update both points using Polars syntax
+                    # Update both full_df and current window
+                    full_df = full_df.with_columns(
+                        pl.when(pl.col("time").is_in([start_time, end_time]))
+                        .then(
+                            pl.when(pl.col("time") == start_time)
+                            .then(float(start_y))
+                            .otherwise(float(end_y))
+                        )
+                        .otherwise(pl.col("prediction"))
+                        .alias("prediction")
+                    )
                     df = df.with_columns(
                         pl.when(pl.col("time").is_in([start_time, end_time]))
                         .then(
@@ -154,7 +170,8 @@ def update_graph(last_click_time: int) -> Figure:
     """Updates the graph based on the DataFrame state."""
     global df, events_df
     
-    return build_figure(df, events_df)
+    chart = GlucoseChart(df, events_df)
+    return chart
 
 
 @app.callback(
@@ -287,9 +304,9 @@ def update_points_shown(points: int, current_position: int) -> Tuple[int, int, i
 )
 def update_time_window(start_idx: int, num_points: int) -> int:
     """Updates the visible window of data based on slider position."""
-    global df
+    global df, full_df
     
-    # Update the visible window to show num_points values starting at start_idx
+    # Simply slice the full_df which already contains all predictions
     df = full_df.slice(start_idx, start_idx + num_points)
     
     # Verify we only have the requested number of points
