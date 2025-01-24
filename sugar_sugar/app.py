@@ -17,11 +17,13 @@ TableData = List[Dict[str, str]]  # Format for the predictions table data
 Figure = go.Figure  # Plotly figure type
 
 # Add this near the top with other type aliases
+#represents the number of points to show in the graph and it's min and max (going from 1h to 3h)
 DEFAULT_POINTS = 24
-MIN_POINTS = 10
-MAX_POINTS = 30
+MIN_POINTS = 12
+MAX_POINTS = 36
 
 # Add new global variables
+#note that index just slides across values- that means an increase +1 moves fwd with 5 minutes interval
 window_start = 0  # Index of first visible point
 full_df = None  # Store complete dataset
 df = None  # Initial window view
@@ -30,7 +32,8 @@ df = None  # Initial window view
 def load_glucose_data(file_path: Path = Path("data/example.csv")) -> Tuple[pl.DataFrame, pl.DataFrame]:
     df = pl.read_csv(
         file_path,
-        null_values=["Low", "High"]
+        null_values=["Low", "High"],
+        truncate_ragged_lines=True
     )
     
     # Filter glucose data (EGV rows)
@@ -81,13 +84,15 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 app.layout = html.Div([
     # Header section
     html.Div([
-        html.H1('Sugar Sugar', style={
-            'textAlign': 'center',
-            'color': '#2c5282',
-            'marginBottom': '10px',
-            'fontSize': '48px',
-            'fontWeight': 'bold',
-        }),
+        html.H1('Sugar Sugar', 
+                style={
+                    'textAlign': 'center',
+                    'color': '#2c5282',
+                    'marginBottom': '10px',
+                    'fontSize': '48px',
+                    'fontWeight': 'bold',
+                    }
+                ),
         # New row with two columns
         html.Div([
             # Left column - Game description
@@ -210,11 +215,11 @@ app.layout = html.Div([
             html.P([
                 'How to play: ',
                 html.Br(),
-                '1. Click on points in the graph to add predictions ',
+                '1. Click and drag in the graph to add predictions ',
                 html.Br(),
-                '2. Draw lines between points to create prediction curves ',
+                '2. Draw one line anfter another to create prediction curves ',
                 html.Br(),
-                '3. Double-click to reset your predictions ',
+                '3. Double-click to reset your predictions(?) ',
                 html.Br(),
                 '4. Try to predict at least 5 points to see your accuracy metrics'
             ], style={
