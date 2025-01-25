@@ -61,14 +61,18 @@ def create_layout() -> html.Div:
 
         # Main content container
         html.Div([
+            # Store components for state management
+            dcc.Store(id='current-window-df', data=None),  # Store for current window DataFrame
+            dcc.Store(id='full-df', data=None),           # Store for full DataFrame
+            dcc.Store(id='events-df', data=None),         # Store for events DataFrame
+            dcc.Store(id='last-click-time', data=0),      # Store for click tracking
+            dcc.Store(id='is-example-data', data=True),   # Store for tracking data source
+
             # Interactive glucose graph component
             glucose_chart,
 
             # Game instructions
             InstructionsComponent(),
-
-            # Store component for click tracking
-            dcc.Store(id='last-click-time', data=0),
             
             # Predictions table using new component
             prediction_table,
@@ -366,6 +370,41 @@ def update_time_window(start_idx: int, num_points: int) -> int:
         df = df.head(num_points)
     
     return int(time.time() * 1000)
+
+
+@app.callback(
+    [Output('full-df', 'data'),
+     Output('current-window-df', 'data'),
+     Output('events-df', 'data')],
+    [Input('glucose-graph', 'id')],  # Using an existing component's id instead of dummy div
+    prevent_initial_call=False
+)
+def initialize_data(_):
+    """Initialize the data stores on page load"""
+    full_df, events_df = load_glucose_data()
+    current_df = full_df.slice(0, DEFAULT_POINTS)
+    
+    # Convert DataFrames to JSON-serializable dictionaries
+    def convert_df_to_dict(df):
+        return {
+            'time': df.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
+            'gl': df.get_column('gl').to_list(),
+            'prediction': df.get_column('prediction').to_list()
+        }
+    
+    def convert_events_df_to_dict(df):
+        return {
+            'time': df.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
+            'event_type': df.get_column('event_type').to_list(),
+            'event_subtype': df.get_column('event_subtype').to_list(),
+            'insulin_value': df.get_column('insulin_value').to_list()
+        }
+    
+    return (
+        convert_df_to_dict(full_df),
+        convert_df_to_dict(current_df),
+        convert_events_df_to_dict(events_df)
+    )
 
 def main() -> None:
     """Starts the Dash server."""
