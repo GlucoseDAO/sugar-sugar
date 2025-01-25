@@ -12,9 +12,9 @@ import tempfile
 
 from .data import load_glucose_data
 from .config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS, DOUBLE_CLICK_THRESHOLD
-from .components.glucose_chart import GlucoseChart
+from .components.glucose import GlucoseChart
 from .components.metrics import MetricsComponent
-from .components.prediction_table import PredictionTableComponent
+from .components.predictions import PredictionTableComponent
 
 # Type aliases for clarity
 TableData = List[Dict[str, str]]  # Format for the predictions table data
