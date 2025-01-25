@@ -11,19 +11,6 @@ class MetricsComponent(html.Div):
         # Create the component layout
         layout = html.Div([
             html.H4("Metrics", style={'fontSize': '20px', 'marginBottom': '10px'}),
-            html.Div([
-                dash_table.DataTable(
-                    id='metrics-table-data',
-                    style_table={'overflowX': 'auto'},
-                    style_cell={
-                        'textAlign': 'center',
-                        'minWidth': '60px',
-                        'maxWidth': '100px',
-                    },
-                    data=[],
-                    columns=[]
-                )
-            ], id='metrics-table-container'),
             html.Div(id='metrics-content-data')
         ])
 
@@ -43,80 +30,6 @@ class MetricsComponent(html.Div):
     def update_dataframe(self, df: pl.DataFrame):
         """Update the DataFrame reference"""
         self.df = df
-
-    def generate_table_data(self, df: pl.DataFrame) -> TableData:
-        """Generates the table data with actual values, predictions, and errors."""
-        table_data = []
-        
-        # Row 1: Actual glucose values
-        glucose_row = {'metric': 'Actual Glucose'}
-        for i, gl in enumerate(df.get_column("gl")):
-            glucose_row[f't{i}'] = f"{gl:.1f}" if gl is not None else "-"
-        table_data.append(glucose_row)
-        
-        # Row 2: Predicted values with interpolation
-        prediction_row = {'metric': 'Predicted'}
-        predictions = df.get_column("prediction")
-        non_zero_indices = [i for i, p in enumerate(predictions) if p != 0]
-        
-        if len(non_zero_indices) >= 2:
-            start_idx = non_zero_indices[0]
-            end_idx = non_zero_indices[-1]
-            
-            for i in range(len(predictions)):
-                if i < start_idx or i > end_idx:
-                    prediction_row[f't{i}'] = "-"
-                elif predictions[i] != 0:
-                    prediction_row[f't{i}'] = f"{predictions[i]:.1f}"
-                else:
-                    prev_idx = max([j for j in non_zero_indices if j < i])
-                    next_idx = min([j for j in non_zero_indices if j > i])
-                    total_steps = next_idx - prev_idx
-                    current_step = i - prev_idx
-                    prev_val = predictions[prev_idx]
-                    next_val = predictions[next_idx]
-                    interpolated = prev_val + (next_val - prev_val) * (current_step / total_steps)
-                    prediction_row[f't{i}'] = f"{interpolated:.1f}"
-        else:
-            for i, pred_val in enumerate(predictions):
-                prediction_row[f't{i}'] = f"{pred_val:.1f}" if pred_val != 0 else "-"
-        
-        table_data.append(prediction_row)
-        
-        # Add error rows
-        table_data.extend(self.calculate_error_rows(df, prediction_row))
-        
-        return table_data
-
-    def calculate_error_rows(self, df: pl.DataFrame, prediction_row: Dict[str, str]) -> List[Dict[str, str]]:
-        """Calculates absolute and relative error rows for the table."""
-        error_rows = []
-        
-        # Absolute Error
-        error_row = {'metric': 'Absolute Error'}
-        for i, gl in enumerate(df.get_column("gl")):
-            pred_str = prediction_row[f't{i}']
-            if pred_str != "-" and gl is not None:
-                pred = float(pred_str)
-                error = abs(gl - pred)
-                error_row[f't{i}'] = f"{error:.1f}"
-            else:
-                error_row[f't{i}'] = "-"
-        error_rows.append(error_row)
-        
-        # Relative Error
-        rel_error_row = {'metric': 'Relative Error (%)'}
-        for i, gl in enumerate(df.get_column("gl")):
-            pred_str = prediction_row[f't{i}']
-            if pred_str != "-" and gl is not None and gl != 0:
-                pred = float(pred_str)
-                rel_error = (abs(gl - pred) / gl * 100)
-                rel_error_row[f't{i}'] = f"{rel_error:.1f}%"
-            else:
-                rel_error_row[f't{i}'] = "-"
-        error_rows.append(rel_error_row)
-        
-        return error_rows
 
     def calculate_error_metrics(self, df: pl.DataFrame, prediction_row: Dict[str, str]) -> Optional[html.Div]:
         """Calculates error metrics when there are 5 or more predictions."""
@@ -205,38 +118,15 @@ class MetricsComponent(html.Div):
 
     def register_callbacks(self, app):
         @app.callback(
-            [
-                Output('metrics-table-data', 'data'),  # Updated ID
-                Output('metrics-table-data', 'columns'),  # Updated ID
-                Output('metrics-content-data', 'children')  # Updated ID
-            ],
-            [Input('last-click-time', 'data')]
+            Output('metrics-content-data', 'children'),
+            [Input('prediction-table-data', 'data')]
         )
-        def update_metrics(last_click_time: int):
-            """Updates the predictions table and error metrics based on the DataFrame state."""
-            # Generate table data using the current DataFrame state
-            table_data = self.generate_table_data(self.df)
+        def update_metrics(table_data: List[Dict[str, str]]):
+            """Updates the error metrics based on the prediction table data."""
+            if not table_data or len(table_data) < 2:
+                return None
             
-            # Generate columns configuration
-            columns = [{'name': 'Metric', 'id': 'metric'}]
-            for i in range(len(self.df)):
-                columns.append({'name': f'T{i}', 'id': f't{i}'})
+            prediction_row = table_data[1]  # Get the predictions row
+            metrics = self.calculate_error_metrics(self.df, prediction_row)
             
-            # Calculate metrics
-            metrics = self.calculate_error_metrics(self.df, table_data[1])
-            
-            return table_data, columns, metrics
-
-    def create_layout(self):
-        """Creates the metrics layout"""
-        return html.Div(id='metrics-container')
-
-    def calculate_metrics(self, prediction_row: Dict[str, str]) -> Optional[Dict[str, float]]:
-        """Calculates error metrics when there are 5 or more predictions."""
-        # ... (same as original calculate_error_metrics function but returns just the metrics dict)
-        pass
-
-    def generate_metrics_div(self, metrics: Optional[Dict[str, float]]) -> html.Div:
-        """Generates the metrics visualization div"""
-        # ... (same as the visualization part of original calculate_error_metrics)
-        pass 
+            return metrics 
