@@ -77,23 +77,36 @@ class GlucoseChart(Div):
         self._update_layout()
 
     def _add_range_rectangles(self):
-        """Adds the glucose range rectangles to the figure."""
-        ranges = [
-            (0, 70, "dangerous_low", "Low Range"),
-            (70, 180, "normal", "Normal Range"),
-            (180, 250, "high", "High Range"),
-            (250, 400, "dangerous_high", "Very High Range")
-        ]
-
-        for y0, y1, style_key, name in ranges:
-            colors = self.RANGE_COLORS[style_key]
-            self._figure.add_hrect(
-                y0=y0, y1=y1,
-                fillcolor=colors["fill"],
-                line=dict(color=colors["line"], width=1),
-                layer="below",
-                name=name
-            )
+        """Add colored range rectangles to indicate glucose ranges."""
+        # Remove existing shapes (rectangles) from the layout
+        self._figure.layout.shapes = []
+        
+        # Add rectangle for high range (>180 mg/dL)
+        self._figure.add_hrect(
+            y0=180, y1=400,
+            fillcolor="rgba(255, 0, 0, 0.1)",
+            line_width=0,
+            xref='x',
+            yref='y'
+        )
+        
+        # Add rectangle for low range (<70 mg/dL)
+        self._figure.add_hrect(
+            y0=0, y1=70,
+            fillcolor="rgba(255, 0, 0, 0.1)",
+            line_width=0,
+            xref='x',
+            yref='y'
+        )
+        
+        # Add rectangle for target range (70-180 mg/dL)
+        self._figure.add_hrect(
+            y0=70, y1=180,
+            fillcolor="rgba(0, 255, 0, 0.1)",
+            line_width=0,
+            xref='x',
+            yref='y'
+        )
 
     def calculate_y_axis_range(self) -> Tuple[float, float]:
         """Calculates the y-axis range based on glucose and prediction values."""

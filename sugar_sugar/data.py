@@ -27,13 +27,13 @@ def detect_cgm_type(file_path: Path) -> CGMType:
     """Detect if the CSV file is from Libre or Dexcom CGM."""
     with open(file_path, 'r') as file:
         # Read first few lines to detect the format
-        first_lines = [next(file) for _ in range(5)]
+        first_lines = [next(file) for _ in range(12)]
         
         # Check for Libre indicators
         if any("Glucose Data,Generated" in line for line in first_lines):
             return CGMType.LIBRE
         # Check for Dexcom indicators
-        elif any("Index,Timestamp" in line for line in first_lines):
+        elif any("Dexcom" in line for line in first_lines):
             return CGMType.DEXCOM
         else:
             raise ValueError("Unknown CGM data format")
