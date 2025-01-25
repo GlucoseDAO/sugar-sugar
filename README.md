@@ -20,6 +20,24 @@ Why did we create this? While fancy AI models are being built to predict glucose
 - Python 3.10 or higher
 - Poetry (Python package manager)
 
+### Installing Poetry
+1. **Windows**:
+```powershell
+(Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
+```
+
+2. **macOS/Linux**:
+```bash
+curl -sSL https://install.python-poetry.org | python3 -
+```
+
+3. **Alternative method** (using pip):
+```bash
+pip install poetry
+```
+
+For detailed installation instructions, visit the [Poetry documentation](https://python-poetry.org/docs/#installation).
+
 ### Installation
 1. Clone the repository:
 ```bash
@@ -37,16 +55,16 @@ poetry install
 poetry run python -m sugar_sugar.app
 ```
 
+## KNOWN ISSUES:
+
+- For the ease of prototyping we used ugly global variables, so at the moment the game does not support multiple users. We will switch to session-based state management soon.
+- Currently only Dexcom and Libre 3 are supported. We will add support for other CGM devices soon.
+- No scoring system and difficulty levels yet.
+
 ## FAQ
 
 ### Is this production-ready software?
-This is an early-stage project meant for research and experimentation. While it's usable, expect some rough edges and potential improvements over time.
-
-### Which CGM data can I use?
-Currently, we support Dexcom G6 and Libre 3. We're working on adding support for other CGM devices, so stay tuned!
-
-### What about scoring?
-We're working on a scoring system that will give you a score based on how well you predict the glucose values. Stay tuned!
+This is an early-stage project meant for research and experimentation. So far it is single-user only but we will fix it soon
 
 ### Do you use my personal data?
 No, we only use the data you upload to allow you play the game. We do not store any data from your uploads (the data is loaded to temp folder and deleted after the game session is over).
