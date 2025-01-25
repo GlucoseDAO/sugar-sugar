@@ -41,7 +41,7 @@ For detailed installation instructions, visit the [Poetry documentation](https:/
 ### Installation
 1. Clone the repository:
 ```bash
-git clone https://github.com/your-username/sugar-sugar.git
+git clone https://github.com/GlucoseDAO/sugar-sugar.git
 cd sugar-sugar
 ```
 
