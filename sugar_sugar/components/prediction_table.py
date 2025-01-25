@@ -7,46 +7,46 @@ from dash import Output, Input
 
 TableData = List[Dict[str, str]]
 
-class PredictionTableComponent:
+class PredictionTableComponent(html.Div):
     def __init__(self, df: pl.DataFrame):
         self.df = df
-        self.layout = self.create_layout()
-
-    def create_layout(self):
-        """Creates the table layout"""
-        return html.Div([
-            html.H4("Predictions Table", style={'fontSize': '20px', 'marginBottom': '10px'}),
-            dash_table.DataTable(
-                id='prediction-table-data',
-                data=self.generate_table_data(),
-                style_table={'overflowX': 'auto'},
-                style_cell={
-                    'textAlign': 'center',
-                    'padding': '5px',
-                    'minWidth': '70px'
-                },
-                style_header={
-                    'backgroundColor': '#f8fafc',
-                    'fontWeight': 'bold'
-                },
-                style_data_conditional=[
-                    {
-                        'if': {'row_index': 0},
-                        'backgroundColor': 'rgba(200, 240, 200, 0.5)'
+        # Create the layout directly instead of storing it in a variable
+        super().__init__(
+            children=[
+                html.H4("Predictions Table", style={'fontSize': '20px', 'marginBottom': '10px'}),
+                dash_table.DataTable(
+                    id='prediction-table-data',
+                    data=self.generate_table_data(),
+                    style_table={'overflowX': 'auto'},
+                    style_cell={
+                        'textAlign': 'center',
+                        'padding': '5px',
+                        'minWidth': '70px'
                     },
-                    {
-                        'if': {'row_index': 1},
-                        'backgroundColor': 'rgba(255, 200, 200, 0.5)'
-                    }
-                ]
-            )
-        ], style={
-            'padding': '20px',
-            'backgroundColor': 'white',
-            'borderRadius': '10px',
-            'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
-            'marginBottom': '20px'
-        })
+                    style_header={
+                        'backgroundColor': '#f8fafc',
+                        'fontWeight': 'bold'
+                    },
+                    style_data_conditional=[
+                        {
+                            'if': {'row_index': 0},
+                            'backgroundColor': 'rgba(200, 240, 200, 0.5)'
+                        },
+                        {
+                            'if': {'row_index': 1},
+                            'backgroundColor': 'rgba(255, 200, 200, 0.5)'
+                        }
+                    ]
+                )
+            ],
+            style={
+                'padding': '20px',
+                'backgroundColor': 'white',
+                'borderRadius': '10px',
+                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+                'marginBottom': '20px'
+            }
+        )
 
     def update_dataframe(self, df: pl.DataFrame):
         """Updates the component's DataFrame reference"""

@@ -15,6 +15,7 @@ from .data import load_glucose_data
 from .config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS, DOUBLE_CLICK_THRESHOLD
 from .components.glucose_chart import GlucoseChart
 from .components.metrics import MetricsComponent
+from .components.prediction_table import PredictionTableComponent
 from dash.html import Div
 
 # Type aliases for clarity
@@ -45,51 +46,13 @@ from dash import html, dcc, dash_table
 from .config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS
 from .components.header import HeaderComponent
 
-# Create a global instance of GlucoseChart
+# Create a global instance of GlucoseChart and PredictionTableComponent
 glucose_chart = GlucoseChart(id='glucose-graph')
+prediction_table = PredictionTableComponent(df)  # Initialize with global df
 
 '''
 Create the layout of the app, the base on which user will interact with
 '''
-def create_predictions_table() -> html.Div:
-    """Create the predictions table section"""
-    return html.Div([
-        html.H4('Glucose Values and Predictions', style={'textAlign': 'center'}),
-        dash_table.DataTable(
-            id='predictions-table',
-            columns=[
-                {'name': 'Metric', 'id': 'metric'},
-                *[{'name': f'T{i}', 'id': f't{i}'} for i in range(24)]
-            ],
-            style_table={'overflowX': 'auto'},
-            style_cell={
-                'textAlign': 'center',
-                'padding': '5px',
-                'minWidth': '60px'
-            },
-            style_header={
-                'backgroundColor': 'rgb(230, 230, 230)',
-                'fontWeight': 'bold'
-            },
-            style_data_conditional=[
-                {
-                    'if': {'row_index': 0},
-                    'backgroundColor': 'rgba(200, 240, 200, 0.5)'
-                },
-                {
-                    'if': {'row_index': 1},
-                    'backgroundColor': 'rgba(255, 200, 200, 0.5)'
-                }
-            ]
-        )
-    ], style={
-        'padding': '20px',
-        'backgroundColor': 'white',
-        'borderRadius': '10px',
-        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
-        'marginBottom': '20px'
-    })
-
 def create_layout() -> html.Div:
     """Create the main layout of the application"""
     return html.Div([
@@ -107,8 +70,8 @@ def create_layout() -> html.Div:
             # Store component for click tracking
             dcc.Store(id='last-click-time', data=0),
             
-            # Predictions table
-            create_predictions_table(),
+            # Predictions table using new component
+            prediction_table,
             
             # Metrics section
             html.Div([
@@ -269,27 +232,16 @@ def update_graph(last_click_time: int) -> Figure:
 
 
 @app.callback(
-    [
-        Output('predictions-table', 'data'),
-        Output('error-metrics', 'children')
-    ],
+    Output('error-metrics', 'children'),
     [Input('last-click-time', 'data')]
 )
-def update_metrics(last_click_time: int) -> Tuple[TableData, Union[List[html.Div], html.Div]]:
-    """Updates the predictions table and error metrics based on the DataFrame state."""
-    # Create metrics component instance
+def update_metrics(last_click_time: int) -> Union[List[html.Div], html.Div]:
+    """Updates the error metrics based on the DataFrame state."""
     metrics = MetricsComponent(df)
-    
-    # Generate table data using the component's method
-    table_data = metrics.generate_table_data(df)
-    
-    # Get prediction row from table data for error metrics calculation
+    prediction_table.update_dataframe(df)  # Update the prediction table's DataFrame
+    table_data = prediction_table.generate_table_data()
     prediction_row = table_data[1]  # Index 1 contains predictions
-    
-    # Calculate error metrics
-    error_metrics = metrics.calculate_error_metrics(df, prediction_row)
-    
-    return table_data, error_metrics
+    return metrics.calculate_error_metrics(df, prediction_row)
 
 
 # Add new callback for file upload
@@ -417,6 +369,7 @@ def update_time_window(start_idx: int, num_points: int) -> int:
 
 def main() -> None:
     """Starts the Dash server."""
+    prediction_table.register_callbacks(app)  # Register the prediction table callbacks
     app.run_server(debug=True)
 
 if __name__ == '__main__':
