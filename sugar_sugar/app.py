@@ -41,118 +41,13 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 
 from dash import html, dcc, dash_table
 from .config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS
+from .components.header import HeaderComponent
 
 '''
 Create the layout of the app, the base on which user will interact with
 '''
 
-def create_header() -> html.Div:
-    """Create the header section with title and description"""
-    return html.Div([
-        html.H1('Sugar Sugar', 
-                style={
-                    'textAlign': 'center',
-                    'color': '#2c5282',
-                    'marginBottom': '10px',
-                    'fontSize': '48px',
-                    'fontWeight': 'bold',
-                }),
-        html.Div([
-            # Left column - Game description
-            html.Div([
-                html.P([
-                    'Test your glucose prediction skills! ',
-                    html.Br(),
-                    'Click on the graph or draw lines to predict future glucose values. ',
-                    'The game will show you how accurate your predictions are compared to actual measurements.'
-                ], style={
-                    'fontSize': '18px',
-                    'color': '#4a5568',
-                    'lineHeight': '1.5'
-                })
-            ], style={'flex': '1', 'paddingRight': '20px'}),
-            
-            # Right column - Upload and controls
-            html.Div([
-                create_controls(),
-                create_upload_section(),
-            ], style={'flex': '1'})
-        ], style={
-            'display': 'flex',
-            'flexDirection': 'row',
-            'gap': '20px',
-            'alignItems': 'start'
-        })
-    ], style={
-        'padding': '15px',
-        'marginBottom': '15px',
-        'backgroundColor': 'white',
-        'borderRadius': '10px',
-        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
-    })
 
-def create_controls() -> html.Div:
-    """Create the points control and time slider section"""
-    return html.Div([
-        html.Div([
-            # Points control
-            html.Div([
-                html.Label('Number of points to show:', style={'marginRight': '10px'}),
-                dcc.Input(
-                    id='points-control',
-                    type='number',
-                    value=DEFAULT_POINTS,
-                    min=MIN_POINTS,
-                    max=MAX_POINTS,
-                    style={'width': '80px'}
-                ),
-            ], style={'flex': '0 0 auto', 'display': 'flex', 'alignItems': 'center'}),
-            
-            # Time slider
-            html.Div([
-                html.Label('Time Window Position:', style={'marginRight': '10px'}),
-                dcc.Slider(
-                    id='time-slider',
-                    min=0,
-                    max=100,  # This will be updated by callback
-                    value=0,
-                    marks=None,
-                    tooltip={"placement": "bottom", "always_visible": True},
-                    updatemode='mouseup',
-                    included=True,
-                    step=1
-                ),
-            ], style={'flex': '1', 'marginLeft': '20px'}),
-        ], style={
-            'display': 'flex',
-            'flexDirection': 'row',
-            'alignItems': 'center',
-            'gap': '10px',
-            'marginBottom': '10px'
-        })
-    ])
-
-def create_upload_section() -> html.Div:
-    """Create the file upload section"""
-    return html.Div([
-        dcc.Upload(
-            id='upload-data',
-            children=html.Div([
-                'Drag and Drop or ',
-                html.A('Select a Dexcom/Libre CSV File')
-            ]),
-            style={
-                'width': '100%',
-                'height': '60px',
-                'lineHeight': '60px',
-                'borderWidth': '1px',
-                'borderStyle': 'dashed',
-                'borderRadius': '5px',
-                'textAlign': 'center',
-            }
-        ),
-        html.Div(id='example-data-warning', style={'marginTop': '10px'})
-    ])
 
 def create_graph_section() -> html.Div:
     """Create the main graph section"""
@@ -248,8 +143,8 @@ def create_predictions_table() -> html.Div:
 def create_layout() -> html.Div:
     """Create the main layout of the application"""
     return html.Div([
-        # Header section
-        create_header(),
+        # Header section using HeaderComponent
+        HeaderComponent(),
 
         # Main content container
         html.Div([
