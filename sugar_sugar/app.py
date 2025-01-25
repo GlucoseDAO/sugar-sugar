@@ -243,14 +243,14 @@ def update_metrics(last_click_time: int) -> Union[List[html.Div], html.Div]:
     prevent_initial_call=True
 )
 def update_data_source(contents: Optional[str], filename: Optional[str]) -> Tuple[Optional[html.Div], int]:
-    global df, is_example_data, full_df
+    global df, is_example_data, full_df, events_df
     
     if contents is None:
         warning = html.Div([
             html.I(className="fas fa-exclamation-triangle", style={'marginRight': '8px'}),
             "Currently using example data. Upload your own Dexcom/Libre CSV file for personalized analysis."
         ], style={
-            'color': '#b7791f',  # Warm yellow color
+            'color': '#b7791f',
             'backgroundColor': '#fefcbf',
             'padding': '10px',
             'borderRadius': '5px',
@@ -268,9 +268,12 @@ def update_data_source(contents: Optional[str], filename: Optional[str]) -> Tupl
             tmp_path = Path(tmp_file.name)
         
         # Load the new data
-        full_df, events_df = load_glucose_data(tmp_path)
+        new_full_df, new_events_df = load_glucose_data(tmp_path)
+        
+        # Update all global dataframes
+        full_df = new_full_df
+        events_df = new_events_df
         df = full_df.slice(0, DEFAULT_POINTS)
-        events_window = events_df  # Store events
         is_example_data = False
         
         # Clean up temporary file
