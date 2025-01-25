@@ -4,16 +4,16 @@ import polars as pl
 
 TableData = List[Dict[str, str]]  # Format for the predictions table data
 
-class MetricsComponent:
+class MetricsComponent(html.Div):
     def __init__(self, df: pl.DataFrame):
         self.df = df  # Store DataFrame reference
         
-        # Create the layout with properly identified components
-        self.layout = html.Div([
+        # Create the component layout
+        layout = html.Div([
             html.H4("Metrics", style={'fontSize': '20px', 'marginBottom': '10px'}),
-            html.Div([  # Wrap table in a div with an ID
+            html.Div([
                 dash_table.DataTable(
-                    id='metrics-table-data',  # Changed to match pattern from prediction table
+                    id='metrics-table-data',
                     style_table={'overflowX': 'auto'},
                     style_cell={
                         'textAlign': 'center',
@@ -24,14 +24,21 @@ class MetricsComponent:
                     columns=[]
                 )
             ], id='metrics-table-container'),
-            html.Div(id='metrics-content-data')  # Changed ID to be more specific
-        ], id='metrics-container', style={
-            'padding': '20px',
-            'backgroundColor': 'white',
-            'borderRadius': '10px',
-            'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
-            'marginBottom': '20px'
-        })
+            html.Div(id='metrics-content-data')
+        ])
+
+        # Initialize the parent html.Div with our layout
+        super().__init__(
+            layout,
+            id='metrics-container',
+            style={
+                'padding': '20px',
+                'backgroundColor': 'white',
+                'borderRadius': '10px',
+                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+                'marginBottom': '20px'
+            }
+        )
 
     def update_dataframe(self, df: pl.DataFrame):
         """Update the DataFrame reference"""

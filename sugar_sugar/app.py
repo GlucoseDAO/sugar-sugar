@@ -70,17 +70,9 @@ def create_layout() -> html.Div:
             # Predictions table using new component
             prediction_table,
             
-            # Metrics section
-            html.Div([
-                html.Div(id='error-metrics', style={
-                    'marginBottom': '15px'
-                })
-            ], style={
-                'padding': '15px',
-                'backgroundColor': 'white',
-                'borderRadius': '10px',
-                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
-            })
+            # Metrics section - simplified since MetricsComponent is now a Div
+            html.Div(id='error-metrics')
+            
         ], style={
             'margin': '0 auto',
             'padding': '0 20px',
@@ -234,7 +226,7 @@ def update_graph(last_click_time: int) -> Figure:
 )
 def update_metrics(last_click_time: int) -> Union[List[html.Div], html.Div]:
     """Updates the error metrics based on the DataFrame state."""
-    metrics = MetricsComponent(df)
+    metrics = MetricsComponent(df)  # This now returns a Div component directly
     prediction_table.update_dataframe(df)  # Update the prediction table's DataFrame
     table_data = prediction_table.generate_table_data()
     prediction_row = table_data[1]  # Index 1 contains predictions
