@@ -42,9 +42,10 @@ from dash import html, dcc
 from .config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS
 from .components.header import HeaderComponent
 
-# Create a global instance of GlucoseChart and PredictionTableComponent
+# Create global instances
 glucose_chart = GlucoseChart(id='glucose-graph')
-prediction_table = PredictionTableComponent(df)  # Initialize with global df
+prediction_table = PredictionTableComponent(df)
+metrics_component = MetricsComponent(df)  # Create global instance
 
 '''
 Create the layout of the app, the base on which user will interact with
@@ -58,11 +59,11 @@ def create_layout() -> html.Div:
         # Main content container
         html.Div([
             # Store components for state management
-            dcc.Store(id='current-window-df', data=None),  # Store for current window DataFrame
-            dcc.Store(id='full-df', data=None),           # Store for full DataFrame
-            dcc.Store(id='events-df', data=None),         # Store for events DataFrame
-            dcc.Store(id='last-click-time', data=0),      # Store for click tracking
-            dcc.Store(id='is-example-data', data=True),   # Store for tracking data source
+            dcc.Store(id='current-window-df', data=None),
+            dcc.Store(id='full-df', data=None),
+            dcc.Store(id='events-df', data=None),
+            dcc.Store(id='last-click-time', data=0),
+            dcc.Store(id='is-example-data', data=True),
 
             # Interactive glucose graph component
             glucose_chart,
@@ -70,8 +71,8 @@ def create_layout() -> html.Div:
             # Predictions table using new component
             prediction_table,
             
-            # Metrics section - simplified since MetricsComponent is now a Div
-            html.Div(id='error-metrics')
+            # Use metrics_component directly instead of empty div
+            metrics_component
             
         ], style={
             'margin': '0 auto',
@@ -221,16 +222,16 @@ def update_graph(last_click_time: int) -> Figure:
 
 
 @app.callback(
-    Output('error-metrics', 'children'),
+    Output('metrics-container', 'children'),  # Update the metrics-container instead
     [Input('last-click-time', 'data')]
 )
 def update_metrics(last_click_time: int) -> Union[List[html.Div], html.Div]:
     """Updates the error metrics based on the DataFrame state."""
-    metrics = MetricsComponent(df)  # This now returns a Div component directly
+    metrics_component.update_dataframe(df)  # Update the component's DataFrame
     prediction_table.update_dataframe(df)  # Update the prediction table's DataFrame
     table_data = prediction_table.generate_table_data()
     prediction_row = table_data[1]  # Index 1 contains predictions
-    return metrics.calculate_error_metrics(df, prediction_row)
+    return metrics_component.calculate_error_metrics(df, prediction_row)
 
 
 # Add new callback for file upload
