@@ -9,6 +9,8 @@ import time
 from pathlib import Path
 import base64
 import tempfile
+
+from sugar_sugar.components.instructions import InstructionsComponent
 from .data import load_glucose_data
 from .config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS, DOUBLE_CLICK_THRESHOLD
 from .components.glucose_chart import GlucoseChart
@@ -49,36 +51,6 @@ glucose_chart = GlucoseChart(id='glucose-graph')
 '''
 Create the layout of the app, the base on which user will interact with
 '''
-
-
-
-def create_instructions() -> html.Div:
-    """Create the game instructions section"""
-    return html.Div([
-        html.P([
-            'How to play: ',
-            html.Br(),
-            '1. Click and drag in the graph to add predictions ',
-            html.Br(),
-            '2. Draw one line after another to create prediction curves ',
-            html.Br(),
-            '3. Double-click to reset your predictions ',
-            html.Br(),
-            '4. Try to predict at least 5 points to see your accuracy metrics'
-        ], style={
-            'fontSize': '16px',
-            'color': '#4a5568',
-            'lineHeight': '1.5',
-            'margin': '10px 0'
-        })
-    ], style={
-        'padding': '15px',
-        'backgroundColor': 'white',
-        'borderRadius': '10px',
-        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
-        'marginBottom': '20px'
-    })
-
 def create_predictions_table() -> html.Div:
     """Create the predictions table section"""
     return html.Div([
@@ -130,7 +102,7 @@ def create_layout() -> html.Div:
             glucose_chart,
 
             # Game instructions
-            create_instructions(),
+            InstructionsComponent(),
 
             # Store component for click tracking
             dcc.Store(id='last-click-time', data=0),
