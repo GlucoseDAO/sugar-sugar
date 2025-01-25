@@ -2,12 +2,49 @@ import plotly.graph_objs as go
 import polars as pl
 from typing import Tuple, List, Dict
 from datetime import datetime
+from typing import List, Dict, Tuple, Optional, Any, Union
+import dash
+from dash import dcc, html, Output, Input, State, dash_table
+import plotly.graph_objs as go
+import pandas as pd
+import polars as pl
+from datetime import datetime
+import time
+from pathlib import Path
+import base64
+import tempfile
+from dash.html import Div
 
 """
 creating the figures that wil be uploaded interactively
 """
 
-class GlucoseChart(go.Figure):
+def create_graph_section() -> html.Div:
+    """Create the main graph section"""
+    return html.Div([
+        dcc.Graph(
+            id='glucose-graph',
+            config={
+                'displayModeBar': True,
+                'scrollZoom': False,
+                'doubleClick': 'reset',
+                'showAxisDragHandles': False,
+                'showAxisRangeEntryBoxes': False,
+                'displaylogo': False
+            },
+            style={'height': '100%'}
+        )
+    ], style={
+        'padding': '20px',
+        'backgroundColor': 'white',
+        'borderRadius': '10px',
+        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+        'marginBottom': '20px',
+        'display': 'flex',
+        'flexDirection': 'column'
+    })
+
+class GlucoseChart(Div):
     RANGE_COLORS = {
         "dangerous_low": {"fill": "rgba(255, 200, 200, 0.5)", "line": "rgba(200, 0, 0, 0.5)"},
         "normal": {"fill": "rgba(200, 240, 200, 0.5)", "line": "rgba(0, 100, 0, 0.5)"},
@@ -21,23 +58,49 @@ class GlucoseChart(go.Figure):
         'Carbohydrates': {'symbol': 'square', 'color': 'green', 'size': 20}
     }
 
-    def __init__(self, df: pl.DataFrame, events_df: pl.DataFrame):
-        # Initialize the parent class first
-        super().__init__()
-        # Store data as private attributes in the figure's _data dictionary
+    def __init__(self, id: str = 'glucose-chart'):
+        # Initialize as a Div with the graph component
+        super().__init__([
+            dcc.Graph(
+                id=id,
+                config={
+                    'displayModeBar': True,
+                    'scrollZoom': False,
+                    'doubleClick': 'reset',
+                    'showAxisDragHandles': False,
+                    'showAxisRangeEntryBoxes': False,
+                    'displaylogo': False
+                },
+                style={'height': '100%'}
+            )
+        ], style={
+            'padding': '20px',
+            'backgroundColor': 'white',
+            'borderRadius': '10px',
+            'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+            'marginBottom': '20px',
+            'display': 'flex',
+            'flexDirection': 'column'
+        })
+        
+        self.id = id
         self._data_store = {
-            'glucose_data': df,
-            'events_data': events_df
+            'glucose_data': None,
+            'events_data': None
         }
+        self._figure = go.Figure()
+
+    def update(self, df: pl.DataFrame, events_df: pl.DataFrame) -> go.Figure:
+        """Updates the chart with new data and returns the updated figure"""
+        self._data_store['glucose_data'] = df
+        self._data_store['events_data'] = events_df
+        
+        # Clear existing traces
+        self._figure.data = []
+        
+        # Rebuild the figure
         self._build()
-    
-    @property
-    def df(self) -> pl.DataFrame:
-        return self._data_store['glucose_data']
-    
-    @property
-    def events_df(self) -> pl.DataFrame:
-        return self._data_store['events_data']
+        return self._figure
 
     def _build(self):
         """Builds complete figure with all components."""
@@ -58,7 +121,7 @@ class GlucoseChart(go.Figure):
 
         for y0, y1, style_key, name in ranges:
             colors = self.RANGE_COLORS[style_key]
-            self.add_hrect(
+            self._figure.add_hrect(
                 y0=y0, y1=y1,
                 fillcolor=colors["fill"],
                 line=dict(color=colors["line"], width=1),
@@ -71,11 +134,11 @@ class GlucoseChart(go.Figure):
         STANDARD_MIN = 40  # Standard lower bound for CGM charts
         STANDARD_MAX = 300  # Upper bound for CGM chart
         
-        line_points = self.df.filter(pl.col("prediction") != 0.0)
+        line_points = self._data_store['glucose_data'].filter(pl.col("prediction") != 0.0)
         
         # Get actual data ranges
-        data_min = self.df.get_column("gl").min()
-        data_max = self.df.get_column("gl").max()
+        data_min = self._data_store['glucose_data'].get_column("gl").min()
+        data_max = self._data_store['glucose_data'].get_column("gl").max()
         
         # Include prediction values in range calculation if they exist
         if line_points.height > 0:
@@ -90,11 +153,11 @@ class GlucoseChart(go.Figure):
 
     def _add_glucose_trace(self):
         """Adds the main glucose data line to the figure."""
-        x_indices = list(range(len(self.df)))
+        x_indices = list(range(len(self._data_store['glucose_data'])))
         
-        self.add_trace(go.Scatter(
+        self._figure.add_trace(go.Scatter(
             x=x_indices,
-            y=self.df['gl'],
+            y=self._data_store['glucose_data']['gl'],
             mode='lines+markers',
             name='Glucose Level',
             line=dict(color='blue'),
@@ -102,7 +165,7 @@ class GlucoseChart(go.Figure):
 
     def get_time_position(self, time_point: datetime) -> float:
         """Converts a datetime to its corresponding x-axis position."""
-        time_series = self.df.get_column("time")
+        time_series = self._data_store['glucose_data'].get_column("time")
         for idx, t in enumerate(time_series):
             if t == time_point:
                 return idx
@@ -110,12 +173,12 @@ class GlucoseChart(go.Figure):
 
     def _add_prediction_traces(self):
         """Adds prediction points and connecting lines to the figure."""
-        line_points = self.df.filter(pl.col("prediction") != 0.0)
+        line_points = self._data_store['glucose_data'].filter(pl.col("prediction") != 0.0)
         if line_points.height > 0:
             x_positions = [self.get_time_position(t) for t in line_points.get_column("time")]
             
             # Add prediction points
-            self.add_trace(go.Scatter(
+            self._figure.add_trace(go.Scatter(
                 x=x_positions,
                 y=line_points.get_column("prediction"),
                 mode='markers',
@@ -133,7 +196,7 @@ class GlucoseChart(go.Figure):
                     start_pos = self.get_time_position(times[i])
                     end_pos = self.get_time_position(times[i + 1])
                     
-                    self.add_trace(go.Scatter(
+                    self._figure.add_trace(go.Scatter(
                         x=[start_pos, end_pos],
                         y=[predictions[i], predictions[i + 1]],
                         mode='lines',
@@ -144,10 +207,10 @@ class GlucoseChart(go.Figure):
     def _add_event_markers(self):
         """Adds event markers (insulin, exercise, carbs) to the figure."""
         # Filter events to only those within the current time window
-        start_time = self.df.get_column("time")[0]
-        end_time = self.df.get_column("time")[-1]
+        start_time = self._data_store['glucose_data'].get_column("time")[0]
+        end_time = self._data_store['glucose_data'].get_column("time")[-1]
         
-        window_events = self.events_df.filter(
+        window_events = self._data_store['events_data'].filter(
             (pl.col("time") >= start_time) & 
             (pl.col("time") <= end_time)
         )
@@ -163,7 +226,7 @@ class GlucoseChart(go.Figure):
                 
                 for event_time in event_times:
                     # Find the glucose readings before and after the event
-                    df_times = self.df.get_column("time")
+                    df_times = self._data_store['glucose_data'].get_column("time")
                     
                     # Find indices of surrounding glucose readings
                     before_idx = None
@@ -184,10 +247,10 @@ class GlucoseChart(go.Figure):
                     # Calculate position and glucose value
                     if df_times[before_idx] == event_time:
                         x_pos = before_idx
-                        glucose_value = self.df.get_column("gl")[before_idx]
+                        glucose_value = self._data_store['glucose_data'].get_column("gl")[before_idx]
                     elif before_idx == after_idx:
                         x_pos = before_idx
-                        glucose_value = self.df.get_column("gl")[before_idx]
+                        glucose_value = self._data_store['glucose_data'].get_column("gl")[before_idx]
                     else:
                         # Interpolate position and glucose value
                         before_time = df_times[before_idx].timestamp()
@@ -197,8 +260,8 @@ class GlucoseChart(go.Figure):
                         factor = (event_timestamp - before_time) / (after_time - before_time)
                         x_pos = before_idx + factor
                         
-                        before_glucose = self.df.get_column("gl")[before_idx]
-                        after_glucose = self.df.get_column("gl")[after_idx]
+                        before_glucose = self._data_store['glucose_data'].get_column("gl")[before_idx]
+                        after_glucose = self._data_store['glucose_data'].get_column("gl")[after_idx]
                         glucose_value = before_glucose + (after_glucose - before_glucose) * factor
                     
                     y_positions.append(glucose_value)
@@ -212,7 +275,7 @@ class GlucoseChart(go.Figure):
                         hover_text = f"{event_type}<br>{event_time.strftime('%H:%M')}"
                     hover_texts.append(hover_text)
                 
-                self.add_trace(go.Scatter(
+                self._figure.add_trace(go.Scatter(
                     x=x_positions,
                     y=y_positions,
                     mode='markers',
@@ -233,24 +296,24 @@ class GlucoseChart(go.Figure):
         y_range = self.calculate_y_axis_range()
         
         # Calculate window info for title
-        start_time = self.df.get_column("time")[0].strftime('%Y-%m-%d %H:%M')
-        end_time = self.df.get_column("time")[-1].strftime('%Y-%m-%d %H:%M')
+        start_time = self._data_store['glucose_data'].get_column("time")[0].strftime('%Y-%m-%d %H:%M')
+        end_time = self._data_store['glucose_data'].get_column("time")[-1].strftime('%Y-%m-%d %H:%M')
         
-        self.update_layout(
+        self._figure.update_layout(
             title=f'Glucose Levels ({start_time} to {end_time})',
             autosize=True,
             xaxis=dict(
                 title='Time',
                 tickmode='array',
-                tickvals=list(range(len(self.df))),
-                ticktext=[t.strftime('%Y-%m-%d %H:%M') for t in self.df.get_column("time")],
+                tickvals=list(range(len(self._data_store['glucose_data']))),
+                ticktext=[t.strftime('%Y-%m-%d %H:%M') for t in self._data_store['glucose_data'].get_column("time")],
                 fixedrange=True,
                 showspikes=True,
                 spikemode='across',
                 spikesnap='cursor',
                 gridcolor='rgba(128, 128, 128, 0.2)',
                 showgrid=True,
-                range=[-0.5, len(self.df) - 0.5]
+                range=[-0.5, len(self._data_store['glucose_data']) - 0.5]
             ),
             yaxis=dict(
                 title='Glucose Level (mg/dL)',

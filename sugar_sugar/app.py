@@ -43,36 +43,14 @@ from dash import html, dcc, dash_table
 from .config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS
 from .components.header import HeaderComponent
 
+# Create a global instance of GlucoseChart
+glucose_chart = GlucoseChart(id='glucose-graph')
+
 '''
 Create the layout of the app, the base on which user will interact with
 '''
 
 
-
-def create_graph_section() -> html.Div:
-    """Create the main graph section"""
-    return html.Div([
-        dcc.Graph(
-            id='glucose-graph',
-            config={
-                'displayModeBar': True,
-                'scrollZoom': False,
-                'doubleClick': 'reset',
-                'showAxisDragHandles': False,
-                'showAxisRangeEntryBoxes': False,
-                'displaylogo': False
-            },
-            style={'height': '100%'}
-        )
-    ], style={
-        'padding': '20px',
-        'backgroundColor': 'white',
-        'borderRadius': '10px',
-        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
-        'marginBottom': '20px',
-        'display': 'flex',
-        'flexDirection': 'column'
-    })
 
 def create_instructions() -> html.Div:
     """Create the game instructions section"""
@@ -149,7 +127,7 @@ def create_layout() -> html.Div:
         # Main content container
         html.Div([
             # Interactive glucose graph component
-            create_graph_section(),
+            glucose_chart,
 
             # Game instructions
             create_instructions(),
@@ -315,9 +293,7 @@ def handle_click(
 def update_graph(last_click_time: int) -> Figure:
     """Updates the graph based on the DataFrame state."""
     global df, events_df
-    
-    chart = GlucoseChart(df, events_df)
-    return chart
+    return glucose_chart.update(df, events_df)
 
 
 @app.callback(
