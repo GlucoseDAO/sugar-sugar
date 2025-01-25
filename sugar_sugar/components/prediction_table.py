@@ -1,5 +1,4 @@
 from typing import List, Dict
-import dash
 from dash import html, dash_table
 import polars as pl
 from dash import Output, Input

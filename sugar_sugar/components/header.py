@@ -113,7 +113,7 @@ class HeaderComponent(Div):
                         'fontWeight': 'bold',
                     }),
             html.Div([
-                # Left column - Game description
+                # Left column - Game description and instructions
                 html.Div([
                     html.P([
                         'Test your glucose prediction skills! ',
@@ -123,7 +123,21 @@ class HeaderComponent(Div):
                     ], style={
                         'fontSize': '18px',
                         'color': '#4a5568',
-                        'lineHeight': '1.5'
+                        'lineHeight': '1.5',
+                        'marginBottom': '15px'
+                    }),
+                    html.P([
+                        html.Strong('How to play:'),
+                        html.Br(),
+                        '1. Click and drag in the graph to add predictions',
+                        html.Br(),
+                        '2. Draw one line after another to create prediction curves',
+                        html.Br(),
+                        '3. Try to predict at least 5 points to see your accuracy metrics'
+                    ], style={
+                        'fontSize': '16px',
+                        'color': '#4a5568',
+                        'lineHeight': '1.8'
                     })
                 ], style={'flex': '1', 'paddingRight': '20px'}),
                 

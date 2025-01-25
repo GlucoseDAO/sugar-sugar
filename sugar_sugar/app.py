@@ -1,6 +1,6 @@
 from typing import List, Dict, Tuple, Optional, Any, Union
 import dash
-from dash import dcc, html, Output, Input, State, dash_table
+from dash import dcc, html, Output, Input, State
 import plotly.graph_objs as go
 import pandas as pd
 import polars as pl
@@ -10,13 +10,11 @@ from pathlib import Path
 import base64
 import tempfile
 
-from sugar_sugar.components.instructions import InstructionsComponent
 from .data import load_glucose_data
 from .config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS, DOUBLE_CLICK_THRESHOLD
 from .components.glucose_chart import GlucoseChart
 from .components.metrics import MetricsComponent
 from .components.prediction_table import PredictionTableComponent
-from dash.html import Div
 
 # Type aliases for clarity
 TimePoint = Dict[str, Union[datetime, float]]  # Represents a single point with time and glucose value
@@ -42,7 +40,7 @@ external_stylesheets: List[str] = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 
-from dash import html, dcc, dash_table
+from dash import html, dcc
 from .config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS
 from .components.header import HeaderComponent
 
@@ -70,9 +68,6 @@ def create_layout() -> html.Div:
 
             # Interactive glucose graph component
             glucose_chart,
-
-            # Game instructions
-            InstructionsComponent(),
             
             # Predictions table using new component
             prediction_table,

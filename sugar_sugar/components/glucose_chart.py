@@ -1,18 +1,12 @@
 import plotly.graph_objs as go
 import polars as pl
-from typing import Tuple, List, Dict
+from typing import Tuple
 from datetime import datetime
-from typing import List, Dict, Tuple, Optional, Any, Union
-import dash
-from dash import dcc, html, Output, Input, State, dash_table
+from typing import Tuple
+from dash import dcc, html
 import plotly.graph_objs as go
-import pandas as pd
 import polars as pl
 from datetime import datetime
-import time
-from pathlib import Path
-import base64
-import tempfile
 from dash.html import Div
 
 """
