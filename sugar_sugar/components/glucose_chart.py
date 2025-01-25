@@ -9,34 +9,6 @@ import polars as pl
 from datetime import datetime
 from dash.html import Div
 
-"""
-creating the figures that wil be uploaded interactively
-"""
-
-def create_graph_section() -> html.Div:
-    """Create the main graph section"""
-    return html.Div([
-        dcc.Graph(
-            id='glucose-graph',
-            config={
-                'displayModeBar': True,
-                'scrollZoom': False,
-                'doubleClick': 'reset',
-                'showAxisDragHandles': False,
-                'showAxisRangeEntryBoxes': False,
-                'displaylogo': False
-            },
-            style={'height': '100%'}
-        )
-    ], style={
-        'padding': '20px',
-        'backgroundColor': 'white',
-        'borderRadius': '10px',
-        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
-        'marginBottom': '20px',
-        'display': 'flex',
-        'flexDirection': 'column'
-    })
 
 class GlucoseChart(Div):
     RANGE_COLORS = {

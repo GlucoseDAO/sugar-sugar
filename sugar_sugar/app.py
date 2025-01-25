@@ -17,8 +17,6 @@ from .components.metrics import MetricsComponent
 from .components.prediction_table import PredictionTableComponent
 
 # Type aliases for clarity
-TimePoint = Dict[str, Union[datetime, float]]  # Represents a single point with time and glucose value
-DrawnLines = List[TimePoint]  # List of points that make up the drawn lines
 TableData = List[Dict[str, str]]  # Format for the predictions table data
 Figure = go.Figure  # Plotly figure type
 
