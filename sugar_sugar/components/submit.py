@@ -68,12 +68,18 @@ class SubmitComponent(Div):
                     # Add corresponding time
                     prediction_times.append(times[i])
         
+        # Get age and user_id from DataFrame
+        age = df.get_column('age')[0] if 'age' in df.columns else 0
+        user_id = df.get_column('user_id')[0] if 'user_id' in df.columns else 1
+        
         # Prepare the data dictionary
         data = {
             'id': str(uuid.uuid4()),
             'number': self._get_next_number(),
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'email': user_info.get('email', ''),
+            'age': age,
+            'user_id': user_id,
             'gender': user_info.get('gender', ''),
             'diabetic': user_info.get('diabetic', ''),
             'diabetic_type': user_info.get('diabetic_type', ''),

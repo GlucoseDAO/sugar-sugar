@@ -120,6 +120,11 @@ def handle_submission(trigger, user_info, full_df_data, current_df_data):
         full_df = pl.DataFrame(full_df_data)
         current_df = pl.DataFrame(current_df_data)
         
+        # Update age and user_id from user_info
+        if user_info and 'age' in user_info:
+            full_df = full_df.with_columns(pl.lit(int(user_info['age'])).alias("age"))
+            current_df = current_df.with_columns(pl.lit(int(user_info['age'])).alias("age"))
+        
         # Save statistics before redirecting
         submit_component.save_statistics(full_df, user_info)
         
@@ -396,7 +401,9 @@ def initialize_data(pathname):
         return {
             'time': df.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
             'gl': df.get_column('gl').to_list(),
-            'prediction': df.get_column('prediction').to_list()
+            'prediction': df.get_column('prediction').to_list(),
+            'age': df.get_column('age').to_list(),
+            'user_id': df.get_column('user_id').to_list()
         }
     
     def convert_events_df_to_dict(df):

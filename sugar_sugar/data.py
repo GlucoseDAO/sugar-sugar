@@ -18,9 +18,17 @@ def load_glucose_data(file_path: Path = Path("data/example.csv")) -> Tuple[pl.Da
     cgm_type = detect_cgm_type(file_path)
     
     if cgm_type == CGMType.LIBRE:
-        return load_libre_data(file_path)
+        glucose_data, events_data = load_libre_data(file_path)
     else:
-        return load_dexcom_data(file_path)  # existing function
+        glucose_data, events_data = load_dexcom_data(file_path)
+    
+    # Add age and user_id columns
+    glucose_data = glucose_data.with_columns([
+        pl.lit(0).alias("age"),  # Default age of 0
+        pl.lit(1).alias("user_id")  # Default user_id of 1
+    ])
+    
+    return glucose_data, events_data
 
 
 def detect_cgm_type(file_path: Path) -> CGMType:
