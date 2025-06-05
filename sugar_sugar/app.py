@@ -61,7 +61,7 @@ app.layout = html.Div([
     dcc.Store(id='full-df', data=None),
     dcc.Store(id='events-df', data=None),
     dcc.Store(id='is-example-data', data=True),
-    dcc.Store(id='reset-predictions', data=False),
+    dcc.Store(id='submission-trigger', data=False),  # New store for submission trigger
     html.Div(id='page-content', children=startup_page())  # Initialize with startup page
 ])
 
@@ -94,91 +94,41 @@ def create_prediction_layout() -> html.Div:
     })
 
 @app.callback(
-    [Output('url', 'pathname'),
-     Output('user-info-store', 'data')],
-    [Input('start-button', 'n_clicks')],
-    [State('email-input', 'value'),
-     State('age-input', 'value'),
-     State('gender-dropdown', 'value'),
-     State('diabetic-dropdown', 'value'),
-     State('diabetic-type-dropdown', 'value'),
-     State('diabetes-duration-input', 'value'),
-     State('medical-conditions-dropdown', 'value'),
-     State('medical-conditions-input', 'value'),
-     State('location-input', 'value')],
+    Output('submission-trigger', 'data'),
+    [Input('submit-button', 'n_clicks')],
     prevent_initial_call=True
 )
-def start_prediction(n_clicks, email, age, gender, diabetic, diabetic_type, diabetes_duration, 
-                    medical_conditions, medical_conditions_input, location):
-    if n_clicks and email and age:
-        return '/prediction', {
-            'email': email,
-            'age': age,
-            'gender': gender,
-            'diabetic': diabetic,
-            'diabetic_type': diabetic_type,
-            'diabetes_duration': diabetes_duration,
-            'other_medical_conditions': medical_conditions,
-            'medical_conditions_input': medical_conditions_input,
-            'location': location
-        }
-    return '/', None
+def trigger_submission(n_clicks):
+    if n_clicks:
+        return True
+    return dash.no_update
 
 @app.callback(
     [Output('url', 'pathname', allow_duplicate=True),
      Output('user-info-store', 'data', allow_duplicate=True),
-     Output('reset-predictions', 'data')],
-    [Input('submit-button', 'n_clicks')],
-    [State('user-info-store', 'data')],
-    prevent_initial_call=True
-)
-def handle_submit(n_clicks, user_info):
-    if n_clicks:
-        # Save statistics before redirecting
-        submit_component.save_statistics(full_df, user_info)
-        return '/', user_info, True  # Set reset trigger to True
-    return dash.no_update, dash.no_update, dash.no_update
-
-@app.callback(
-    [Output('full-df', 'data', allow_duplicate=True),
+     Output('full-df', 'data', allow_duplicate=True),
      Output('current-window-df', 'data', allow_duplicate=True)],
-    [Input('reset-predictions', 'data')],
-    [State('full-df', 'data'),
+    [Input('submission-trigger', 'data')],
+    [State('user-info-store', 'data'),
+     State('full-df', 'data'),
      State('current-window-df', 'data')],
     prevent_initial_call=True
 )
-def reset_predictions(reset_trigger, full_df_data, current_df_data):
-    if reset_trigger:
-        # Reset predictions in both dataframes
+def handle_submission(trigger, user_info, full_df_data, current_df_data):
+    if trigger:
+        # Create DataFrames from the stored data
         full_df = pl.DataFrame(full_df_data)
         current_df = pl.DataFrame(current_df_data)
         
+        # Save statistics before redirecting
+        submit_component.save_statistics(full_df, user_info)
+        
+        # Reset predictions in both dataframes
         full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
         current_df = current_df.with_columns(pl.lit(0.0).alias("prediction"))
         
-        return full_df.to_dict(as_series=False), current_df.to_dict(as_series=False)
-    return dash.no_update, dash.no_update
-
-def find_nearest_time(x: Union[str, float, datetime]) -> datetime:
-    """
-    Finds the nearest allowed time from the DataFrame 'df' for a given x-coordinate.
-    x can be either an index (float) or a timestamp string.
-    """
-    if isinstance(x, (int, float)):
-        # If x is a numerical index, round to nearest integer and get corresponding time
-        idx = round(float(x))
-        idx = max(0, min(idx, len(df) - 1))  # Ensure index is within bounds
-        return df.get_column("time")[idx]
-    
-    # If x is a timestamp string, convert to datetime
-    x_ts = pd.to_datetime(x)
-    time_diffs = df.select([
-        (pl.col("time").cast(pl.Int64) - pl.lit(int(x_ts.timestamp() * 1000)))
-        .abs()
-        .alias("diff")
-    ])
-    nearest_idx = time_diffs.select(pl.col("diff").arg_min()).item()
-    return df.get_column("time")[nearest_idx]
+        return '/', user_info, full_df.to_dict(as_series=False), current_df.to_dict(as_series=False)
+    return dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
 @app.callback(
     Output('last-click-time', 'data'),
@@ -462,6 +412,70 @@ def initialize_data(pathname):
         convert_df_to_dict(df),
         convert_events_df_to_dict(events_df)
     )
+
+@app.callback(
+    [Output('url', 'pathname'),
+     Output('user-info-store', 'data')],
+    [Input('start-button', 'n_clicks')],
+    [State('email-input', 'value'),
+     State('age-input', 'value'),
+     State('gender-dropdown', 'value'),
+     State('diabetic-dropdown', 'value'),
+     State('diabetic-type-dropdown', 'value'),
+     State('diabetes-duration-input', 'value'),
+     State('medical-conditions-dropdown', 'value'),
+     State('medical-conditions-input', 'value'),
+     State('location-input', 'value')],
+    prevent_initial_call=True
+)
+def start_prediction(n_clicks, email, age, gender, diabetic, diabetic_type, diabetes_duration, 
+                    medical_conditions, medical_conditions_input, location):
+    if n_clicks and email and age:
+        return '/prediction', {
+            'email': email,
+            'age': age,
+            'gender': gender,
+            'diabetic': diabetic,
+            'diabetic_type': diabetic_type,
+            'diabetes_duration': diabetes_duration,
+            'other_medical_conditions': medical_conditions,
+            'medical_conditions_input': medical_conditions_input,
+            'location': location
+        }
+    return '/', None
+
+@app.callback(
+    Output('user-info-store', 'data', allow_duplicate=True),
+    [Input('prediction-table-data', 'data')],
+    [State('user-info-store', 'data')],
+    prevent_initial_call=True
+)
+def update_user_info_with_table_data(table_data, user_info):
+    if user_info is None:
+        return dash.no_update
+    user_info['prediction_table_data'] = table_data
+    return user_info
+
+def find_nearest_time(x: Union[str, float, datetime]) -> datetime:
+    """
+    Finds the nearest allowed time from the DataFrame 'df' for a given x-coordinate.
+    x can be either an index (float) or a timestamp string.
+    """
+    if isinstance(x, (int, float)):
+        # If x is a numerical index, round to nearest integer and get corresponding time
+        idx = round(float(x))
+        idx = max(0, min(idx, len(df) - 1))  # Ensure index is within bounds
+        return df.get_column("time")[idx]
+    
+    # If x is a timestamp string, convert to datetime
+    x_ts = pd.to_datetime(x)
+    time_diffs = df.select([
+        (pl.col("time").cast(pl.Int64) - pl.lit(int(x_ts.timestamp() * 1000)))
+        .abs()
+        .alias("diff")
+    ])
+    nearest_idx = time_diffs.select(pl.col("diff").arg_min()).item()
+    return df.get_column("time")[nearest_idx]
 
 def main() -> None:
     """Starts the Dash server."""

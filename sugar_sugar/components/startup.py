@@ -9,7 +9,15 @@ class StartupPage:
         
     def __call__(self):
         return html.Div([
-            html.H1("Sugar Sugar", style={'textAlign': 'center', 'marginBottom': '30px', 'fontSize': '48px'}),
+            html.H1("Sugar Sugar", 
+                style={
+                    'textAlign': 'center', 
+                    'marginBottom': '30px', 
+                    'fontSize': '48px',
+                    'fontWeight': 'bold',
+                    'color': '#2c5282'  # Match the prediction page color
+                }
+            ),
             html.Div([
                 html.Div([
                     html.Label("Email", style={'fontSize': '24px', 'marginBottom': '10px'}),
@@ -112,18 +120,29 @@ class StartupPage:
                             style={
                                 'backgroundColor': '#4CAF50',
                                 'color': 'white',
-                                'padding': '15px 30px',
+                                'padding': '20px 30px',
                                 'border': 'none',
                                 'borderRadius': '5px',
                                 'fontSize': '24px',
                                 'cursor': 'pointer',
-                                'width': '100%'
+                                'width': '100%',
+                                'height': '80px',
+                                'display': 'flex',
+                                'alignItems': 'center',
+                                'justifyContent': 'center',
+                                'lineHeight': '1.2'
                             }
                         )
-                    ], style={'textAlign': 'center', 'marginTop': '30px'})
+                    ], style={'textAlign': 'center', 'marginTop': '30px', 'marginBottom': '30px'})
                 ], style={'maxWidth': '600px', 'margin': '0 auto', 'padding': '20px'})
             ], style={'backgroundColor': 'white', 'borderRadius': '10px', 'boxShadow': '0 0 10px rgba(0,0,0,0.1)'})
-        ], style={'padding': '20px', 'backgroundColor': '#f5f5f5', 'minHeight': '100vh'})
+        ], style={
+            'padding': '20px', 
+            'backgroundColor': '#f5f5f5', 
+            'minHeight': '100vh',
+            'display': 'flex',
+            'flexDirection': 'column'
+        })
 
     def register_callbacks(self, app):
         @app.callback(

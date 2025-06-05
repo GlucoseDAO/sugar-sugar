@@ -45,28 +45,7 @@ class GlucoseChart(Div):
                     }
                 },
                 style={'height': '100%'}
-            ),
-            # Add controls for points and time window
-            html.Div([
-                html.Label("Number of points to show:"),
-                dcc.Slider(
-                    id='points-control',
-                    min=MIN_POINTS,
-                    max=MAX_POINTS,
-                    step=1,
-                    value=DEFAULT_POINTS,
-                    marks={i: str(i) for i in range(MIN_POINTS, MAX_POINTS + 1, 6)}
-                ),
-                html.Label("Time window:"),
-                dcc.Slider(
-                    id='time-slider',
-                    min=0,
-                    max=0,  # Will be set dynamically
-                    step=1,
-                    value=0,
-                    marks={}
-                )
-            ], style={'marginTop': '20px'})
+            )
         ], style={
             'padding': '20px',
             'backgroundColor': 'white',
