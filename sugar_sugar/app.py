@@ -9,87 +9,155 @@ import time
 from pathlib import Path
 import base64
 import tempfile
+import dash_bootstrap_components as dbc
 
 from .data import load_glucose_data
 from .config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS, DOUBLE_CLICK_THRESHOLD
 from .components.glucose import GlucoseChart
 from .components.metrics import MetricsComponent
 from .components.predictions import PredictionTableComponent
+from .components.startup import StartupPage
+from .components.submit import SubmitComponent
+from .components.header import HeaderComponent
 
 # Type aliases for clarity
 TableData = List[Dict[str, str]]  # Format for the predictions table data
 Figure = go.Figure  # Plotly figure type
 
-
-
 # Add new global variables
-#note that index just slides across values- that means an increase +1 moves fwd with 5 minutes interval
 window_start = 0  # Index of first visible point
 full_df = None  # Store complete dataset
 df = None  # Initial window view
+events_df = None  # Store events
+is_example_data = True  # Track if we're using example data
 
 # Update initial loading
 full_df, events_df = load_glucose_data()  # Unpack both dataframes
 df = full_df.slice(0, DEFAULT_POINTS)  # Now this will work
-events_window = events_df  # Store events
-is_example_data = True  # Track if we're using example data
 
-external_stylesheets: List[str] = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+external_stylesheets = [
+    'https://codepen.io/chriddyp/pen/bWLwgP.css',
+    dbc.themes.BOOTSTRAP
+]
 
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-
-from dash import html, dcc
-from .config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS
-from .components.header import HeaderComponent
+app = dash.Dash(__name__, 
+    external_stylesheets=external_stylesheets,
+    suppress_callback_exceptions=True
+)
 
 # Create global instances
 glucose_chart = GlucoseChart(id='glucose-graph')
 prediction_table = PredictionTableComponent(df)
-metrics_component = MetricsComponent(df)  # Create global instance
+metrics_component = MetricsComponent(df)
+submit_component = SubmitComponent()
+startup_page = StartupPage()
 
-'''
-Create the layout of the app, the base on which user will interact with
-'''
-def create_layout() -> html.Div:
-    """Create the main layout of the application"""
+# Set initial layout to startup page
+app.layout = html.Div([
+    dcc.Location(id='url', refresh=False),
+    dcc.Store(id='user-info-store', data=None),
+    dcc.Store(id='last-click-time', data=0),
+    dcc.Store(id='current-window-df', data=None),
+    dcc.Store(id='full-df', data=None),
+    dcc.Store(id='events-df', data=None),
+    dcc.Store(id='is-example-data', data=True),
+    dcc.Store(id='reset-predictions', data=False),
+    html.Div(id='page-content', children=startup_page())  # Initialize with startup page
+])
+
+@app.callback(
+    Output('page-content', 'children'),
+    [Input('url', 'pathname')],
+    [State('user-info-store', 'data')]
+)
+def display_page(pathname, user_info):
+    if pathname == '/prediction' and user_info:
+        return create_prediction_layout()
+    return startup_page()  # Call the startup page component
+
+def create_prediction_layout() -> html.Div:
+    """Create the prediction page layout"""
     return html.Div([
-        # Header section using HeaderComponent
         HeaderComponent(),
-
-        # Main content container
         html.Div([
-            # Store components for state management
-            dcc.Store(id='current-window-df', data=None),
-            dcc.Store(id='full-df', data=None),
-            dcc.Store(id='events-df', data=None),
-            dcc.Store(id='last-click-time', data=0),
-            dcc.Store(id='is-example-data', data=True),
-
-            # Interactive glucose graph component
             glucose_chart,
-            
-            # Predictions table using new component
             prediction_table,
-            
-            # Use metrics_component directly instead of empty div
-            metrics_component
-            
-        ], style={
-            'margin': '0 auto',
-            'padding': '0 20px',
-            'display': 'flex',
-            'flexDirection': 'column',
-            'gap': '20px'
-        })
+            metrics_component,
+            submit_component
+        ], style={'flex': '1'})
     ], style={
-        'backgroundColor': '#f7fafc',
-        'minHeight': '100vh',
-        'padding': '20px'
+        'margin': '0 auto',
+        'padding': '0 20px',
+        'display': 'flex',
+        'flexDirection': 'column',
+        'gap': '20px'
     })
 
+@app.callback(
+    [Output('url', 'pathname'),
+     Output('user-info-store', 'data')],
+    [Input('start-button', 'n_clicks')],
+    [State('email-input', 'value'),
+     State('age-input', 'value'),
+     State('gender-dropdown', 'value'),
+     State('diabetic-dropdown', 'value'),
+     State('diabetic-type-dropdown', 'value'),
+     State('diabetes-duration-input', 'value'),
+     State('medical-conditions-dropdown', 'value'),
+     State('medical-conditions-input', 'value'),
+     State('location-input', 'value')],
+    prevent_initial_call=True
+)
+def start_prediction(n_clicks, email, age, gender, diabetic, diabetic_type, diabetes_duration, 
+                    medical_conditions, medical_conditions_input, location):
+    if n_clicks and email and age:
+        return '/prediction', {
+            'email': email,
+            'age': age,
+            'gender': gender,
+            'diabetic': diabetic,
+            'diabetic_type': diabetic_type,
+            'diabetes_duration': diabetes_duration,
+            'other_medical_conditions': medical_conditions,
+            'medical_conditions_input': medical_conditions_input,
+            'location': location
+        }
+    return '/', None
 
-app.layout = create_layout()
+@app.callback(
+    [Output('url', 'pathname', allow_duplicate=True),
+     Output('user-info-store', 'data', allow_duplicate=True),
+     Output('reset-predictions', 'data')],
+    [Input('submit-button', 'n_clicks')],
+    [State('user-info-store', 'data')],
+    prevent_initial_call=True
+)
+def handle_submit(n_clicks, user_info):
+    if n_clicks:
+        # Save statistics before redirecting
+        submit_component.save_statistics(full_df, user_info)
+        return '/', user_info, True  # Set reset trigger to True
+    return dash.no_update, dash.no_update, dash.no_update
 
+@app.callback(
+    [Output('full-df', 'data', allow_duplicate=True),
+     Output('current-window-df', 'data', allow_duplicate=True)],
+    [Input('reset-predictions', 'data')],
+    [State('full-df', 'data'),
+     State('current-window-df', 'data')],
+    prevent_initial_call=True
+)
+def reset_predictions(reset_trigger, full_df_data, current_df_data):
+    if reset_trigger:
+        # Reset predictions in both dataframes
+        full_df = pl.DataFrame(full_df_data)
+        current_df = pl.DataFrame(current_df_data)
+        
+        full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
+        current_df = current_df.with_columns(pl.lit(0.0).alias("prediction"))
+        
+        return full_df.to_dict(as_series=False), current_df.to_dict(as_series=False)
+    return dash.no_update, dash.no_update
 
 def find_nearest_time(x: Union[str, float, datetime]) -> datetime:
     """
@@ -112,12 +180,11 @@ def find_nearest_time(x: Union[str, float, datetime]) -> datetime:
     nearest_idx = time_diffs.select(pl.col("diff").arg_min()).item()
     return df.get_column("time")[nearest_idx]
 
-
 @app.callback(
     Output('last-click-time', 'data'),
     [
-        Input('glucose-graph', 'clickData'),
-        Input('glucose-graph', 'relayoutData'),
+        Input('glucose-graph-graph', 'clickData'),
+        Input('glucose-graph-graph', 'relayoutData'),
     ],
     [
         State('last-click-time', 'data'),
@@ -138,7 +205,7 @@ def handle_click(
     trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
     
     # Handle double-click reset
-    if trigger_id == 'glucose-graph' and click_data:
+    if trigger_id == 'glucose-graph-graph' and click_data:
         if current_time - last_click_time <= DOUBLE_CLICK_THRESHOLD:
             print("Double-click detected: Resetting drawn lines.")
             full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
@@ -169,7 +236,7 @@ def handle_click(
         return current_time
     
     # Handle drawing mode
-    if trigger_id == 'glucose-graph' and relayout_data:
+    if trigger_id == 'glucose-graph-graph' and relayout_data:
         if 'shapes' in relayout_data:
             shapes = relayout_data['shapes']
             if shapes and len(shapes) > 0:
@@ -210,16 +277,14 @@ def handle_click(
     
     return last_click_time
 
-
 @app.callback(
-    Output('glucose-graph', 'figure'),
+    Output('glucose-graph-graph', 'figure'),
     [Input('last-click-time', 'data')]
 )
 def update_graph(last_click_time: int) -> Figure:
     """Updates the graph based on the DataFrame state."""
     global df, events_df
     return glucose_chart.update(df, events_df)
-
 
 @app.callback(
     Output('metrics-container', 'children'),  # Update the metrics-container instead
@@ -232,7 +297,6 @@ def update_metrics(last_click_time: int) -> Union[List[html.Div], html.Div]:
     table_data = prediction_table.generate_table_data()
     prediction_row = table_data[1]  # Index 1 contains predictions
     return metrics_component.calculate_error_metrics(df, prediction_row)
-
 
 # Add new callback for file upload
 @app.callback(
@@ -304,7 +368,6 @@ def update_data_source(contents: Optional[str], filename: Optional[str]) -> Tupl
         })
         return error_msg, int(time.time() * 1000)
 
-
 # Modify the points control callback to update range slider properties
 @app.callback(
     [
@@ -339,7 +402,6 @@ def update_points_shown(points: int, current_position: int) -> Tuple[int, int, i
         new_start                 # new slider value
     )
 
-
 # Update the slider callback for single value
 @app.callback(
     Output('last-click-time', 'data', allow_duplicate=True),
@@ -360,18 +422,24 @@ def update_time_window(start_idx: int, num_points: int) -> int:
     
     return int(time.time() * 1000)
 
-
 @app.callback(
     [Output('full-df', 'data'),
      Output('current-window-df', 'data'),
      Output('events-df', 'data')],
-    [Input('glucose-graph', 'id')],  # Using an existing component's id instead of dummy div
+    [Input('url', 'pathname')],
     prevent_initial_call=False
 )
-def initialize_data(_):
+def initialize_data(pathname):
     """Initialize the data stores on page load"""
+    global full_df, df, events_df
+    
+    # Load fresh data
     full_df, events_df = load_glucose_data()
-    current_df = full_df.slice(0, DEFAULT_POINTS)
+    df = full_df.slice(0, DEFAULT_POINTS)
+    
+    # Reset predictions
+    full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
+    df = df.with_columns(pl.lit(0.0).alias("prediction"))
     
     # Convert DataFrames to JSON-serializable dictionaries
     def convert_df_to_dict(df):
@@ -391,13 +459,14 @@ def initialize_data(_):
     
     return (
         convert_df_to_dict(full_df),
-        convert_df_to_dict(current_df),
+        convert_df_to_dict(df),
         convert_events_df_to_dict(events_df)
     )
 
 def main() -> None:
     """Starts the Dash server."""
     prediction_table.register_callbacks(app)  # Register the prediction table callbacks
+    startup_page.register_callbacks(app)  # Register the startup page callbacks
     app.run_server(debug=True)
 
 if __name__ == '__main__':

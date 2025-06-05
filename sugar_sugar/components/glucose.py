@@ -8,6 +8,7 @@ import plotly.graph_objs as go
 import polars as pl
 from datetime import datetime
 from dash.html import Div
+from ..config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS
 
 
 class GlucoseChart(Div):
@@ -28,17 +29,44 @@ class GlucoseChart(Div):
         # Initialize as a Div with the graph component
         super().__init__([
             dcc.Graph(
-                id=id,
+                id=f"{id}-graph",
                 config={
                     'displayModeBar': True,
                     'scrollZoom': False,
                     'doubleClick': 'reset',
                     'showAxisDragHandles': False,
                     'showAxisRangeEntryBoxes': False,
-                    'displaylogo': False
+                    'displaylogo': False,
+                    'modeBarButtonsToAdd': ['drawopenpath', 'eraseshape'],
+                    'editable': False,
+                    'edits': {
+                        'shapePosition': False,
+                        'annotationPosition': False
+                    }
                 },
                 style={'height': '100%'}
-            )
+            ),
+            # Add controls for points and time window
+            html.Div([
+                html.Label("Number of points to show:"),
+                dcc.Slider(
+                    id='points-control',
+                    min=MIN_POINTS,
+                    max=MAX_POINTS,
+                    step=1,
+                    value=DEFAULT_POINTS,
+                    marks={i: str(i) for i in range(MIN_POINTS, MAX_POINTS + 1, 6)}
+                ),
+                html.Label("Time window:"),
+                dcc.Slider(
+                    id='time-slider',
+                    min=0,
+                    max=0,  # Will be set dynamically
+                    step=1,
+                    value=0,
+                    marks={}
+                )
+            ], style={'marginTop': '20px'})
         ], style={
             'padding': '20px',
             'backgroundColor': 'white',
@@ -162,7 +190,14 @@ class GlucoseChart(Div):
                 y=line_points.get_column("prediction"),
                 mode='markers',
                 name='Prediction Points',
-                marker=dict(color='red', size=8)
+                marker=dict(
+                    color='red',
+                    size=8,
+                    symbol='circle'
+                ),
+                hoverinfo='x+y',
+                hoverlabel=dict(bgcolor='white'),
+                customdata=line_points.get_column("time").to_list()
             ))
 
             # Add connecting lines between predictions
@@ -180,7 +215,8 @@ class GlucoseChart(Div):
                         y=[predictions[i], predictions[i + 1]],
                         mode='lines',
                         line=dict(color='red', width=2),
-                        showlegend=False
+                        showlegend=False,
+                        hoverinfo='skip'
                     ))
 
     def _add_event_markers(self):
