@@ -15,7 +15,7 @@ class SubmitComponent(Div):
                 id="submit-button",
                 color="primary",
                 className="mt-4",
-                style={'width': '300px', 'fontSize': '18px', 'padding': '15px 0', 'textAlign': 'center', 'verticalAlign': 'middle', 'lineHeight': '1.5', 'height': '60px'}
+                style={'width': '300px', 'fontSize': '25px', 'padding': '15px 0', 'textAlign': 'center', 'verticalAlign': 'middle', 'lineHeight': '1.5', 'height': '60px'}
             ),
             dcc.Store(id='prediction-stats-store', data=None)
         ], style={'display': 'flex', 'justifyContent': 'center', 'alignItems': 'center'})

@@ -45,10 +45,13 @@ class MetricsComponent(html.Div):
 
     def calculate_error_metrics(self, df: pl.DataFrame, prediction_row: Dict[str, str]) -> List[html.Div]:
         """Calculates error metrics when there are 5 or more predictions."""
+        print("DEBUG: calculate_error_metrics called")
         # Count valid predictions (non-"-" values)
         valid_predictions = sum(1 for key, value in prediction_row.items() if value != "-" and key != "metric")
+        print(f"DEBUG: Found {valid_predictions} valid predictions")
         
         if valid_predictions < 5:
+            print("DEBUG: Not enough predictions, returning placeholder")
             return [
                 html.H4("Metrics", style={'fontSize': '20px', 'marginBottom': '10px'}),
                 self._get_initial_content()
@@ -77,6 +80,8 @@ class MetricsComponent(html.Div):
             "MAPE": mape
         }
         
+        print(f"DEBUG: Calculated metrics: {metrics}")
+        
         metric_descriptions = {
             "MAE": "Average difference between predicted and actual values",
             "MSE": "Emphasizes larger prediction errors",
@@ -84,44 +89,45 @@ class MetricsComponent(html.Div):
             "MAPE": "Average percentage difference from actual values"
         }
         
-        return [
-            html.H4("Metrics", style={'fontSize': '20px', 'marginBottom': '10px'}),
+        # Create a single div containing all metrics
+        result = html.Div([
+            html.H4("Prediction Accuracy", style={'fontSize': '20px', 'marginBottom': '10px'}),
             html.Div([
-                html.H4("Prediction Accuracy", style={'fontSize': '20px', 'marginBottom': '10px'}),
                 html.Div([
                     html.Div([
-                        html.Div([
-                            html.Strong(f"{metric}", style={'fontSize': '16px'}),
-                            html.Div(f"{value:.2f}" + ("%" if metric == "MAPE" else ""), 
-                                   style={'fontSize': '20px', 'color': '#2c5282', 'margin': '5px 0'}),
-                            html.Div(metric_descriptions[metric],
-                                   style={'fontSize': '14px', 'color': '#4a5568'})
-                        ], style={
-                            'padding': '10px',
-                            'margin': '5px',
-                            'border': '2px solid #e2e8f0',
-                            'borderRadius': '8px',
-                            'backgroundColor': '#f8fafc',
-                            'minWidth': '150px',
-                            'flex': '1'
-                        })
-                        for metric, value in metrics.items()
+                        html.Strong(f"{metric}", style={'fontSize': '16px'}),
+                        html.Div(f"{value:.2f}" + ("%" if metric == "MAPE" else ""), 
+                               style={'fontSize': '20px', 'color': '#2c5282', 'margin': '5px 0'}),
+                        html.Div(metric_descriptions[metric],
+                               style={'fontSize': '14px', 'color': '#4a5568'})
                     ], style={
-                        'display': 'flex',
-                        'flexWrap': 'wrap',
-                        'gap': '10px',
-                        'justifyContent': 'center'
+                        'padding': '10px',
+                        'margin': '5px',
+                        'border': '2px solid #e2e8f0',
+                        'borderRadius': '8px',
+                        'backgroundColor': '#f8fafc',
+                        'minWidth': '150px',
+                        'flex': '1'
                     })
+                    for metric, value in metrics.items()
                 ], style={
-                    'border': '2px solid #cbd5e0',
-                    'borderRadius': '12px',
-                    'padding': '10px',
-                    'margin': '10px',
-                    'backgroundColor': 'white',
-                    'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
+                    'display': 'flex',
+                    'flexWrap': 'wrap',
+                    'gap': '10px',
+                    'justifyContent': 'center'
                 })
-            ])
-        ]
+            ], style={
+                'border': '2px solid #cbd5e0',
+                'borderRadius': '12px',
+                'padding': '10px',
+                'margin': '10px',
+                'backgroundColor': 'white',
+                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
+            })
+        ])
+        
+        print("DEBUG: Generated result structure")
+        return result
 
     def register_callbacks(self, app):
         """No callbacks needed anymore as the component is updated directly"""

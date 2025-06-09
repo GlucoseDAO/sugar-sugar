@@ -1,6 +1,6 @@
 from typing import List, Dict, Tuple, Optional, Any, Union
 import dash
-from dash import dcc, html, Output, Input, State
+from dash import dcc, html, Output, Input, State, no_update
 import plotly.graph_objs as go
 import pandas as pd
 import polars as pl
@@ -19,6 +19,7 @@ from .components.predictions import PredictionTableComponent
 from .components.startup import StartupPage
 from .components.submit import SubmitComponent
 from .components.header import HeaderComponent
+from .components.ending import EndingPage
 
 # Type aliases for clarity
 TableData = List[Dict[str, str]]  # Format for the predictions table data
@@ -31,7 +32,7 @@ df = None  # Initial window view
 events_df = None  # Store events
 is_example_data = True  # Track if we're using example data
 
-# Update initial loading
+# Update initial loading here is uploaded as a dataframe from the stored one
 full_df, events_df = load_glucose_data()  # Unpack both dataframes
 df = full_df.slice(0, DEFAULT_POINTS)  # Now this will work
 
@@ -51,6 +52,7 @@ prediction_table = PredictionTableComponent(df)
 metrics_component = MetricsComponent(df)
 submit_component = SubmitComponent()
 startup_page = StartupPage()
+ending_page = EndingPage()
 
 # Set initial layout to startup page
 app.layout = html.Div([
@@ -68,11 +70,16 @@ app.layout = html.Div([
 @app.callback(
     Output('page-content', 'children'),
     [Input('url', 'pathname')],
-    [State('user-info-store', 'data')]
+    [State('user-info-store', 'data')],
+    prevent_initial_call=False
 )
 def display_page(pathname, user_info):
+    print(f"DEBUG: display_page called with pathname: {pathname}")
     if pathname == '/prediction' and user_info:
         return create_prediction_layout()
+    elif pathname == '/ending':
+        # Let the ending page callback handle this - return no_update to avoid conflicts
+        return no_update
     return startup_page()  # Call the startup page component
 
 def create_prediction_layout() -> html.Div:
@@ -101,7 +108,7 @@ def create_prediction_layout() -> html.Div:
 def trigger_submission(n_clicks):
     if n_clicks:
         return True
-    return dash.no_update
+    return no_update
 
 @app.callback(
     [Output('url', 'pathname', allow_duplicate=True),
@@ -116,24 +123,81 @@ def trigger_submission(n_clicks):
 )
 def handle_submission(trigger, user_info, full_df_data, current_df_data):
     if trigger:
-        # Create DataFrames from the stored data
-        full_df = pl.DataFrame(full_df_data)
-        current_df = pl.DataFrame(current_df_data)
+        print("DEBUG: handle_submission triggered")
+        global full_df, df
+        
+        # Use the current global DataFrames which have the latest predictions
+        # instead of the potentially stale stored data
+        current_full_df = full_df.clone()
+        current_df = df.clone()
         
         # Update age and user_id from user_info
         if user_info and 'age' in user_info:
-            full_df = full_df.with_columns(pl.lit(int(user_info['age'])).alias("age"))
+            current_full_df = current_full_df.with_columns(pl.lit(int(user_info['age'])).alias("age"))
             current_df = current_df.with_columns(pl.lit(int(user_info['age'])).alias("age"))
         
+        print("DEBUG: Submitting with prediction data:")
+        print(f"Full DF predictions: {current_full_df.filter(pl.col('prediction') != 0.0).height} non-zero")
+        print(f"Current DF predictions: {current_df.filter(pl.col('prediction') != 0.0).height} non-zero")
+        
         # Save statistics before redirecting
-        submit_component.save_statistics(full_df, user_info)
+        submit_component.save_statistics(current_full_df, user_info)
+        
+        # Convert to dict format for storage
+        def convert_df_to_dict(df):
+            return {
+                'time': df.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
+                'gl': df.get_column('gl').to_list(),
+                'prediction': df.get_column('prediction').to_list(),
+                'age': df.get_column('age').to_list(),
+                'user_id': df.get_column('user_id').to_list()
+            }
+        
+        return '/ending', user_info, convert_df_to_dict(current_full_df), convert_df_to_dict(current_df)
+    return no_update, no_update, no_update, no_update
+
+@app.callback(
+    [Output('url', 'pathname', allow_duplicate=True),
+     Output('user-info-store', 'data', allow_duplicate=True),
+     Output('full-df', 'data', allow_duplicate=True),
+     Output('current-window-df', 'data', allow_duplicate=True)],
+    [Input('exit-button', 'n_clicks')],
+    [State('full-df', 'data'),
+     State('current-window-df', 'data')],
+    prevent_initial_call=True
+)
+def exit_prediction(n_clicks, full_df_data, current_df_data):
+    print(f"DEBUG: exit_prediction called with n_clicks: {n_clicks}")
+    if n_clicks and n_clicks > 0:  # Only proceed if actually clicked
+        print("DEBUG: Exit button clicked, returning to startup page")
+        
+        # If data stores are None, just load fresh data and reset
+        if not full_df_data or not current_df_data:
+            print("DEBUG: No stored data, loading fresh data for reset")
+            # Load fresh data
+            global full_df, events_df
+            full_df, events_df = load_glucose_data()
+            df = full_df.slice(0, DEFAULT_POINTS)
+            
+            # Reset predictions
+            full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
+            df = df.with_columns(pl.lit(0.0).alias("prediction"))
+            
+            return '/', None, full_df.to_dict(as_series=False), df.to_dict(as_series=False)
+        
+        # Create DataFrames from the stored data
+        full_df = reconstruct_dataframe_from_dict(full_df_data)
+        current_df = reconstruct_dataframe_from_dict(current_df_data)
         
         # Reset predictions in both dataframes
         full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
         current_df = current_df.with_columns(pl.lit(0.0).alias("prediction"))
         
-        return '/', user_info, full_df.to_dict(as_series=False), current_df.to_dict(as_series=False)
-    return dash.no_update, dash.no_update, dash.no_update, dash.no_update
+        # Return to startup page, clear user info, and return reset dataframes
+        return '/', None, full_df.to_dict(as_series=False), current_df.to_dict(as_series=False)
+    
+    print("DEBUG: Exit callback triggered but not clicked, ignoring")
+    return no_update, no_update, no_update, no_update
 
 @app.callback(
     Output('last-click-time', 'data'),
@@ -247,11 +311,16 @@ def update_graph(last_click_time: int) -> Figure:
 )
 def update_metrics(last_click_time: int) -> Union[List[html.Div], html.Div]:
     """Updates the error metrics based on the DataFrame state."""
+    
     metrics_component.update_dataframe(df)  # Update the component's DataFrame
     prediction_table.update_dataframe(df)  # Update the prediction table's DataFrame
     table_data = prediction_table.generate_table_data()
     prediction_row = table_data[1]  # Index 1 contains predictions
-    return metrics_component.calculate_error_metrics(df, prediction_row)
+    metrics = metrics_component.calculate_error_metrics(df, prediction_row)
+    
+    return metrics
+
+
 
 # Add new callback for file upload
 @app.callback(
@@ -388,13 +457,20 @@ def initialize_data(pathname):
     """Initialize the data stores on page load"""
     global full_df, df, events_df
     
-    # Load fresh data
-    full_df, events_df = load_glucose_data()
-    df = full_df.slice(0, DEFAULT_POINTS)
-    
-    # Reset predictions
-    full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
-    df = df.with_columns(pl.lit(0.0).alias("prediction"))
+    # Only reset data when going to startup or prediction pages, not ending page
+    if pathname != '/ending':
+        print(f"DEBUG: initialize_data called for pathname: {pathname}")
+        # Load fresh data
+        full_df, events_df = load_glucose_data()
+        df = full_df.slice(0, DEFAULT_POINTS)
+        
+        # Reset predictions
+        full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
+        df = df.with_columns(pl.lit(0.0).alias("prediction"))
+    else:
+        print("DEBUG: initialize_data skipped for ending page")
+        # Don't reset data when on ending page - use existing data
+        return no_update, no_update, no_update
     
     # Convert DataFrames to JSON-serializable dictionaries
     def convert_df_to_dict(df):
@@ -459,9 +535,19 @@ def start_prediction(n_clicks, email, age, gender, diabetic, diabetic_type, diab
 )
 def update_user_info_with_table_data(table_data, user_info):
     if user_info is None:
-        return dash.no_update
+        return no_update
     user_info['prediction_table_data'] = table_data
     return user_info
+
+def reconstruct_dataframe_from_dict(df_data: Dict) -> pl.DataFrame:
+    """Safely reconstruct a Polars DataFrame from a dictionary with proper type handling."""
+    return pl.DataFrame({
+        'time': pl.Series(df_data['time']).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),
+        'gl': pl.Series(df_data['gl'], dtype=pl.Float64),
+        'prediction': pl.Series(df_data['prediction'], dtype=pl.Float64),
+        'age': pl.Series([int(float(x)) for x in df_data['age']], dtype=pl.Int64),
+        'user_id': pl.Series([int(float(x)) for x in df_data['user_id']], dtype=pl.Int64)
+    })
 
 def find_nearest_time(x: Union[str, float, datetime]) -> datetime:
     """
@@ -488,6 +574,7 @@ def main() -> None:
     """Starts the Dash server."""
     prediction_table.register_callbacks(app)  # Register the prediction table callbacks
     startup_page.register_callbacks(app)  # Register the startup page callbacks
+    ending_page.register_callbacks(app)  # Register the ending page callbacks
     app.run_server(debug=True)
 
 if __name__ == '__main__':
