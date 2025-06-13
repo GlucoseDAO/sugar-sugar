@@ -17,26 +17,26 @@ Why did we create this? While fancy AI models are being built to predict glucose
 ## Setup
 
 ### Prerequisites
-- Python 3.10 or higher
-- Poetry (Python package manager)
+- Python 3.11 or higher
+- UV (Python package manager)
 
-### Installing Poetry
-1. **Windows**:
-```powershell
-(Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
-```
-
-2. **macOS/Linux**:
+### Installing UV
+1. **Windows/macOS/Linux**:
 ```bash
-curl -sSL https://install.python-poetry.org | python3 -
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-3. **Alternative method** (using pip):
+2. **Alternative method** (using pip):
 ```bash
-pip install poetry
+pip install uv
 ```
 
-For detailed installation instructions, visit the [Poetry documentation](https://python-poetry.org/docs/#installation).
+3. **Using Homebrew** (macOS):
+```bash
+brew install uv
+```
+
+For detailed installation instructions, visit the [UV documentation](https://docs.astral.sh/uv/getting-started/installation/).
 
 ### Installation
 1. Clone the repository:
@@ -45,14 +45,19 @@ git clone https://github.com/GlucoseDAO/sugar-sugar.git
 cd sugar-sugar
 ```
 
-2. Install dependencies using Poetry:
+2. Install dependencies using UV:
 ```bash
-poetry install
+uv sync
+```
+
+3. Install development dependencies (optional):
+```bash
+uv sync --group dev
 ```
 
 ### Running the Game
 ```bash
-poetry run python -m sugar_sugar.app
+uv run start
 ```
 
 ## KNOWN ISSUES:

@@ -1,30 +1,38 @@
-[tool.poetry]
+[project]
 name = "sugar-sugar"
 version = "0.1.0"
 description = "A data access and visualization tool for glucose monitoring data"
-authors = ["Anton Kulaga <Antonkulaga@gmail.com>"]
-license = "Apache-2.0"
+authors = [
+    {name = "Anton Kulaga", email = "Antonkulaga@gmail.com"}
+]
+license = {text = "Apache-2.0"}
 readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "dash>=3.0.4",
+    "dash-bootstrap-components>=2.0.3",
+    "plotly>=6.1.2",
+    "polars>=1.30.0",
+    "pandas>=2.3.0",
+    "typer>=0.16.0",
+    "numpy>=2.3.0",
+    "pycomfort>=0.0.18",
+]
 
-[tool.poetry.dependencies]
-python = "^3.11"
-dash = "^2.18.2"
-dash-bootstrap-components = "^1.5.0"
-plotly = "^5.24.1"
-polars = "^1.20.0"
-pandas = ">=2.2.3"
-typer = ">=0.15.1"
-numpy = "^2.2.2"
-
-[tool.poetry.scripts]
+[project.scripts]
 start = "sugar_sugar.app:main"
 
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.1.1"
+[dependency-groups]
+dev = [
+    "pytest>=8.1.1",
+]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["sugar_sugar"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

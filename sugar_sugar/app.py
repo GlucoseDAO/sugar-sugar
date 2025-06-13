@@ -11,15 +11,15 @@ import base64
 import tempfile
 import dash_bootstrap_components as dbc
 
-from .data import load_glucose_data
-from .config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS, DOUBLE_CLICK_THRESHOLD
-from .components.glucose import GlucoseChart
-from .components.metrics import MetricsComponent
-from .components.predictions import PredictionTableComponent
-from .components.startup import StartupPage
-from .components.submit import SubmitComponent
-from .components.header import HeaderComponent
-from .components.ending import EndingPage
+from sugar_sugar.data import load_glucose_data
+from sugar_sugar.config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS, DOUBLE_CLICK_THRESHOLD
+from sugar_sugar.components.glucose import GlucoseChart
+from sugar_sugar.components.metrics import MetricsComponent
+from sugar_sugar.components.predictions import PredictionTableComponent
+from sugar_sugar.components.startup import StartupPage
+from sugar_sugar.components.submit import SubmitComponent
+from sugar_sugar.components.header import HeaderComponent
+from sugar_sugar.components.ending import EndingPage
 
 # Type aliases for clarity
 TableData = List[Dict[str, str]]  # Format for the predictions table data
@@ -64,7 +64,7 @@ app.layout = html.Div([
     dcc.Store(id='events-df', data=None),
     dcc.Store(id='is-example-data', data=True),
     dcc.Store(id='submission-trigger', data=False),  # New store for submission trigger
-    html.Div(id='page-content', children=startup_page())  # Initialize with startup page
+    html.Div(id='page-content', children=[startup_page])  # Initialize with startup page
 ])
 
 @app.callback(
@@ -73,14 +73,14 @@ app.layout = html.Div([
     [State('user-info-store', 'data')],
     prevent_initial_call=False
 )
-def display_page(pathname, user_info):
+def display_page(pathname: Optional[str], user_info: Optional[Dict[str, Any]]) -> html.Div:
     print(f"DEBUG: display_page called with pathname: {pathname}")
     if pathname == '/prediction' and user_info:
         return create_prediction_layout()
     elif pathname == '/ending':
         # Let the ending page callback handle this - return no_update to avoid conflicts
         return no_update
-    return startup_page()  # Call the startup page component
+    return startup_page  # Return the startup page component
 
 def create_prediction_layout() -> html.Div:
     """Create the prediction page layout"""
@@ -105,7 +105,7 @@ def create_prediction_layout() -> html.Div:
     [Input('submit-button', 'n_clicks')],
     prevent_initial_call=True
 )
-def trigger_submission(n_clicks):
+def trigger_submission(n_clicks: Optional[int]) -> Union[bool, Any]:
     if n_clicks:
         return True
     return no_update
@@ -116,12 +116,10 @@ def trigger_submission(n_clicks):
      Output('full-df', 'data', allow_duplicate=True),
      Output('current-window-df', 'data', allow_duplicate=True)],
     [Input('submission-trigger', 'data')],
-    [State('user-info-store', 'data'),
-     State('full-df', 'data'),
-     State('current-window-df', 'data')],
+    [State('user-info-store', 'data')],
     prevent_initial_call=True
 )
-def handle_submission(trigger, user_info, full_df_data, current_df_data):
+def handle_submission(trigger: bool, user_info: Optional[Dict[str, Any]]) -> Tuple[Union[str, Any], Union[Dict[str, Any], Any], Union[Dict[str, Any], Any], Union[Dict[str, Any], Any]]:
     if trigger:
         print("DEBUG: handle_submission triggered")
         global full_df, df
@@ -144,7 +142,7 @@ def handle_submission(trigger, user_info, full_df_data, current_df_data):
         submit_component.save_statistics(current_full_df, user_info)
         
         # Convert to dict format for storage
-        def convert_df_to_dict(df):
+        def convert_df_to_dict(df: pl.DataFrame) -> Dict[str, List[Any]]:
             return {
                 'time': df.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
                 'gl': df.get_column('gl').to_list(),
@@ -166,7 +164,7 @@ def handle_submission(trigger, user_info, full_df_data, current_df_data):
      State('current-window-df', 'data')],
     prevent_initial_call=True
 )
-def exit_prediction(n_clicks, full_df_data, current_df_data):
+def exit_prediction(n_clicks: Optional[int], full_df_data: Optional[Dict[str, Any]], current_df_data: Optional[Dict[str, Any]]) -> Tuple[Union[str, Any], Union[None, Any], Union[Dict[str, Any], Any], Union[Dict[str, Any], Any]]:
     print(f"DEBUG: exit_prediction called with n_clicks: {n_clicks}")
     if n_clicks and n_clicks > 0:  # Only proceed if actually clicked
         print("DEBUG: Exit button clicked, returning to startup page")
@@ -453,7 +451,7 @@ def update_time_window(start_idx: int, num_points: int) -> int:
     [Input('url', 'pathname')],
     prevent_initial_call=False
 )
-def initialize_data(pathname):
+def initialize_data(pathname: Optional[str]) -> Tuple[Union[Dict[str, List[Any]], Any], Union[Dict[str, List[Any]], Any], Union[Dict[str, List[Any]], Any]]:
     """Initialize the data stores on page load"""
     global full_df, df, events_df
     
@@ -473,7 +471,7 @@ def initialize_data(pathname):
         return no_update, no_update, no_update
     
     # Convert DataFrames to JSON-serializable dictionaries
-    def convert_df_to_dict(df):
+    def convert_df_to_dict(df: pl.DataFrame) -> Dict[str, List[Any]]:
         return {
             'time': df.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
             'gl': df.get_column('gl').to_list(),
@@ -482,7 +480,7 @@ def initialize_data(pathname):
             'user_id': df.get_column('user_id').to_list()
         }
     
-    def convert_events_df_to_dict(df):
+    def convert_events_df_to_dict(df: pl.DataFrame) -> Dict[str, List[Any]]:
         return {
             'time': df.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
             'event_type': df.get_column('event_type').to_list(),
@@ -511,8 +509,9 @@ def initialize_data(pathname):
      State('location-input', 'value')],
     prevent_initial_call=True
 )
-def start_prediction(n_clicks, email, age, gender, diabetic, diabetic_type, diabetes_duration, 
-                    medical_conditions, medical_conditions_input, location):
+def start_prediction(n_clicks: Optional[int], email: Optional[str], age: Optional[int], gender: Optional[str], 
+                    diabetic: Optional[str], diabetic_type: Optional[str], diabetes_duration: Optional[int], 
+                    medical_conditions: Optional[List[str]], medical_conditions_input: Optional[str], location: Optional[str]) -> Tuple[str, Optional[Dict[str, Any]]]:
     if n_clicks and email and age:
         return '/prediction', {
             'email': email,
@@ -533,7 +532,7 @@ def start_prediction(n_clicks, email, age, gender, diabetic, diabetic_type, diab
     [State('user-info-store', 'data')],
     prevent_initial_call=True
 )
-def update_user_info_with_table_data(table_data, user_info):
+def update_user_info_with_table_data(table_data: Optional[TableData], user_info: Optional[Dict[str, Any]]) -> Union[Dict[str, Any], Any]:
     if user_info is None:
         return no_update
     user_info['prediction_table_data'] = table_data
@@ -575,7 +574,7 @@ def main() -> None:
     prediction_table.register_callbacks(app)  # Register the prediction table callbacks
     startup_page.register_callbacks(app)  # Register the startup page callbacks
     ending_page.register_callbacks(app)  # Register the ending page callbacks
-    app.run_server(debug=True)
+    app.run(debug=True)
 
 if __name__ == '__main__':
     main()
