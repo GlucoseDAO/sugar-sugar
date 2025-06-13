@@ -43,67 +43,35 @@ class MetricsComponent(html.Div):
         
         @app.callback(
             Output('metrics-store', 'data'),
-            [Input('last-click-time', 'data')]
+            [Input('current-window-df', 'data')]  # Listen to session storage instead
         )
-        def calculate_and_store_metrics(last_click_time: int) -> Union[Dict[str, Any], None]:
-            """Calculate metrics when predictions change and store them"""
-            from sugar_sugar.app import df  # Import the global df
-            
-            # Generate table data to get predictions
-            prediction_table_instance.update_dataframe(df)
-            table_data = prediction_table_instance.generate_table_data()
-            
-            if len(table_data) < 2:
+        def store_metrics_data(df_data: Optional[Dict]) -> Optional[Dict]:
+            """Calculate and store metrics when DataFrame changes"""
+            if not df_data:
                 return None
                 
-            prediction_row = table_data[1]  # Index 1 contains predictions
+            # Reconstruct DataFrame from session storage
+            df = self._reconstruct_dataframe_from_dict(df_data)
             
-            # Count valid predictions (non-"-" values)
-            valid_predictions = sum(1 for key, value in prediction_row.items() if value != "-" and key != "metric")
-            print(f"DEBUG: Found {valid_predictions} valid predictions for metrics storage")
+            # Calculate metrics using the table data
+            table_data = self._generate_table_data(df)
             
-            if valid_predictions < 5:
-                print("DEBUG: Not enough predictions for metrics, storing None")
+            if len(table_data) < 4:  # Need actual, predicted, absolute error, relative error rows
                 return None
             
-            # Calculate metrics
-            actual_values = []
-            predicted_values = []
+            # Extract prediction data for metrics calculation
+            prediction_row = table_data[1]  # Predicted values row
+            actual_row = table_data[0]      # Actual glucose values row
             
-            for i, gl in enumerate(df.get_column("gl")):
-                pred_str = prediction_row[f't{i}']
-                if pred_str != "-":
-                    actual_values.append(gl)
-                    predicted_values.append(float(pred_str))
+            # Count valid predictions (non-dash values)
+            valid_predictions = sum(1 for key, value in prediction_row.items() 
+                                  if key != 'metric' and value != "-")
             
-            # Calculate metrics
-            n = len(actual_values)
-            mae = sum(abs(a - p) for a, p in zip(actual_values, predicted_values)) / n
-            mse = sum((a - p) ** 2 for a, p in zip(actual_values, predicted_values)) / n
-            rmse = mse ** 0.5
-            mape = sum(abs((a - p) / a) * 100 for a, p in zip(actual_values, predicted_values)) / n
+            if valid_predictions < 5:
+                return None
             
-            metrics = {
-                "MAE": {
-                    "value": mae,
-                    "description": "Average difference between predicted and actual values"
-                },
-                "MSE": {
-                    "value": mse,
-                    "description": "Emphasizes larger prediction errors"
-                },
-                "RMSE": {
-                    "value": rmse,
-                    "description": "Similar to MAE but penalizes large errors more"
-                },
-                "MAPE": {
-                    "value": mape,
-                    "description": "Average percentage difference from actual values"
-                }
-            }
-            
-            print(f"DEBUG: Calculated and stored metrics: {metrics}")
-            return metrics
+            # Calculate metrics from the table data
+            return self._calculate_metrics_from_table_data(table_data)
 
         @app.callback(
             Output('metrics-container', 'children'),
@@ -223,4 +191,145 @@ class MetricsComponent(html.Div):
                 'backgroundColor': 'white',
                 'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
             })
-        ] 
+        ]
+
+    def _reconstruct_dataframe_from_dict(self, df_data: Dict) -> pl.DataFrame:
+        """Reconstruct a Polars DataFrame from stored dictionary data"""
+        return pl.DataFrame({
+            'time': pl.Series(df_data['time']).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),
+            'gl': pl.Series(df_data['gl'], dtype=pl.Float64),
+            'prediction': pl.Series(df_data['prediction'], dtype=pl.Float64),
+            'age': pl.Series([int(float(x)) for x in df_data['age']], dtype=pl.Int64),
+            'user_id': pl.Series([int(float(x)) for x in df_data['user_id']], dtype=pl.Int64)
+        })
+
+    def _generate_table_data(self, df: pl.DataFrame) -> List[Dict[str, str]]:
+        """Generates the table data with actual values, predictions, and errors."""
+        table_data = []
+        
+        # Row 1: Actual glucose values
+        glucose_row = {'metric': 'Actual Glucose'}
+        for i, gl in enumerate(df.get_column("gl")):
+            glucose_row[f't{i}'] = f"{gl:.1f}" if gl is not None else "-"
+        table_data.append(glucose_row)
+        
+        # Row 2: Predicted values with interpolation
+        prediction_row = {'metric': 'Predicted'}
+        predictions = df.get_column("prediction")
+        non_zero_indices = [i for i, p in enumerate(predictions) if p != 0]
+        
+        if len(non_zero_indices) >= 2:
+            start_idx = non_zero_indices[0]
+            end_idx = non_zero_indices[-1]
+            
+            for i in range(len(predictions)):
+                if i < start_idx or i > end_idx:
+                    prediction_row[f't{i}'] = "-"
+                elif predictions[i] != 0:
+                    prediction_row[f't{i}'] = f"{predictions[i]:.1f}"
+                else:
+                    prev_idx = max([j for j in non_zero_indices if j < i])
+                    next_idx = min([j for j in non_zero_indices if j > i])
+                    total_steps = next_idx - prev_idx
+                    current_step = i - prev_idx
+                    prev_val = predictions[prev_idx]
+                    next_val = predictions[next_idx]
+                    interpolated = prev_val + (next_val - prev_val) * (current_step / total_steps)
+                    prediction_row[f't{i}'] = f"{interpolated:.1f}"
+        else:
+            for i, pred_val in enumerate(predictions):
+                prediction_row[f't{i}'] = f"{pred_val:.1f}" if pred_val != 0 else "-"
+        
+        table_data.append(prediction_row)
+        
+        # Add error rows
+        table_data.extend(self._calculate_error_rows(df, prediction_row))
+        
+        return table_data
+
+    def _calculate_error_rows(self, df: pl.DataFrame, prediction_row: Dict[str, str]) -> List[Dict[str, str]]:
+        """Calculates absolute and relative error rows for the table."""
+        error_rows = []
+        
+        # Absolute Error
+        error_row = {'metric': 'Absolute Error'}
+        for i, gl in enumerate(df.get_column("gl")):
+            pred_str = prediction_row[f't{i}']
+            if pred_str != "-" and gl is not None:
+                pred = float(pred_str)
+                error = abs(gl - pred)
+                error_row[f't{i}'] = f"{error:.1f}"
+            else:
+                error_row[f't{i}'] = "-"
+        error_rows.append(error_row)
+        
+        # Relative Error
+        rel_error_row = {'metric': 'Relative Error (%)'}
+        for i, gl in enumerate(df.get_column("gl")):
+            pred_str = prediction_row[f't{i}']
+            if pred_str != "-" and gl is not None and gl != 0:
+                pred = float(pred_str)
+                rel_error = (abs(gl - pred) / gl * 100)
+                rel_error_row[f't{i}'] = f"{rel_error:.1f}%"
+            else:
+                rel_error_row[f't{i}'] = "-"
+        error_rows.append(rel_error_row)
+        
+        return error_rows
+
+    def _calculate_metrics_from_table_data(self, table_data: List[Dict[str, str]]) -> Dict[str, Any]:
+        """Calculate metrics from table data"""
+        if len(table_data) < 2:
+            return {}
+        
+        actual_row = table_data[0]      # Actual glucose values row
+        prediction_row = table_data[1]  # Predicted values row
+        
+        # Extract valid prediction pairs
+        actual_values = []
+        predicted_values = []
+        
+        for key in actual_row.keys():
+            if key == 'metric':
+                continue
+            
+            actual_str = actual_row[key]
+            pred_str = prediction_row[key]
+            
+            if actual_str != "-" and pred_str != "-":
+                try:
+                    actual_val = float(actual_str)
+                    pred_val = float(pred_str)
+                    actual_values.append(actual_val)
+                    predicted_values.append(pred_val)
+                except ValueError:
+                    continue
+        
+        if len(actual_values) < 5:
+            return {}
+        
+        # Calculate metrics
+        n = len(actual_values)
+        mae = sum(abs(a - p) for a, p in zip(actual_values, predicted_values)) / n
+        mse = sum((a - p) ** 2 for a, p in zip(actual_values, predicted_values)) / n
+        rmse = mse ** 0.5
+        mape = sum(abs((a - p) / a) * 100 for a, p in zip(actual_values, predicted_values) if a != 0) / n
+        
+        return {
+            "MAE": {
+                "value": mae,
+                "description": "Average difference between predicted and actual values"
+            },
+            "MSE": {
+                "value": mse,
+                "description": "Emphasizes larger prediction errors"
+            },
+            "RMSE": {
+                "value": rmse,
+                "description": "Similar to MAE but penalizes large errors more"
+            },
+            "MAPE": {
+                "value": mape,
+                "description": "Average percentage difference from actual values"
+            }
+        } 

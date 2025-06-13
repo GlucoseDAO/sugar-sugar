@@ -1,8 +1,8 @@
 from typing import List, Dict, Tuple, Optional, Any, Union
 import dash
-from dash import dcc, html, Output, Input, State, no_update
+from dash import dcc, html, Output, Input, State, no_update, dash_table
 import plotly.graph_objs as go
-import pandas as pd
+
 import polars as pl
 from datetime import datetime
 import time
@@ -10,6 +10,7 @@ from pathlib import Path
 import base64
 import tempfile
 import dash_bootstrap_components as dbc
+import os
 
 from sugar_sugar.data import load_glucose_data
 from sugar_sugar.config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS, DOUBLE_CLICK_THRESHOLD
@@ -25,28 +26,24 @@ from sugar_sugar.components.ending import EndingPage
 TableData = List[Dict[str, str]]  # Format for the predictions table data
 Figure = go.Figure  # Plotly figure type
 
-# Add new global variables
-window_start = 0  # Index of first visible point
-full_df = None  # Store complete dataset
-df = None  # Initial window view
-events_df = None  # Store events
-is_example_data = True  # Track if we're using example data
-
-# Update initial loading here is uploaded as a dataframe from the stored one
-full_df, events_df = load_glucose_data()  # Unpack both dataframes
-df = full_df.slice(0, DEFAULT_POINTS)  # Now this will work
+# Load example data once at startup for initial session storage
+example_full_df, example_events_df = load_glucose_data()  # Unpack both dataframes
 
 external_stylesheets = [
     'https://codepen.io/chriddyp/pen/bWLwgP.css',
-    dbc.themes.BOOTSTRAP
+    dbc.themes.BOOTSTRAP,
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css'
 ]
 
 app = dash.Dash(__name__, 
     external_stylesheets=external_stylesheets,
     suppress_callback_exceptions=True
 )
+app.title = "Sugar Sugar - Glucose Prediction Game"
 
-# Create global instances
+
+
+# Create component instances
 glucose_chart = GlucoseChart(id='glucose-graph')
 prediction_table = PredictionTableComponent()
 metrics_component = MetricsComponent()
@@ -129,8 +126,9 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
     # Create new components with the updated data
     ending_prediction_table = PredictionTableComponent()
     
-    # Update glucose chart and get the figure
-    figure = ending_page.glucose_chart.update(df, events_df)
+    # Create a new glucose chart for the ending page and get the figure
+    ending_glucose_chart = GlucoseChart(id='ending-glucose-chart')
+    figure = ending_glucose_chart._build_figure(df, events_df)
     
     # Create the page content with metrics container that will be populated by the callback
     return html.Div([
@@ -225,18 +223,19 @@ def handle_start_button(n_clicks, email, age, gender, diabetic, diabetic_type,
     [Output('url', 'pathname', allow_duplicate=True),
      Output('user-info-store', 'data', allow_duplicate=True)],
     [Input('submit-button', 'n_clicks')],
-    [State('user-info-store', 'data')],
+    [State('user-info-store', 'data'),
+     State('full-df', 'data'),
+     State('current-window-df', 'data')],
     prevent_initial_call=True
 )
-def handle_submit_button(n_clicks, user_info):
+def handle_submit_button(n_clicks, user_info, full_df_data, current_df_data):
     """Handle submit button on prediction page"""
-    if n_clicks:
+    if n_clicks and full_df_data and current_df_data:
         print("DEBUG: Submit button clicked")
-        global full_df, df
         
-        # Use current global DataFrames with latest predictions
-        current_full_df = full_df.clone()
-        current_df = df.clone()
+        # Reconstruct DataFrames from session storage
+        current_full_df = reconstruct_dataframe_from_dict(full_df_data)
+        current_df = reconstruct_dataframe_from_dict(current_df_data)
         
         # Update age and user_id from user_info
         if user_info and 'age' in user_info:
@@ -259,35 +258,26 @@ def handle_exit_button(n_clicks):
     """Handle exit button"""
     if n_clicks:
         print("DEBUG: Exit button clicked")
-        global full_df, df, events_df
-        
-        # Load fresh data and reset
-        full_df, events_df = load_glucose_data()
-        df = full_df.slice(0, DEFAULT_POINTS)
-        
-        # Reset predictions
-        full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
-        df = df.with_columns(pl.lit(0.0).alias("prediction"))
-        
+        # Just redirect to home - data will be reset by URL change callback
         return '/', None
     return no_update, no_update
 
 @app.callback(
     [Output('full-df', 'data'),
      Output('current-window-df', 'data'),
-     Output('events-df', 'data')],
+     Output('events-df', 'data'),
+     Output('is-example-data', 'data')],
     [Input('url', 'pathname')],
     prevent_initial_call=False
 )
 def handle_url_changes(pathname: str):
-    """Handle URL changes"""
-    global full_df, df, events_df
+    """Handle URL changes and initialize session storage"""
     
     if pathname == '/ending':
         # Don't reset data when on ending page
-        return no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update
     
-    # For startup and prediction pages, initialize fresh data if needed
+    # For startup and prediction pages, initialize fresh data
     print(f"DEBUG: URL changed to {pathname}, initializing data")
     full_df, events_df = load_glucose_data()
     df = full_df.slice(0, DEFAULT_POINTS)
@@ -317,12 +307,17 @@ def handle_url_changes(pathname: str):
     return (
         convert_df_to_dict(full_df),
         convert_df_to_dict(df),
-        convert_events_df_to_dict(events_df)
+        convert_events_df_to_dict(events_df),
+        True  # is_example_data = True by default
     )
 
 # Consolidated callback for last-click-time updates
 @app.callback(
-    Output('last-click-time', 'data'),
+    [Output('last-click-time', 'data'),
+     Output('full-df', 'data', allow_duplicate=True),
+     Output('current-window-df', 'data', allow_duplicate=True),
+     Output('events-df', 'data', allow_duplicate=True),
+     Output('is-example-data', 'data', allow_duplicate=True)],
     [Input('glucose-graph-graph', 'clickData'),
      Input('glucose-graph-graph', 'relayoutData'),
      Input('upload-data', 'contents'),
@@ -331,20 +326,51 @@ def handle_url_changes(pathname: str):
     [State('last-click-time', 'data'),
      State('upload-data', 'filename'),
      State('time-slider', 'value'),
-     State('points-control', 'value')],
+     State('points-control', 'value'),
+     State('full-df', 'data'),
+     State('current-window-df', 'data'),
+     State('events-df', 'data'),
+     State('is-example-data', 'data')],
+    prevent_initial_call=True
 )
 def handle_all_interactions(click_data, relayout_data, upload_contents, points_value, slider_value,
-                           last_click_time, filename, current_position, current_points):
-    """Consolidated callback for all interactions that update last-click-time"""
-    global df, full_df, events_df, is_example_data
+                           last_click_time, filename, current_position, current_points,
+                           full_df_data, current_df_data, events_df_data, is_example_data):
+    """Consolidated callback for all interactions that update last-click-time and data"""
     
     current_time = int(time.time() * 1000)
     ctx = dash.callback_context
     
     if not ctx.triggered:
-        return last_click_time
+        return last_click_time, no_update, no_update, no_update, no_update
     
     trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    
+    # Helper functions
+    def convert_df_to_dict(df: pl.DataFrame) -> Dict[str, List[Any]]:
+        return {
+            'time': df.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
+            'gl': df.get_column('gl').to_list(),
+            'prediction': df.get_column('prediction').to_list(),
+            'age': df.get_column('age').to_list(),
+            'user_id': df.get_column('user_id').to_list()
+        }
+    
+    def convert_events_df_to_dict(df: pl.DataFrame) -> Dict[str, List[Any]]:
+        return {
+            'time': df.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
+            'event_type': df.get_column('event_type').to_list(),
+            'event_subtype': df.get_column('event_subtype').to_list(),
+            'insulin_value': df.get_column('insulin_value').to_list()
+        }
+    
+    # Get current data from session storage
+    if not full_df_data or not current_df_data or not events_df_data:
+        return last_click_time, no_update, no_update, no_update, no_update
+    
+    full_df = reconstruct_dataframe_from_dict(full_df_data)
+    df = reconstruct_dataframe_from_dict(current_df_data)
+    events_df = reconstruct_events_dataframe_from_dict(events_df_data)
     
     # Handle file upload
     if trigger_id == 'upload-data' and upload_contents:
@@ -357,16 +383,18 @@ def handle_all_interactions(click_data, relayout_data, upload_contents, points_v
                 tmp_path = Path(tmp_file.name)
             
             new_full_df, new_events_df = load_glucose_data(tmp_path)
-            full_df = new_full_df
-            events_df = new_events_df
-            df = full_df.slice(0, DEFAULT_POINTS)
-            is_example_data = False
+            new_df = new_full_df.slice(0, DEFAULT_POINTS)
             tmp_path.unlink()
+            
+            return (current_time, 
+                   convert_df_to_dict(new_full_df),
+                   convert_df_to_dict(new_df),
+                   convert_events_df_to_dict(new_events_df),
+                   False)  # is_example_data = False for uploaded files
             
         except Exception as e:
             print(f"Error loading file: {e}")
-        
-        return current_time
+            return current_time, no_update, no_update, no_update, no_update
     
     # Handle points control
     elif trigger_id == 'points-control':
@@ -374,30 +402,45 @@ def handle_all_interactions(click_data, relayout_data, upload_contents, points_v
         new_max = len(full_df) - points
         new_start = min(current_position, new_max)
         new_start = max(0, new_start)
-        df = full_df.slice(new_start, new_start + points)
-        return current_time
+        new_df = full_df.slice(new_start, new_start + points)
+        
+        return (current_time,
+               no_update,
+               convert_df_to_dict(new_df),
+               no_update,
+               no_update)
     
     # Handle time slider
     elif trigger_id == 'time-slider':
-        df = full_df.slice(slider_value, slider_value + current_points)
-        if len(df) != current_points:
-            df = df.head(current_points)
-        return current_time
+        new_df = full_df.slice(slider_value, slider_value + current_points)
+        if len(new_df) != current_points:
+            new_df = new_df.head(current_points)
+        
+        return (current_time,
+               no_update,
+               convert_df_to_dict(new_df),
+               no_update,
+               no_update)
     
-    # Handle graph interactions (existing logic)
+    # Handle graph interactions
     elif trigger_id == 'glucose-graph-graph':
         if click_data:
             if current_time - last_click_time <= DOUBLE_CLICK_THRESHOLD:
                 print("Double-click detected: Resetting drawn lines.")
                 full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
                 df = df.with_columns(pl.lit(0.0).alias("prediction"))
-                return current_time
+                
+                return (current_time,
+                       convert_df_to_dict(full_df),
+                       convert_df_to_dict(df),
+                       no_update,
+                       no_update)
             
             point_data = click_data['points'][0]
             click_x = point_data['x']
             click_y = point_data['y']
             
-            nearest_time = find_nearest_time(click_x)
+            nearest_time = find_nearest_time(click_x, df)
             full_df = full_df.with_columns(
                 pl.when(pl.col("time") == nearest_time)
                 .then(click_y)
@@ -410,7 +453,12 @@ def handle_all_interactions(click_data, relayout_data, upload_contents, points_v
                 .otherwise(pl.col("prediction"))
                 .alias("prediction")
             )
-            return current_time
+            
+            return (current_time,
+                   convert_df_to_dict(full_df),
+                   convert_df_to_dict(df),
+                   no_update,
+                   no_update)
         
         elif relayout_data and 'shapes' in relayout_data:
             shapes = relayout_data['shapes']
@@ -423,8 +471,8 @@ def handle_all_interactions(click_data, relayout_data, upload_contents, points_v
                 end_y = latest_shape.get('y1')
                 
                 if all(v is not None for v in [start_x, end_x, start_y, end_y]):
-                    start_time = find_nearest_time(start_x)
-                    end_time = find_nearest_time(end_x)
+                    start_time = find_nearest_time(start_x, df)
+                    end_time = find_nearest_time(end_x, df)
                     
                     full_df = full_df.with_columns(
                         pl.when(pl.col("time").is_in([start_time, end_time]))
@@ -447,20 +495,13 @@ def handle_all_interactions(click_data, relayout_data, upload_contents, points_v
                         .alias("prediction")
                     )
                     
-                    return current_time
+                    return (current_time,
+                           convert_df_to_dict(full_df),
+                           convert_df_to_dict(df),
+                           no_update,
+                           no_update)
     
-    return last_click_time
-
-@app.callback(
-    Output('glucose-graph-graph', 'figure'),
-    [Input('last-click-time', 'data')]
-)
-def update_graph(last_click_time: int) -> Figure:
-    """Updates the graph based on the DataFrame state."""
-    global df, events_df
-    return glucose_chart.update(df, events_df)
-
-
+    return last_click_time, no_update, no_update, no_update, no_update
 
 # Add simplified callbacks for UI updates only
 @app.callback(
@@ -470,18 +511,25 @@ def update_graph(last_click_time: int) -> Figure:
     [Input('upload-data', 'contents'),
      Input('points-control', 'value')],
     [State('upload-data', 'filename'),
-     State('time-slider', 'value')],
+     State('time-slider', 'value'),
+     State('full-df', 'data'),
+     State('is-example-data', 'data')],
     prevent_initial_call=True
 )
-def update_ui_components(upload_contents, points_value, filename, current_position):
+def update_ui_components(upload_contents, points_value, filename, current_position, full_df_data, is_example_data):
     """Update UI components based on file upload and points control"""
-    global full_df, is_example_data
     
     ctx = dash.callback_context
     trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
     
+    if not full_df_data:
+        return no_update, no_update, no_update
+    
+    # Reconstruct full_df to get its length
+    full_df = reconstruct_dataframe_from_dict(full_df_data)
+    
     if trigger_id == 'upload-data' and upload_contents:
-        if is_example_data:
+        if not is_example_data:  # File was successfully uploaded
             success_msg = html.Div([
                 html.I(className="fas fa-check-circle", style={'marginRight': '8px'}),
                 f"Successfully loaded data from {filename}"
@@ -532,7 +580,7 @@ def reconstruct_dataframe_from_dict(df_data: Dict) -> pl.DataFrame:
         'user_id': pl.Series([int(float(x)) for x in df_data['user_id']], dtype=pl.Int64)
     })
 
-def find_nearest_time(x: Union[str, float, datetime]) -> datetime:
+def find_nearest_time(x: Union[str, float, datetime], df: pl.DataFrame) -> datetime:
     """
     Finds the nearest allowed time from the DataFrame 'df' for a given x-coordinate.
     x can be either an index (float) or a timestamp string.
@@ -544,7 +592,10 @@ def find_nearest_time(x: Union[str, float, datetime]) -> datetime:
         return df.get_column("time")[idx]
     
     # If x is a timestamp string, convert to datetime
-    x_ts = pd.to_datetime(x)
+    if isinstance(x, str):
+        x_ts = datetime.fromisoformat(x.replace('Z', '+00:00'))
+    else:
+        x_ts = x
     time_diffs = df.select([
         (pl.col("time").cast(pl.Int64) - pl.lit(int(x_ts.timestamp() * 1000)))
         .abs()
@@ -566,6 +617,7 @@ def main() -> None:
     """Starts the Dash server."""
     prediction_table.register_callbacks(app)  # Register the prediction table callbacks
     metrics_component.register_callbacks(app, prediction_table)  # Register the metrics component callbacks
+    glucose_chart.register_callbacks(app)  # Register the glucose chart callbacks
     startup_page.register_callbacks(app)  # Register the startup page callbacks
     ending_page.register_callbacks(app)  # Register the ending page callbacks
     app.run(debug=True)

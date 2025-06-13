@@ -53,23 +53,12 @@ class PredictionTableComponent(html.Div):
         
         @app.callback(
             Output('current-df-store', 'data'),
-            [Input('last-click-time', 'data')]
+            [Input('current-window-df', 'data')]  # Listen to session storage instead
         )
-        def store_current_df(last_click_time: int) -> Optional[Dict]:
+        def store_current_df(df_data: Optional[Dict]) -> Optional[Dict]:
             """Store the current DataFrame state when it changes"""
-            from sugar_sugar.app import df  # Import the global df
-            
-            if df is None or df.height == 0:
-                return None
-                
-            # Convert DataFrame to storable format
-            return {
-                'time': [t.isoformat() for t in df.get_column("time")],
-                'gl': df.get_column("gl").to_list(),
-                'prediction': df.get_column("prediction").to_list(),
-                'age': df.get_column("age").to_list(),
-                'user_id': df.get_column("user_id").to_list()
-            }
+            # Just pass through the session storage data
+            return df_data
 
         @app.callback(
             [Output('prediction-table-data', 'data'),
@@ -178,15 +167,4 @@ class PredictionTableComponent(html.Div):
         
         return error_rows
 
-    # Keep these methods for backward compatibility with metrics component
-    def update_dataframe(self, df: pl.DataFrame):
-        """Backward compatibility method - now handled by session storage"""
-        pass
-
-    def generate_table_data(self) -> TableData:
-        """Backward compatibility method that returns the last generated table data"""
-        # This is used by the metrics component, so we need to provide access to the data
-        from sugar_sugar.app import df
-        if df is None:
-            return []
-        return self._generate_table_data(df) 
+ 

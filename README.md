@@ -1,7 +1,16 @@
 # sugar-sugar
 A fun game to test your glucose-predicting superpowers! 🎯
 
-Ever wondered how good you are at predicting where your glucose levels are heading? sugar-sugar turns this into an engaging game where you can test your glucose-spotting skills. Look at your CGM data, make your best guess about future values, and see how close you get!
+Ever wondered how good you are at predicting where your glucose levels are heading? sugar-sugar turns this into an engaging game where you test your glucose-spotting skills against real CGM data.
+
+## How It Works
+
+1. **Load Your Data**: Upload your own Dexcom or Libre CSV file, or use our example dataset
+2. **Make Predictions**: Click and draw on the glucose chart to predict future glucose values
+3. **Compare Results**: Your predictions are compared against the actual glucose values from the file
+4. **See Your Accuracy**: Get detailed metrics showing how close your predictions were to reality
+
+The game shows you historical glucose data up to a certain point, then challenges you to predict what happens next. Since the file contains the actual "ground truth" values, we can precisely measure how accurate your human intuition is compared to what really happened.
 
 Why did we create this? While fancy AI models are being built to predict glucose values, we realized nobody really knows how good humans are at this - especially experienced CGM users who've developed an instinct for their patterns. By playing sugar-sugar, you're not just having fun, you're also helping us understand:
 - How accurate are humans at predicting glucose trends?
@@ -62,14 +71,13 @@ uv run start
 
 ## KNOWN ISSUES:
 
-- For the ease of prototyping we used ugly global variables, so at the moment the game does not support multiple users. We will switch to session-based state management soon.
 - Currently only Dexcom and Libre 3 are supported. We will add support for other CGM devices soon.
 - No scoring system and difficulty levels yet.
 
 ## FAQ
 
 ### Is this production-ready software?
-This is an early-stage project meant for research and experimentation. So far it is single-user only but we will fix it soon
+This is an early-stage project meant for research and experimentation. The app now supports multiple users with session-based state management.
 
 ### Do you use my personal data?
 No, we only use the data you upload to allow you play the game. We do not store any data from your uploads (the data is loaded to temp folder and deleted after the game session is over).
@@ -93,14 +101,114 @@ Great! Feel free to:
 
 ## Technical Architecture
 
-sugar-sugar is built with [Plotly Dash](https://dash.plotly.com/), creating an interactive web app that allows you to view CGM data, make predictions, and analyze accuracy. The app supports both Dexcom G6 and Libre 3 data formats, processing them automatically without storing any personal information.
+sugar-sugar is built with [Plotly Dash](https://dash.plotly.com/), creating an interactive web application for glucose prediction gaming. The app uses session-based state management to support multiple users and processes CGM data from Dexcom and Libre devices without storing any personal information permanently.
 
-### Main Components
+### Application Structure
 
-1. **Glucose Chart**: Interactive visualization showing your glucose data, color-coded ranges, event markers, and predictions
+```
+sugar_sugar/
+├── app.py                  # Main application and routing logic
+├── config.py              # Application constants and configuration
+├── data.py                 # Data loading and processing utilities
+└── components/             # Modular UI components
+    ├── startup.py          # User registration and consent page
+    ├── header.py           # Game controls and file upload
+    ├── glucose.py          # Interactive glucose visualization
+    ├── predictions.py      # Prediction data table
+    ├── metrics.py          # Accuracy metrics display
+    ├── submit.py           # Game submission logic
+    └── ending.py           # Results summary page
+```
 
-2. **Metrics Display**: Real-time accuracy measures for your predictions
+### Core Components and Their Roles
 
-3. **Prediction Table**: Tracks predicted values, actual values, and prediction errors
+#### 1. **Application Core (`app.py`)**
+- **Purpose**: Main application orchestration and routing
+- **Key Features**:
+  - Multi-page routing (startup → prediction → ending)
+  - Session storage management for user state
+  - Component integration and callback coordination
+  - Data format conversion between session storage and components
 
-4. **Header Controls**: Upload data, adjust time windows, and customize display settings
+#### 2. **Startup Page (`startup.py`)**
+- **Purpose**: User onboarding and data consent
+- **Key Features**:
+  - Comprehensive user information collection (demographics, medical history)
+  - Data usage consent and privacy information
+  - Form validation with required field indicators
+  - Debug mode for development testing
+
+#### 3. **Header Component (`header.py`)**
+- **Purpose**: Game controls and data management
+- **Key Features**:
+  - CGM file upload (Dexcom/Libre CSV formats)
+  - Time window position slider for data navigation
+  - Points control for adjusting visible data range (24-48 points)
+  - Game instructions and user guidance
+
+#### 4. **Glucose Chart (`glucose.py`)**
+- **Purpose**: Interactive glucose data visualization and prediction interface
+- **Key Features**:
+  - Displays historical glucose data from uploaded CSV files
+  - Interactive prediction drawing via click-and-drag on the chart
+  - Real-time glucose line plotting with color-coded safety ranges
+  - Event markers for insulin, exercise, and carbohydrate events
+  - Dynamic y-axis scaling based on data range
+  - Session storage integration for state persistence
+
+#### 5. **Prediction Table (`predictions.py`)**
+- **Purpose**: Structured display comparing user predictions against ground truth
+- **Key Features**:
+  - Side-by-side comparison of predicted vs actual glucose values (from CSV)
+  - Real-time table updates as predictions are drawn on the chart
+  - Automatic interpolation between prediction points
+  - Absolute and relative error calculations showing prediction accuracy
+  - Time-indexed columns for easy temporal comparison
+
+#### 6. **Metrics Component (`metrics.py`)**
+- **Purpose**: Statistical accuracy measurement comparing predictions to ground truth
+- **Key Features**:
+  - Multiple accuracy metrics (MAE, RMSE, MAPE, R²) calculated against actual CSV values
+  - Minimum 5 predictions required for statistical validity
+  - Real-time calculation updates as more predictions are added
+  - Detailed metric descriptions for user education about prediction quality
+
+#### 7. **Submit Component (`submit.py`)**
+- **Purpose**: Game completion and data export
+- **Key Features**:
+  - Prediction statistics export to CSV
+  - User session data persistence
+  - Unique session ID generation
+  - Research data collection (anonymized)
+
+#### 8. **Ending Page (`ending.py`)**
+- **Purpose**: Results summary and game completion
+- **Key Features**:
+  - Complete prediction visualization
+  - Final accuracy metrics display
+  - Session summary with all predictions
+  - Option to exit or restart
+
+### Data Processing Layer (`data.py`)
+
+- **CGM Format Detection**: Automatic detection of Dexcom vs Libre data formats
+- **Data Standardization**: Conversion of different CGM formats to unified schema
+- **Event Processing**: Extraction and categorization of diabetes management events
+- **Time Series Handling**: Proper datetime parsing and chronological sorting
+
+### State Management Architecture
+
+The application uses Dash's session storage (`dcc.Store`) for state management:
+
+- **Session Isolation**: Each user gets independent session storage
+- **Data Persistence**: User state maintained across page navigation
+- **Component Communication**: Centralized state updates trigger component re-renders
+- **Memory Efficiency**: Automatic cleanup when sessions end
+
+### Key Technical Features
+
+- **Multi-CGM Support**: Handles both Dexcom G6 and Libre 3 data formats
+- **Real-time Interactivity**: Immediate feedback as users make predictions
+- **Responsive Design**: Bootstrap-based UI that works on various screen sizes
+- **Privacy-First**: No server-side data storage, all processing client-side
+- **Research Integration**: Optional anonymized data collection for glucose prediction research

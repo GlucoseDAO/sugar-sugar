@@ -1,24 +1,9 @@
 from typing import List, Dict, Tuple, Optional, Any, Union
 import dash
-from dash import dcc, html, Output, Input, State, dash_table
-import plotly.graph_objs as go
-import pandas as pd
-import polars as pl
-from datetime import datetime
-import time
-from pathlib import Path
-import base64
-import tempfile
+from dash import dcc, html
 
 from dash.html import Div
-
-# Add this near the top with other type aliases
-#represents the number of points to show in the graph and it's min and max (going from 1h to 3h)
-DEFAULT_POINTS = 24
-MIN_POINTS = 12
-MAX_POINTS = 36
-
-DOUBLE_CLICK_THRESHOLD: int = 500  # milliseconds
+from sugar_sugar.config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS
 
 
 class HeaderComponent(Div):

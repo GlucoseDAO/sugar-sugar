@@ -2,10 +2,10 @@ import dash
 from dash import html, dcc, Output, Input, State, no_update
 import dash_bootstrap_components as dbc
 import polars as pl
-from .glucose import GlucoseChart
-from .predictions import PredictionTableComponent
-from .metrics import MetricsComponent
-from ..config import DEFAULT_POINTS
+from sugar_sugar.components.glucose import GlucoseChart
+from sugar_sugar.components.predictions import PredictionTableComponent
+from sugar_sugar.components.metrics import MetricsComponent
+from sugar_sugar.config import DEFAULT_POINTS
 
 class EndingPage:
     def __init__(self):
