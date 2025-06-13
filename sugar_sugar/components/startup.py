@@ -1,6 +1,7 @@
 from dash import html, dcc
 import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, State
+from dash import no_update
 import dash
 from typing import Dict, Any, Optional, List, Union, Tuple
 import os
@@ -351,24 +352,17 @@ class StartupPage(html.Div):
         # Debug skip button callback (only registered when DEBUG=true)
         if os.getenv('DEBUG', '').lower() == 'true':
             @app.callback(
-                [Output('url', 'pathname', allow_duplicate=True),
-                 Output('user-info-store', 'data', allow_duplicate=True)],
+                [Output('email-input', 'value'),
+                 Output('age-input', 'value'),
+                 Output('gender-dropdown', 'value'),
+                 Output('diabetic-dropdown', 'value'),
+                 Output('location-input', 'value'),
+                 Output('consent-checkbox', 'value')],
                 [Input('skip-button', 'n_clicks')],
                 prevent_initial_call=True
             )
-            def skip_to_prediction(n_clicks: Optional[int]) -> Tuple[str, Dict[str, Any]]:
+            def fill_skip_form(n_clicks: Optional[int]) -> Tuple[str, int, str, bool, str, List[str]]:
                 if n_clicks:
-                    # Return dummy data for testing
-                    dummy_data = {
-                        'email': 'test@example.com',
-                        'age': 30,
-                        'gender': 'N/A',
-                        'diabetic': False,
-                        'diabetic_type': 'N/A',
-                        'diabetes_duration': 0,
-                        'other_medical_conditions': False,
-                        'medical_conditions_input': 'N/A',
-                        'location': 'Test Location'
-                    }
-                    return '/prediction', dummy_data
-                return '/', {} 
+                    # Fill the form with dummy data and tick consent checkbox
+                    return 'test@example.com', 30, 'N/A', False, 'Test Location', ['consent']
+                return no_update, no_update, no_update, no_update, no_update, no_update 
