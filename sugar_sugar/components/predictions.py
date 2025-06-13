@@ -1,21 +1,22 @@
-from typing import List, Dict
-from dash import html, dash_table
+from typing import List, Dict, Optional
+from dash import html, dash_table, dcc, Output, Input
 import polars as pl
-from dash import Output, Input
+import dash
 
 
 TableData = List[Dict[str, str]]
 
 class PredictionTableComponent(html.Div):
-    def __init__(self, df: pl.DataFrame):
-        self.df = df
-        # Create the layout directly instead of storing it in a variable
+    def __init__(self):
+        # Create the layout with session storage and initial empty table
         super().__init__(
             children=[
+                dcc.Store(id='current-df-store', data=None),  # Session storage for current DataFrame
                 html.H4("Predictions Table", style={'fontSize': '20px', 'marginBottom': '10px'}),
                 dash_table.DataTable(
                     id='prediction-table-data',
-                    data=self.generate_table_data(),
+                    data=[],  # Start empty - will be populated by callbacks
+                    columns=[],  # Start empty - will be populated by callbacks
                     style_table={'overflowX': 'auto'},
                     style_cell={
                         'textAlign': 'center',
@@ -47,23 +48,75 @@ class PredictionTableComponent(html.Div):
             }
         )
 
-    def update_dataframe(self, df: pl.DataFrame):
-        """Updates the component's DataFrame reference"""
-        self.df = df
+    def register_callbacks(self, app: dash.Dash) -> None:
+        """Register all prediction table related callbacks"""
+        
+        @app.callback(
+            Output('current-df-store', 'data'),
+            [Input('last-click-time', 'data')]
+        )
+        def store_current_df(last_click_time: int) -> Optional[Dict]:
+            """Store the current DataFrame state when it changes"""
+            from sugar_sugar.app import df  # Import the global df
+            
+            if df is None or df.height == 0:
+                return None
+                
+            # Convert DataFrame to storable format
+            return {
+                'time': [t.isoformat() for t in df.get_column("time")],
+                'gl': df.get_column("gl").to_list(),
+                'prediction': df.get_column("prediction").to_list(),
+                'age': df.get_column("age").to_list(),
+                'user_id': df.get_column("user_id").to_list()
+            }
 
-    def generate_table_data(self) -> TableData:
+        @app.callback(
+            [Output('prediction-table-data', 'data'),
+             Output('prediction-table-data', 'columns')],
+            [Input('current-df-store', 'data')]
+        )
+        def update_table(df_data: Optional[Dict]) -> tuple[TableData, List[Dict]]:
+            """Updates the predictions table based on the stored DataFrame state."""
+            if not df_data:
+                return [], []
+            
+            # Reconstruct DataFrame from stored data
+            df = self._reconstruct_dataframe_from_dict(df_data)
+            
+            # Generate table data
+            table_data = self._generate_table_data(df)
+            
+            # Generate columns configuration
+            columns = [{'name': 'Metric', 'id': 'metric'}]
+            for i in range(len(df)):
+                columns.append({'name': f'T{i}', 'id': f't{i}'})
+            
+            return table_data, columns
+
+    def _reconstruct_dataframe_from_dict(self, df_data: Dict) -> pl.DataFrame:
+        """Reconstruct a Polars DataFrame from stored dictionary data"""
+        return pl.DataFrame({
+            'time': pl.Series(df_data['time']).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),
+            'gl': pl.Series(df_data['gl'], dtype=pl.Float64),
+            'prediction': pl.Series(df_data['prediction'], dtype=pl.Float64),
+            'age': pl.Series([int(float(x)) for x in df_data['age']], dtype=pl.Int64),
+            'user_id': pl.Series([int(float(x)) for x in df_data['user_id']], dtype=pl.Int64)
+        })
+
+    def _generate_table_data(self, df: pl.DataFrame) -> TableData:
         """Generates the table data with actual values, predictions, and errors."""
         table_data = []
         
         # Row 1: Actual glucose values
         glucose_row = {'metric': 'Actual Glucose'}
-        for i, gl in enumerate(self.df.get_column("gl")):
+        for i, gl in enumerate(df.get_column("gl")):
             glucose_row[f't{i}'] = f"{gl:.1f}" if gl is not None else "-"
         table_data.append(glucose_row)
         
         # Row 2: Predicted values with interpolation
         prediction_row = {'metric': 'Predicted'}
-        predictions = self.df.get_column("prediction")
+        predictions = df.get_column("prediction")
         non_zero_indices = [i for i, p in enumerate(predictions) if p != 0]
         
         if len(non_zero_indices) >= 2:
@@ -91,17 +144,17 @@ class PredictionTableComponent(html.Div):
         table_data.append(prediction_row)
         
         # Add error rows
-        table_data.extend(self._calculate_error_rows(prediction_row))
+        table_data.extend(self._calculate_error_rows(df, prediction_row))
         
         return table_data
 
-    def _calculate_error_rows(self, prediction_row: Dict[str, str]) -> List[Dict[str, str]]:
+    def _calculate_error_rows(self, df: pl.DataFrame, prediction_row: Dict[str, str]) -> List[Dict[str, str]]:
         """Calculates absolute and relative error rows for the table."""
         error_rows = []
         
         # Absolute Error
         error_row = {'metric': 'Absolute Error'}
-        for i, gl in enumerate(self.df.get_column("gl")):
+        for i, gl in enumerate(df.get_column("gl")):
             pred_str = prediction_row[f't{i}']
             if pred_str != "-" and gl is not None:
                 pred = float(pred_str)
@@ -113,7 +166,7 @@ class PredictionTableComponent(html.Div):
         
         # Relative Error
         rel_error_row = {'metric': 'Relative Error (%)'}
-        for i, gl in enumerate(self.df.get_column("gl")):
+        for i, gl in enumerate(df.get_column("gl")):
             pred_str = prediction_row[f't{i}']
             if pred_str != "-" and gl is not None and gl != 0:
                 pred = float(pred_str)
@@ -125,19 +178,15 @@ class PredictionTableComponent(html.Div):
         
         return error_rows
 
-    def register_callbacks(self, app):
-        @app.callback(
-            [Output('prediction-table-data', 'data'),
-             Output('prediction-table-data', 'columns')],
-            [Input('last-click-time', 'data')]
-        )
-        def update_table(last_click_time: int):
-            """Updates the predictions table based on the DataFrame state."""
-            table_data = self.generate_table_data()
-            
-            # Generate columns configuration
-            columns = [{'name': 'Metric', 'id': 'metric'}]
-            for i in range(len(self.df)):
-                columns.append({'name': f'T{i}', 'id': f't{i}'})
-            
-            return table_data, columns 
+    # Keep these methods for backward compatibility with metrics component
+    def update_dataframe(self, df: pl.DataFrame):
+        """Backward compatibility method - now handled by session storage"""
+        pass
+
+    def generate_table_data(self) -> TableData:
+        """Backward compatibility method that returns the last generated table data"""
+        # This is used by the metrics component, so we need to provide access to the data
+        from sugar_sugar.app import df
+        if df is None:
+            return []
+        return self._generate_table_data(df) 

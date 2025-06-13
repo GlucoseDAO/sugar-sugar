@@ -48,7 +48,7 @@ app = dash.Dash(__name__,
 
 # Create global instances
 glucose_chart = GlucoseChart(id='glucose-graph')
-prediction_table = PredictionTableComponent(df)
+prediction_table = PredictionTableComponent()
 metrics_component = MetricsComponent()
 submit_component = SubmitComponent()
 startup_page = StartupPage()
@@ -127,7 +127,7 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
         return html.Div("No predictions to display", style={'textAlign': 'center', 'padding': '50px'})
     
     # Create new components with the updated data
-    prediction_table = PredictionTableComponent(df)
+    ending_prediction_table = PredictionTableComponent()
     
     # Update glucose chart and get the figure
     figure = ending_page.glucose_chart.update(df, events_df)
@@ -154,7 +154,7 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
         # Prediction table section
         html.Div([
             html.H3("Prediction Results", style={'textAlign': 'center'}),
-            *prediction_table.children  # Unpack the children list
+            *ending_prediction_table.children  # Unpack the children list
         ], style={'marginBottom': '20px'}),
         
         # Metrics section - now using stored metrics
