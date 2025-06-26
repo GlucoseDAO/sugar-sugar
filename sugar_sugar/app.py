@@ -88,8 +88,6 @@ def create_prediction_layout() -> html.Div:
         HeaderComponent(),
         html.Div([
             glucose_chart,
-            prediction_table,
-            metrics_component,
             submit_component
         ], style={'flex': '1'})
     ], style={
@@ -130,9 +128,39 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
     ending_glucose_chart = GlucoseChart(id='ending-glucose-chart')
     figure = ending_glucose_chart._build_figure(df, events_df)
     
+    # Calculate metrics directly from the data
+    metrics_component_ending = MetricsComponent()
+    table_data = metrics_component_ending._generate_table_data(df)
+    stored_metrics = None
+    
+    if len(table_data) >= 2:  # Need at least actual and predicted rows
+        stored_metrics = metrics_component_ending._calculate_metrics_from_table_data(table_data)
+    
+    # Create metrics display directly
+    metrics_display = MetricsComponent.create_ending_metrics_display(stored_metrics) if stored_metrics else [
+        html.H3("Accuracy Metrics", style={'textAlign': 'center'}),
+        html.Div(
+            "No metrics available - insufficient prediction data", 
+            style={
+                'color': 'gray',
+                'fontStyle': 'italic',
+                'fontSize': '16px',
+                'padding': '10px',
+                'textAlign': 'center'
+            }
+        )
+    ]
+
     # Create the page content with metrics container that will be populated by the callback
     return html.Div([
-        html.H1("Prediction Summary", style={'textAlign': 'center', 'marginBottom': '20px'}),
+        # Add a scroll-to-top trigger element
+        html.Div(id='scroll-to-top-trigger', style={'display': 'none'}),
+        html.H1("Prediction Summary", style={
+            'textAlign': 'center', 
+            'marginBottom': '20px',
+            'fontSize': 'clamp(24px, 4vw, 48px)',  # Responsive font size
+            'padding': '0 10px'
+        }),
         
         # Graph section
         html.Div([
@@ -144,37 +172,99 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
                     'scrollZoom': False,
                     'doubleClick': 'reset',
                     'displaylogo': False,
+                    'responsive': True  # Make graph responsive
                 },
-                style={'height': '500px'}
+                style={
+                    'height': 'clamp(300px, 50vh, 600px)',  # Responsive height
+                    'width': '100%'
+                }
             )
-        ], style={'marginBottom': '20px', 'padding': '20px', 'backgroundColor': 'white', 'borderRadius': '10px', 'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'}),
+        ], style={
+            'marginBottom': '20px', 
+            'padding': 'clamp(10px, 2vw, 20px)', 
+            'backgroundColor': 'white', 
+            'borderRadius': '10px', 
+            'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+            'width': '100%',
+            'boxSizing': 'border-box'
+        }),
         
-        # Prediction table section
+        # Prediction table section with responsive flexbox layout
         html.Div([
-            html.H3("Prediction Results", style={'textAlign': 'center'}),
+            html.H3("Prediction Results", style={
+                'textAlign': 'center', 
+                'marginBottom': '15px',
+                'fontSize': 'clamp(18px, 3vw, 24px)'  # Responsive font size
+            }),
             *ending_prediction_table.children  # Unpack the children list
-        ], style={'marginBottom': '20px'}),
+        ], style={
+            'marginBottom': '20px',
+            'padding': 'clamp(10px, 2vw, 20px)',
+            'backgroundColor': 'white',
+            'borderRadius': '10px',
+            'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+            'display': 'flex',
+            'flexDirection': 'column',
+            'width': '100%',
+            'boxSizing': 'border-box',
+            'overflowX': 'auto'  # Allow horizontal scroll for table if needed
+        }),
         
-        # Metrics section - now using stored metrics
+        # Metrics section - now directly calculated and displayed
         html.Div(
-            id='ending-metrics-container',  # Different ID for ending page metrics
+            metrics_display,
             style={
-                'padding': '20px',
+                'padding': 'clamp(10px, 2vw, 20px)',
                 'backgroundColor': 'white',
                 'borderRadius': '10px',
                 'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
-                'marginBottom': '20px'
+                'marginBottom': '20px',
+                'width': '100%',
+                'boxSizing': 'border-box'
             }
         ),
         
         # Buttons section
         html.Div([
-            dbc.Button("Exit", id='exit-button', color="secondary")
-        ], style={'textAlign': 'center', 'marginTop': '20px'})
+            html.Button(
+                'Exit',
+                id='exit-button',
+                autoFocus=False,
+                style={
+                    'backgroundColor': '#6c757d',  # Bootstrap secondary color
+                    'color': 'white',
+                    'padding': 'clamp(15px, 2vw, 20px) clamp(20px, 3vw, 30px)',
+                    'border': 'none',
+                    'borderRadius': '5px',
+                    'fontSize': 'clamp(18px, 3vw, 24px)',  # Responsive font size
+                    'cursor': 'pointer',
+                    'minWidth': '200px',
+                    'maxWidth': '400px',
+                    'width': '100%',
+                    'height': 'clamp(60px, 8vh, 80px)',  # Responsive height
+                    'display': 'flex',
+                    'alignItems': 'center',
+                    'justifyContent': 'center',
+                    'lineHeight': '1.2'
+                }
+            )
+        ], style={
+            'display': 'flex',
+            'justifyContent': 'center',
+            'alignItems': 'center',
+            'marginTop': '20px',
+            'padding': '0 10px'
+        })
     ], style={
-        'maxWidth': '1200px',
+        'maxWidth': '100%',  # Allow full width usage
+        'width': '100%',
         'margin': '0 auto',
-        'padding': '20px'
+        'padding': 'clamp(10px, 2vw, 20px)',  # Responsive padding
+        'display': 'flex',
+        'flexDirection': 'column',
+        'minHeight': '100vh',
+        'gap': 'clamp(10px, 2vh, 20px)',  # Responsive gap
+        'boxSizing': 'border-box'
     })
 
 def reconstruct_events_dataframe_from_dict(events_data: Dict) -> pl.DataFrame:
@@ -242,6 +332,15 @@ def handle_submit_button(n_clicks, user_info, full_df_data, current_df_data):
             current_full_df = current_full_df.with_columns(pl.lit(int(user_info['age'])).alias("age"))
             current_df = current_df.with_columns(pl.lit(int(user_info['age'])).alias("age"))
         
+        # Generate prediction table data directly from DataFrame instead of relying on component
+        if user_info is None:
+            user_info = {}
+        
+        # Create a temporary prediction table component to generate the table data
+        temp_prediction_table = PredictionTableComponent()
+        prediction_table_data = temp_prediction_table._generate_table_data(current_df)
+        user_info['prediction_table_data'] = prediction_table_data
+        
         # Save statistics before redirecting
         submit_component.save_statistics(current_full_df, user_info)
         
@@ -261,6 +360,21 @@ def handle_exit_button(n_clicks):
         # Just redirect to home - data will be reset by URL change callback
         return '/', None
     return no_update, no_update
+
+# Add client-side callback to scroll to top when ending page loads
+app.clientside_callback(
+    """
+    function(pathname) {
+        if (pathname === '/ending') {
+            window.scrollTo(0, 0);
+            return '';
+        }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output('scroll-to-top-trigger', 'children'),
+    Input('url', 'pathname')
+)
 
 @app.callback(
     [Output('full-df', 'data'),
@@ -604,14 +718,7 @@ def find_nearest_time(x: Union[str, float, datetime], df: pl.DataFrame) -> datet
     nearest_idx = time_diffs.select(pl.col("diff").arg_min()).item()
     return df.get_column("time")[nearest_idx]
 
-@app.callback(
-    Output('ending-metrics-container', 'children'),
-    [Input('metrics-store', 'data')],
-    prevent_initial_call=True
-)
-def update_ending_metrics_display(stored_metrics: Optional[Dict[str, Any]]) -> List[html.Div]:
-    """Updates the ending page metrics display based on stored metrics."""
-    return MetricsComponent.create_ending_metrics_display(stored_metrics)
+
 
 def main() -> None:
     """Starts the Dash server."""

@@ -158,38 +158,60 @@ class MetricsComponent(html.Div):
         
         # Create metrics display from stored data
         return [
-            html.H3("Accuracy Metrics", style={'textAlign': 'center'}),
+            html.H3("Accuracy Metrics", style={
+                'textAlign': 'center',
+                'fontSize': 'clamp(20px, 3vw, 28px)',  # Responsive font size
+                'marginBottom': 'clamp(10px, 2vh, 20px)'
+            }),
             html.Div([
                 html.Div([
                     html.Div([
-                        html.Strong(f"{metric}", style={'fontSize': '18px'}),
+                        html.Strong(f"{metric}", style={
+                            'fontSize': 'clamp(14px, 2.5vw, 18px)',  # Responsive font size
+                            'display': 'block',
+                            'marginBottom': '8px'
+                        }),
                         html.Div(f"{data['value']:.2f}" + ("%" if metric == "MAPE" else ""), 
-                               style={'fontSize': '24px', 'color': '#2c5282', 'margin': '5px 0'}),
+                               style={
+                                   'fontSize': 'clamp(18px, 3vw, 24px)',  # Responsive font size
+                                   'color': '#2c5282', 
+                                   'margin': '5px 0',
+                                   'fontWeight': 'bold'
+                               }),
                         html.Div(data['description'],
-                               style={'fontSize': '16px', 'color': '#4a5568'})
+                               style={
+                                   'fontSize': 'clamp(12px, 2vw, 16px)',  # Responsive font size 
+                                   'color': '#4a5568',
+                                   'lineHeight': '1.4'
+                               })
                     ], style={
-                        'padding': '15px',
-                        'margin': '10px',
+                        'padding': 'clamp(10px, 2vw, 15px)',  # Responsive padding
+                        'margin': 'clamp(5px, 1vw, 10px)',  # Responsive margin
                         'border': '2px solid #e2e8f0',
                         'borderRadius': '8px',
                         'backgroundColor': '#f8fafc',
-                        'minWidth': '200px',
-                        'flex': '1'
+                        'minWidth': 'clamp(150px, 20vw, 250px)',  # Responsive min width
+                        'flex': '1',
+                        'textAlign': 'center',
+                        'boxSizing': 'border-box'
                     })
                     for metric, data in stored_metrics.items()
                 ], style={
                     'display': 'flex',
                     'flexWrap': 'wrap',
-                    'gap': '10px',
-                    'justifyContent': 'center'
+                    'gap': 'clamp(8px, 1.5vw, 15px)',  # Responsive gap
+                    'justifyContent': 'center',
+                    'alignItems': 'stretch'  # Make all metric cards same height
                 })
             ], style={
                 'border': '2px solid #cbd5e0',
                 'borderRadius': '12px',
-                'padding': '15px',
-                'margin': '15px',
+                'padding': 'clamp(10px, 2vw, 20px)',  # Responsive padding
+                'margin': 'clamp(10px, 2vw, 15px)',  # Responsive margin
                 'backgroundColor': 'white',
-                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
+                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+                'width': '100%',
+                'boxSizing': 'border-box'
             })
         ]
 

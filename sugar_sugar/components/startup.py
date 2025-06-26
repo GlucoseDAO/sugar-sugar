@@ -167,6 +167,31 @@ class StartupPage(html.Div):
                         ])
                     ], style={'backgroundColor': '#f8f9fa', 'padding': '20px', 'borderRadius': '8px', 'marginBottom': '20px'}),
                     
+                    # <!-- START INSERTION: Just Test Me Button --> 
+                    html.Div([
+                        html.Button(
+                            'Just Test Me',
+                            id='test-me-button',
+                            style={
+                                'backgroundColor': '#2196F3',
+                                'color': 'white',
+                                'padding': '15px 25px',
+                                'border': 'none',
+                                'borderRadius': '5px',
+                                'fontSize': '18px',
+                                'cursor': 'pointer',
+                                'width': '100%',
+                                'height': '60px',
+                                'display': 'flex',
+                                'alignItems': 'center',
+                                'justifyContent': 'center',
+                                'lineHeight': '1.2',
+                                'marginBottom': '15px'
+                            }
+                        )
+                    ], style={'textAlign': 'center', 'marginTop': '30px'}),
+                    # <!-- END INSERTION: Just Test Me Button -->
+                    
                     html.Div([
                         html.Button(
                             'Start Prediction',
@@ -188,7 +213,7 @@ class StartupPage(html.Div):
                                 'lineHeight': '1.2'
                             }
                         )
-                    ], style={'textAlign': 'center', 'marginTop': '30px', 'marginBottom': '30px'}),
+                    ], style={'textAlign': 'center', 'marginBottom': '30px'}),
                     
                     # Debug skip button (only shown when DEBUG=true)
                     html.Div([
@@ -239,13 +264,19 @@ class StartupPage(html.Div):
             [Output('diabetic-details', 'style'),
              Output('diabetic-type-dropdown', 'value'),
              Output('diabetes-duration-input', 'value')],
-            [Input('diabetic-dropdown', 'value')]
+            [Input('diabetic-dropdown', 'value')],
+            [State('test-me-button', 'n_clicks'),
+             State('email-input', 'value')]
         )
-        def update_diabetic_details(is_diabetic: Optional[bool]) -> Tuple[Dict[str, str], Optional[str], Optional[int]]:
+        def update_diabetic_details(is_diabetic: Optional[bool], test_clicks: Optional[int], email: Optional[str]) -> Tuple[Dict[str, str], Optional[str], Optional[int]]:
             if is_diabetic is None:
                 return {'display': 'none'}, None, None
             elif is_diabetic:
-                return {'display': 'block'}, None, None
+                # Check if this is from the test button (email will be test email)
+                if test_clicks and email and 'test.user@example.com' in str(email):
+                    return {'display': 'block'}, 'Type 1', 5
+                else:
+                    return {'display': 'block'}, None, None
             else:
                 return {'display': 'none'}, 'N/A', 0
 
@@ -349,20 +380,57 @@ class StartupPage(html.Div):
                 }
                 return True, button_style, email_asterisk, age_asterisk, gender_asterisk, diabetic_asterisk, diabetic_type_asterisk, diabetes_duration_asterisk, location_asterisk 
 
-        # Debug skip button callback (only registered when DEBUG=true)
+        # <!-- START INSERTION: Combined Test Me and Skip Button Callback -->
+        # Combined callback for both "Just Test Me" and debug skip buttons
+        # Note: diabetic-type-dropdown, diabetes-duration-input, and medical-conditions-input
+        # are handled by their respective callbacks when diabetic-dropdown and medical-conditions-dropdown change
+        inputs = [Input('test-me-button', 'n_clicks')]
         if os.getenv('DEBUG', '').lower() == 'true':
-            @app.callback(
-                [Output('email-input', 'value'),
-                 Output('age-input', 'value'),
-                 Output('gender-dropdown', 'value'),
-                 Output('diabetic-dropdown', 'value'),
-                 Output('location-input', 'value'),
-                 Output('consent-checkbox', 'value')],
-                [Input('skip-button', 'n_clicks')],
-                prevent_initial_call=True
-            )
-            def fill_skip_form(n_clicks: Optional[int]) -> Tuple[str, int, str, bool, str, List[str]]:
-                if n_clicks:
-                    # Fill the form with dummy data and tick consent checkbox
-                    return 'test@example.com', 30, 'N/A', False, 'Test Location', ['consent']
-                return no_update, no_update, no_update, no_update, no_update, no_update 
+            inputs.append(Input('skip-button', 'n_clicks'))
+        
+        @app.callback(
+            [Output('email-input', 'value'),
+             Output('age-input', 'value'),
+             Output('gender-dropdown', 'value'),
+             Output('diabetic-dropdown', 'value'),
+             Output('medical-conditions-dropdown', 'value'),
+             Output('location-input', 'value'),
+             Output('consent-checkbox', 'value')],
+            inputs,
+            prevent_initial_call=True
+        )
+        def fill_form_data(*args) -> Tuple[str, int, str, bool, bool, str, List[str]]:
+            ctx = dash.callback_context
+            if not ctx.triggered:
+                return no_update, no_update, no_update, no_update, no_update, no_update, no_update
+            
+            button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+            
+            if button_id == 'test-me-button':
+                # Fill the form with realistic test data and tick consent checkbox
+                # Note: diabetic-type and diabetes-duration will be auto-filled by existing callbacks
+                return (
+                    'test.user@example.com',  # email
+                    28,                       # age
+                    'F',                      # gender (Female)
+                    True,                     # is_diabetic (Yes) - this will trigger diabetic details callback
+                    False,                    # medical_conditions (No) - this will trigger medical conditions callback
+                    'San Francisco, CA',      # location
+                    ['consent']               # consent checkbox
+                )
+            elif button_id == 'skip-button' and os.getenv('DEBUG', '').lower() == 'true':
+                # Fill the form with minimal debug data and tick consent checkbox
+                return (
+                    'test@example.com',       # email
+                    30,                       # age
+                    'N/A',                    # gender
+                    False,                    # is_diabetic (No) - this will trigger diabetic details callback
+                    False,                    # medical_conditions (No) - this will trigger medical conditions callback
+                    'Test Location',          # location
+                    ['consent']               # consent checkbox
+                )
+            
+            return no_update, no_update, no_update, no_update, no_update, no_update, no_update
+        # <!-- END INSERTION: Combined Test Me and Skip Button Callback -->
+
+ 

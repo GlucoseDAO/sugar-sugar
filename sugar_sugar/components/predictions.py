@@ -17,15 +17,34 @@ class PredictionTableComponent(html.Div):
                     id='prediction-table-data',
                     data=[],  # Start empty - will be populated by callbacks
                     columns=[],  # Start empty - will be populated by callbacks
-                    style_table={'overflowX': 'auto'},
+                    style_table={
+                        'width': '100%',
+                        'height': 'auto',
+                        'maxHeight': 'clamp(300px, 40vh, 500px)',  # Responsive max height
+                        'overflowY': 'auto',  # Allow vertical scroll if needed
+                        'overflowX': 'auto',  # Allow horizontal scroll for small screens
+                        'tableLayout': 'fixed'  # Fixed layout for equal column distribution
+                    },
                     style_cell={
                         'textAlign': 'center',
-                        'padding': '5px',
-                        'minWidth': '70px'
+                        'padding': 'clamp(2px, 1vw, 4px) clamp(1px, 0.5vw, 2px)',  # Responsive padding
+                        'fontSize': 'clamp(8px, 1.5vw, 12px)',  # Responsive font size
+                        'whiteSpace': 'nowrap',  # Prevent text wrapping to maintain compact layout
+                        'overflow': 'hidden',
+                        'textOverflow': 'ellipsis',
+                        'lineHeight': '1.2',
+                        'minWidth': '40px'  # Minimum width for readability
                     },
+                    style_cell_conditional=[],  # Will be set dynamically by callback
                     style_header={
                         'backgroundColor': '#f8fafc',
-                        'fontWeight': 'bold'
+                        'fontWeight': 'bold',
+                        'fontSize': 'clamp(8px, 1.5vw, 12px)',  # Responsive font size
+                        'padding': 'clamp(4px, 1vw, 6px) clamp(2px, 0.5vw, 4px)',  # Responsive padding
+                        'textAlign': 'center',
+                        'whiteSpace': 'normal',
+                        'height': 'auto',
+                        'minWidth': '40px'  # Minimum width for readability
                     },
                     style_data_conditional=[
                         {
@@ -40,11 +59,19 @@ class PredictionTableComponent(html.Div):
                 )
             ],
             style={
-                'padding': '20px',
+                'padding': 'clamp(10px, 2vw, 20px)',  # Responsive padding
                 'backgroundColor': 'white',
                 'borderRadius': '10px',
                 'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
-                'marginBottom': '20px'
+                'marginBottom': '20px',
+                'width': '100%',
+                'maxWidth': '100%',
+                'display': 'flex',
+                'flexDirection': 'column',
+                'flex': '1',  # Allow the table container to grow within the parent flexbox
+                'minHeight': '0',  # Allow shrinking if needed
+                'boxSizing': 'border-box',
+                'overflowX': 'auto'  # Allow horizontal scroll on small screens
             }
         )
 
@@ -62,13 +89,14 @@ class PredictionTableComponent(html.Div):
 
         @app.callback(
             [Output('prediction-table-data', 'data'),
-             Output('prediction-table-data', 'columns')],
+             Output('prediction-table-data', 'columns'),
+             Output('prediction-table-data', 'style_cell_conditional')],
             [Input('current-df-store', 'data')]
         )
-        def update_table(df_data: Optional[Dict]) -> tuple[TableData, List[Dict]]:
+        def update_table(df_data: Optional[Dict]) -> tuple[TableData, List[Dict], List[Dict]]:
             """Updates the predictions table based on the stored DataFrame state."""
             if not df_data:
-                return [], []
+                return [], [], []
             
             # Reconstruct DataFrame from stored data
             df = self._reconstruct_dataframe_from_dict(df_data)
@@ -76,12 +104,41 @@ class PredictionTableComponent(html.Div):
             # Generate table data
             table_data = self._generate_table_data(df)
             
-            # Generate columns configuration
+            # Generate columns configuration with dynamic widths
             columns = [{'name': 'Metric', 'id': 'metric'}]
-            for i in range(len(df)):
-                columns.append({'name': f'T{i}', 'id': f't{i}'})
+            num_data_columns = len(df)
+            # Calculate width for data columns (75% total width divided by number of columns)
+            data_column_width = f"{75 / num_data_columns}%" if num_data_columns > 0 else "75%"
             
-            return table_data, columns
+            # Create style conditional for data columns
+            style_cell_conditional = [
+                {
+                    'if': {'column_id': 'metric'},
+                    'textAlign': 'left',
+                    'fontWeight': 'bold',
+                    'width': '25%',  # Fixed percentage width for metric column
+                    'backgroundColor': '#f8fafc',
+                    'whiteSpace': 'nowrap',
+                    'overflow': 'hidden',
+                    'textOverflow': 'ellipsis'
+                }
+            ]
+            
+            for i in range(num_data_columns):
+                # Use shorter column names for better fit - show time index
+                columns.append({
+                    'name': f'T{i}', 
+                    'id': f't{i}',
+                    'type': 'text'
+                })
+                
+                # Add width styling for each data column
+                style_cell_conditional.append({
+                    'if': {'column_id': f't{i}'},
+                    'width': data_column_width
+                })
+            
+            return table_data, columns, style_cell_conditional
 
     def _reconstruct_dataframe_from_dict(self, df_data: Dict) -> pl.DataFrame:
         """Reconstruct a Polars DataFrame from stored dictionary data"""
