@@ -7,7 +7,8 @@ from sugar_sugar.config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS
 
 
 class HeaderComponent(Div):
-    def __init__(self, children: List = None, **kwargs):
+    def __init__(self, children: List = None, show_time_slider: bool = True, **kwargs):
+        self.show_time_slider = show_time_slider
         if children is None:
             children = self._create_header_content()
             
@@ -25,7 +26,7 @@ class HeaderComponent(Div):
 
     def create_controls(self) -> html.Div:
         """Create the points control and time slider section"""
-        return html.Div([
+        controls_children = [
             html.Div([
                 # Points control
                 html.Div([
@@ -39,22 +40,6 @@ class HeaderComponent(Div):
                         style={'width': '80px'}
                     ),
                 ], style={'flex': '0 0 auto', 'display': 'flex', 'alignItems': 'center'}),
-                
-                # Time slider
-                html.Div([
-                    html.Label('Time Window Position:', style={'marginRight': '10px'}),
-                    dcc.Slider(
-                        id='time-slider',
-                        min=0,
-                        max=100,  # This will be updated by callback
-                        value=0,
-                        marks=None,
-                        tooltip={"placement": "bottom", "always_visible": True},
-                        updatemode='mouseup',
-                        included=True,
-                        step=1
-                    ),
-                ], style={'flex': '1', 'marginLeft': '20px'}),
             ], style={
                 'display': 'flex',
                 'flexDirection': 'row',
@@ -62,7 +47,36 @@ class HeaderComponent(Div):
                 'gap': '10px',
                 'marginBottom': '10px'
             })
-        ])
+        ]
+        
+        # Always include the time slider for functionality, but conditionally hide it
+        time_slider_div = html.Div([
+            html.Label('Time Window Position:', style={'marginRight': '10px'}),
+            dcc.Slider(
+                id='time-slider',
+                min=0,
+                max=100,  # This will be updated by callback
+                value=0,
+                marks=None,
+                tooltip={"placement": "bottom", "always_visible": True},
+                updatemode='mouseup',
+                included=True,
+                step=1
+            ),
+        ], style={
+            'flex': '1', 
+            'marginLeft': '20px',
+            'display': 'block' if self.show_time_slider else 'none'  # Hide when show_time_slider is False
+        })
+        
+        # Add the time slider to the first child's style
+        if self.show_time_slider:
+            controls_children[0]['props']['children'].append(time_slider_div)
+        else:
+            # Still include the slider but hidden for callback functionality
+            controls_children.append(time_slider_div)
+        
+        return html.Div(controls_children)
 
     def create_upload_section(self) -> html.Div:
         """Create the file upload section"""

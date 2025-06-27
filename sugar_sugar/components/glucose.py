@@ -5,7 +5,8 @@ from datetime import datetime
 from dash import dcc, html, Output, Input
 import dash
 from dash.html import Div
-from sugar_sugar.config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS
+import random
+from sugar_sugar.config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS, PREDICTION_HOUR_OFFSET
 
 
 class GlucoseChart(Div):
@@ -186,7 +187,7 @@ class GlucoseChart(Div):
             pred_max = line_points.get_column("prediction").max()
             data_max = max(data_max, pred_max)
         
-        # Set bounds
+        # Set bounds with some padding
         lower_bound = min(STANDARD_MIN, max(0, data_min * 0.9))
         upper_bound = max(STANDARD_MAX, data_max * 1.1)
         
@@ -196,8 +197,8 @@ class GlucoseChart(Div):
         """Adds the main glucose data line to the figure."""
         # Determine how many points to show based on hide_last_hour setting
         if self.hide_last_hour:
-            # Show only first half of data points (hide last hour)
-            visible_points = len(self._current_df) // 2
+            # Show only data points minus PREDICTION_HOUR_OFFSET (hide last hour)
+            visible_points = len(self._current_df) - PREDICTION_HOUR_OFFSET +1
             visible_df = self._current_df.slice(0, visible_points)
             x_indices = list(range(visible_points))
             glucose_values = visible_df['gl']
@@ -213,27 +214,7 @@ class GlucoseChart(Div):
             name='Glucose Level',
             line=dict(color='blue'),
         ))
-        
-        # Add prediction area indicator if hiding last hour
-        if self.hide_last_hour:
-            self._add_prediction_area_indicator(figure, visible_points)
 
-    def _add_prediction_area_indicator(self, figure: go.Figure, visible_points: int):
-        """Add a visual indicator for the prediction area when last hour is hidden."""
-        total_points = len(self._current_df)
-        
-        # Add a shaded area to indicate where predictions should be made
-        figure.add_vrect(
-            x0=visible_points - 1,
-            x1=total_points ,
-            fillcolor="rgba(255, 215, 0, 0.2)",  # Light orange/yellow
-            line_width=2,
-            line_color="rgba(255, 165, 0, 0.8)",  # Orange border
-            annotation_text="Prediction Area",
-            annotation_position="top",
-            annotation_font_size=12,
-            annotation_font_color="orange"
-        )
 
     def _get_time_position(self, time_point: datetime) -> float:
         """Converts a datetime to its corresponding x-axis position."""
@@ -251,23 +232,47 @@ class GlucoseChart(Div):
             
             # Filter predictions to only show in allowed area when hiding last hour
             if self.hide_last_hour:
-                visible_points = len(self._current_df) // 2
-                # Only show predictions in the hidden area (second half)
-                filtered_positions = []
-                filtered_predictions = []
-                filtered_times = []
-                for i, (pos, pred, time_val) in enumerate(zip(x_positions, line_points.get_column("prediction"), line_points.get_column("time"))):
-                    if pos >= visible_points:  # Only show predictions in the hidden area
-                        filtered_positions.append(pos)
-                        filtered_predictions.append(pred)
-                        filtered_times.append(time_val)
+                visible_points = len(self._current_df) - PREDICTION_HOUR_OFFSET
+                # Only show predictions in the hidden area (after PREDICTION_HOUR_OFFSET)
+                filtered_data = []
+                seen_positions = set()  # Track seen positions to avoid duplicates
                 
-                x_positions = filtered_positions
-                predictions = filtered_predictions
-                custom_data = filtered_times
+                for i, (pos, pred, time_val) in enumerate(zip(x_positions, line_points.get_column("prediction"), line_points.get_column("time"))):
+                    if pos >= visible_points and pos not in seen_positions:  # Only show unique predictions in the hidden area
+                        filtered_data.append((pos, pred, time_val))
+                        seen_positions.add(pos)
+                
+                # Sort by position to ensure proper order for line drawing
+                filtered_data.sort(key=lambda x: x[0])
+                
+                if filtered_data:
+                    x_positions, predictions, custom_data = zip(*filtered_data)
+                    x_positions = list(x_positions)
+                    predictions = list(predictions)
+                    custom_data = list(custom_data)
+                else:
+                    x_positions, predictions, custom_data = [], [], []
             else:
-                predictions = line_points.get_column("prediction")
-                custom_data = line_points.get_column("time").to_list()
+                # Remove duplicates even when showing all predictions
+                unique_data = []
+                seen_positions = set()
+                
+                for i, (pos, pred, time_val) in enumerate(zip(x_positions, line_points.get_column("prediction"), line_points.get_column("time"))):
+                    if pos not in seen_positions:
+                        unique_data.append((pos, pred, time_val))
+                        seen_positions.add(pos)
+                
+                # Sort by position to ensure proper order
+                unique_data.sort(key=lambda x: x[0])
+                
+                if unique_data:
+                    x_positions, predictions, custom_data = zip(*unique_data)
+                    x_positions = list(x_positions)
+                    predictions = list(predictions)
+                    custom_data = list(custom_data)
+                else:
+                    predictions = line_points.get_column("prediction")
+                    custom_data = line_points.get_column("time").to_list()
             
             if x_positions:  # Only add traces if we have data to show
                 # Add prediction points
