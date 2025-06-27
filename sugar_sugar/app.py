@@ -44,7 +44,7 @@ app.title = "Sugar Sugar - Glucose Prediction Game"
 
 
 # Create component instances
-glucose_chart = GlucoseChart(id='glucose-graph')
+glucose_chart = GlucoseChart(id='glucose-graph', hide_last_hour=True)  # Hide last hour in prediction page
 prediction_table = PredictionTableComponent()
 metrics_component = MetricsComponent()
 submit_component = SubmitComponent()
@@ -124,8 +124,8 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
     # Create new components with the updated data
     ending_prediction_table = PredictionTableComponent()
     
-    # Create a new glucose chart for the ending page and get the figure
-    ending_glucose_chart = GlucoseChart(id='ending-glucose-chart')
+    # Create a new glucose chart for the ending page and get the figure (show complete data)
+    ending_glucose_chart = GlucoseChart(id='ending-glucose-chart', hide_last_hour=False)
     figure = ending_glucose_chart._build_figure(df, events_df)
     
     # Calculate metrics directly from the data
@@ -554,6 +554,12 @@ def handle_all_interactions(click_data, relayout_data, upload_contents, points_v
             click_x = point_data['x']
             click_y = point_data['y']
             
+            # Restrict clicks to prediction area only (second half of data)
+            visible_points = len(df) // 2
+            if click_x < visible_points:
+                print(f"Click at x={click_x} is outside prediction area (starts at x={visible_points}). Ignoring click.")
+                return (last_click_time, no_update, no_update, no_update, no_update)
+            
             nearest_time = find_nearest_time(click_x, df)
             full_df = full_df.with_columns(
                 pl.when(pl.col("time") == nearest_time)
@@ -585,6 +591,12 @@ def handle_all_interactions(click_data, relayout_data, upload_contents, points_v
                 end_y = latest_shape.get('y1')
                 
                 if all(v is not None for v in [start_x, end_x, start_y, end_y]):
+                    # Restrict drawing to prediction area only (second half of data)
+                    visible_points = len(df) // 2
+                    if start_x < visible_points or end_x < visible_points:
+                        print(f"Drawing area partially outside prediction area (starts at x={visible_points}). Ignoring shape.")
+                        return (last_click_time, no_update, no_update, no_update, no_update)
+                    
                     start_time = find_nearest_time(start_x, df)
                     end_time = find_nearest_time(end_x, df)
                     

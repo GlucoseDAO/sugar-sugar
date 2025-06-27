@@ -22,7 +22,7 @@ class GlucoseChart(Div):
         'Carbohydrates': {'symbol': 'square', 'color': 'green', 'size': 20}
     }
 
-    def __init__(self, id: str = 'glucose-chart'):
+    def __init__(self, id: str = 'glucose-chart', hide_last_hour: bool = False):
         # Initialize as a Div with session storage and graph component
         super().__init__([
             dcc.Store(id=f"{id}-df-store", data=None),  # Session storage for DataFrame
@@ -57,6 +57,7 @@ class GlucoseChart(Div):
         })
         
         self.id = id
+        self.hide_last_hour = hide_last_hour  # New parameter to control hiding last hour
 
     def _create_empty_figure(self) -> go.Figure:
         """Create an empty figure with basic layout"""
@@ -193,15 +194,46 @@ class GlucoseChart(Div):
 
     def _add_glucose_trace(self, figure: go.Figure):
         """Adds the main glucose data line to the figure."""
-        x_indices = list(range(len(self._current_df)))
+        # Determine how many points to show based on hide_last_hour setting
+        if self.hide_last_hour:
+            # Show only first half of data points (hide last hour)
+            visible_points = len(self._current_df) // 2
+            visible_df = self._current_df.slice(0, visible_points)
+            x_indices = list(range(visible_points))
+            glucose_values = visible_df['gl']
+        else:
+            # Show all data points
+            x_indices = list(range(len(self._current_df)))
+            glucose_values = self._current_df['gl']
         
         figure.add_trace(go.Scatter(
             x=x_indices,
-            y=self._current_df['gl'],
+            y=glucose_values,
             mode='lines+markers',
             name='Glucose Level',
             line=dict(color='blue'),
         ))
+        
+        # Add prediction area indicator if hiding last hour
+        if self.hide_last_hour:
+            self._add_prediction_area_indicator(figure, visible_points)
+
+    def _add_prediction_area_indicator(self, figure: go.Figure, visible_points: int):
+        """Add a visual indicator for the prediction area when last hour is hidden."""
+        total_points = len(self._current_df)
+        
+        # Add a shaded area to indicate where predictions should be made
+        figure.add_vrect(
+            x0=visible_points - 1,
+            x1=total_points ,
+            fillcolor="rgba(255, 215, 0, 0.2)",  # Light orange/yellow
+            line_width=2,
+            line_color="rgba(255, 165, 0, 0.8)",  # Orange border
+            annotation_text="Prediction Area",
+            annotation_position="top",
+            annotation_font_size=12,
+            annotation_font_color="orange"
+        )
 
     def _get_time_position(self, time_point: datetime) -> float:
         """Converts a datetime to its corresponding x-axis position."""
@@ -217,40 +249,54 @@ class GlucoseChart(Div):
         if line_points.height > 0:
             x_positions = [self._get_time_position(t) for t in line_points.get_column("time")]
             
-            # Add prediction points
-            figure.add_trace(go.Scatter(
-                x=x_positions,
-                y=line_points.get_column("prediction"),
-                mode='markers',
-                name='Prediction Points',
-                marker=dict(
-                    color='red',
-                    size=8,
-                    symbol='circle'
-                ),
-                hoverinfo='x+y',
-                hoverlabel=dict(bgcolor='white'),
-                customdata=line_points.get_column("time").to_list()
-            ))
-
-            # Add connecting lines between predictions
-            if line_points.height >= 2:
-                line_points_sorted = line_points.sort("time")
-                times = line_points_sorted.get_column("time")
-                predictions = line_points_sorted.get_column("prediction")
+            # Filter predictions to only show in allowed area when hiding last hour
+            if self.hide_last_hour:
+                visible_points = len(self._current_df) // 2
+                # Only show predictions in the hidden area (second half)
+                filtered_positions = []
+                filtered_predictions = []
+                filtered_times = []
+                for i, (pos, pred, time_val) in enumerate(zip(x_positions, line_points.get_column("prediction"), line_points.get_column("time"))):
+                    if pos >= visible_points:  # Only show predictions in the hidden area
+                        filtered_positions.append(pos)
+                        filtered_predictions.append(pred)
+                        filtered_times.append(time_val)
                 
-                for i in range(line_points.height - 1):
-                    start_pos = self._get_time_position(times[i])
-                    end_pos = self._get_time_position(times[i + 1])
-                    
-                    figure.add_trace(go.Scatter(
-                        x=[start_pos, end_pos],
-                        y=[predictions[i], predictions[i + 1]],
-                        mode='lines',
-                        line=dict(color='red', width=2),
-                        showlegend=False,
-                        hoverinfo='skip'
-                    ))
+                x_positions = filtered_positions
+                predictions = filtered_predictions
+                custom_data = filtered_times
+            else:
+                predictions = line_points.get_column("prediction")
+                custom_data = line_points.get_column("time").to_list()
+            
+            if x_positions:  # Only add traces if we have data to show
+                # Add prediction points
+                figure.add_trace(go.Scatter(
+                    x=x_positions,
+                    y=predictions,
+                    mode='markers',
+                    name='Prediction Points',
+                    marker=dict(
+                        color='red',
+                        size=8,
+                        symbol='circle'
+                    ),
+                    hoverinfo='x+y',
+                    hoverlabel=dict(bgcolor='white'),
+                    customdata=custom_data
+                ))
+
+                # Add connecting lines between predictions
+                if len(predictions) >= 2:
+                    for i in range(len(predictions) - 1):
+                        figure.add_trace(go.Scatter(
+                            x=[x_positions[i], x_positions[i + 1]],
+                            y=[predictions[i], predictions[i + 1]],
+                            mode='lines',
+                            line=dict(color='red', width=2),
+                            showlegend=False,
+                            hoverinfo='skip'
+                        ))
 
     def _add_event_markers(self, figure: go.Figure):
         """Adds event markers (insulin, exercise, carbs) to the figure."""
