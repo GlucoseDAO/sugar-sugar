@@ -398,8 +398,8 @@ class GlucoseChart(Div):
         y_range = self._calculate_y_axis_range()
         
         # Calculate window info for title
-        start_time = self._current_df.get_column("time")[0].strftime('%Y-%m-%d %H:%M')
-        end_time = self._current_df.get_column("time")[-1].strftime('%Y-%m-%d %H:%M')
+        start_time = self._current_df.get_column("time")[0].strftime('%H:%M')
+        end_time = self._current_df.get_column("time")[-1].strftime('%H:%M')
         
         figure.update_layout(
             title=f'Glucose Levels ({start_time} to {end_time})',
@@ -408,7 +408,7 @@ class GlucoseChart(Div):
                 title='Time',
                 tickmode='array',
                 tickvals=list(range(len(self._current_df))),
-                ticktext=[t.strftime('%Y-%m-%d %H:%M') for t in self._current_df.get_column("time")],
+                ticktext=[t.strftime('%H:%M') for t in self._current_df.get_column("time")],
                 fixedrange=True,
                 showspikes=True,
                 spikemode='across',
