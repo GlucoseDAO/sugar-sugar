@@ -5,7 +5,7 @@ Ever wondered how good you are at predicting where your glucose levels are headi
 
 ## How It Works
 
-1. **Load Your Data**: Upload your own Dexcom or Libre CSV file, or use our example dataset
+1. **Load Your Data**: Upload your own Dexcom or Libre CSV file, or use our example dataset (At the momemt we haven't yet fully tested the load your own data function-however the sample dataset is available and working)
 2. **Make Predictions**: Click and draw on the glucose chart to predict future glucose values
 3. **Compare Results**: Your predictions are compared against the actual glucose values from the file
 4. **See Your Accuracy**: Get detailed metrics showing how close your predictions were to reality
@@ -68,11 +68,16 @@ uv sync --group dev
 ```bash
 uv run start
 ```
+Note- for debuging purposes we have a comand for quickly filling in the form so the developpers can check fast other functions
+```bash
+uv run start --debug
+```
 
 ## KNOWN ISSUES:
 
 - Currently only Dexcom and Libre 3 are supported. We will add support for other CGM devices soon.
 - No scoring system and difficulty levels yet.
+- Import your own data hasn't been fully tested
 
 ## FAQ
 
