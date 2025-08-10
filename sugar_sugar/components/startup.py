@@ -6,12 +6,14 @@ import dash
 from typing import Dict, Any, Optional, List, Union, Tuple
 import os
 from dotenv import load_dotenv
+# DEBUG_MODE will be imported dynamically to get the latest value
 
 # Load environment variables
 load_dotenv()
 
 class StartupPage(html.Div):
     def __init__(self) -> None:
+        from sugar_sugar.config import DEBUG_MODE
         self.component_id: str = 'startup-page'
         
         # Create the layout
@@ -167,7 +169,7 @@ class StartupPage(html.Div):
                         ])
                     ], style={'backgroundColor': '#f8f9fa', 'padding': '20px', 'borderRadius': '8px', 'marginBottom': '20px'}),
                     
-                    # <!-- START INSERTION: Just Test Me Button --> 
+                    # <!-- START INSERTION: Just Test Me Button (Debug Mode Only) --> 
                     html.Div([
                         html.Button(
                             'Just Test Me',
@@ -189,8 +191,12 @@ class StartupPage(html.Div):
                                 'marginBottom': '15px'
                             }
                         )
-                    ], style={'textAlign': 'center', 'marginTop': '30px'}),
-                    # <!-- END INSERTION: Just Test Me Button -->
+                    ], style={
+                        'textAlign': 'center', 
+                        'marginTop': '30px',
+                        'display': 'block' if DEBUG_MODE else 'none'
+                    }),
+                    # <!-- END INSERTION: Just Test Me Button (Debug Mode Only) -->
                     
                     html.Div([
                         html.Button(
@@ -215,33 +221,7 @@ class StartupPage(html.Div):
                         )
                     ], style={'textAlign': 'center', 'marginBottom': '30px'}),
                     
-                    # Debug skip button (only shown when DEBUG=true)
-                    html.Div([
-                        html.Button(
-                            'Skip (just want to play)',
-                            id='skip-button',
-                            style={
-                                'backgroundColor': '#ff9800',
-                                'color': 'white',
-                                'padding': '15px 25px',
-                                'border': 'none',
-                                'borderRadius': '5px',
-                                'fontSize': '18px',
-                                'cursor': 'pointer',
-                                'width': '100%',
-                                'height': '60px',
-                                'display': 'flex',
-                                'alignItems': 'center',
-                                'justifyContent': 'center',
-                                'lineHeight': '1.2'
-                            }
-                        )
-                    ], style={
-                        'textAlign': 'center', 
-                        'marginTop': '15px', 
-                        'marginBottom': '30px',
-                        'display': 'block' if os.getenv('DEBUG', '').lower() == 'true' else 'none'
-                    })
+
                 ], style={'maxWidth': '600px', 'margin': '0 auto', 'padding': '20px'})
             ], style={'backgroundColor': 'white', 'borderRadius': '10px', 'boxShadow': '0 0 10px rgba(0,0,0,0.1)'})
         ]
@@ -380,14 +360,10 @@ class StartupPage(html.Div):
                 }
                 return True, button_style, email_asterisk, age_asterisk, gender_asterisk, diabetic_asterisk, diabetic_type_asterisk, diabetes_duration_asterisk, location_asterisk 
 
-        # <!-- START INSERTION: Combined Test Me and Skip Button Callback -->
-        # Combined callback for both "Just Test Me" and debug skip buttons
+        # <!-- START INSERTION: Test Me Button Callback -->
+        # Callback for "Just Test Me" button
         # Note: diabetic-type-dropdown, diabetes-duration-input, and medical-conditions-input
         # are handled by their respective callbacks when diabetic-dropdown and medical-conditions-dropdown change
-        inputs = [Input('test-me-button', 'n_clicks')]
-        if os.getenv('DEBUG', '').lower() == 'true':
-            inputs.append(Input('skip-button', 'n_clicks'))
-        
         @app.callback(
             [Output('email-input', 'value'),
              Output('age-input', 'value'),
@@ -396,17 +372,11 @@ class StartupPage(html.Div):
              Output('medical-conditions-dropdown', 'value'),
              Output('location-input', 'value'),
              Output('consent-checkbox', 'value')],
-            inputs,
+            [Input('test-me-button', 'n_clicks')],
             prevent_initial_call=True
         )
-        def fill_form_data(*args) -> Tuple[str, int, str, bool, bool, str, List[str]]:
-            ctx = dash.callback_context
-            if not ctx.triggered:
-                return no_update, no_update, no_update, no_update, no_update, no_update, no_update
-            
-            button_id = ctx.triggered[0]['prop_id'].split('.')[0]
-            
-            if button_id == 'test-me-button':
+        def fill_form_data(n_clicks) -> Tuple[str, int, str, bool, bool, str, List[str]]:
+            if n_clicks:
                 # Fill the form with realistic test data and tick consent checkbox
                 # Note: diabetic-type and diabetes-duration will be auto-filled by existing callbacks
                 return (
@@ -418,19 +388,8 @@ class StartupPage(html.Div):
                     'San Francisco, CA',      # location
                     ['consent']               # consent checkbox
                 )
-            elif button_id == 'skip-button' and os.getenv('DEBUG', '').lower() == 'true':
-                # Fill the form with minimal debug data and tick consent checkbox
-                return (
-                    'test@example.com',       # email
-                    30,                       # age
-                    'N/A',                    # gender
-                    False,                    # is_diabetic (No) - this will trigger diabetic details callback
-                    False,                    # medical_conditions (No) - this will trigger medical conditions callback
-                    'Test Location',          # location
-                    ['consent']               # consent checkbox
-                )
             
             return no_update, no_update, no_update, no_update, no_update, no_update, no_update
-        # <!-- END INSERTION: Combined Test Me and Skip Button Callback -->
+        # <!-- END INSERTION: Test Me Button Callback -->
 
  

@@ -11,9 +11,10 @@ import base64
 import tempfile
 import dash_bootstrap_components as dbc
 import os
+import typer
 
 from sugar_sugar.data import load_glucose_data
-from sugar_sugar.config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS, DOUBLE_CLICK_THRESHOLD, PREDICTION_HOUR_OFFSET
+from sugar_sugar.config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS, DOUBLE_CLICK_THRESHOLD, PREDICTION_HOUR_OFFSET, DEBUG_MODE
 from sugar_sugar.components.glucose import GlucoseChart
 from sugar_sugar.components.metrics import MetricsComponent
 from sugar_sugar.components.predictions import PredictionTableComponent
@@ -48,7 +49,8 @@ glucose_chart = GlucoseChart(id='glucose-graph', hide_last_hour=True)  # Hide la
 prediction_table = PredictionTableComponent()
 metrics_component = MetricsComponent()
 submit_component = SubmitComponent()
-startup_page = StartupPage()
+# startup_page will be created in main() after debug mode is set
+startup_page = None  # Will be initialized in main()
 ending_page = EndingPage()
 
 # Set initial layout to startup page
@@ -61,7 +63,7 @@ app.layout = html.Div([
     dcc.Store(id='events-df', data=None),
     dcc.Store(id='is-example-data', data=True),
 
-    html.Div(id='page-content', children=[startup_page])  # Initialize with startup page
+    html.Div(id='page-content', children=[])  # Will be populated in main()
 ])
 
 @app.callback(
@@ -80,7 +82,7 @@ def display_page(pathname: Optional[str], user_info: Optional[Dict[str, Any]],
         return create_prediction_layout()
     elif pathname == '/ending':
         return create_ending_layout(full_df_data, events_df_data, user_info)
-    return startup_page  # Return the startup page component
+    return startup_page if startup_page else html.Div("Loading...")  # Return the startup page component
 
 def create_prediction_layout() -> html.Div:
     """Create the prediction page layout"""
@@ -903,14 +905,36 @@ def find_nearest_time(x: Union[str, float, datetime], df: pl.DataFrame) -> datet
 
 
 
-def main() -> None:
+# Create typer app
+cli = typer.Typer()
+
+@cli.command()
+def main(debug: bool = typer.Option(False, "--debug", help="Enable debug mode to show test button")) -> None:
     """Starts the Dash server."""
+    # Import config here to update the global DEBUG_MODE variable
+    import sugar_sugar.config as config
+    
+    # Set the global debug mode based on command line argument
+    config.DEBUG_MODE = debug
+    
+    # Create components after setting debug mode
+    global startup_page
+    startup_page = StartupPage()
+    
     prediction_table.register_callbacks(app)  # Register the prediction table callbacks
     metrics_component.register_callbacks(app, prediction_table)  # Register the metrics component callbacks
     glucose_chart.register_callbacks(app)  # Register the glucose chart callbacks
     startup_page.register_callbacks(app)  # Register the startup page callbacks
     ending_page.register_callbacks(app)  # Register the ending page callbacks
+    
+    # Update the app layout with the new startup page
+    app.layout.children[-1].children = [startup_page]
+    
     app.run(debug=True)
 
+def cli_main() -> None:
+    """CLI entry point"""
+    cli()
+
 if __name__ == '__main__':
-    main()
+    cli()

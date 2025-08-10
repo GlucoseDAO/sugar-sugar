@@ -9,3 +9,6 @@ MAX_POINTS = 60
 PREDICTION_HOUR_OFFSET = 12
 
 DOUBLE_CLICK_THRESHOLD: int = 500  # milliseconds
+
+# Debug mode configuration
+DEBUG_MODE: bool = False
