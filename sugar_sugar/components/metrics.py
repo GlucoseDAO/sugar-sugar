@@ -5,7 +5,7 @@ import dash
 
 
 class MetricsComponent(html.Div):
-    def __init__(self):
+    def __init__(self) -> None:
         # Create the layout with session storage
         super().__init__(
             children=[
@@ -38,7 +38,7 @@ class MetricsComponent(html.Div):
             ]
         )
 
-    def register_callbacks(self, app: dash.Dash, prediction_table_instance) -> None:
+    def register_callbacks(self, app: dash.Dash, prediction_table_instance: Any) -> None:
         """Register all metrics-related callbacks"""
         
         @app.callback(
@@ -215,7 +215,7 @@ class MetricsComponent(html.Div):
             })
         ]
 
-    def _reconstruct_dataframe_from_dict(self, df_data: Dict) -> pl.DataFrame:
+    def _reconstruct_dataframe_from_dict(self, df_data: Dict[str, List[Any]]) -> pl.DataFrame:
         """Reconstruct a Polars DataFrame from stored dictionary data"""
         return pl.DataFrame({
             'time': pl.Series(df_data['time']).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),

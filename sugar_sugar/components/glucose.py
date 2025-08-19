@@ -23,7 +23,7 @@ class GlucoseChart(Div):
         'Carbohydrates': {'symbol': 'square', 'color': 'green', 'size': 20}
     }
 
-    def __init__(self, id: str = 'glucose-chart', hide_last_hour: bool = False):
+    def __init__(self, id: str = 'glucose-chart', hide_last_hour: bool = False) -> None:
         # Initialize as a Div with session storage and graph component
         super().__init__([
             dcc.Store(id=f"{id}-df-store", data=None),  # Session storage for DataFrame
@@ -84,7 +84,7 @@ class GlucoseChart(Div):
             [Input('current-window-df', 'data'),
              Input('events-df', 'data')]
         )
-        def store_chart_data(df_data: Optional[Dict], events_data: Optional[Dict]) -> tuple[Optional[Dict], Optional[Dict]]:
+        def store_chart_data(df_data: Optional[Dict], events_data: Optional[Dict]) -> Tuple[Optional[Dict], Optional[Dict]]:
             """Store the current DataFrame and events data when they change"""
             # Just pass through the session storage data
             return df_data, events_data
@@ -106,7 +106,7 @@ class GlucoseChart(Div):
             # Create the figure
             return self._build_figure(df, events_df)
 
-    def _reconstruct_dataframe_from_dict(self, df_data: Dict) -> pl.DataFrame:
+    def _reconstruct_dataframe_from_dict(self, df_data: Dict[str, List[Any]]) -> pl.DataFrame:
         """Reconstruct a Polars DataFrame from stored dictionary data"""
         return pl.DataFrame({
             'time': pl.Series(df_data['time']).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),
@@ -116,7 +116,7 @@ class GlucoseChart(Div):
             'user_id': pl.Series([int(float(x)) for x in df_data['user_id']], dtype=pl.Int64)
         })
 
-    def _reconstruct_events_dataframe_from_dict(self, events_data: Dict) -> pl.DataFrame:
+    def _reconstruct_events_dataframe_from_dict(self, events_data: Dict[str, List[Any]]) -> pl.DataFrame:
         """Reconstruct the events DataFrame from stored data"""
         return pl.DataFrame({
             'time': pl.Series(events_data['time']).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),
@@ -142,7 +142,7 @@ class GlucoseChart(Div):
         
         return figure
 
-    def _add_range_rectangles(self, figure: go.Figure):
+    def _add_range_rectangles(self, figure: go.Figure) -> None:
         """Add colored range rectangles to indicate glucose ranges."""
         # Add rectangle for high range (>180 mg/dL)
         figure.add_hrect(
@@ -193,7 +193,7 @@ class GlucoseChart(Div):
         
         return lower_bound, upper_bound
 
-    def _add_glucose_trace(self, figure: go.Figure):
+    def _add_glucose_trace(self, figure: go.Figure) -> None:
         """Adds the main glucose data line to the figure."""
         # Determine how many points to show based on hide_last_hour setting
         if self.hide_last_hour:
@@ -224,7 +224,7 @@ class GlucoseChart(Div):
                 return idx
         return 0
 
-    def _add_prediction_traces(self, figure: go.Figure):
+    def _add_prediction_traces(self, figure: go.Figure) -> None:
         """Adds prediction points and connecting lines to the figure."""
         line_points = self._current_df.filter(pl.col("prediction") != 0.0)
         if line_points.height > 0:
@@ -303,7 +303,7 @@ class GlucoseChart(Div):
                             hoverinfo='skip'
                         ))
 
-    def _add_event_markers(self, figure: go.Figure):
+    def _add_event_markers(self, figure: go.Figure) -> None:
         """Adds event markers (insulin, exercise, carbs) to the figure."""
         if self._current_events.height == 0:
             return
@@ -393,7 +393,7 @@ class GlucoseChart(Div):
                     hoverinfo='text'
                 ))
 
-    def _update_layout(self, figure: go.Figure):
+    def _update_layout(self, figure: go.Figure) -> None:
         """Updates the figure layout with axes, margins, and interaction settings."""
         y_range = self._calculate_y_axis_range()
         

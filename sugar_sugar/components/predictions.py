@@ -1,4 +1,4 @@
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple, Any
 from dash import html, dash_table, dcc, Output, Input
 import polars as pl
 import dash
@@ -7,7 +7,7 @@ import dash
 TableData = List[Dict[str, str]]
 
 class PredictionTableComponent(html.Div):
-    def __init__(self):
+    def __init__(self) -> None:
         # Create the layout with session storage and initial empty table
         super().__init__(
             children=[
@@ -93,7 +93,7 @@ class PredictionTableComponent(html.Div):
              Output('prediction-table-data', 'style_cell_conditional')],
             [Input('current-df-store', 'data')]
         )
-        def update_table(df_data: Optional[Dict]) -> tuple[TableData, List[Dict], List[Dict]]:
+        def update_table(df_data: Optional[Dict]) -> Tuple[TableData, List[Dict], List[Dict]]:
             """Updates the predictions table based on the stored DataFrame state."""
             if not df_data:
                 return [], [], []
@@ -140,7 +140,7 @@ class PredictionTableComponent(html.Div):
             
             return table_data, columns, style_cell_conditional
 
-    def _reconstruct_dataframe_from_dict(self, df_data: Dict) -> pl.DataFrame:
+    def _reconstruct_dataframe_from_dict(self, df_data: Dict[str, List[Any]]) -> pl.DataFrame:
         """Reconstruct a Polars DataFrame from stored dictionary data"""
         return pl.DataFrame({
             'time': pl.Series(df_data['time']).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),

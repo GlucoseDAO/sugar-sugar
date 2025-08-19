@@ -12,6 +12,13 @@ import tempfile
 import dash_bootstrap_components as dbc
 import os
 import typer
+from dotenv import load_dotenv
+
+# Load environment variables from .env file in project root
+# Find the project root (parent directory of this file's directory)
+project_root = Path(__file__).parent.parent
+env_path = project_root / '.env'
+load_dotenv(env_path)
 
 from sugar_sugar.data import load_glucose_data
 from sugar_sugar.config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS, DOUBLE_CLICK_THRESHOLD, PREDICTION_HOUR_OFFSET, DEBUG_MODE
@@ -277,7 +284,7 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
         'boxSizing': 'border-box'
     })
 
-def reconstruct_events_dataframe_from_dict(events_data: Dict) -> pl.DataFrame:
+def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) -> pl.DataFrame:
     """Reconstruct the events DataFrame from stored data.""" 
     return pl.DataFrame({
         'time': pl.Series(events_data['time']).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),
@@ -301,8 +308,10 @@ def reconstruct_events_dataframe_from_dict(events_data: Dict) -> pl.DataFrame:
      State('location-input', 'value')],
     prevent_initial_call=True
 )
-def handle_start_button(n_clicks, email, age, gender, diabetic, diabetic_type, 
-                       diabetes_duration, medical_conditions, medical_conditions_input, location):
+def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Optional[int], 
+                       gender: Optional[str], diabetic: Optional[bool], diabetic_type: Optional[str], 
+                       diabetes_duration: Optional[int], medical_conditions: Optional[bool], 
+                       medical_conditions_input: Optional[str], location: Optional[str]) -> Tuple[str, Dict[str, Any]]:
     """Handle start button on startup page"""
     if n_clicks and email and age:
         print("DEBUG: Start button clicked")
@@ -329,7 +338,9 @@ def handle_start_button(n_clicks, email, age, gender, diabetic, diabetic_type,
      State('time-slider', 'value')],
     prevent_initial_call=True
 )
-def handle_submit_button(n_clicks, user_info, full_df_data, current_df_data, slider_value):
+def handle_submit_button(n_clicks: Optional[int], user_info: Optional[Dict[str, Any]], 
+                        full_df_data: Optional[Dict], current_df_data: Optional[Dict], 
+                        slider_value: Optional[int]) -> Tuple[str, Optional[Dict[str, Any]]]:
     """Handle submit button on prediction page"""
     if n_clicks and full_df_data and current_df_data:
         print("DEBUG: Submit button clicked")
@@ -368,7 +379,7 @@ def handle_submit_button(n_clicks, user_info, full_df_data, current_df_data, sli
     [Input('exit-button', 'n_clicks')],
     prevent_initial_call=True
 )
-def handle_exit_button(n_clicks):
+def handle_exit_button(n_clicks: Optional[int]) -> Tuple[str, None]:
     """Handle exit button"""
     if n_clicks:
         print("DEBUG: Exit button clicked")
@@ -399,7 +410,7 @@ app.clientside_callback(
     [Input('url', 'pathname')],
     prevent_initial_call=False
 )
-def handle_url_changes(pathname: str):
+def handle_url_changes(pathname: str) -> Tuple[Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool]:
     """Handle URL changes and initialize session storage"""
     
     if pathname == '/ending':
@@ -462,9 +473,12 @@ def handle_url_changes(pathname: str):
      State('is-example-data', 'data')],
     prevent_initial_call=True
 )
-def handle_all_interactions(click_data, relayout_data, upload_contents, points_value, slider_value,
-                           last_click_time, filename, current_position, current_points,
-                           full_df_data, current_df_data, events_df_data, is_example_data):
+def handle_all_interactions(click_data: Optional[Dict], relayout_data: Optional[Dict], 
+                           upload_contents: Optional[str], points_value: Optional[int], 
+                           slider_value: Optional[int], last_click_time: int, filename: Optional[str], 
+                           current_position: Optional[int], current_points: Optional[int],
+                           full_df_data: Optional[Dict], current_df_data: Optional[Dict], 
+                           events_df_data: Optional[Dict], is_example_data: Optional[bool]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool]:
     """Consolidated callback for all interactions that update last-click-time and data"""
     
     current_time = int(time.time() * 1000)
@@ -693,7 +707,7 @@ def handle_all_interactions(click_data, relayout_data, upload_contents, points_v
      State('points-control', 'value')],
     prevent_initial_call=True
 )
-def randomize_slider_on_prediction_page(slider_max: int, pathname: str, full_df_data: Optional[Dict], points_value: int):
+def randomize_slider_on_prediction_page(slider_max: int, pathname: str, full_df_data: Optional[Dict], points_value: int) -> Tuple[int, Dict[str, List[Any]]]:
     """Set slider to random position when time-slider component is ready on prediction page"""
     if pathname == '/prediction' and full_df_data and slider_max is not None:
         import random
@@ -742,7 +756,9 @@ def randomize_slider_on_prediction_page(slider_max: int, pathname: str, full_df_
      State('is-example-data', 'data')],
     prevent_initial_call=True
 )
-def update_ui_components(upload_contents, points_value, filename, current_position, full_df_data, is_example_data):
+def update_ui_components(upload_contents: Optional[str], points_value: Optional[int], 
+                        filename: Optional[str], current_position: Optional[int], 
+                        full_df_data: Optional[Dict], is_example_data: Optional[bool]) -> Tuple[Optional[html.Div], int, int]:
     """Update UI components based on file upload and points control"""
     
     ctx = dash.callback_context
@@ -796,7 +812,7 @@ def update_ui_components(upload_contents, points_value, filename, current_positi
     
     return no_update, no_update, no_update
 
-def reconstruct_dataframe_from_dict(df_data: Dict) -> pl.DataFrame:
+def reconstruct_dataframe_from_dict(df_data: Dict[str, List[Any]]) -> pl.DataFrame:
     """Safely reconstruct a Polars DataFrame from a dictionary with proper type handling."""
     return pl.DataFrame({
         'time': pl.Series(df_data['time']).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),
@@ -909,13 +925,22 @@ def find_nearest_time(x: Union[str, float, datetime], df: pl.DataFrame) -> datet
 cli = typer.Typer()
 
 @cli.command()
-def main(debug: bool = typer.Option(False, "--debug", help="Enable debug mode to show test button")) -> None:
+def main(
+    debug: Optional[bool] = typer.Option(None, "--debug", help="Enable debug mode to show test button"),
+    host: Optional[str] = typer.Option(None, "--host", help="Host to run the server on"),
+    port: Optional[int] = typer.Option(None, "--port", help="Port to run the server on")
+) -> None:
     """Starts the Dash server."""
     # Import config here to update the global DEBUG_MODE variable
     import sugar_sugar.config as config
     
-    # Set the global debug mode based on command line argument
-    config.DEBUG_MODE = debug
+    # Get configuration from environment variables with fallbacks
+    dash_host = host or os.getenv('DASH_HOST', '127.0.0.1')
+    dash_port = port or int(os.getenv('DASH_PORT', '8050'))
+    dash_debug = debug if debug is not None else os.getenv('DASH_DEBUG', 'True').lower() == 'true'
+    
+    # Set the global debug mode based on command line argument or environment
+    config.DEBUG_MODE = debug if debug is not None else os.getenv('DEBUG_MODE', 'False').lower() == 'true'
     
     # Create components after setting debug mode
     global startup_page
@@ -930,7 +955,10 @@ def main(debug: bool = typer.Option(False, "--debug", help="Enable debug mode to
     # Update the app layout with the new startup page
     app.layout.children[-1].children = [startup_page]
     
-    app.run(debug=True)
+    # Print configuration info
+    print(f"Starting Dash server on {dash_host}:{dash_port} (debug={dash_debug})")
+    
+    app.run(host=dash_host, port=dash_port, debug=dash_debug)
 
 def cli_main() -> None:
     """CLI entry point"""

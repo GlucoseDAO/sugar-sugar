@@ -1,3 +1,4 @@
+from typing import Dict, List, Any, Optional
 from dash import html, dcc
 from dash.html import Div
 import dash_bootstrap_components as dbc
@@ -8,7 +9,7 @@ import csv
 import os
 
 class SubmitComponent(Div):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__([
             dbc.Button(
                 "Submit",
@@ -20,7 +21,7 @@ class SubmitComponent(Div):
             dcc.Store(id='prediction-stats-store', data=None)
         ], style={'display': 'flex', 'justifyContent': 'center', 'alignItems': 'center'})
 
-    def _get_next_number(self):
+    def _get_next_number(self) -> int:
         """Get the next number for the prediction statistics."""
         csv_file = 'prediction_statistics.csv'
         if not os.path.exists(csv_file):
@@ -34,7 +35,7 @@ class SubmitComponent(Div):
         except Exception:
             return 0
 
-    def save_statistics(self, df: pl.DataFrame, user_info: dict) -> None:
+    def save_statistics(self, df: pl.DataFrame, user_info: Dict[str, Any]) -> None:
         """Save prediction statistics to CSV file"""
         csv_file = 'prediction_statistics.csv'
         

@@ -64,14 +64,39 @@ uv sync
 uv sync --group dev
 ```
 
+### Configuration
+1. Copy the environment template and customize your settings:
+```bash
+cp .env.template .env
+```
+
+2. Edit `.env` to configure your server settings:
+```bash
+# Dash Application Configuration
+DASH_HOST=127.0.0.1      # Host to run the server on
+DASH_PORT=8050           # Port to run the server on
+DASH_DEBUG=True          # Enable Dash debug mode
+DEBUG_MODE=False         # Enable application debug features (test button)
+```
+
 ### Running the Game
 ```bash
 uv run start
 ```
-Note- for debuging purposes we have a comand for quickly filling in the form so the developpers can check fast other functions
+
+You can also override configuration via command line:
 ```bash
+# Run on a different host/port
+uv run start --host 0.0.0.0 --port 3000
+
+# Enable debug mode for development
 uv run start --debug
+
+# Combine options
+uv run start --host 0.0.0.0 --port 3000 --debug
 ```
+
+Note: Debug mode adds a "Just Test Me" button for quickly filling in the form during development.
 
 ## KNOWN ISSUES:
 

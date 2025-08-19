@@ -7,7 +7,7 @@ from sugar_sugar.config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS
 
 
 class HeaderComponent(Div):
-    def __init__(self, children: List = None, show_time_slider: bool = True, **kwargs):
+    def __init__(self, children: Optional[List[Any]] = None, show_time_slider: bool = True, **kwargs) -> None:
         self.show_time_slider = show_time_slider
         if children is None:
             children = self._create_header_content()
@@ -100,7 +100,7 @@ class HeaderComponent(Div):
             html.Div(id='example-data-warning', style={'marginTop': '10px'})
         ])
 
-    def _create_header_content(self) -> List:
+    def _create_header_content(self) -> List[Any]:
         """Create the header section content with title and description"""
         return [
             html.H1('Sugar Sugar', 
