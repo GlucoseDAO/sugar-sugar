@@ -13,7 +13,6 @@ load_dotenv()
 
 class StartupPage(html.Div):
     def __init__(self) -> None:
-        from sugar_sugar.config import DEBUG_MODE
         self.component_id: str = 'startup-page'
         
         # Create the layout
@@ -194,7 +193,7 @@ class StartupPage(html.Div):
                     ], style={
                         'textAlign': 'center', 
                         'marginTop': '30px',
-                        'display': 'block' if DEBUG_MODE else 'none'
+                        'display': 'block' if self._get_debug_mode() else 'none'
                     }),
                     # <!-- END INSERTION: Just Test Me Button (Debug Mode Only) -->
                     
@@ -238,6 +237,14 @@ class StartupPage(html.Div):
                 'flexDirection': 'column'
             }
         )
+
+    def _get_debug_mode(self) -> bool:
+        """Dynamically get the current DEBUG_MODE value."""
+        try:
+            from sugar_sugar.config import DEBUG_MODE
+            return DEBUG_MODE
+        except ImportError:
+            return False
 
     def register_callbacks(self, app: dash.Dash) -> None:
         @app.callback(
