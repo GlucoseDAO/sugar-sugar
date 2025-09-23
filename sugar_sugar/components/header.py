@@ -85,7 +85,7 @@ class HeaderComponent(Div):
                 id='upload-data',
                 children=html.Div([
                     'Drag and Drop or ',
-                    html.A('Select a Dexcom/Libre CSV File')
+                    html.A('Upload Your Data Here')
                 ]),
                 style={
                     'width': '100%',
@@ -95,6 +95,21 @@ class HeaderComponent(Div):
                     'borderStyle': 'dashed',
                     'borderRadius': '5px',
                     'textAlign': 'center',
+                    'marginBottom': '10px'
+                }
+            ),
+            html.Button(
+                'Use Example Data',
+                id='use-example-data-button',
+                style={
+                    'width': '100%',
+                    'height': '40px',
+                    'backgroundColor': '#f8f9fa',
+                    'border': '1px solid #dee2e6',
+                    'borderRadius': '5px',
+                    'cursor': 'pointer',
+                    'fontSize': '14px',
+                    'color': '#6c757d'
                 }
             ),
             html.Div(id='example-data-warning', style={'marginTop': '10px'})
@@ -144,6 +159,34 @@ class HeaderComponent(Div):
                 html.Div([
                     self.create_controls(),
                     self.create_upload_section(),
+                    # Add data source indicator with improved visibility
+                    html.Div([
+                        html.Label('Current Data Source:', style={
+                            'fontWeight': 'bold',
+                            'marginRight': '8px',
+                            'color': '#4a5568',
+                            'fontSize': '14px'
+                        }),
+                        html.Div(id='data-source-display', children="example.csv", style={
+                            'color': '#2c5282',
+                            'fontStyle': 'italic',
+                            'fontSize': '14px',
+                            'fontWeight': '500',
+                            'overflow': 'hidden',
+                            'textOverflow': 'ellipsis',
+                            'maxWidth': '300px',
+                            'whiteSpace': 'nowrap'
+                        })
+                    ], style={
+                        'marginTop': '15px',
+                        'padding': '10px',
+                        'backgroundColor': '#f7fafc',
+                        'borderRadius': '5px',
+                        'display': 'flex',
+                        'alignItems': 'center',
+                        'width': '100%',
+                        'boxShadow': '0 1px 2px rgba(0,0,0,0.05)'
+                    })
                 ], style={'flex': '1'})
             ], style={
                 'display': 'flex',

@@ -1,6 +1,7 @@
 from typing import List, Dict, Tuple, Optional, Any, Union
 import dash
 from dash import dcc, html, Output, Input, State, no_update, dash_table
+from dash.exceptions import PreventUpdate
 import plotly.graph_objs as go
 
 import polars as pl
@@ -56,6 +57,7 @@ glucose_chart = GlucoseChart(id='glucose-graph', hide_last_hour=True)  # Hide la
 prediction_table = PredictionTableComponent()
 metrics_component = MetricsComponent()
 submit_component = SubmitComponent()
+header_component = HeaderComponent(show_time_slider=False)  # Create a persistent header component
 # startup_page will be created in main() after debug mode is set
 startup_page = None  # Will be initialized in main()
 ending_page = EndingPage()
@@ -69,6 +71,8 @@ app.layout = html.Div([
     dcc.Store(id='full-df', data=None),
     dcc.Store(id='events-df', data=None),
     dcc.Store(id='is-example-data', data=True),
+    dcc.Store(id='data-source-name', data="example.csv"),  # Store source filename
+    dcc.Store(id='randomization-initialized', data=False),  # Track if randomization has been done
 
     html.Div(id='page-content', children=[])  # Will be populated in main()
 ])
@@ -94,7 +98,7 @@ def display_page(pathname: Optional[str], user_info: Optional[Dict[str, Any]],
 def create_prediction_layout() -> html.Div:
     """Create the prediction page layout"""
     return html.Div([
-        HeaderComponent(show_time_slider=False),  # Hide the time slider on prediction page
+        header_component,  # Use the persistent header component
         html.Div([
             glucose_chart,
             submit_component
@@ -119,23 +123,41 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
     full_df = reconstruct_dataframe_from_dict(full_df_data)
     events_df = reconstruct_events_dataframe_from_dict(events_df_data)
     
-    # Use the same window that was used for predictions if available
-    if user_info and 'prediction_window_start' in user_info and 'prediction_window_size' in user_info:
-        window_start = user_info['prediction_window_start']
-        window_size = user_info['prediction_window_size']
-        df = full_df.slice(window_start, window_size)
-        print(f"DEBUG: Using prediction window starting at {window_start} with size {window_size}")
+    # Check if we have stored prediction data from the submit button
+    if user_info and 'prediction_table_data' in user_info:
+        print("DEBUG: Using stored prediction table data from submit button")
+        prediction_table_data = user_info['prediction_table_data']
+        
+        # Check if we have predictions in the stored data
+        if len(prediction_table_data) >= 2:
+            prediction_row = prediction_table_data[1]  # Second row contains predictions
+            valid_predictions = sum(1 for key, value in prediction_row.items() 
+                                  if key != 'metric' and value != "-")
+            print(f"DEBUG: Found {valid_predictions} valid predictions in stored data")
+            
+            if valid_predictions == 0:
+                print("DEBUG: No valid predictions in stored data")
+                return html.Div("No predictions to display", style={'textAlign': 'center', 'padding': '50px'})
+        else:
+            print("DEBUG: No prediction table data available")
+            return html.Div("No predictions to display", style={'textAlign': 'center', 'padding': '50px'})
+        
+        # Use the same window that was used for predictions if available
+        if user_info and 'prediction_window_start' in user_info and 'prediction_window_size' in user_info:
+            window_start = user_info['prediction_window_start']
+            window_size = user_info['prediction_window_size']
+            # Ensure we don't go beyond the available data
+            max_start = len(full_df) - window_size
+            safe_start = min(window_start, max_start)
+            safe_start = max(0, safe_start)
+            df = full_df.slice(safe_start, window_size)
+            print(f"DEBUG: Using prediction window starting at {safe_start} with size {window_size}")
+        else:
+            # Fallback to first DEFAULT_POINTS for display
+            df = full_df.slice(0, DEFAULT_POINTS)
+            print("DEBUG: No prediction window info found, using default first 24 points")
     else:
-        # Fallback to first DEFAULT_POINTS for display
-        df = full_df.slice(0, DEFAULT_POINTS)
-        print("DEBUG: No prediction window info found, using default first 24 points")
-    
-    # Check if we have any predictions
-    prediction_count = df.filter(pl.col("prediction") != 0.0).height
-    print(f"DEBUG: Found {prediction_count} predictions in ending page data")
-    
-    if prediction_count == 0:
-        print("DEBUG: No predictions found")
+        print("DEBUG: No stored prediction data found")
         return html.Div("No predictions to display", style={'textAlign': 'center', 'padding': '50px'})
     
     # Create new components with the updated data
@@ -145,13 +167,12 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
     ending_glucose_chart = GlucoseChart(id='ending-glucose-chart', hide_last_hour=False)
     figure = ending_glucose_chart._build_figure(df, events_df)
     
-    # Calculate metrics directly from the data
+    # Calculate metrics directly from the stored prediction table data
     metrics_component_ending = MetricsComponent()
-    table_data = metrics_component_ending._generate_table_data(df)
     stored_metrics = None
     
-    if len(table_data) >= 2:  # Need at least actual and predicted rows
-        stored_metrics = metrics_component_ending._calculate_metrics_from_table_data(table_data)
+    if len(prediction_table_data) >= 2:  # Need at least actual and predicted rows
+        stored_metrics = metrics_component_ending._calculate_metrics_from_table_data(prediction_table_data)
     
     # Create metrics display directly
     metrics_display = MetricsComponent.create_ending_metrics_display(stored_metrics) if stored_metrics else [
@@ -213,7 +234,42 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
                 'marginBottom': '15px',
                 'fontSize': 'clamp(18px, 3vw, 24px)'  # Responsive font size
             }),
-            *ending_prediction_table.children  # Unpack the children list
+            # Create prediction table directly from stored data
+            dash_table.DataTable(
+                data=prediction_table_data,
+                columns=[{'name': 'Metric', 'id': 'metric'}] + [
+                    {'name': f'T{i}', 'id': f't{i}', 'type': 'text'} 
+                    for i in range(len(prediction_table_data[0]) - 1) if prediction_table_data
+                ],
+                style_table={
+                    'width': '100%',
+                    'height': 'auto',
+                    'maxHeight': 'clamp(300px, 40vh, 500px)',
+                    'overflowY': 'auto',
+                    'overflowX': 'auto',
+                    'tableLayout': 'fixed'
+                },
+                style_cell={
+                    'textAlign': 'center',
+                    'padding': 'clamp(2px, 1vw, 4px) clamp(1px, 0.5vw, 2px)',
+                    'fontSize': 'clamp(8px, 1.5vw, 12px)',
+                    'whiteSpace': 'nowrap',
+                    'overflow': 'hidden',
+                    'textOverflow': 'ellipsis',
+                    'lineHeight': '1.2',
+                    'minWidth': '40px'
+                },
+                style_data_conditional=[
+                    {
+                        'if': {'row_index': 0},
+                        'backgroundColor': 'rgba(200, 240, 200, 0.5)'
+                    },
+                    {
+                        'if': {'row_index': 1},
+                        'backgroundColor': 'rgba(255, 200, 200, 0.5)'
+                    }
+                ]
+            )
         ], style={
             'marginBottom': '20px',
             'padding': 'clamp(10px, 2vw, 20px)',
@@ -286,11 +342,24 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
 
 def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) -> pl.DataFrame:
     """Reconstruct the events DataFrame from stored data.""" 
+    # Convert mixed types to strings first, then to float
+    insulin_values = []
+    for val in events_data['insulin_value']:
+        if val is None or val == '':
+            insulin_values.append(None)
+        else:
+            try:
+                # Convert to float, handling both string and numeric inputs
+                insulin_values.append(float(val))
+            except (ValueError, TypeError):
+                insulin_values.append(None)
+    
     return pl.DataFrame({
         'time': pl.Series(events_data['time']).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),
         'event_type': pl.Series(events_data['event_type'], dtype=pl.String),
         'event_subtype': pl.Series(events_data['event_subtype'], dtype=pl.String),
-        'insulin_value': pl.Series(events_data['insulin_value'], dtype=pl.Float64)
+        # Use pre-processed float values
+        'insulin_value': pl.Series(insulin_values, dtype=pl.Float64)
     })
 
 @app.callback(
@@ -367,6 +436,11 @@ def handle_submit_button(n_clicks: Optional[int], user_info: Optional[Dict[str, 
         prediction_table_data = temp_prediction_table._generate_table_data(current_df)
         user_info['prediction_table_data'] = prediction_table_data
         
+        # Debug: Check what predictions we have
+        prediction_count = current_df.filter(pl.col("prediction") != 0.0).height
+        print(f"DEBUG: Submit button - Found {prediction_count} predictions in current_df")
+        print(f"DEBUG: Submit button - Sample predictions: {current_df.filter(pl.col('prediction') != 0.0).select(['time', 'prediction']).head(5).to_dicts()}")
+        
         # Save statistics before redirecting
         submit_component.save_statistics(current_full_df, user_info)
         
@@ -375,17 +449,74 @@ def handle_submit_button(n_clicks: Optional[int], user_info: Optional[Dict[str, 
 
 @app.callback(
     [Output('url', 'pathname', allow_duplicate=True),
-     Output('user-info-store', 'data', allow_duplicate=True)],
+     Output('user-info-store', 'data', allow_duplicate=True),
+     Output('full-df', 'data', allow_duplicate=True),
+     Output('current-window-df', 'data', allow_duplicate=True),
+     Output('events-df', 'data', allow_duplicate=True),
+     Output('is-example-data', 'data', allow_duplicate=True),
+     Output('data-source-name', 'data', allow_duplicate=True),
+     Output('randomization-initialized', 'data', allow_duplicate=True)],
     [Input('exit-button', 'n_clicks')],
     prevent_initial_call=True
 )
-def handle_exit_button(n_clicks: Optional[int]) -> Tuple[str, None]:
-    """Handle exit button"""
+def handle_exit_button(n_clicks: Optional[int]) -> Tuple[str, None, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool]:
+    """Handle exit button - reset to example data and randomize"""
     if n_clicks:
         print("DEBUG: Exit button clicked")
-        # Just redirect to home - data will be reset by URL change callback
-        return '/', None
-    return no_update, no_update
+        
+        # Load fresh example data and randomize
+        full_df, events_df = load_glucose_data()
+        
+        # Start at a random position
+        import random
+        points = DEFAULT_POINTS
+        max_start_index = len(full_df) - points
+        
+        if max_start_index > 0:
+            # Generate random start position that is a multiple of the number of points
+            max_multiple = max_start_index // points
+            if max_multiple > 0:
+                random_multiple = random.randint(0, max_multiple)
+                random_start = random_multiple * points
+            else:
+                random_start = 0
+        else:
+            random_start = 0
+        
+        df = full_df.slice(random_start, points)
+        
+        # Reset predictions
+        full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
+        df = df.with_columns(pl.lit(0.0).alias("prediction"))
+        
+        print(f"DEBUG: Exit button - reset to example data with random_start={random_start}")
+        
+        # Convert DataFrames to JSON-serializable dictionaries
+        def convert_df_to_dict(df: pl.DataFrame) -> Dict[str, List[Any]]:
+            return {
+                'time': df.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
+                'gl': df.get_column('gl').to_list(),
+                'prediction': df.get_column('prediction').to_list(),
+                'age': df.get_column('age').to_list(),
+                'user_id': df.get_column('user_id').to_list()
+            }
+        
+        def convert_events_df_to_dict(df: pl.DataFrame) -> Dict[str, List[Any]]:
+            return {
+                'time': df.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
+                'event_type': df.get_column('event_type').to_list(),
+                'event_subtype': df.get_column('event_subtype').to_list(),
+                'insulin_value': df.get_column('insulin_value').to_list()
+            }
+        
+        return ('/', None, 
+                convert_df_to_dict(full_df),
+                convert_df_to_dict(df),
+                convert_events_df_to_dict(events_df),
+                True,  # is_example_data = True
+                "example.csv",  # data_source_name
+                False)  # reset randomization flag
+    return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
 
 # Add client-side callback to scroll to top when ending page loads
 app.clientside_callback(
@@ -406,25 +537,124 @@ app.clientside_callback(
     [Output('full-df', 'data'),
      Output('current-window-df', 'data'),
      Output('events-df', 'data'),
-     Output('is-example-data', 'data')],
+     Output('is-example-data', 'data'),
+     Output('data-source-name', 'data'),
+     Output('randomization-initialized', 'data')],
     [Input('url', 'pathname')],
-    prevent_initial_call=False
+    [State('full-df', 'data'),
+     State('current-window-df', 'data'),
+     State('events-df', 'data'),
+     State('is-example-data', 'data'),
+     State('data-source-name', 'data')],
+    prevent_initial_call='initial_duplicate'
 )
-def handle_url_changes(pathname: str) -> Tuple[Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool]:
+def handle_url_changes(pathname: str, current_full_df: Optional[Dict], current_window_df: Optional[Dict], 
+                      current_events_df: Optional[Dict], current_is_example: Optional[bool],
+                      current_source_name: Optional[str]) -> Tuple[Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool]:
     """Handle URL changes and initialize session storage"""
-    
+    print(f"DEBUG[app.handle_url_changes]: pathname={pathname}, has_full={current_full_df is not None}, has_window={current_window_df is not None}, has_events={current_events_df is not None}")
     if pathname == '/ending':
-        # Don't reset data when on ending page
-        return no_update, no_update, no_update, no_update
+        # Don't reset data when on ending page - don't update data-source-display since it doesn't exist on ending page
+        return no_update, no_update, no_update, no_update, no_update, no_update
     
-    # For startup and prediction pages, initialize fresh data
-    print(f"DEBUG: URL changed to {pathname}, initializing data")
-    full_df, events_df = load_glucose_data()
-    df = full_df.slice(0, DEFAULT_POINTS)
+    # If we're going to prediction page and already have data, preserve it
+    if pathname == '/prediction' and current_full_df is not None:
+        print(f"DEBUG: Going to prediction page, preserving existing data")
+        # Preserve state; data-source-display will be updated by a dedicated callback
+        return no_update, no_update, no_update, no_update, no_update, no_update
     
-    # Reset predictions
-    full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
-    df = df.with_columns(pl.lit(0.0).alias("prediction"))
+    # Only initialize fresh data when going to startup page or when no data exists
+    print(f"DEBUG[app.handle_url_changes]: URL changed to {pathname}, initializing fresh data")
+    
+    # Check if we should preserve the current data source or load fresh example data
+    # Don't preserve data source if we're going to startup page (/) - this indicates a reset
+    preserve_data_source = (current_source_name and current_source_name != "example.csv" and 
+                           pathname != '/')
+    
+    if preserve_data_source and current_full_df is not None:
+        # Preserve the current data source instead of loading fresh example data
+        print(f"DEBUG[app.handle_url_changes]: Preserving data source: {current_source_name}")
+        full_df, events_df = reconstruct_dataframe_from_dict(current_full_df), reconstruct_events_dataframe_from_dict(current_events_df)
+    else:
+        # Load fresh example data
+        print(f"DEBUG[app.handle_url_changes]: Loading fresh example data (pathname={pathname}, preserve_data_source={preserve_data_source})")
+        full_df, events_df = load_glucose_data()
+    
+    # Start at a random position for initial data too
+    import random
+    points = DEFAULT_POINTS
+    max_start_index = len(full_df) - points
+    
+    if max_start_index > 0:
+        # Generate random start position that is a multiple of the number of points
+        max_multiple = max_start_index // points
+        if max_multiple > 0:
+            random_multiple = random.randint(0, max_multiple)
+            random_start = random_multiple * points
+        else:
+            random_start = 0
+    else:
+        random_start = 0
+    
+    df = full_df.slice(random_start, points)
+    
+    # Only reset predictions for fresh data loading (not when preserving existing data)
+    # Check if we're loading fresh data vs preserving existing data with predictions
+    should_reset_predictions = True
+    
+    # If we have existing data with predictions, preserve them
+    if current_full_df is not None:
+        try:
+            existing_full_df = reconstruct_dataframe_from_dict(current_full_df)
+            existing_predictions = existing_full_df.filter(pl.col("prediction") != 0.0)
+            if existing_predictions.height > 0:
+                print(f"DEBUG[app.handle_url_changes]: Found {existing_predictions.height} existing predictions, preserving them")
+                should_reset_predictions = False
+        except Exception as e:
+            print(f"DEBUG[app.handle_url_changes]: Error checking existing predictions: {e}")
+            should_reset_predictions = True
+    
+    if should_reset_predictions:
+        # Reset predictions only for fresh data
+        full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
+        df = df.with_columns(pl.lit(0.0).alias("prediction"))
+        print("DEBUG[app.handle_url_changes]: Reset predictions for fresh data")
+    else:
+        # Preserve existing predictions by copying them to the new data
+        try:
+            existing_full_df = reconstruct_dataframe_from_dict(current_full_df)
+            existing_window_df = reconstruct_dataframe_from_dict(current_window_df) if current_window_df else None
+            
+            # Copy predictions from existing data to new data based on time matching
+            existing_predictions = existing_full_df.select(["time", "prediction"]).filter(pl.col("prediction") != 0.0)
+            
+            if existing_predictions.height > 0:
+                # Join predictions back to the new data
+                full_df = full_df.join(existing_predictions, on="time", how="left", suffix="_existing")
+                full_df = full_df.with_columns(
+                    pl.when(pl.col("prediction_existing").is_not_null())
+                    .then(pl.col("prediction_existing"))
+                    .otherwise(pl.col("prediction"))
+                    .alias("prediction")
+                ).drop("prediction_existing")
+                
+                # Also update the window df if we have it
+                if existing_window_df is not None:
+                    df = df.join(existing_predictions, on="time", how="left", suffix="_existing")
+                    df = df.with_columns(
+                        pl.when(pl.col("prediction_existing").is_not_null())
+                        .then(pl.col("prediction_existing"))
+                        .otherwise(pl.col("prediction"))
+                        .alias("prediction")
+                    ).drop("prediction_existing")
+                
+                print(f"DEBUG[app.handle_url_changes]: Preserved {existing_predictions.height} predictions in new data")
+        except Exception as e:
+            print(f"DEBUG[app.handle_url_changes]: Error preserving predictions: {e}, falling back to reset")
+            full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
+            df = df.with_columns(pl.lit(0.0).alias("prediction"))
+    
+    print(f"DEBUG[app.handle_url_changes]: initial data random_start={random_start}")
     
     # Convert DataFrames to JSON-serializable dictionaries
     def convert_df_to_dict(df: pl.DataFrame) -> Dict[str, List[Any]]:
@@ -448,7 +678,9 @@ def handle_url_changes(pathname: str) -> Tuple[Dict[str, List[Any]], Dict[str, L
         convert_df_to_dict(full_df),
         convert_df_to_dict(df),
         convert_events_df_to_dict(events_df),
-        True  # is_example_data = True by default
+        True,  # is_example_data = True by default
+        "example.csv",  # data_source_name for default data
+        False  # reset randomization flag for new data
     )
 
 # Consolidated callback for last-click-time updates
@@ -457,10 +689,13 @@ def handle_url_changes(pathname: str) -> Tuple[Dict[str, List[Any]], Dict[str, L
      Output('full-df', 'data', allow_duplicate=True),
      Output('current-window-df', 'data', allow_duplicate=True),
      Output('events-df', 'data', allow_duplicate=True),
-     Output('is-example-data', 'data', allow_duplicate=True)],
+     Output('is-example-data', 'data', allow_duplicate=True),
+     Output('data-source-name', 'data', allow_duplicate=True),
+     Output('randomization-initialized', 'data', allow_duplicate=True)],
     [Input('glucose-graph-graph', 'clickData'),
      Input('glucose-graph-graph', 'relayoutData'),
      Input('upload-data', 'contents'),
+     Input('use-example-data-button', 'n_clicks'),
      Input('points-control', 'value'),
      Input('time-slider', 'value')],
     [State('last-click-time', 'data'),
@@ -470,24 +705,28 @@ def handle_url_changes(pathname: str) -> Tuple[Dict[str, List[Any]], Dict[str, L
      State('full-df', 'data'),
      State('current-window-df', 'data'),
      State('events-df', 'data'),
-     State('is-example-data', 'data')],
+     State('is-example-data', 'data'),
+     State('data-source-name', 'data')],
     prevent_initial_call=True
 )
-def handle_all_interactions(click_data: Optional[Dict], relayout_data: Optional[Dict], 
-                           upload_contents: Optional[str], points_value: Optional[int], 
-                           slider_value: Optional[int], last_click_time: int, filename: Optional[str], 
-                           current_position: Optional[int], current_points: Optional[int],
-                           full_df_data: Optional[Dict], current_df_data: Optional[Dict], 
-                           events_df_data: Optional[Dict], is_example_data: Optional[bool]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool]:
+def handle_all_interactions(click_data: Optional[Dict], relayout_data: Optional[Dict],
+                          upload_contents: Optional[str], example_button_clicks: Optional[int],
+                          points_value: Optional[int], slider_value: Optional[int], 
+                          last_click_time: int, filename: Optional[str], 
+                          current_position: Optional[int], current_points: Optional[int],
+                          full_df_data: Optional[Dict], current_df_data: Optional[Dict], 
+                          events_df_data: Optional[Dict], is_example_data: Optional[bool],
+                          current_source_name: Optional[str]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool]:
     """Consolidated callback for all interactions that update last-click-time and data"""
-    
+    print(f"DEBUG[app.handle_all_interactions]: triggered with ctx and last_click={last_click_time}")
     current_time = int(time.time() * 1000)
     ctx = dash.callback_context
     
     if not ctx.triggered:
-        return last_click_time, no_update, no_update, no_update, no_update
+        return last_click_time, no_update, no_update, no_update, no_update, no_update, no_update
     
     trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    print(f"DEBUG[app.handle_all_interactions]: trigger_id={trigger_id}")
     
     # Helper functions
     def convert_df_to_dict(df: pl.DataFrame) -> Dict[str, List[Any]]:
@@ -509,7 +748,7 @@ def handle_all_interactions(click_data: Optional[Dict], relayout_data: Optional[
     
     # Get current data from session storage
     if not full_df_data or not current_df_data or not events_df_data:
-        return last_click_time, no_update, no_update, no_update, no_update
+        return last_click_time, no_update, no_update, no_update, no_update, no_update, no_update
     
     full_df = reconstruct_dataframe_from_dict(full_df_data)
     df = reconstruct_dataframe_from_dict(current_df_data)
@@ -517,51 +756,138 @@ def handle_all_interactions(click_data: Optional[Dict], relayout_data: Optional[
     
     # Handle file upload
     if trigger_id == 'upload-data' and upload_contents:
+        print(f"DEBUG[app.handle_all_interactions]: upload received filename={filename}")
         try:
             content_type, content_string = upload_contents.split(',')
             decoded = base64.b64decode(content_string)
             
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as tmp_file:
-                tmp_file.write(decoded)
-                tmp_path = Path(tmp_file.name)
+            # Create imputed_data directory if it doesn't exist
+            imputed_data_dir = Path('imputed_data')
+            imputed_data_dir.mkdir(exist_ok=True)
             
-            new_full_df, new_events_df = load_glucose_data(tmp_path)
-            new_df = new_full_df.slice(0, DEFAULT_POINTS)
-            tmp_path.unlink()
+            # Generate unique filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            safe_filename = filename.replace(' ', '_').replace('/', '_') if filename else 'uploaded_data'
+            if not safe_filename.endswith('.csv'):
+                safe_filename += '.csv'
+            unique_filename = f"{timestamp}_{safe_filename}"
+            
+            # Save file to imputed_data folder
+            save_path = imputed_data_dir / unique_filename
+            with open(save_path, 'wb') as f:
+                f.write(decoded)
+            
+            print(f"DEBUG[app.handle_all_interactions]: saved uploaded file to {save_path}")
+            
+            new_full_df, new_events_df = load_glucose_data(save_path)
+            
+            # Start at a random position for uploaded files too
+            import random
+            points = max(MIN_POINTS, min(MAX_POINTS, points_value or DEFAULT_POINTS))
+            max_start_index = len(new_full_df) - points
+            
+            if max_start_index > 0:
+                # Generate random start position that is a multiple of the number of points
+                max_multiple = max_start_index // points
+                if max_multiple > 0:
+                    random_multiple = random.randint(0, max_multiple)
+                    random_start = random_multiple * points
+                else:
+                    random_start = 0
+            else:
+                random_start = 0
+            
+            new_df = new_full_df.slice(random_start, points)
+            
+            print(f"DEBUG[app.handle_all_interactions]: loaded uploaded data full_len={len(new_full_df)}, window_len={len(new_df)}, random_start={random_start}")
+            print(f"DEBUG[app.handle_all_interactions]: sample_glucose={new_df.get_column('gl').head(5).to_list()}")
+            print(f"DEBUG[app.handle_all_interactions]: setting data source to {filename}")
             
             return (current_time, 
                    convert_df_to_dict(new_full_df),
                    convert_df_to_dict(new_df),
                    convert_events_df_to_dict(new_events_df),
-                   False)  # is_example_data = False for uploaded files
+                   False,  # is_example_data = False for uploaded files
+                   filename,  # store the original filename
+                   False)  # reset randomization flag for new data
             
         except Exception as e:
-            print(f"Error loading file: {e}")
-            return current_time, no_update, no_update, no_update, no_update
+            print(f"ERROR[app.handle_all_interactions]: error loading file: {e}")
+            return current_time, no_update, no_update, no_update, no_update, no_update, no_update
+    
+    # Handle use example data button
+    elif trigger_id == 'use-example-data-button':
+        print("DEBUG[app.handle_all_interactions]: Use example data button clicked")
+        # Load fresh example data
+        new_full_df, new_events_df = load_glucose_data()
+        
+        # Start at a random position for example data too
+        import random
+        points = max(MIN_POINTS, min(MAX_POINTS, points_value or DEFAULT_POINTS))
+        max_start_index = len(new_full_df) - points
+        
+        if max_start_index > 0:
+            # Generate random start position that is a multiple of the number of points
+            max_multiple = max_start_index // points
+            if max_multiple > 0:
+                random_multiple = random.randint(0, max_multiple)
+                random_start = random_multiple * points
+            else:
+                random_start = 0
+        else:
+            random_start = 0
+        
+        new_df = new_full_df.slice(random_start, points)
+        
+        # Reset predictions
+        new_full_df = new_full_df.with_columns(pl.lit(0.0).alias("prediction"))
+        new_df = new_df.with_columns(pl.lit(0.0).alias("prediction"))
+        
+        print(f"DEBUG[app.handle_all_interactions]: example data random_start={random_start}")
+        
+        return (current_time, 
+               convert_df_to_dict(new_full_df),
+               convert_df_to_dict(new_df),
+               convert_events_df_to_dict(new_events_df),
+               True,  # is_example_data = True for example data
+               "example.csv",  # data_source_name for example data
+               False)  # reset randomization flag for new data
     
     # Handle points control
     elif trigger_id == 'points-control':
         points = max(MIN_POINTS, min(MAX_POINTS, points_value))
         new_max = len(full_df) - points
-        new_start = min(current_position, new_max)
+        new_start = min(current_position or 0, new_max)
         new_start = max(0, new_start)
-        new_df = full_df.slice(new_start, new_start + points)
+        new_df = full_df.slice(new_start, points)
+        
+        print(f"DEBUG[app.handle_all_interactions]: points control changed to {points}, start {new_start}")
         
         return (current_time,
                no_update,
                convert_df_to_dict(new_df),
+               no_update,
+               no_update,
                no_update,
                no_update)
     
     # Handle time slider
     elif trigger_id == 'time-slider':
-        new_df = full_df.slice(slider_value, slider_value + current_points)
-        if len(new_df) != current_points:
-            new_df = new_df.head(current_points)
+        # Ensure we don't go beyond the available data
+        points = max(MIN_POINTS, min(MAX_POINTS, current_points or DEFAULT_POINTS))
+        max_start = len(full_df) - points
+        safe_slider_value = min(slider_value, max_start)
+        safe_slider_value = max(0, safe_slider_value)
+        
+        new_df = full_df.slice(safe_slider_value, points)
+        
+        print(f"DEBUG[app.handle_all_interactions]: slider moved to {safe_slider_value}, window size {points}")
         
         return (current_time,
                no_update,
                convert_df_to_dict(new_df),
+               no_update,
+               no_update,
                no_update,
                no_update)
     
@@ -577,6 +903,8 @@ def handle_all_interactions(click_data: Optional[Dict], relayout_data: Optional[
                        convert_df_to_dict(full_df),
                        convert_df_to_dict(df),
                        no_update,
+                       no_update,
+                       no_update,
                        no_update)
             
             point_data = click_data['points'][0]
@@ -587,7 +915,7 @@ def handle_all_interactions(click_data: Optional[Dict], relayout_data: Optional[
             visible_points = len(df) - PREDICTION_HOUR_OFFSET
             if click_x < visible_points:
                 print(f"Click at x={click_x} is outside prediction area (starts at x={visible_points}). Ignoring click.")
-                return (last_click_time, no_update, no_update, no_update, no_update)
+                return (last_click_time, no_update, no_update, no_update, no_update, no_update, no_update)
             
             nearest_time = find_nearest_time(click_x, df)
             full_df = full_df.with_columns(
@@ -607,6 +935,8 @@ def handle_all_interactions(click_data: Optional[Dict], relayout_data: Optional[
                    convert_df_to_dict(full_df),
                    convert_df_to_dict(df),
                    no_update,
+                   no_update,
+                   no_update,
                    no_update)
         
         elif relayout_data and 'shapes' in relayout_data:
@@ -624,7 +954,7 @@ def handle_all_interactions(click_data: Optional[Dict], relayout_data: Optional[
                     visible_points = len(df) - PREDICTION_HOUR_OFFSET
                     if start_x < visible_points or end_x < visible_points:
                         print(f"Drawing area partially outside prediction area (starts at x={visible_points}). Ignoring shape.")
-                        return (last_click_time, no_update, no_update, no_update, no_update)
+                        return (last_click_time, no_update, no_update, no_update, no_update, no_update, no_update)
                     
                     start_time = find_nearest_time(start_x, df)
                     
@@ -693,23 +1023,43 @@ def handle_all_interactions(click_data: Optional[Dict], relayout_data: Optional[
                            convert_df_to_dict(full_df),
                            convert_df_to_dict(df),
                            no_update,
+                           no_update,
+                           no_update,
                            no_update)
     
-    return last_click_time, no_update, no_update, no_update, no_update
+    return last_click_time, no_update, no_update, no_update, no_update, no_update, no_update
+
+@app.callback(
+    Output('data-source-display', 'children'),
+    [Input('url', 'pathname'), Input('data-source-name', 'data')],
+    prevent_initial_call=True
+)
+def update_data_source_display(pathname: str, source_name: Optional[str]) -> str:
+    """Update the visible data source label only when on the prediction page."""
+    if pathname != '/prediction':
+        raise PreventUpdate
+    return source_name if source_name else "example.csv"
 
 # Add callback for random slider initialization when prediction page components are ready
 @app.callback(
     [Output('time-slider', 'value', allow_duplicate=True),
-     Output('current-window-df', 'data', allow_duplicate=True)],
+     Output('current-window-df', 'data', allow_duplicate=True),
+     Output('randomization-initialized', 'data', allow_duplicate=True)],
     [Input('time-slider', 'max')],  # Triggers when slider is created and max is set
     [State('url', 'pathname'),
      State('full-df', 'data'),
-     State('points-control', 'value')],
+     State('points-control', 'value'),
+     State('is-example-data', 'data'),
+     State('data-source-name', 'data'),
+     State('randomization-initialized', 'data')],
     prevent_initial_call=True
 )
-def randomize_slider_on_prediction_page(slider_max: int, pathname: str, full_df_data: Optional[Dict], points_value: int) -> Tuple[int, Dict[str, List[Any]]]:
+def randomize_slider_on_prediction_page(slider_max: int, pathname: str, full_df_data: Optional[Dict], points_value: int, is_example_data: Optional[bool], data_source_name: Optional[str], randomization_initialized: bool) -> Tuple[int, Dict[str, List[Any]], bool]:
     """Set slider to random position when time-slider component is ready on prediction page"""
-    if pathname == '/prediction' and full_df_data and slider_max is not None:
+    if pathname == '/prediction' and full_df_data and slider_max is not None and not randomization_initialized:
+        # Only randomize once when the slider is first created
+        print(f"DEBUG: Setting random position for data source: {data_source_name}")
+        print(f"DEBUG: Is example data: {is_example_data}")
         import random
         full_df = reconstruct_dataframe_from_dict(full_df_data)
         points = max(MIN_POINTS, min(MAX_POINTS, points_value or DEFAULT_POINTS))
@@ -739,9 +1089,10 @@ def randomize_slider_on_prediction_page(slider_max: int, pathname: str, full_df_
                     'user_id': df.get_column('user_id').to_list()
                 }
             
-            return random_start, convert_df_to_dict(new_df)
+            return random_start, convert_df_to_dict(new_df), True  # Mark as initialized
     
-    return no_update, no_update
+    return no_update, no_update, no_update
+
 
 # Add simplified callbacks for UI updates only
 @app.callback(
@@ -749,16 +1100,19 @@ def randomize_slider_on_prediction_page(slider_max: int, pathname: str, full_df_
      Output('time-slider', 'max'),
      Output('time-slider', 'value')],
     [Input('upload-data', 'contents'),
+     Input('use-example-data-button', 'n_clicks'),
      Input('points-control', 'value')],
     [State('upload-data', 'filename'),
      State('time-slider', 'value'),
      State('full-df', 'data'),
-     State('is-example-data', 'data')],
+     State('is-example-data', 'data'),
+     State('data-source-name', 'data')],
     prevent_initial_call=True
 )
-def update_ui_components(upload_contents: Optional[str], points_value: Optional[int], 
-                        filename: Optional[str], current_position: Optional[int], 
-                        full_df_data: Optional[Dict], is_example_data: Optional[bool]) -> Tuple[Optional[html.Div], int, int]:
+def update_ui_components(upload_contents: Optional[str], example_button_clicks: Optional[int],
+                        points_value: Optional[int], filename: Optional[str], current_position: Optional[int], 
+                        full_df_data: Optional[Dict], is_example_data: Optional[bool], 
+                        data_source_name: Optional[str]) -> Tuple[Optional[html.Div], int, int]:
     """Update UI components based on file upload and points control"""
     
     ctx = dash.callback_context
@@ -774,7 +1128,7 @@ def update_ui_components(upload_contents: Optional[str], points_value: Optional[
         if not is_example_data:  # File was successfully uploaded
             success_msg = html.Div([
                 html.I(className="fas fa-check-circle", style={'marginRight': '8px'}),
-                f"Successfully loaded data from {filename}"
+                f"Successfully loaded data from {filename}. This data will be used for predictions."
             ], style={
                 'color': '#2f855a',
                 'backgroundColor': '#c6f6d5',
@@ -785,11 +1139,27 @@ def update_ui_components(upload_contents: Optional[str], points_value: Optional[
         else:
             success_msg = None
         
-        # Return current slider settings
+        # Avoid changing slider on upload to prevent time-slider triggers racing with data-source-name
+        return success_msg, no_update, no_update
+    
+    elif trigger_id == 'use-example-data-button':
         points = max(MIN_POINTS, min(MAX_POINTS, points_value))
         new_max = len(full_df) - points
         new_start = min(current_position, new_max)
-        return success_msg, new_max, max(0, new_start)
+        
+        # Show message that we're now using example data
+        example_msg = html.Div([
+            html.I(className="fas fa-info-circle", style={'marginRight': '8px'}),
+            "Now using example data. Upload a CSV file for personalized analysis."
+        ], style={
+            'color': '#0c5460',
+            'backgroundColor': '#d1ecf1',
+            'padding': '10px',
+            'borderRadius': '5px',
+            'textAlign': 'center'
+        })
+        
+        return example_msg, new_max, max(0, new_start)
     
     elif trigger_id == 'points-control':
         points = max(MIN_POINTS, min(MAX_POINTS, points_value))

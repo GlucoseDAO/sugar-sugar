@@ -28,6 +28,7 @@ class GlucoseChart(Div):
         super().__init__([
             dcc.Store(id=f"{id}-df-store", data=None),  # Session storage for DataFrame
             dcc.Store(id=f"{id}-events-store", data=None),  # Session storage for events
+            dcc.Store(id=f"{id}-source-store", data=None),  # Session storage for data source
             dcc.Graph(
                 id=f"{id}-graph",
                 figure=self._create_empty_figure(),
@@ -80,21 +81,25 @@ class GlucoseChart(Div):
         
         @app.callback(
             [Output(f'{self.id}-df-store', 'data'),
-             Output(f'{self.id}-events-store', 'data')],
+             Output(f'{self.id}-events-store', 'data'),
+             Output(f'{self.id}-source-store', 'data')],
             [Input('current-window-df', 'data'),
-             Input('events-df', 'data')]
+             Input('events-df', 'data'),
+             Input('data-source-name', 'data')]
         )
-        def store_chart_data(df_data: Optional[Dict], events_data: Optional[Dict]) -> Tuple[Optional[Dict], Optional[Dict]]:
+        def store_chart_data(df_data: Optional[Dict], events_data: Optional[Dict], source_name: Optional[str]) -> Tuple[Optional[Dict], Optional[Dict], Optional[str]]:
             """Store the current DataFrame and events data when they change"""
+            print(f"DEBUG: GlucoseChart store_chart_data source={source_name}")
             # Just pass through the session storage data
-            return df_data, events_data
+            return df_data, events_data, source_name
 
         @app.callback(
             Output(f'{self.id}-graph', 'figure'),
             [Input(f'{self.id}-df-store', 'data'),
-             Input(f'{self.id}-events-store', 'data')]
+             Input(f'{self.id}-events-store', 'data'),
+             Input(f'{self.id}-source-store', 'data')]
         )
-        def update_chart_figure(df_data: Optional[Dict], events_data: Optional[Dict]) -> go.Figure:
+        def update_chart_figure(df_data: Optional[Dict], events_data: Optional[Dict], source_name: Optional[str]) -> go.Figure:
             """Update the chart figure when data changes"""
             if not df_data:
                 return self._create_empty_figure()
@@ -103,8 +108,10 @@ class GlucoseChart(Div):
             df = self._reconstruct_dataframe_from_dict(df_data)
             events_df = self._reconstruct_events_dataframe_from_dict(events_data) if events_data else pl.DataFrame()
             
-            # Create the figure
-            return self._build_figure(df, events_df)
+            print(f"DEBUG: GlucoseChart updating figure - {len(df)} points, glucose range: {df.get_column('gl').min()}-{df.get_column('gl').max()} | source={source_name}")
+            
+            # Create the figure with source information
+            return self._build_figure(df, events_df, source_name)
 
     def _reconstruct_dataframe_from_dict(self, df_data: Dict[str, List[Any]]) -> pl.DataFrame:
         """Reconstruct a Polars DataFrame from stored dictionary data"""
@@ -122,16 +129,18 @@ class GlucoseChart(Div):
             'time': pl.Series(events_data['time']).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),
             'event_type': pl.Series(events_data['event_type'], dtype=pl.String),
             'event_subtype': pl.Series(events_data['event_subtype'], dtype=pl.String),
-            'insulin_value': pl.Series(events_data['insulin_value'], dtype=pl.Float64)
+            # Coerce numeric strings and mixed types to Float64
+            'insulin_value': pl.Series(events_data['insulin_value']).cast(pl.Float64, strict=False)
         })
 
-    def _build_figure(self, df: pl.DataFrame, events_df: pl.DataFrame) -> go.Figure:
+    def _build_figure(self, df: pl.DataFrame, events_df: pl.DataFrame, source_name: Optional[str] = None) -> go.Figure:
         """Build complete figure with all components"""
         figure = go.Figure()
         
         # Store data for internal methods
         self._current_df = df
         self._current_events = events_df
+        self._current_source = source_name
         
         # Build all components
         self._add_range_rectangles(figure)
@@ -401,8 +410,13 @@ class GlucoseChart(Div):
         start_time = self._current_df.get_column("time")[0].strftime('%H:%M')
         end_time = self._current_df.get_column("time")[-1].strftime('%H:%M')
         
+        # Create title with source information
+        title_text = f'Glucose Levels ({start_time} to {end_time})'
+        if self._current_source:
+            title_text += f' - Source: {self._current_source}'
+        
         figure.update_layout(
-            title=f'Glucose Levels ({start_time} to {end_time})',
+            title=title_text,
             autosize=True,
             xaxis=dict(
                 title='Time',
