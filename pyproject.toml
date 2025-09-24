@@ -17,6 +17,7 @@ dependencies = [
     "numpy>=2.3.0",
     "pycomfort>=0.0.18",
     "dotenv>=0.9.9",
+    "eliot>=1.15.0",
 ]
 
 [project.scripts]

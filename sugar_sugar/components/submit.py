@@ -5,11 +5,21 @@ import polars as pl
 from datetime import datetime
 import uuid
 import csv
-import os
+from pathlib import Path
 from sugar_sugar.config import PREDICTION_HOUR_OFFSET
 
 class SubmitComponent(html.Div):
     def __init__(self) -> None:
+        self._stats_csv_path = (
+            Path(__file__).resolve().parents[2]
+            / 'data'
+            / 'input'
+            / 'prediction_statistics.csv'
+        )
+        self._stats_csv_path.parent.mkdir(parents=True, exist_ok=True)
+        legacy_csv_path = Path(__file__).resolve().parents[2] / 'prediction_statistics.csv'
+        if legacy_csv_path.exists() and not self._stats_csv_path.exists():
+            legacy_csv_path.replace(self._stats_csv_path)
         super().__init__([
             html.Div(
                 id="prediction-progress-label",
@@ -35,13 +45,13 @@ class SubmitComponent(html.Div):
 
     def _get_next_number(self) -> int:
         """Get the next number for the prediction statistics."""
-        csv_file = 'prediction_statistics.csv'
-        if not os.path.exists(csv_file):
+        csv_file_path = self._stats_csv_path
+        if not csv_file_path.exists():
             return 0
         
         try:
-            with open(csv_file, 'r') as f:
-                reader = csv.DictReader(f)
+            with csv_file_path.open('r', newline='') as file_handle:
+                reader = csv.DictReader(file_handle)
                 numbers = [int(row['number']) for row in reader if row['number'].isdigit()]
                 return max(numbers) + 1 if numbers else 0
         except Exception:
@@ -49,7 +59,7 @@ class SubmitComponent(html.Div):
 
     def save_statistics(self, df: pl.DataFrame, user_info: dict[str, Any]) -> None:
         """Save prediction statistics to CSV file"""
-        csv_file = 'prediction_statistics.csv'
+        csv_file_path = self._stats_csv_path
         
         # Extract parameters, actual values, and prediction time from the prediction table
         table_data = user_info.get('prediction_table_data', [])
@@ -106,9 +116,9 @@ class SubmitComponent(html.Div):
         }
         
         # Write to CSV
-        file_exists = os.path.exists(csv_file)
-        with open(csv_file, 'a', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=data.keys())
+        file_exists = csv_file_path.exists()
+        with csv_file_path.open('a', newline='') as file_handle:
+            writer = csv.DictWriter(file_handle, fieldnames=list(data.keys()))
             if not file_exists:
                 writer.writeheader()
             writer.writerow(data)

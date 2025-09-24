@@ -146,7 +146,7 @@ sugar_sugar/
     ├── glucose.py          # Interactive glucose visualization
     ├── predictions.py      # Prediction data table
     ├── metrics.py          # Accuracy metrics display
-    ├── submit.py           # Game submission logic
+    └── submit.py           # Game submission logic
     └── ending.py           # Results summary page
 ```
 

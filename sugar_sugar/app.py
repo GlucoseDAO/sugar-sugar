@@ -13,11 +13,18 @@ import dash_bootstrap_components as dbc
 import os
 import typer
 from dotenv import load_dotenv
+from eliot import start_action, start_task
+from pycomfort.logging import to_nice_file, to_nice_stdout
 
 # Load environment variables from .env file in project root
 project_root = Path(__file__).parent.parent
 env_path = project_root / '.env'
 load_dotenv(env_path)
+
+logs_dir = project_root / 'logs'
+logs_dir.mkdir(exist_ok=True)
+to_nice_stdout()
+to_nice_file(logs_dir / 'sugar_sugar.json', logs_dir / 'sugar_sugar.log')
 
 from sugar_sugar.data import load_glucose_data
 from sugar_sugar.config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS, DOUBLE_CLICK_THRESHOLD, PREDICTION_HOUR_OFFSET
@@ -39,7 +46,8 @@ example_full_df, example_events_df = load_glucose_data()  # Unpack both datafram
 external_stylesheets = [
     'https://codepen.io/chriddyp/pen/bWLwgP.css',
     dbc.themes.BOOTSTRAP,
-    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css'
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css',
+    'https://cdnjs.cloudflare.com/ajax/libs/github-fork-ribbon-css/0.2.3/gh-fork-ribbon.min.css'
 ]
 
 app = dash.Dash(__name__, 
@@ -47,6 +55,13 @@ app = dash.Dash(__name__,
     suppress_callback_exceptions=True
 )
 app.title = "Sugar Sugar - Glucose Prediction Game"
+
+app.clientside_callback(
+    "function() { return window.navigator.userAgent || ''; }",
+    Output('user-agent', 'data'),
+    Input('url', 'href'),
+    prevent_initial_call=False
+)
 
 
 
@@ -72,6 +87,18 @@ app.layout = html.Div([
     dcc.Store(id='data-source-name', data="example.csv"),  # Store source filename
     dcc.Store(id='randomization-initialized', data=False),  # Track if randomization has been done
     dcc.Store(id='glucose-chart-mode', data={'hide_last_hour': True}),
+    dcc.Store(id='user-agent', data=None, storage_type='session'),
+
+    html.Div(id='mobile-warning', style={'margin': '12px 0'}),
+
+    html.A(
+        "Fork me on GitHub",
+        href="https://github.com/GlucoseDAO/sugar-sugar",
+        target="_blank",
+        rel="noopener noreferrer",
+        className="github-fork-ribbon github-fork-ribbon-right-bottom fixed",
+        **{"data-ribbon": "Fork me on GitHub"}
+    ),
 
     html.Div(id='page-content', children=[])  # Will be populated in main()
 ])
@@ -79,43 +106,44 @@ app.layout = html.Div([
 
 
 @app.callback(
-    Output('page-content', 'children'),
+    [Output('page-content', 'children'),
+     Output('mobile-warning', 'children')],
     [Input('url', 'pathname')],
     [State('user-info-store', 'data'),
      State('full-df', 'data'),
-     State('events-df', 'data')],
+     State('events-df', 'data'),
+     State('user-agent', 'data')],
     prevent_initial_call=False
 )
 def display_page(pathname: Optional[str], user_info: Optional[Dict[str, Any]], 
-                full_df_data: Optional[Dict], events_df_data: Optional[Dict]) -> html.Div:
-    print(f"DEBUG: display_page called with pathname: {pathname}")
-    
-    if pathname == '/prediction' and user_info:
-        return create_prediction_layout()
-    elif pathname == '/ending':
-        # Check if we have the required data for ending page
-        if not full_df_data or not user_info or 'prediction_table_data' not in user_info:
-            print("DEBUG: Missing data for ending page, showing redirect message")
-            return html.Div([
-                html.H2("Session Expired", style={'textAlign': 'center', 'marginTop': '50px'}),
-                html.P("Please start over from the beginning.", style={'textAlign': 'center', 'marginBottom': '30px'}),
-                html.Div([
-                    html.A(
-                        "Go to Start Page", 
-                        href="/",
-                        style={
-                            'backgroundColor': '#007bff',
-                            'color': 'white',
-                            'padding': '15px 30px',
-                            'textDecoration': 'none',
-                            'borderRadius': '5px',
-                            'fontSize': '18px'
-                        }
-                    )
-                ], style={'textAlign': 'center'})
-            ])
-        return create_ending_layout(full_df_data, events_df_data, user_info)
-    return startup_page if startup_page else html.Div("Loading...")  # Return the startup page component
+                full_df_data: Optional[Dict], events_df_data: Optional[Dict], user_agent: Optional[str]) -> tuple[html.Div, Optional[html.Div]]:
+    with start_action(action_type=u"display_page", pathname=pathname):
+        warning_content = render_mobile_warning(user_agent)
+        if pathname == '/prediction' and user_info:
+            return create_prediction_layout(), warning_content
+        if pathname == '/ending':
+            # Check if we have the required data for ending page
+            if not full_df_data or not user_info or 'prediction_table_data' not in user_info:
+                return html.Div([
+                    html.H2("Session Expired", style={'textAlign': 'center', 'marginTop': '50px'}),
+                    html.P("Please start over from the beginning.", style={'textAlign': 'center', 'marginBottom': '30px'}),
+                    html.Div([
+                        html.A(
+                            "Go to Start Page", 
+                            href="/",
+                            style={
+                                'backgroundColor': '#007bff',
+                                'color': 'white',
+                                'padding': '15px 30px',
+                                'textDecoration': 'none',
+                                'borderRadius': '5px',
+                                'fontSize': '18px'
+                            }
+                        )
+                    ], style={'textAlign': 'center'})
+                ]), warning_content
+            return create_ending_layout(full_df_data, events_df_data, user_info), warning_content
+        return (startup_page if startup_page else html.Div("Loading..."), warning_content)  # Return the startup page component
 
 def create_prediction_layout() -> html.Div:
     """Create the prediction page layout"""
@@ -353,6 +381,27 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
         'gap': 'clamp(10px, 2vh, 20px)',  # Responsive gap
         'boxSizing': 'border-box'
     })
+
+def render_mobile_warning(user_agent: Optional[str]) -> Optional[html.Div]:
+    if not user_agent:
+        return None
+    ua = user_agent.lower()
+    mobile_keywords = ("iphone", "android", "ipad", "mobile", "opera mini", "mobi")
+    if any(keyword in ua for keyword in mobile_keywords):
+        return html.Div(
+            "Note: Sugar Sugar is optimised for desktop at the moment. Mobile support is coming soon!",
+            style={
+                'backgroundColor': '#fff3cd',
+                'border': '1px solid #ffeeba',
+                'color': '#856404',
+                'padding': '10px 14px',
+                'borderRadius': '6px',
+                'textAlign': 'center',
+                'marginBottom': '12px',
+                'fontWeight': '600'
+            }
+        )
+    return None
 
 def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) -> pl.DataFrame:
     """Reconstruct the events DataFrame from stored data.""" 
@@ -831,7 +880,6 @@ def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optiona
     
     if click_data:
         if current_time - last_click_time <= DOUBLE_CLICK_THRESHOLD:
-            print("Double-click detected: Resetting drawn lines.")
             full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
             df = df.with_columns(pl.lit(0.0).alias("prediction"))
             
@@ -844,7 +892,6 @@ def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optiona
         click_y = point_data['y']
         snapped_idx = snap_index(float(click_x))
         if snapped_idx is None:
-            print(f"Click at x={click_x} did not align with prediction window. Ignoring click.")
             return no_update, no_update, no_update
         nearest_time = df.get_column("time")[snapped_idx]
         
@@ -856,7 +903,6 @@ def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optiona
             if existing_predictions == 0:  # No existing predictions, snap to ground truth
                 ground_truth_y = df.get_column("gl")[snapped_idx]
                 prediction_y = ground_truth_y
-                print(f"DEBUG: Snapping first prediction point to ground truth: {ground_truth_y}")
         
         full_df = full_df.with_columns(
             pl.when(pl.col("time") == nearest_time)
@@ -889,8 +935,11 @@ def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optiona
                 start_idx = snap_index(float(start_x))
                 end_idx = snap_index(float(end_x))
                 if start_idx is None or end_idx is None:
-                    print("Drawn shape did not align with prediction window. Ignoring shape.")
-                    return no_update, no_update, no_update
+                    return (
+                        last_click_time,
+                        convert_df_to_dict(full_df),
+                        convert_df_to_dict(df)
+                    )
                 
                 start_time = df.get_column("time")[start_idx]
                 
@@ -902,7 +951,6 @@ def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optiona
                     if existing_predictions == 0:  # No existing predictions, snap to ground truth
                         ground_truth_y = df.get_column("gl")[start_idx]
                         actual_start_y = ground_truth_y
-                        print(f"DEBUG: Snapping drawn line start to ground truth: {ground_truth_y}")
                 
                 # Calculate the intersection with the first vertical guideline after start
                 actual_end_x, actual_end_y = calculate_first_guideline_intersection(
@@ -910,8 +958,11 @@ def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optiona
                 )
                 snapped_end_idx = snap_index(actual_end_x)
                 if snapped_end_idx is None:
-                    print("Calculated end of shape falls outside prediction window. Ignoring shape.")
-                    return no_update, no_update, no_update
+                    return (
+                        last_click_time,
+                        convert_df_to_dict(full_df),
+                        convert_df_to_dict(df)
+                    )
                 end_time = df.get_column("time")[snapped_end_idx]
                 
                 # Get intermediate prediction points every 5 minutes
@@ -1242,10 +1293,13 @@ def main(
     # Update the app layout with the new startup page
     app.layout.children[-1].children = [startup_page]
     
-    # Print configuration info
-    print(f"Starting Dash server on {dash_host}:{dash_port} (debug={dash_debug})")
-    
-    app.run(host=dash_host, port=dash_port, debug=dash_debug)
+    with start_action(
+        action_type=u"start_dash_server",
+        host=dash_host,
+        port=dash_port,
+        debug=dash_debug
+    ):
+        app.run(host=dash_host, port=dash_port, debug=dash_debug)
 
 def cli_main() -> None:
     """CLI entry point"""

@@ -12,4 +12,7 @@ uv run start is used to run the dash app.
 
 ## Code style guidelines
 
-Always use type-hints. For file pathes prefer to use pathlib, for cli - typer, for dataframes - polars. We try to split logic into components and use functional style when possible, avoiding unneccesary mutability and duplication.
+Always use type-hints. 
+For file pathes prefer to use pathlib, for cli - typer, for dataframes - polars. 
+We try to split logic into components and use functional style when possible, avoiding unneccesary mutability and duplication.
+We use eliot logging library with with start_action(action_type=u"action_name") as action pattern to log results to logs folder. We use to_nice_file, to_nice_stdout from pycomfort logging to tell where to save files

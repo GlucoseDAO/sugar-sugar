@@ -4,6 +4,7 @@ from typing import Any, Optional
 from datetime import datetime
 from dash import dcc, Output, Input
 from dash import Dash, html
+from eliot import start_action
 from sugar_sugar.config import PREDICTION_HOUR_OFFSET
 
 
@@ -81,9 +82,12 @@ class GlucoseChart(html.Div):
             source_name: Optional[str]
         ) -> tuple[Optional[dict[str, Any]], Optional[dict[str, Any]], Optional[str]]:
             """Store the current DataFrame and events data when they change"""
-            print(f"DEBUG: GlucoseChart store_chart_data source={source_name}")
-            # Just pass through the session storage data
-            return df_data, events_data, source_name
+            with start_action(
+                action_type=u"glucose_store_chart_data",
+                source=source_name
+            ):
+                # Just pass through the session storage data
+                return df_data, events_data, source_name
 
         @app.callback(
             Output(f'{self.id}-graph', 'figure'),
@@ -109,10 +113,16 @@ class GlucoseChart(html.Div):
             hide_last_hour_flag = hide_mode.get('hide_last_hour', self.hide_last_hour)
             self.hide_last_hour = hide_last_hour_flag
             
-            print(f"DEBUG: GlucoseChart updating figure - {len(df)} points, glucose range: {df.get_column('gl').min()}-{df.get_column('gl').max()} | source={source_name}")
-            
-            # Create the figure with source information
-            return self._build_figure(df, events_df, source_name)
+            with start_action(
+                action_type=u"glucose_update_figure",
+                points=len(df),
+                gl_min=df.get_column('gl').min(),
+                gl_max=df.get_column('gl').max(),
+                source=source_name,
+                hide_last_hour=hide_last_hour_flag
+            ):
+                # Create the figure with source information
+                return self._build_figure(df, events_df, source_name)
 
     def _reconstruct_dataframe_from_dict(self, df_data: dict[str, list[Any]]) -> pl.DataFrame:
         """Reconstruct a Polars DataFrame from stored dictionary data"""
