@@ -1,7 +1,6 @@
-from enum import Enum, auto
-from typing import List, Dict, Tuple, Optional, Any, Union
+from enum import Enum
+from typing import Tuple
 import polars as pl
-from datetime import datetime
 from pathlib import Path
 
 class CGMType(Enum):

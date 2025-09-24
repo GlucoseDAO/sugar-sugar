@@ -1,4 +1,4 @@
-from typing import List, Dict, Tuple, Optional, Any, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 import dash
 from dash import dcc, html, Output, Input, State, no_update, dash_table
 from dash.exceptions import PreventUpdate
@@ -9,20 +9,18 @@ from datetime import datetime
 import time
 from pathlib import Path
 import base64
-import tempfile
 import dash_bootstrap_components as dbc
 import os
 import typer
 from dotenv import load_dotenv
 
 # Load environment variables from .env file in project root
-# Find the project root (parent directory of this file's directory)
 project_root = Path(__file__).parent.parent
 env_path = project_root / '.env'
 load_dotenv(env_path)
 
 from sugar_sugar.data import load_glucose_data
-from sugar_sugar.config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS, DOUBLE_CLICK_THRESHOLD, PREDICTION_HOUR_OFFSET, DEBUG_MODE
+from sugar_sugar.config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS, DOUBLE_CLICK_THRESHOLD, PREDICTION_HOUR_OFFSET
 from sugar_sugar.components.glucose import GlucoseChart
 from sugar_sugar.components.metrics import MetricsComponent
 from sugar_sugar.components.predictions import PredictionTableComponent
@@ -73,9 +71,12 @@ app.layout = html.Div([
     dcc.Store(id='is-example-data', data=True),
     dcc.Store(id='data-source-name', data="example.csv"),  # Store source filename
     dcc.Store(id='randomization-initialized', data=False),  # Track if randomization has been done
+    dcc.Store(id='glucose-chart-mode', data={'hide_last_hour': True}),
 
     html.Div(id='page-content', children=[])  # Will be populated in main()
 ])
+
+
 
 @app.callback(
     Output('page-content', 'children'),
@@ -92,15 +93,39 @@ def display_page(pathname: Optional[str], user_info: Optional[Dict[str, Any]],
     if pathname == '/prediction' and user_info:
         return create_prediction_layout()
     elif pathname == '/ending':
+        # Check if we have the required data for ending page
+        if not full_df_data or not user_info or 'prediction_table_data' not in user_info:
+            print("DEBUG: Missing data for ending page, showing redirect message")
+            return html.Div([
+                html.H2("Session Expired", style={'textAlign': 'center', 'marginTop': '50px'}),
+                html.P("Please start over from the beginning.", style={'textAlign': 'center', 'marginBottom': '30px'}),
+                html.Div([
+                    html.A(
+                        "Go to Start Page", 
+                        href="/",
+                        style={
+                            'backgroundColor': '#007bff',
+                            'color': 'white',
+                            'padding': '15px 30px',
+                            'textDecoration': 'none',
+                            'borderRadius': '5px',
+                            'fontSize': '18px'
+                        }
+                    )
+                ], style={'textAlign': 'center'})
+            ])
         return create_ending_layout(full_df_data, events_df_data, user_info)
     return startup_page if startup_page else html.Div("Loading...")  # Return the startup page component
 
 def create_prediction_layout() -> html.Div:
     """Create the prediction page layout"""
     return html.Div([
-        header_component,  # Use the persistent header component
+        header_component,
         html.Div([
-            glucose_chart,
+            html.Div(
+                glucose_chart,
+                id='prediction-glucose-chart-container'
+            ),
             submit_component
         ], style={'flex': '1'})
     ], style={
@@ -113,7 +138,7 @@ def create_prediction_layout() -> html.Div:
 
 def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[Dict], user_info: Optional[Dict] = None) -> html.Div:
     """Create the ending page layout"""
-    if not full_df_data or not events_df_data:
+    if not full_df_data:
         print("DEBUG: No data available for ending page")
         return html.Div("No data available", style={'textAlign': 'center', 'padding': '50px'})
     
@@ -121,7 +146,14 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
     
     # Reconstruct DataFrames from stored data
     full_df = reconstruct_dataframe_from_dict(full_df_data)
-    events_df = reconstruct_events_dataframe_from_dict(events_df_data)
+    events_df = reconstruct_events_dataframe_from_dict(events_df_data) if events_df_data else pl.DataFrame(
+        {
+            'time': [],
+            'event_type': [],
+            'event_subtype': [],
+            'insulin_value': []
+        }
+    )
     
     # Check if we have stored prediction data from the submit button
     if user_info and 'prediction_table_data' in user_info:
@@ -160,13 +192,6 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
         print("DEBUG: No stored prediction data found")
         return html.Div("No predictions to display", style={'textAlign': 'center', 'padding': '50px'})
     
-    # Create new components with the updated data
-    ending_prediction_table = PredictionTableComponent()
-    
-    # Create a new glucose chart for the ending page and get the figure (show complete data)
-    ending_glucose_chart = GlucoseChart(id='ending-glucose-chart', hide_last_hour=False)
-    figure = ending_glucose_chart._build_figure(df, events_df)
-    
     # Calculate metrics directly from the stored prediction table data
     metrics_component_ending = MetricsComponent()
     stored_metrics = None
@@ -200,28 +225,17 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
             'padding': '0 10px'
         }),
         
-        # Graph section
+        # Graph section - reuse the same glucose chart component
         html.Div([
-            dcc.Graph(
-                id='ending-glucose-graph-graph',
-                figure=figure,
-                config={
-                    'displayModeBar': True,
-                    'scrollZoom': False,
-                    'doubleClick': 'reset',
-                    'displaylogo': False,
-                    'responsive': True  # Make graph responsive
-                },
-                style={
-                    'height': 'clamp(300px, 50vh, 600px)',  # Responsive height
-                    'width': '100%'
-                }
+            html.Div(
+                glucose_chart,
+                id='ending-glucose-chart-container'
             )
         ], style={
-            'marginBottom': '20px', 
-            'padding': 'clamp(10px, 2vw, 20px)', 
-            'backgroundColor': 'white', 
-            'borderRadius': '10px', 
+            'marginBottom': '20px',
+            'padding': 'clamp(10px, 2vw, 20px)',
+            'backgroundColor': 'white',
+            'borderRadius': '10px',
             'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
             'width': '100%',
             'boxSizing': 'border-box'
@@ -399,7 +413,9 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
 
 @app.callback(
     [Output('url', 'pathname', allow_duplicate=True),
-     Output('user-info-store', 'data', allow_duplicate=True)],
+     Output('user-info-store', 'data', allow_duplicate=True),
+     Output('glucose-chart-mode', 'data', allow_duplicate=True),
+     Output('current-window-df', 'data', allow_duplicate=True)],
     [Input('submit-button', 'n_clicks')],
     [State('user-info-store', 'data'),
      State('full-df', 'data'),
@@ -409,7 +425,7 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
 )
 def handle_submit_button(n_clicks: Optional[int], user_info: Optional[Dict[str, Any]], 
                         full_df_data: Optional[Dict], current_df_data: Optional[Dict], 
-                        slider_value: Optional[int]) -> Tuple[str, Optional[Dict[str, Any]]]:
+                        slider_value: Optional[int]) -> Tuple[str, Optional[Dict[str, Any]], Dict[str, bool], Dict[str, List[Any]]]:
     """Handle submit button on prediction page"""
     if n_clicks and full_df_data and current_df_data:
         print("DEBUG: Submit button clicked")
@@ -444,79 +460,37 @@ def handle_submit_button(n_clicks: Optional[int], user_info: Optional[Dict[str, 
         # Save statistics before redirecting
         submit_component.save_statistics(current_full_df, user_info)
         
-        return '/ending', user_info
-    return no_update, no_update
+        # Update chart mode to show ground truth and return the full window with ground truth
+        chart_mode = {'hide_last_hour': False}
+        
+        # Convert the current DataFrame back to dict for the store
+        def convert_df_to_dict(df_in: pl.DataFrame) -> Dict[str, List[Any]]:
+            return {
+                'time': df_in.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
+                'gl': df_in.get_column('gl').to_list(),
+                'prediction': df_in.get_column('prediction').to_list(),
+                'age': df_in.get_column('age').to_list(),
+                'user_id': df_in.get_column('user_id').to_list()
+            }
+        
+        return '/ending', user_info, chart_mode, convert_df_to_dict(current_df)
+    return no_update, no_update, no_update, no_update
 
 @app.callback(
     [Output('url', 'pathname', allow_duplicate=True),
      Output('user-info-store', 'data', allow_duplicate=True),
-     Output('full-df', 'data', allow_duplicate=True),
-     Output('current-window-df', 'data', allow_duplicate=True),
-     Output('events-df', 'data', allow_duplicate=True),
-     Output('is-example-data', 'data', allow_duplicate=True),
-     Output('data-source-name', 'data', allow_duplicate=True),
-     Output('randomization-initialized', 'data', allow_duplicate=True)],
+     Output('glucose-chart-mode', 'data', allow_duplicate=True)],
     [Input('exit-button', 'n_clicks')],
     prevent_initial_call=True
 )
-def handle_exit_button(n_clicks: Optional[int]) -> Tuple[str, None, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool]:
-    """Handle exit button - reset to example data and randomize"""
+def handle_exit_button(n_clicks: Optional[int]) -> Tuple[str, None, Dict[str, bool]]:
+    """Handle exit button - navigate to start and clear user info. Data reset handled elsewhere."""
     if n_clicks:
         print("DEBUG: Exit button clicked")
-        
-        # Load fresh example data and randomize
-        full_df, events_df = load_glucose_data()
-        
-        # Start at a random position
-        import random
-        points = DEFAULT_POINTS
-        max_start_index = len(full_df) - points
-        
-        if max_start_index > 0:
-            # Generate random start position that is a multiple of the number of points
-            max_multiple = max_start_index // points
-            if max_multiple > 0:
-                random_multiple = random.randint(0, max_multiple)
-                random_start = random_multiple * points
-            else:
-                random_start = 0
-        else:
-            random_start = 0
-        
-        df = full_df.slice(random_start, points)
-        
-        # Reset predictions
-        full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
-        df = df.with_columns(pl.lit(0.0).alias("prediction"))
-        
-        print(f"DEBUG: Exit button - reset to example data with random_start={random_start}")
-        
-        # Convert DataFrames to JSON-serializable dictionaries
-        def convert_df_to_dict(df: pl.DataFrame) -> Dict[str, List[Any]]:
-            return {
-                'time': df.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
-                'gl': df.get_column('gl').to_list(),
-                'prediction': df.get_column('prediction').to_list(),
-                'age': df.get_column('age').to_list(),
-                'user_id': df.get_column('user_id').to_list()
-            }
-        
-        def convert_events_df_to_dict(df: pl.DataFrame) -> Dict[str, List[Any]]:
-            return {
-                'time': df.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
-                'event_type': df.get_column('event_type').to_list(),
-                'event_subtype': df.get_column('event_subtype').to_list(),
-                'insulin_value': df.get_column('insulin_value').to_list()
-            }
-        
-        return ('/', None, 
-                convert_df_to_dict(full_df),
-                convert_df_to_dict(df),
-                convert_events_df_to_dict(events_df),
-                True,  # is_example_data = True
-                "example.csv",  # data_source_name
-                False)  # reset randomization flag
-    return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+        # Reset chart mode to hide last hour when going back to prediction
+        chart_mode = {'hide_last_hour': True}
+        return '/', None, chart_mode
+    return no_update, no_update, no_update
 
 # Add client-side callback to scroll to top when ending page loads
 app.clientside_callback(
@@ -533,60 +507,41 @@ app.clientside_callback(
     Input('url', 'pathname')
 )
 
+## Removed URL-based data writer callback to enforce single-writer for data stores
+
+# Data initialization callback (URL-based only)
 @app.callback(
-    [Output('full-df', 'data'),
-     Output('current-window-df', 'data'),
-     Output('events-df', 'data'),
-     Output('is-example-data', 'data'),
-     Output('data-source-name', 'data'),
-     Output('randomization-initialized', 'data')],
+    [Output('full-df', 'data', allow_duplicate=True),
+     Output('current-window-df', 'data', allow_duplicate=True),
+     Output('events-df', 'data', allow_duplicate=True),
+     Output('is-example-data', 'data', allow_duplicate=True),
+     Output('data-source-name', 'data', allow_duplicate=True),
+     Output('randomization-initialized', 'data', allow_duplicate=True)],
     [Input('url', 'pathname')],
     [State('full-df', 'data'),
      State('current-window-df', 'data'),
      State('events-df', 'data'),
      State('is-example-data', 'data'),
      State('data-source-name', 'data')],
-    prevent_initial_call='initial_duplicate'
+    prevent_initial_call=True
 )
-def handle_url_changes(pathname: str, current_full_df: Optional[Dict], current_window_df: Optional[Dict], 
-                      current_events_df: Optional[Dict], current_is_example: Optional[bool],
-                      current_source_name: Optional[str]) -> Tuple[Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool]:
-    """Handle URL changes and initialize session storage"""
-    print(f"DEBUG[app.handle_url_changes]: pathname={pathname}, has_full={current_full_df is not None}, has_window={current_window_df is not None}, has_events={current_events_df is not None}")
+def initialize_data_on_url_change(pathname: Optional[str], full_df_data: Optional[Dict], 
+                                current_df_data: Optional[Dict], events_df_data: Optional[Dict], 
+                                is_example_data: Optional[bool], current_source_name: Optional[str]) -> Tuple[Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool]:
+    """Initialize data when URL changes or on first load"""
+    # Handle URL-driven initialization without requiring existing data
     if pathname == '/ending':
-        # Don't reset data when on ending page - don't update data-source-display since it doesn't exist on ending page
+        return no_update, no_update, no_update, no_update, no_update, no_update
+    # If prediction page and data already present, preserve
+    if pathname == '/prediction' and full_df_data is not None:
         return no_update, no_update, no_update, no_update, no_update, no_update
     
-    # If we're going to prediction page and already have data, preserve it
-    if pathname == '/prediction' and current_full_df is not None:
-        print(f"DEBUG: Going to prediction page, preserving existing data")
-        # Preserve state; data-source-display will be updated by a dedicated callback
-        return no_update, no_update, no_update, no_update, no_update, no_update
-    
-    # Only initialize fresh data when going to startup page or when no data exists
-    print(f"DEBUG[app.handle_url_changes]: URL changed to {pathname}, initializing fresh data")
-    
-    # Check if we should preserve the current data source or load fresh example data
-    # Don't preserve data source if we're going to startup page (/) - this indicates a reset
-    preserve_data_source = (current_source_name and current_source_name != "example.csv" and 
-                           pathname != '/')
-    
-    if preserve_data_source and current_full_df is not None:
-        # Preserve the current data source instead of loading fresh example data
-        print(f"DEBUG[app.handle_url_changes]: Preserving data source: {current_source_name}")
-        full_df, events_df = reconstruct_dataframe_from_dict(current_full_df), reconstruct_events_dataframe_from_dict(current_events_df)
-    else:
-        # Load fresh example data
-        print(f"DEBUG[app.handle_url_changes]: Loading fresh example data (pathname={pathname}, preserve_data_source={preserve_data_source})")
-        full_df, events_df = load_glucose_data()
-    
-    # Start at a random position for initial data too
+    # Initialize fresh example data (startup or first load)
+    full_df, events_df = load_glucose_data()
     import random
     points = DEFAULT_POINTS
     max_start_index = len(full_df) - points
-    
     if max_start_index > 0:
-        # Generate random start position that is a multiple of the number of points
         max_multiple = max_start_index // points
         if max_multiple > 0:
             random_multiple = random.randint(0, max_multiple)
@@ -595,95 +550,34 @@ def handle_url_changes(pathname: str, current_full_df: Optional[Dict], current_w
             random_start = 0
     else:
         random_start = 0
-    
     df = full_df.slice(random_start, points)
-    
-    # Only reset predictions for fresh data loading (not when preserving existing data)
-    # Check if we're loading fresh data vs preserving existing data with predictions
-    should_reset_predictions = True
-    
-    # If we have existing data with predictions, preserve them
-    if current_full_df is not None:
-        try:
-            existing_full_df = reconstruct_dataframe_from_dict(current_full_df)
-            existing_predictions = existing_full_df.filter(pl.col("prediction") != 0.0)
-            if existing_predictions.height > 0:
-                print(f"DEBUG[app.handle_url_changes]: Found {existing_predictions.height} existing predictions, preserving them")
-                should_reset_predictions = False
-        except Exception as e:
-            print(f"DEBUG[app.handle_url_changes]: Error checking existing predictions: {e}")
-            should_reset_predictions = True
-    
-    if should_reset_predictions:
-        # Reset predictions only for fresh data
-        full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
-        df = df.with_columns(pl.lit(0.0).alias("prediction"))
-        print("DEBUG[app.handle_url_changes]: Reset predictions for fresh data")
-    else:
-        # Preserve existing predictions by copying them to the new data
-        try:
-            existing_full_df = reconstruct_dataframe_from_dict(current_full_df)
-            existing_window_df = reconstruct_dataframe_from_dict(current_window_df) if current_window_df else None
-            
-            # Copy predictions from existing data to new data based on time matching
-            existing_predictions = existing_full_df.select(["time", "prediction"]).filter(pl.col("prediction") != 0.0)
-            
-            if existing_predictions.height > 0:
-                # Join predictions back to the new data
-                full_df = full_df.join(existing_predictions, on="time", how="left", suffix="_existing")
-                full_df = full_df.with_columns(
-                    pl.when(pl.col("prediction_existing").is_not_null())
-                    .then(pl.col("prediction_existing"))
-                    .otherwise(pl.col("prediction"))
-                    .alias("prediction")
-                ).drop("prediction_existing")
-                
-                # Also update the window df if we have it
-                if existing_window_df is not None:
-                    df = df.join(existing_predictions, on="time", how="left", suffix="_existing")
-                    df = df.with_columns(
-                        pl.when(pl.col("prediction_existing").is_not_null())
-                        .then(pl.col("prediction_existing"))
-                        .otherwise(pl.col("prediction"))
-                        .alias("prediction")
-                    ).drop("prediction_existing")
-                
-                print(f"DEBUG[app.handle_url_changes]: Preserved {existing_predictions.height} predictions in new data")
-        except Exception as e:
-            print(f"DEBUG[app.handle_url_changes]: Error preserving predictions: {e}, falling back to reset")
-            full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
-            df = df.with_columns(pl.lit(0.0).alias("prediction"))
-    
-    print(f"DEBUG[app.handle_url_changes]: initial data random_start={random_start}")
-    
-    # Convert DataFrames to JSON-serializable dictionaries
-    def convert_df_to_dict(df: pl.DataFrame) -> Dict[str, List[Any]]:
+    full_df = full_df.with_columns(pl.lit(0.0).alias('prediction'))
+    df = df.with_columns(pl.lit(0.0).alias('prediction'))
+    def convert_df_to_dict(df_in: pl.DataFrame) -> Dict[str, List[Any]]:
         return {
-            'time': df.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
-            'gl': df.get_column('gl').to_list(),
-            'prediction': df.get_column('prediction').to_list(),
-            'age': df.get_column('age').to_list(),
-            'user_id': df.get_column('user_id').to_list()
+            'time': df_in.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
+            'gl': df_in.get_column('gl').to_list(),
+            'prediction': df_in.get_column('prediction').to_list(),
+            'age': df_in.get_column('age').to_list(),
+            'user_id': df_in.get_column('user_id').to_list()
         }
-    
-    def convert_events_df_to_dict(df: pl.DataFrame) -> Dict[str, List[Any]]:
+    def convert_events_df_to_dict(df_in: pl.DataFrame) -> Dict[str, List[Any]]:
         return {
-            'time': df.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
-            'event_type': df.get_column('event_type').to_list(),
-            'event_subtype': df.get_column('event_subtype').to_list(),
-            'insulin_value': df.get_column('insulin_value').to_list()
+            'time': df_in.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
+            'event_type': df_in.get_column('event_type').to_list(),
+            'event_subtype': df_in.get_column('event_subtype').to_list(),
+            'insulin_value': df_in.get_column('insulin_value').to_list()
         }
-    
     return (
         convert_df_to_dict(full_df),
         convert_df_to_dict(df),
         convert_events_df_to_dict(events_df),
-        True,  # is_example_data = True by default
-        "example.csv",  # data_source_name for default data
-        False  # reset randomization flag for new data
+        True,
+        'example.csv',
+        False
     )
 
-# Consolidated callback for last-click-time updates
+# Prediction page interactions callback (only for prediction page components)  
 @app.callback(
     [Output('last-click-time', 'data'),
      Output('full-df', 'data', allow_duplicate=True),
@@ -692,9 +586,7 @@ def handle_url_changes(pathname: str, current_full_df: Optional[Dict], current_w
      Output('is-example-data', 'data', allow_duplicate=True),
      Output('data-source-name', 'data', allow_duplicate=True),
      Output('randomization-initialized', 'data', allow_duplicate=True)],
-    [Input('glucose-graph-graph', 'clickData'),
-     Input('glucose-graph-graph', 'relayoutData'),
-     Input('upload-data', 'contents'),
+    [Input('upload-data', 'contents'),
      Input('use-example-data-button', 'n_clicks'),
      Input('points-control', 'value'),
      Input('time-slider', 'value')],
@@ -709,16 +601,15 @@ def handle_url_changes(pathname: str, current_full_df: Optional[Dict], current_w
      State('data-source-name', 'data')],
     prevent_initial_call=True
 )
-def handle_all_interactions(click_data: Optional[Dict], relayout_data: Optional[Dict],
-                          upload_contents: Optional[str], example_button_clicks: Optional[int],
-                          points_value: Optional[int], slider_value: Optional[int], 
+def handle_prediction_page_interactions(upload_contents: Optional[str], example_button_clicks: Optional[int],
+                          points_value: Optional[int], slider_value: Optional[int],
                           last_click_time: int, filename: Optional[str], 
                           current_position: Optional[int], current_points: Optional[int],
                           full_df_data: Optional[Dict], current_df_data: Optional[Dict], 
                           events_df_data: Optional[Dict], is_example_data: Optional[bool],
                           current_source_name: Optional[str]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool]:
-    """Consolidated callback for all interactions that update last-click-time and data"""
-    print(f"DEBUG[app.handle_all_interactions]: triggered with ctx and last_click={last_click_time}")
+    """Handle prediction page interactions only (upload, example button, controls)"""
+    print(f"DEBUG[app.handle_prediction_page_interactions]: triggered with ctx and last_click={last_click_time}")
     current_time = int(time.time() * 1000)
     ctx = dash.callback_context
     
@@ -726,7 +617,11 @@ def handle_all_interactions(click_data: Optional[Dict], relayout_data: Optional[
         return last_click_time, no_update, no_update, no_update, no_update, no_update, no_update
     
     trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
-    print(f"DEBUG[app.handle_all_interactions]: trigger_id={trigger_id}")
+    print(f"DEBUG[app.handle_prediction_page_interactions]: trigger_id={trigger_id}")
+    
+    # Get current data from session storage
+    if not full_df_data or not current_df_data or not events_df_data:
+        return last_click_time, no_update, no_update, no_update, no_update, no_update, no_update
     
     # Helper functions
     def convert_df_to_dict(df: pl.DataFrame) -> Dict[str, List[Any]]:
@@ -746,13 +641,8 @@ def handle_all_interactions(click_data: Optional[Dict], relayout_data: Optional[
             'insulin_value': df.get_column('insulin_value').to_list()
         }
     
-    # Get current data from session storage
-    if not full_df_data or not current_df_data or not events_df_data:
-        return last_click_time, no_update, no_update, no_update, no_update, no_update, no_update
-    
     full_df = reconstruct_dataframe_from_dict(full_df_data)
-    df = reconstruct_dataframe_from_dict(current_df_data)
-    events_df = reconstruct_events_dataframe_from_dict(events_df_data)
+    reconstruct_events_dataframe_from_dict(events_df_data)
     
     # Handle file upload
     if trigger_id == 'upload-data' and upload_contents:
@@ -761,9 +651,9 @@ def handle_all_interactions(click_data: Optional[Dict], relayout_data: Optional[
             content_type, content_string = upload_contents.split(',')
             decoded = base64.b64decode(content_string)
             
-            # Create imputed_data directory if it doesn't exist
-            imputed_data_dir = Path('imputed_data')
-            imputed_data_dir.mkdir(exist_ok=True)
+            # Ensure user data directory exists under data/input/users
+            users_data_dir = project_root / 'data' / 'input' / 'users'
+            users_data_dir.mkdir(parents=True, exist_ok=True)
             
             # Generate unique filename with timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -772,8 +662,8 @@ def handle_all_interactions(click_data: Optional[Dict], relayout_data: Optional[
                 safe_filename += '.csv'
             unique_filename = f"{timestamp}_{safe_filename}"
             
-            # Save file to imputed_data folder
-            save_path = imputed_data_dir / unique_filename
+            # Save file to the users data folder
+            save_path = users_data_dir / unique_filename
             with open(save_path, 'wb') as f:
                 f.write(decoded)
             
@@ -891,143 +781,199 @@ def handle_all_interactions(click_data: Optional[Dict], relayout_data: Optional[
                no_update,
                no_update)
     
-    # Handle graph interactions
-    elif trigger_id == 'glucose-graph-graph':
-        if click_data:
-            if current_time - last_click_time <= DOUBLE_CLICK_THRESHOLD:
-                print("Double-click detected: Resetting drawn lines.")
-                full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
-                df = df.with_columns(pl.lit(0.0).alias("prediction"))
-                
-                return (current_time,
-                       convert_df_to_dict(full_df),
-                       convert_df_to_dict(df),
-                       no_update,
-                       no_update,
-                       no_update,
-                       no_update)
-            
-            point_data = click_data['points'][0]
-            click_x = point_data['x']
-            click_y = point_data['y']
-            
-            # Restrict clicks to prediction area only (after PREDICTION_HOUR_OFFSET)
-            visible_points = len(df) - PREDICTION_HOUR_OFFSET
-            if click_x < visible_points:
-                print(f"Click at x={click_x} is outside prediction area (starts at x={visible_points}). Ignoring click.")
-                return (last_click_time, no_update, no_update, no_update, no_update, no_update, no_update)
-            
-            nearest_time = find_nearest_time(click_x, df)
-            full_df = full_df.with_columns(
-                pl.when(pl.col("time") == nearest_time)
-                .then(click_y)
-                .otherwise(pl.col("prediction"))
-                .alias("prediction")
-            )
-            df = df.with_columns(
-                pl.when(pl.col("time") == nearest_time)
-                .then(click_y)
-                .otherwise(pl.col("prediction"))
-                .alias("prediction")
-            )
+    # Graph interactions handled by separate glucose chart callbacks
+    
+    return last_click_time, no_update, no_update, no_update, no_update, no_update, no_update
+
+# Separate callback for glucose graph interactions (only active on prediction page)
+@app.callback(
+    [Output('last-click-time', 'data', allow_duplicate=True),
+     Output('full-df', 'data', allow_duplicate=True),
+     Output('current-window-df', 'data', allow_duplicate=True)],
+    [Input('glucose-graph-graph', 'clickData'),
+     Input('glucose-graph-graph', 'relayoutData')],
+    [State('last-click-time', 'data'),
+     State('full-df', 'data'),
+     State('current-window-df', 'data')],
+    prevent_initial_call=True
+)
+def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optional[Dict],
+                            last_click_time: int, full_df_data: Optional[Dict], 
+                            current_df_data: Optional[Dict]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]]]:
+    """Handle glucose graph click and draw interactions"""
+    if not full_df_data or not current_df_data:
+        return no_update, no_update, no_update
+    
+    current_time = int(time.time() * 1000)
+    full_df = reconstruct_dataframe_from_dict(full_df_data)
+    df = reconstruct_dataframe_from_dict(current_df_data)
+    predictions_values = df.get_column("prediction").to_list()
+    visible_points = len(df) - PREDICTION_HOUR_OFFSET
+    
+    def convert_df_to_dict(df_in: pl.DataFrame) -> Dict[str, List[Any]]:
+        return {
+            'time': df_in.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
+            'gl': df_in.get_column('gl').to_list(),
+            'prediction': df_in.get_column('prediction').to_list(),
+            'age': df_in.get_column('age').to_list(),
+            'user_id': df_in.get_column('user_id').to_list()
+        }
+    
+    def snap_index(x_value: Optional[float]) -> Optional[int]:
+        """Snap a drawn x-coordinate to the nearest data index while respecting prediction bounds."""
+        if x_value is None:
+            return None
+        snapped_idx = int(round(float(x_value)))
+        snapped_idx = max(0, min(snapped_idx, len(df) - 1))
+        if snapped_idx < visible_points and predictions_values[snapped_idx] == 0.0:
+            return None
+        return snapped_idx
+    
+    if click_data:
+        if current_time - last_click_time <= DOUBLE_CLICK_THRESHOLD:
+            print("Double-click detected: Resetting drawn lines.")
+            full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
+            df = df.with_columns(pl.lit(0.0).alias("prediction"))
             
             return (current_time,
                    convert_df_to_dict(full_df),
-                   convert_df_to_dict(df),
-                   no_update,
-                   no_update,
-                   no_update,
-                   no_update)
+                   convert_df_to_dict(df))
         
-        elif relayout_data and 'shapes' in relayout_data:
-            shapes = relayout_data['shapes']
-            if shapes and len(shapes) > 0:
-                latest_shape = shapes[-1]
-                
-                start_x = latest_shape.get('x0')
-                end_x = latest_shape.get('x1')
-                start_y = latest_shape.get('y0')
-                end_y = latest_shape.get('y1')
-                
-                if all(v is not None for v in [start_x, end_x, start_y, end_y]):
-                    # Restrict drawing to prediction area only (after PREDICTION_HOUR_OFFSET)
-                    visible_points = len(df) - PREDICTION_HOUR_OFFSET
-                    if start_x < visible_points or end_x < visible_points:
-                        print(f"Drawing area partially outside prediction area (starts at x={visible_points}). Ignoring shape.")
-                        return (last_click_time, no_update, no_update, no_update, no_update, no_update, no_update)
-                    
-                    start_time = find_nearest_time(start_x, df)
-                    
-                    # Calculate the intersection with the first vertical guideline after start
-                    actual_end_x, actual_end_y = calculate_first_guideline_intersection(
-                        start_x, start_y, end_x, end_y, df
-                    )
-                    end_time = find_nearest_time(actual_end_x, df)
-                    
-                    # Get intermediate prediction points every 5 minutes
-                    intermediate_points = create_intermediate_predictions(start_time, end_time, float(start_y), float(actual_end_y), df)
-                    
-                    # Collect all times that need prediction values
-                    all_prediction_times = [start_time, end_time]
-                    all_prediction_values = [float(start_y), float(actual_end_y)]
-                    
-                    # Add intermediate points
-                    for time_point, glucose_value in intermediate_points:
-                        all_prediction_times.append(time_point)
-                        all_prediction_values.append(glucose_value)
-                    
-                    # Create a mapping for the predictions
-                    time_to_value = dict(zip(all_prediction_times, all_prediction_values))
-                    
-                    # Update both DataFrames with all prediction points
-                    full_df = full_df.with_columns(
-                        pl.when(pl.col("time").is_in(all_prediction_times))
-                        .then(
-                            # Use a series of when conditions to map each time to its value
-                            pl.when(pl.col("time") == start_time)
-                            .then(float(start_y))
-                            .when(pl.col("time") == end_time)
-                            .then(float(actual_end_y))
-                            .otherwise(
-                                # For intermediate points, we need to match them individually
-                                pl.col("time").map_elements(
-                                    lambda x: time_to_value.get(x, 0.0),
-                                    return_dtype=pl.Float64
-                                )
-                            )
-                        )
-                        .otherwise(pl.col("prediction"))
-                        .alias("prediction")
-                    )
-                    df = df.with_columns(
-                        pl.when(pl.col("time").is_in(all_prediction_times))
-                        .then(
-                            # Use a series of when conditions to map each time to its value
-                            pl.when(pl.col("time") == start_time)
-                            .then(float(start_y))
-                            .when(pl.col("time") == end_time)
-                            .then(float(actual_end_y))
-                            .otherwise(
-                                # For intermediate points, we need to match them individually
-                                pl.col("time").map_elements(
-                                    lambda x: time_to_value.get(x, 0.0),
-                                    return_dtype=pl.Float64
-                                )
-                            )
-                        )
-                        .otherwise(pl.col("prediction"))
-                        .alias("prediction")
-                    )
-                    
-                    return (current_time,
-                           convert_df_to_dict(full_df),
-                           convert_df_to_dict(df),
-                           no_update,
-                           no_update,
-                           no_update,
-                           no_update)
+        point_data = click_data['points'][0]
+        click_x = point_data['x']
+        click_y = point_data['y']
+        snapped_idx = snap_index(float(click_x))
+        if snapped_idx is None:
+            print(f"Click at x={click_x} did not align with prediction window. Ignoring click.")
+            return no_update, no_update, no_update
+        nearest_time = df.get_column("time")[snapped_idx]
+        
+        # Check if this is the first prediction point at the boundary - snap to ground truth
+        prediction_y = click_y
+        if snapped_idx == visible_points:  # First point in hidden area
+            # Check if this is the start of a new prediction sequence
+            existing_predictions = df.filter(pl.col("prediction") != 0.0).height
+            if existing_predictions == 0:  # No existing predictions, snap to ground truth
+                ground_truth_y = df.get_column("gl")[snapped_idx]
+                prediction_y = ground_truth_y
+                print(f"DEBUG: Snapping first prediction point to ground truth: {ground_truth_y}")
+        
+        full_df = full_df.with_columns(
+            pl.when(pl.col("time") == nearest_time)
+            .then(prediction_y)
+            .otherwise(pl.col("prediction"))
+            .alias("prediction")
+        )
+        df = df.with_columns(
+            pl.when(pl.col("time") == nearest_time)
+            .then(prediction_y)
+            .otherwise(pl.col("prediction"))
+            .alias("prediction")
+        )
+        
+        return (current_time,
+               convert_df_to_dict(full_df),
+               convert_df_to_dict(df))
     
-    return last_click_time, no_update, no_update, no_update, no_update, no_update, no_update
+    elif relayout_data and 'shapes' in relayout_data:
+        shapes = relayout_data['shapes']
+        if shapes and len(shapes) > 0:
+            latest_shape = shapes[-1]
+            
+            start_x = latest_shape.get('x0')
+            end_x = latest_shape.get('x1')
+            start_y = latest_shape.get('y0')
+            end_y = latest_shape.get('y1')
+            
+            if all(v is not None for v in [start_x, end_x, start_y, end_y]):
+                start_idx = snap_index(float(start_x))
+                end_idx = snap_index(float(end_x))
+                if start_idx is None or end_idx is None:
+                    print("Drawn shape did not align with prediction window. Ignoring shape.")
+                    return no_update, no_update, no_update
+                
+                start_time = df.get_column("time")[start_idx]
+                
+                # Check if this is the first prediction starting at the boundary - snap to ground truth
+                actual_start_y = start_y
+                if start_idx == visible_points:  # Starting at first point in hidden area
+                    # Check if this is the start of a new prediction sequence
+                    existing_predictions = df.filter(pl.col("prediction") != 0.0).height
+                    if existing_predictions == 0:  # No existing predictions, snap to ground truth
+                        ground_truth_y = df.get_column("gl")[start_idx]
+                        actual_start_y = ground_truth_y
+                        print(f"DEBUG: Snapping drawn line start to ground truth: {ground_truth_y}")
+                
+                # Calculate the intersection with the first vertical guideline after start
+                actual_end_x, actual_end_y = calculate_first_guideline_intersection(
+                    float(start_idx), actual_start_y, float(end_idx), end_y, df
+                )
+                snapped_end_idx = snap_index(actual_end_x)
+                if snapped_end_idx is None:
+                    print("Calculated end of shape falls outside prediction window. Ignoring shape.")
+                    return no_update, no_update, no_update
+                end_time = df.get_column("time")[snapped_end_idx]
+                
+                # Get intermediate prediction points every 5 minutes
+                intermediate_points = create_intermediate_predictions(start_time, end_time, float(actual_start_y), float(actual_end_y), df)
+                
+                # Collect all times that need prediction values
+                all_prediction_times = [start_time, end_time]
+                all_prediction_values = [float(actual_start_y), float(actual_end_y)]
+                
+                # Add intermediate points
+                for time_point, glucose_value in intermediate_points:
+                    all_prediction_times.append(time_point)
+                    all_prediction_values.append(glucose_value)
+                
+                # Create a mapping for the predictions
+                time_to_value = dict(zip(all_prediction_times, all_prediction_values))
+                
+                # Update both DataFrames with all prediction points
+                full_df = full_df.with_columns(
+                    pl.when(pl.col("time").is_in(all_prediction_times))
+                    .then(
+                        # Use a series of when conditions to map each time to its value
+                        pl.when(pl.col("time") == start_time)
+                        .then(float(actual_start_y))
+                        .when(pl.col("time") == end_time)
+                        .then(float(actual_end_y))
+                        .otherwise(
+                            # For intermediate points, we need to match them individually
+                            pl.col("time").map_elements(
+                                lambda x: time_to_value.get(x, 0.0),
+                                return_dtype=pl.Float64
+                            )
+                        )
+                    )
+                    .otherwise(pl.col("prediction"))
+                    .alias("prediction")
+                )
+                df = df.with_columns(
+                    pl.when(pl.col("time").is_in(all_prediction_times))
+                    .then(
+                        # Use a series of when conditions to map each time to its value
+                        pl.when(pl.col("time") == start_time)
+                        .then(float(actual_start_y))
+                        .when(pl.col("time") == end_time)
+                        .then(float(actual_end_y))
+                        .otherwise(
+                            # For intermediate points, we need to match them individually
+                            pl.col("time").map_elements(
+                                lambda x: time_to_value.get(x, 0.0),
+                                return_dtype=pl.Float64
+                            )
+                        )
+                    )
+                    .otherwise(pl.col("prediction"))
+                    .alias("prediction")
+                )
+                
+                return (current_time,
+                       convert_df_to_dict(full_df),
+                       convert_df_to_dict(df))
+    
+    return no_update, no_update, no_update
 
 @app.callback(
     Output('data-source-display', 'children'),
@@ -1042,56 +988,28 @@ def update_data_source_display(pathname: str, source_name: Optional[str]) -> str
 
 # Add callback for random slider initialization when prediction page components are ready
 @app.callback(
-    [Output('time-slider', 'value', allow_duplicate=True),
-     Output('current-window-df', 'data', allow_duplicate=True),
-     Output('randomization-initialized', 'data', allow_duplicate=True)],
+    Output('time-slider', 'value', allow_duplicate=True),
     [Input('time-slider', 'max')],  # Triggers when slider is created and max is set
     [State('url', 'pathname'),
      State('full-df', 'data'),
      State('points-control', 'value'),
-     State('is-example-data', 'data'),
-     State('data-source-name', 'data'),
      State('randomization-initialized', 'data')],
     prevent_initial_call=True
 )
-def randomize_slider_on_prediction_page(slider_max: int, pathname: str, full_df_data: Optional[Dict], points_value: int, is_example_data: Optional[bool], data_source_name: Optional[str], randomization_initialized: bool) -> Tuple[int, Dict[str, List[Any]], bool]:
-    """Set slider to random position when time-slider component is ready on prediction page"""
+def randomize_slider_on_prediction_page(slider_max: int, pathname: str, full_df_data: Optional[Dict], points_value: int, randomization_initialized: bool) -> int:
+    """Set slider to a random valid window start when slider mounts on prediction page. Only returns slider value."""
     if pathname == '/prediction' and full_df_data and slider_max is not None and not randomization_initialized:
-        # Only randomize once when the slider is first created
-        print(f"DEBUG: Setting random position for data source: {data_source_name}")
-        print(f"DEBUG: Is example data: {is_example_data}")
         import random
         full_df = reconstruct_dataframe_from_dict(full_df_data)
         points = max(MIN_POINTS, min(MAX_POINTS, points_value or DEFAULT_POINTS))
         max_start_index = len(full_df) - points
-        
         if max_start_index > 0:
-            # Generate random start position that is a multiple of the number of points
-            # This ensures we get clean windows (0, 24, 48, 72, etc.)
             max_multiple = max_start_index // points
             if max_multiple > 0:
                 random_multiple = random.randint(0, max_multiple)
-                random_start = random_multiple * points
-            else:
-                random_start = 0
-            
-            print(f"DEBUG: Setting slider to random position {random_start} (multiple of {points})")
-            
-            # Update the data slice to match the random position
-            new_df = full_df.slice(random_start, points)
-            
-            def convert_df_to_dict(df: pl.DataFrame) -> Dict[str, List[Any]]:
-                return {
-                    'time': df.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
-                    'gl': df.get_column('gl').to_list(),
-                    'prediction': df.get_column('prediction').to_list(),
-                    'age': df.get_column('age').to_list(),
-                    'user_id': df.get_column('user_id').to_list()
-                }
-            
-            return random_start, convert_df_to_dict(new_df), True  # Mark as initialized
-    
-    return no_update, no_update, no_update
+                return random_multiple * points
+        return 0
+    return no_update
 
 
 # Add simplified callbacks for UI updates only
@@ -1223,8 +1141,6 @@ def create_intermediate_predictions(start_time: datetime, end_time: datetime, st
     Create intermediate prediction points every 5 minutes between start and end points.
     Returns a list of (time, glucose_value) tuples for intermediate points.
     """
-    from datetime import timedelta
-    
     intermediate_points = []
     time_diff = end_time - start_time
     
@@ -1247,7 +1163,7 @@ def create_intermediate_predictions(start_time: datetime, end_time: datetime, st
     
     # Create prediction points for times that are approximately every 5 minutes
     target_interval = 5  # minutes
-    for i, time_point in enumerate(available_times):
+    for time_point in available_times:
         # Calculate how far along we are in the time range (0 to 1)
         time_from_start = time_point - start_time
         progress = time_from_start.total_seconds() / time_diff.total_seconds()
@@ -1310,7 +1226,7 @@ def main(
     dash_debug = debug if debug is not None else os.getenv('DASH_DEBUG', 'True').lower() == 'true'
     
     # Set the global debug mode based on command line argument or environment
-    config.DEBUG_MODE = debug if debug is not None else os.getenv('DEBUG_MODE', 'False').lower() == 'true'
+    config.DEBUG_MODE = debug if debug is not None else os.getenv('DEBUG_MODE', 'True').lower() == 'true'
     
     # Create components after setting debug mode
     global startup_page
@@ -1319,6 +1235,7 @@ def main(
     prediction_table.register_callbacks(app)  # Register the prediction table callbacks
     metrics_component.register_callbacks(app, prediction_table)  # Register the metrics component callbacks
     glucose_chart.register_callbacks(app)  # Register the glucose chart callbacks
+    submit_component.register_callbacks(app)  # Register the submit component callbacks
     startup_page.register_callbacks(app)  # Register the startup page callbacks
     ending_page.register_callbacks(app)  # Register the ending page callbacks
     

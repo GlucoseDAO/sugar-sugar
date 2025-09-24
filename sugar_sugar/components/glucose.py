@@ -1,15 +1,13 @@
 import plotly.graph_objs as go
 import polars as pl
-from typing import Tuple, Optional, Dict, List, Any
+from typing import Any, Optional
 from datetime import datetime
-from dash import dcc, html, Output, Input
-import dash
-from dash.html import Div
-import random
-from sugar_sugar.config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS, PREDICTION_HOUR_OFFSET
+from dash import dcc, Output, Input
+from dash import Dash, html
+from sugar_sugar.config import PREDICTION_HOUR_OFFSET
 
 
-class GlucoseChart(Div):
+class GlucoseChart(html.Div):
     RANGE_COLORS = {
         "dangerous_low": {"fill": "rgba(255, 200, 200, 0.5)", "line": "rgba(200, 0, 0, 0.5)"},
         "normal": {"fill": "rgba(200, 240, 200, 0.5)", "line": "rgba(0, 100, 0, 0.5)"},
@@ -24,11 +22,10 @@ class GlucoseChart(Div):
     }
 
     def __init__(self, id: str = 'glucose-chart', hide_last_hour: bool = False) -> None:
-        # Initialize as a Div with session storage and graph component
         super().__init__([
-            dcc.Store(id=f"{id}-df-store", data=None),  # Session storage for DataFrame
-            dcc.Store(id=f"{id}-events-store", data=None),  # Session storage for events
-            dcc.Store(id=f"{id}-source-store", data=None),  # Session storage for data source
+            dcc.Store(id=f"{id}-df-store", data=None),
+            dcc.Store(id=f"{id}-events-store", data=None),
+            dcc.Store(id=f"{id}-source-store", data=None),
             dcc.Graph(
                 id=f"{id}-graph",
                 figure=self._create_empty_figure(),
@@ -48,18 +45,9 @@ class GlucoseChart(Div):
                 },
                 style={'height': '100%'}
             )
-        ], style={
-            'padding': '20px',
-            'backgroundColor': 'white',
-            'borderRadius': '10px',
-            'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
-            'marginBottom': '20px',
-            'display': 'flex',
-            'flexDirection': 'column'
-        })
-        
+        ])
         self.id = id
-        self.hide_last_hour = hide_last_hour  # New parameter to control hiding last hour
+        self.hide_last_hour = hide_last_hour
 
     def _create_empty_figure(self) -> go.Figure:
         """Create an empty figure with basic layout"""
@@ -76,7 +64,7 @@ class GlucoseChart(Div):
         )
         return fig
 
-    def register_callbacks(self, app: dash.Dash) -> None:
+    def register_callbacks(self, app: Dash) -> None:
         """Register all glucose chart related callbacks"""
         
         @app.callback(
@@ -87,7 +75,11 @@ class GlucoseChart(Div):
              Input('events-df', 'data'),
              Input('data-source-name', 'data')]
         )
-        def store_chart_data(df_data: Optional[Dict], events_data: Optional[Dict], source_name: Optional[str]) -> Tuple[Optional[Dict], Optional[Dict], Optional[str]]:
+        def store_chart_data(
+            df_data: Optional[dict[str, Any]],
+            events_data: Optional[dict[str, Any]],
+            source_name: Optional[str]
+        ) -> tuple[Optional[dict[str, Any]], Optional[dict[str, Any]], Optional[str]]:
             """Store the current DataFrame and events data when they change"""
             print(f"DEBUG: GlucoseChart store_chart_data source={source_name}")
             # Just pass through the session storage data
@@ -97,9 +89,15 @@ class GlucoseChart(Div):
             Output(f'{self.id}-graph', 'figure'),
             [Input(f'{self.id}-df-store', 'data'),
              Input(f'{self.id}-events-store', 'data'),
-             Input(f'{self.id}-source-store', 'data')]
+             Input(f'{self.id}-source-store', 'data'),
+             Input('glucose-chart-mode', 'data')]
         )
-        def update_chart_figure(df_data: Optional[Dict], events_data: Optional[Dict], source_name: Optional[str]) -> go.Figure:
+        def update_chart_figure(
+            df_data: Optional[dict[str, Any]],
+            events_data: Optional[dict[str, Any]],
+            source_name: Optional[str],
+            mode_data: Optional[dict[str, Any]]
+        ) -> go.Figure:
             """Update the chart figure when data changes"""
             if not df_data:
                 return self._create_empty_figure()
@@ -107,13 +105,16 @@ class GlucoseChart(Div):
             # Reconstruct DataFrames from stored data
             df = self._reconstruct_dataframe_from_dict(df_data)
             events_df = self._reconstruct_events_dataframe_from_dict(events_data) if events_data else pl.DataFrame()
+            hide_mode = mode_data or {'hide_last_hour': self.hide_last_hour}
+            hide_last_hour_flag = hide_mode.get('hide_last_hour', self.hide_last_hour)
+            self.hide_last_hour = hide_last_hour_flag
             
             print(f"DEBUG: GlucoseChart updating figure - {len(df)} points, glucose range: {df.get_column('gl').min()}-{df.get_column('gl').max()} | source={source_name}")
             
             # Create the figure with source information
             return self._build_figure(df, events_df, source_name)
 
-    def _reconstruct_dataframe_from_dict(self, df_data: Dict[str, List[Any]]) -> pl.DataFrame:
+    def _reconstruct_dataframe_from_dict(self, df_data: dict[str, list[Any]]) -> pl.DataFrame:
         """Reconstruct a Polars DataFrame from stored dictionary data"""
         return pl.DataFrame({
             'time': pl.Series(df_data['time']).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),
@@ -123,7 +124,7 @@ class GlucoseChart(Div):
             'user_id': pl.Series([int(float(x)) for x in df_data['user_id']], dtype=pl.Int64)
         })
 
-    def _reconstruct_events_dataframe_from_dict(self, events_data: Dict[str, List[Any]]) -> pl.DataFrame:
+    def _reconstruct_events_dataframe_from_dict(self, events_data: dict[str, list[Any]]) -> pl.DataFrame:
         """Reconstruct the events DataFrame from stored data"""
         return pl.DataFrame({
             'time': pl.Series(events_data['time']).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),
@@ -180,7 +181,7 @@ class GlucoseChart(Div):
             yref='y'
         )
 
-    def _calculate_y_axis_range(self) -> Tuple[float, float]:
+    def _calculate_y_axis_range(self) -> tuple[float, float]:
         """Calculates the y-axis range based on glucose and prediction values."""
         STANDARD_MIN = 40  # Standard lower bound for CGM charts
         STANDARD_MAX = 300  # Upper bound for CGM chart

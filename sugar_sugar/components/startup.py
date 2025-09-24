@@ -1,15 +1,9 @@
 from dash import html, dcc
-import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, State
 from dash import no_update
 import dash
-from typing import Dict, Any, Optional, List, Union, Tuple
-import os
-from dotenv import load_dotenv
+from typing import Optional
 # DEBUG_MODE will be imported dynamically to get the latest value
-
-# Load environment variables
-load_dotenv()
 
 class StartupPage(html.Div):
     def __init__(self) -> None:
@@ -255,7 +249,11 @@ class StartupPage(html.Div):
             [State('test-me-button', 'n_clicks'),
              State('email-input', 'value')]
         )
-        def update_diabetic_details(is_diabetic: Optional[bool], test_clicks: Optional[int], email: Optional[str]) -> Tuple[Dict[str, str], Optional[str], Optional[int]]:
+        def update_diabetic_details(
+            is_diabetic: Optional[bool],
+            test_clicks: Optional[int],
+            email: Optional[str]
+        ) -> tuple[dict[str, str], Optional[str], Optional[int]]:
             if is_diabetic is None:
                 return {'display': 'none'}, None, None
             elif is_diabetic:
@@ -272,7 +270,9 @@ class StartupPage(html.Div):
              Output('medical-conditions-input', 'value')],
             [Input('medical-conditions-dropdown', 'value')]
         )
-        def update_medical_conditions_details(has_conditions: Optional[bool]) -> Tuple[Dict[str, str], Optional[str]]:
+        def update_medical_conditions_details(
+            has_conditions: Optional[bool]
+        ) -> tuple[dict[str, str], Optional[str]]:
             if has_conditions is None:
                 return {'display': 'none'}, None
             elif has_conditions:
@@ -300,15 +300,25 @@ class StartupPage(html.Div):
              Input('location-input', 'value')]
         )
         def update_form_validation(
-            consent_value: Optional[List[str]], 
+            consent_value: Optional[list[str]], 
             email: Optional[str], 
-            age: Optional[Union[int, float]], 
+            age: Optional[int | float], 
             gender: Optional[str], 
             is_diabetic: Optional[bool], 
             diabetic_type: Optional[str], 
-            diabetes_duration: Optional[Union[int, float]], 
+            diabetes_duration: Optional[int | float], 
             location: Optional[str]
-        ) -> Tuple[bool, Dict[str, Union[str, int]], Dict[str, Union[str, int]], Dict[str, Union[str, int]], Dict[str, Union[str, int]], Dict[str, Union[str, int]], Dict[str, Union[str, int]], Dict[str, Union[str, int]], Dict[str, Union[str, int]]]:
+        ) -> tuple[
+            bool,
+            dict[str, str | int],
+            dict[str, str | int],
+            dict[str, str | int],
+            dict[str, str | int],
+            dict[str, str | int],
+            dict[str, str | int],
+            dict[str, str | int],
+            dict[str, str | int]
+        ]:
             # Check if consent is given
             consent_given = consent_value and 'consent' in consent_value
             
@@ -382,7 +392,7 @@ class StartupPage(html.Div):
             [Input('test-me-button', 'n_clicks')],
             prevent_initial_call=True
         )
-        def fill_form_data(n_clicks) -> Tuple[str, int, str, bool, bool, str, List[str]]:
+        def fill_form_data(n_clicks: Optional[int]) -> tuple[str, int, str, bool, bool, str, list[str]]:
             if n_clicks:
                 # Fill the form with realistic test data and tick consent checkbox
                 # Note: diabetic-type and diabetes-duration will be auto-filled by existing callbacks
@@ -396,7 +406,6 @@ class StartupPage(html.Div):
                     ['consent']               # consent checkbox
                 )
             
-            return no_update, no_update, no_update, no_update, no_update, no_update, no_update
-        # <!-- END INSERTION: Test Me Button Callback -->
+            return no_update, no_update, no_update, no_update, no_update, no_update, no_update 
 
  

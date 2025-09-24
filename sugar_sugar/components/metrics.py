@@ -1,7 +1,6 @@
-from typing import List, Dict, Tuple, Optional, Any, Union
-from dash import html, dcc, Output, Input, State, dash_table
+from typing import Optional, Any
+from dash import Dash, html, dcc, Output, Input
 import polars as pl
-import dash
 
 
 class MetricsComponent(html.Div):
@@ -38,14 +37,14 @@ class MetricsComponent(html.Div):
             ]
         )
 
-    def register_callbacks(self, app: dash.Dash, prediction_table_instance: Any) -> None:
+    def register_callbacks(self, app: Dash, prediction_table_instance: Any) -> None:
         """Register all metrics-related callbacks"""
         
         @app.callback(
             Output('metrics-store', 'data'),
             [Input('current-window-df', 'data')]  # Listen to session storage instead
         )
-        def store_metrics_data(df_data: Optional[Dict]) -> Optional[Dict]:
+        def store_metrics_data(df_data: Optional[dict]) -> Optional[dict]:
             """Calculate and store metrics when DataFrame changes"""
             if not df_data:
                 return None
@@ -61,7 +60,6 @@ class MetricsComponent(html.Div):
             
             # Extract prediction data for metrics calculation
             prediction_row = table_data[1]  # Predicted values row
-            actual_row = table_data[0]      # Actual glucose values row
             
             # Count valid predictions (non-dash values)
             valid_predictions = sum(1 for key, value in prediction_row.items() 
@@ -77,7 +75,7 @@ class MetricsComponent(html.Div):
             Output('metrics-container', 'children'),
             [Input('metrics-store', 'data')]
         )
-        def update_metrics_display(stored_metrics: Optional[Dict[str, Any]]) -> List[html.Div]:
+        def update_metrics_display(stored_metrics: Optional[dict[str, Any]]) -> list[html.Div]:
             """Updates the metrics display based on stored metrics."""
             print(f"DEBUG: update_metrics_display called with stored metrics: {bool(stored_metrics)}")
             
@@ -137,7 +135,7 @@ class MetricsComponent(html.Div):
             ]
 
     @staticmethod
-    def create_ending_metrics_display(stored_metrics: Optional[Dict[str, Any]]) -> List[html.Div]:
+    def create_ending_metrics_display(stored_metrics: Optional[dict[str, Any]]) -> list[html.Div]:
         """Create metrics display for the ending page"""
         print(f"DEBUG: create_ending_metrics_display called with stored metrics: {bool(stored_metrics)}")
         
@@ -215,7 +213,7 @@ class MetricsComponent(html.Div):
             })
         ]
 
-    def _reconstruct_dataframe_from_dict(self, df_data: Dict[str, List[Any]]) -> pl.DataFrame:
+    def _reconstruct_dataframe_from_dict(self, df_data: dict[str, list[Any]]) -> pl.DataFrame:
         """Reconstruct a Polars DataFrame from stored dictionary data"""
         return pl.DataFrame({
             'time': pl.Series(df_data['time']).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),
@@ -225,7 +223,7 @@ class MetricsComponent(html.Div):
             'user_id': pl.Series([int(float(x)) for x in df_data['user_id']], dtype=pl.Int64)
         })
 
-    def _generate_table_data(self, df: pl.DataFrame) -> List[Dict[str, str]]:
+    def _generate_table_data(self, df: pl.DataFrame) -> list[dict[str, str]]:
         """Generates the table data with actual values, predictions, and errors."""
         table_data = []
         
@@ -269,7 +267,7 @@ class MetricsComponent(html.Div):
         
         return table_data
 
-    def _calculate_error_rows(self, df: pl.DataFrame, prediction_row: Dict[str, str]) -> List[Dict[str, str]]:
+    def _calculate_error_rows(self, df: pl.DataFrame, prediction_row: dict[str, str]) -> list[dict[str, str]]:
         """Calculates absolute and relative error rows for the table."""
         error_rows = []
         
@@ -299,7 +297,7 @@ class MetricsComponent(html.Div):
         
         return error_rows
 
-    def _calculate_metrics_from_table_data(self, table_data: List[Dict[str, str]]) -> Dict[str, Any]:
+    def _calculate_metrics_from_table_data(self, table_data: list[dict[str, str]]) -> dict[str, Any]:
         """Calculate metrics from table data"""
         if len(table_data) < 2:
             return {}

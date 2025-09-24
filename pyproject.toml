@@ -1,6 +1,6 @@
 [project]
 name = "sugar-sugar"
-version = "0.1.0"
+version = "0.1.1"
 description = "A data access and visualization tool for glucose monitoring data"
 authors = [
     {name = "Anton Kulaga", email = "Antonkulaga@gmail.com"}
@@ -9,12 +9,11 @@ license = {text = "Apache-2.0"}
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "dash>=3.0.4",
-    "dash-bootstrap-components>=2.0.3",
-    "plotly>=6.1.2",
-    "polars>=1.30.0",
-    "pandas>=2.3.0",
-    "typer>=0.16.0",
+    "dash>=3.2.0",
+    "dash-bootstrap-components>=2.0.4",
+    "plotly>=6.3.0",
+    "polars>=1.33.1",
+    "typer>=0.19.2",
     "numpy>=2.3.0",
     "pycomfort>=0.0.18",
     "dotenv>=0.9.9",

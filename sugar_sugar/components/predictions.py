@@ -1,10 +1,10 @@
-from typing import List, Dict, Optional, Tuple, Any
+from typing import Optional, Tuple, Any
 from dash import html, dash_table, dcc, Output, Input
 import polars as pl
 import dash
 
 
-TableData = List[Dict[str, str]]
+TableData = list[dict[str, str]]
 
 class PredictionTableComponent(html.Div):
     def __init__(self) -> None:
@@ -82,7 +82,7 @@ class PredictionTableComponent(html.Div):
             Output('current-df-store', 'data'),
             [Input('current-window-df', 'data')]  # Listen to session storage instead
         )
-        def store_current_df(df_data: Optional[Dict]) -> Optional[Dict]:
+        def store_current_df(df_data: Optional[dict]) -> Optional[dict]:
             """Store the current DataFrame state when it changes"""
             # Just pass through the session storage data
             return df_data
@@ -93,7 +93,7 @@ class PredictionTableComponent(html.Div):
              Output('prediction-table-data', 'style_cell_conditional')],
             [Input('current-df-store', 'data')]
         )
-        def update_table(df_data: Optional[Dict]) -> Tuple[TableData, List[Dict], List[Dict]]:
+        def update_table(df_data: Optional[dict]) -> Tuple[TableData, list[dict], list[dict]]:
             """Updates the predictions table based on the stored DataFrame state."""
             if not df_data:
                 return [], [], []
@@ -140,7 +140,7 @@ class PredictionTableComponent(html.Div):
             
             return table_data, columns, style_cell_conditional
 
-    def _reconstruct_dataframe_from_dict(self, df_data: Dict[str, List[Any]]) -> pl.DataFrame:
+    def _reconstruct_dataframe_from_dict(self, df_data: dict[str, list[Any]]) -> pl.DataFrame:
         """Reconstruct a Polars DataFrame from stored dictionary data"""
         return pl.DataFrame({
             'time': pl.Series(df_data['time']).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),
@@ -194,7 +194,7 @@ class PredictionTableComponent(html.Div):
         
         return table_data
 
-    def _calculate_error_rows(self, df: pl.DataFrame, prediction_row: Dict[str, str]) -> List[Dict[str, str]]:
+    def _calculate_error_rows(self, df: pl.DataFrame, prediction_row: dict[str, str]) -> list[dict[str, str]]:
         """Calculates absolute and relative error rows for the table."""
         error_rows = []
         

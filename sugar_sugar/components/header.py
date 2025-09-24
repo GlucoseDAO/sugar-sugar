@@ -1,5 +1,4 @@
-from typing import List, Dict, Tuple, Optional, Any, Union
-import dash
+from typing import Sequence, Optional, Any
 from dash import dcc, html
 
 from dash.html import Div
@@ -7,11 +6,11 @@ from sugar_sugar.config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS
 
 
 class HeaderComponent(Div):
-    def __init__(self, children: Optional[List[Any]] = None, show_time_slider: bool = True, **kwargs) -> None:
+    def __init__(self, show_time_slider: bool = True, children: Optional[Sequence[Any]] = None, **kwargs: Any) -> None:
         self.show_time_slider = show_time_slider
         if children is None:
             children = self._create_header_content()
-            
+
         super().__init__(
             children=children,
             style={
@@ -48,7 +47,7 @@ class HeaderComponent(Div):
                 'marginBottom': '10px'
             })
         ]
-        
+
         # Always include the time slider for functionality, but conditionally hide it
         time_slider_div = html.Div([
             html.Label('Time Window Position:', style={'marginRight': '10px'}),
@@ -64,18 +63,18 @@ class HeaderComponent(Div):
                 step=1
             ),
         ], style={
-            'flex': '1', 
+            'flex': '1',
             'marginLeft': '20px',
             'display': 'block' if self.show_time_slider else 'none'  # Hide when show_time_slider is False
         })
-        
+
         # Add the time slider to the first child's style
         if self.show_time_slider:
             controls_children[0]['props']['children'].append(time_slider_div)
         else:
             # Still include the slider but hidden for callback functionality
             controls_children.append(time_slider_div)
-        
+
         return html.Div(controls_children)
 
     def create_upload_section(self) -> html.Div:
@@ -115,10 +114,10 @@ class HeaderComponent(Div):
             html.Div(id='example-data-warning', style={'marginTop': '10px'})
         ])
 
-    def _create_header_content(self) -> List[Any]:
+    def _create_header_content(self) -> Sequence[Any]:
         """Create the header section content with title and description"""
         return [
-            html.H1('Sugar Sugar', 
+            html.H1('Sugar Sugar',
                     style={
                         'textAlign': 'center',
                         'color': '#2c5282',
@@ -154,7 +153,7 @@ class HeaderComponent(Div):
                         'lineHeight': '1.8'
                     })
                 ], style={'flex': '1', 'paddingRight': '20px'}),
-                
+
                 # Right column - Upload and controls
                 html.Div([
                     self.create_controls(),

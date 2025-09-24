@@ -1,21 +1,14 @@
-from typing import Dict, List, Any, Optional
-import dash
-from dash import html, dcc, Output, Input, State, no_update
-import dash_bootstrap_components as dbc
+from typing import Any
 import polars as pl
-from sugar_sugar.components.glucose import GlucoseChart
-from sugar_sugar.components.predictions import PredictionTableComponent
-from sugar_sugar.components.metrics import MetricsComponent
-from sugar_sugar.config import DEFAULT_POINTS
+from dash import Dash, html
 
 class EndingPage:
     def __init__(self) -> None:
         print("DEBUG: Initializing EndingPage")
         # Initialize components without data
-        self.glucose_chart = GlucoseChart(id='ending-glucose-graph')
         self.cached_content = None  # Cache the ending page content
         
-    def register_callbacks(self, app: dash.Dash) -> None:
+    def register_callbacks(self, app: Dash) -> None:
         """Register callbacks for the ending page."""
         print("DEBUG: Registering ending page callbacks")
         
@@ -23,7 +16,7 @@ class EndingPage:
         # This component only handles internal ending page logic if needed
         pass
         
-    def _reconstruct_dataframe(self, df_data: Dict[str, List[Any]]) -> pl.DataFrame:
+    def _reconstruct_dataframe(self, df_data: dict[str, list[Any]]) -> pl.DataFrame:
         """Reconstruct the DataFrame from stored data."""
         return pl.DataFrame({
             'time': pl.Series(df_data['time']).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),
@@ -33,7 +26,7 @@ class EndingPage:
             'user_id': pl.Series([int(float(x)) for x in df_data['user_id']], dtype=pl.Int64)
         })
     
-    def _reconstruct_events_dataframe(self, events_data: Dict[str, List[Any]]) -> pl.DataFrame:
+    def _reconstruct_events_dataframe(self, events_data: dict[str, list[Any]]) -> pl.DataFrame:
         """Reconstruct the events DataFrame from stored data.""" 
         return pl.DataFrame({
             'time': pl.Series(events_data['time']).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),

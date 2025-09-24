@@ -11,4 +11,4 @@ PREDICTION_HOUR_OFFSET: int = 12
 DOUBLE_CLICK_THRESHOLD: int = 500  # milliseconds
 
 # Debug mode configuration
-DEBUG_MODE: bool = False
+DEBUG_MODE: bool = True
