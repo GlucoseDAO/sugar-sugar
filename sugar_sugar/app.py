@@ -663,14 +663,11 @@ def initialize_data_on_url_change(pathname: Optional[str], full_df_data: Optiona
      Output('randomization-initialized', 'data', allow_duplicate=True)],
     [Input('upload-data', 'contents')],
     [State('upload-data', 'filename'),
-     State('points-control', 'value'),
-     State('full-df', 'data'),
-     State('events-df', 'data')],
+     State('points-control', 'value')],
     prevent_initial_call=True
 )
 def handle_file_upload(upload_contents: Optional[str], filename: Optional[str], 
-                      points_value: Optional[int], full_df_data: Optional[Dict], 
-                      events_df_data: Optional[Dict]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool]:
+                      points_value: Optional[int]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool]:
     """Handle file upload and data loading"""
     if not upload_contents:
         return no_update, no_update, no_update, no_update, no_update, no_update, no_update
@@ -728,15 +725,16 @@ def handle_file_upload(upload_contents: Optional[str], filename: Optional[str],
      Output('events-df', 'data', allow_duplicate=True),
      Output('is-example-data', 'data', allow_duplicate=True),
      Output('data-source-name', 'data', allow_duplicate=True),
-     Output('randomization-initialized', 'data', allow_duplicate=True)],
+     Output('randomization-initialized', 'data', allow_duplicate=True),
+     Output('time-slider', 'value', allow_duplicate=True)],  # Add slider value update
     [Input('use-example-data-button', 'n_clicks')],
     [State('points-control', 'value')],
     prevent_initial_call=True
 )
-def handle_example_data_button(example_button_clicks: Optional[int], points_value: Optional[int]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool]:
+def handle_example_data_button(example_button_clicks: Optional[int], points_value: Optional[int]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int]:
     """Handle use example data button click"""
     if not example_button_clicks:
-        return no_update, no_update, no_update, no_update, no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
     
     with start_action(action_type=u"handle_example_data_button"):
         current_time = int(time.time() * 1000)
@@ -752,6 +750,7 @@ def handle_example_data_button(example_button_clicks: Optional[int], points_valu
         new_full_df = new_full_df.with_columns(pl.lit(0.0).alias("prediction"))
         new_df = new_df.with_columns(pl.lit(0.0).alias("prediction"))
         
+        print(f"DEBUG: Generated new random start position for example data: {random_start}")
         
         return (current_time, 
                convert_df_to_dict(new_full_df),
@@ -759,7 +758,8 @@ def handle_example_data_button(example_button_clicks: Optional[int], points_valu
                convert_events_df_to_dict(new_events_df),
                True,  # is_example_data = True for example data
                "example.csv",  # data_source_name for example data
-               False)  # reset randomization flag for new data
+               False,  # reset randomization flag for new data
+               random_start)  # Set slider to the random start position
 
 
 # Separate callback for points control
@@ -1071,30 +1071,27 @@ def update_upload_success_message(upload_contents: Optional[str], filename: Opti
     return None
 
 
-# Separate UI callback for example data button message
+# Separate UI callback for example data button message and upload reset
 @app.callback(
     [Output('example-data-warning', 'children', allow_duplicate=True),
-     Output('time-slider', 'max'),
-     Output('time-slider', 'value'),
-     Output('upload-data', 'contents'),  # Reset upload contents
-     Output('upload-data', 'filename')],  # Reset filename
+     Output('time-slider', 'max', allow_duplicate=True),
+     Output('upload-data', 'contents', allow_duplicate=True),  # Reset upload contents
+     Output('upload-data', 'filename', allow_duplicate=True)],  # Reset filename
     [Input('use-example-data-button', 'n_clicks')],
     [State('points-control', 'value'),
-     State('time-slider', 'value'),
      State('full-df', 'data')],
     prevent_initial_call=True
 )
-def update_example_data_ui(example_button_clicks: Optional[int], points_value: Optional[int],
-                          current_position: Optional[int], full_df_data: Optional[Dict]) -> Tuple[Optional[html.Div], int, int, None, None]:
-    """Update UI when example data button is clicked and reset upload component"""
+def reset_upload_on_example_data(example_button_clicks: Optional[int], points_value: Optional[int], 
+                                full_df_data: Optional[Dict]) -> Tuple[Optional[html.Div], int, None, None]:
+    """Reset upload component and show message when example data button is clicked"""
     if not example_button_clicks or not full_df_data:
-        return no_update, no_update, no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update
     
-    with start_action(action_type=u"update_example_data_ui_with_upload_reset"):
+    with start_action(action_type=u"reset_upload_on_example_data"):
         full_df = reconstruct_dataframe_from_dict(full_df_data)
         points = max(MIN_POINTS, min(MAX_POINTS, points_value))
         new_max = len(full_df) - points
-        new_start = min(current_position, new_max)
         
         print("DEBUG: Resetting upload component to allow re-upload of same file")
         
@@ -1112,7 +1109,7 @@ def update_example_data_ui(example_button_clicks: Optional[int], points_value: O
         
         # Reset upload component by clearing contents and filename
         # This allows the same file to be uploaded again after switching to example data
-        return example_msg, new_max, max(0, new_start), None, None
+        return example_msg, new_max, None, None
 
 
 # Separate UI callback for points control
