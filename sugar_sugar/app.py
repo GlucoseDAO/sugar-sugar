@@ -146,6 +146,7 @@ app.layout = html.Div([
     dcc.Store(id='randomization-initialized', data=False),  # Track if randomization has been done
     dcc.Store(id='glucose-chart-mode', data={'hide_last_hour': True}),
     dcc.Store(id='user-agent', data=None, storage_type='session'),
+    dcc.Store(id='initial-slider-value', data=example_initial_slider_value),  # Store initial random start
 
     html.Div(id='mobile-warning', style={'margin': '12px 0'}),
 
@@ -648,7 +649,7 @@ def initialize_data_on_url_change(pathname: Optional[str], full_df_data: Optiona
         events_dataframe_to_store_dict(events_df),
         True,
         'example.csv',
-        True
+        False  # Keep randomization flag false so slider can be randomized
     )
 
 # Prediction page interactions callback (only for prediction page components)  
@@ -1021,22 +1022,30 @@ def update_data_source_display(pathname: str, source_name: Optional[str]) -> str
 
 # Add callback for random slider initialization when prediction page components are ready
 @app.callback(
-    Output('time-slider', 'value', allow_duplicate=True),
+    [Output('time-slider', 'value', allow_duplicate=True),
+     Output('randomization-initialized', 'data', allow_duplicate=True)],
     [Input('time-slider', 'max')],  # Triggers when slider is created and max is set
     [State('url', 'pathname'),
      State('full-df', 'data'),
      State('points-control', 'value'),
-     State('randomization-initialized', 'data')],
+     State('randomization-initialized', 'data'),
+     State('initial-slider-value', 'data')],
     prevent_initial_call=True
 )
-def randomize_slider_on_prediction_page(slider_max: int, pathname: str, full_df_data: Optional[Dict], points_value: int, randomization_initialized: bool) -> int:
-    """Set slider to a random valid window start when slider mounts on prediction page. Only returns slider value."""
+def randomize_slider_on_prediction_page(slider_max: int, pathname: str, full_df_data: Optional[Dict], 
+                                       points_value: int, randomization_initialized: bool, 
+                                       initial_slider_value: Optional[int]) -> Tuple[int, bool]:
+    """Set slider to a random valid window start when slider mounts on prediction page. Returns slider value and updated randomization flag."""
     if pathname == '/prediction' and full_df_data and slider_max is not None and not randomization_initialized:
+        # Use the stored initial slider value if available
+        if initial_slider_value is not None:
+            return initial_slider_value, True
+        # Otherwise generate a new random start
         full_df = reconstruct_dataframe_from_dict(full_df_data)
         points = max(MIN_POINTS, min(MAX_POINTS, points_value or DEFAULT_POINTS))
         _, random_start = get_random_data_window(full_df, points)
-        return random_start
-    return no_update
+        return random_start, True  # Set randomization flag to True after randomizing
+    return no_update, no_update
 
 
 # Add simplified callbacks for UI updates only
