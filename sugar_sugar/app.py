@@ -652,7 +652,7 @@ def initialize_data_on_url_change(pathname: Optional[str], full_df_data: Optiona
         False  # Keep randomization flag false so slider can be randomized
     )
 
-# Prediction page interactions callback (only for prediction page components)  
+# Separate callback for file upload handling
 @app.callback(
     [Output('last-click-time', 'data'),
      Output('full-df', 'data', allow_duplicate=True),
@@ -661,105 +661,86 @@ def initialize_data_on_url_change(pathname: Optional[str], full_df_data: Optiona
      Output('is-example-data', 'data', allow_duplicate=True),
      Output('data-source-name', 'data', allow_duplicate=True),
      Output('randomization-initialized', 'data', allow_duplicate=True)],
-    [Input('upload-data', 'contents'),
-     Input('use-example-data-button', 'n_clicks'),
-     Input('points-control', 'value'),
-     Input('time-slider', 'value')],
-    [State('last-click-time', 'data'),
-     State('upload-data', 'filename'),
-     State('time-slider', 'value'),
+    [Input('upload-data', 'contents')],
+    [State('upload-data', 'filename'),
      State('points-control', 'value'),
      State('full-df', 'data'),
-     State('current-window-df', 'data'),
-     State('events-df', 'data'),
-     State('is-example-data', 'data'),
-     State('data-source-name', 'data')],
+     State('events-df', 'data')],
     prevent_initial_call=True
 )
-def handle_prediction_page_interactions(upload_contents: Optional[str], example_button_clicks: Optional[int],
-                          points_value: Optional[int], slider_value: Optional[int],
-                          last_click_time: int, filename: Optional[str], 
-                          current_position: Optional[int], current_points: Optional[int],
-                          full_df_data: Optional[Dict], current_df_data: Optional[Dict], 
-                          events_df_data: Optional[Dict], is_example_data: Optional[bool],
-                          current_source_name: Optional[str]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool]:
-    """Handle prediction page interactions only (upload, example button, controls)"""
-    current_time = int(time.time() * 1000)
-    ctx = dash.callback_context
+def handle_file_upload(upload_contents: Optional[str], filename: Optional[str], 
+                      points_value: Optional[int], full_df_data: Optional[Dict], 
+                      events_df_data: Optional[Dict]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool]:
+    """Handle file upload and data loading"""
+    if not upload_contents:
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update
     
-    if not ctx.triggered:
-        return last_click_time, no_update, no_update, no_update, no_update, no_update, no_update
-    
-    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
-    
-    # Get current data from session storage
-    if not full_df_data or not current_df_data or not events_df_data:
-        return last_click_time, no_update, no_update, no_update, no_update, no_update, no_update
-    
-    # Helper functions
-    def convert_df_to_dict(df: pl.DataFrame) -> Dict[str, List[Any]]:
-        return {
-            'time': df.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
-            'gl': df.get_column('gl').to_list(),
-            'prediction': df.get_column('prediction').to_list(),
-            'age': df.get_column('age').to_list(),
-            'user_id': df.get_column('user_id').to_list()
-        }
-    
-    def convert_events_df_to_dict(df: pl.DataFrame) -> Dict[str, List[Any]]:
-        return {
-            'time': df.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
-            'event_type': df.get_column('event_type').to_list(),
-            'event_subtype': df.get_column('event_subtype').to_list(),
-            'insulin_value': df.get_column('insulin_value').to_list()
-        }
-    
-    full_df = reconstruct_dataframe_from_dict(full_df_data)
-    reconstruct_events_dataframe_from_dict(events_df_data)
-    
-    # Handle file upload
-    if trigger_id == 'upload-data' and upload_contents:
-        print(f"DEBUG[app.handle_all_interactions]: upload received filename={filename}")
-        try:
-            content_type, content_string = upload_contents.split(',')
-            decoded = base64.b64decode(content_string)
-            
-            # Ensure user data directory exists under data/input/users
-            users_data_dir = project_root / 'data' / 'input' / 'users'
-            users_data_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Generate unique filename with timestamp
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            safe_filename = filename.replace(' ', '_').replace('/', '_') if filename else 'uploaded_data'
-            if not safe_filename.endswith('.csv'):
-                safe_filename += '.csv'
-            unique_filename = f"{timestamp}_{safe_filename}"
-            
-            # Save file to the users data folder
-            save_path = users_data_dir / unique_filename
-            with open(save_path, 'wb') as f:
-                f.write(decoded)
-            
-            print(f"DEBUG[app.handle_all_interactions]: saved uploaded file to {save_path}")
-            
-            new_full_df, new_events_df = load_glucose_data(save_path)
-            
-            # Start at a random position for uploaded files too
-            points = max(MIN_POINTS, min(MAX_POINTS, points_value or DEFAULT_POINTS))
-            new_df, random_start = get_random_data_window(new_full_df, points)
-            return (current_time, 
-                   convert_df_to_dict(new_full_df),
-                   convert_df_to_dict(new_df),
-                   convert_events_df_to_dict(new_events_df),
-                   False,  # is_example_data = False for uploaded files
-                   filename,  # store the original filename
-                   False)  # reset randomization flag for new data
-            
-        except Exception as e:
+    with start_action(action_type=u"handle_file_upload", filename=filename):
+        current_time = int(time.time() * 1000)
+        
+        # Parse upload contents
+        if ',' not in upload_contents:
+            print(f"ERROR: Invalid upload format for file {filename}")
             return current_time, no_update, no_update, no_update, no_update, no_update, no_update
+        
+        content_type, content_string = upload_contents.split(',', 1)
+        decoded = base64.b64decode(content_string)
+        
+        # Ensure user data directory exists under data/input/users
+        users_data_dir = project_root / 'data' / 'input' / 'users'
+        users_data_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate unique filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_filename = filename.replace(' ', '_').replace('/', '_') if filename else 'uploaded_data'
+        if not safe_filename.endswith('.csv'):
+            safe_filename += '.csv'
+        unique_filename = f"{timestamp}_{safe_filename}"
+        
+        # Save file to the users data folder
+        save_path = users_data_dir / unique_filename
+        with open(save_path, 'wb') as f:
+            f.write(decoded)
+        
+        print(f"DEBUG: saved uploaded file to {save_path}")
+        
+        # Load glucose data - let load_glucose_data handle its own error cases
+        new_full_df, new_events_df = load_glucose_data(save_path)
+        
+        # Start at a random position for uploaded files too
+        points = max(MIN_POINTS, min(MAX_POINTS, points_value or DEFAULT_POINTS))
+        new_df, random_start = get_random_data_window(new_full_df, points)
+        
+        return (current_time, 
+               convert_df_to_dict(new_full_df),
+               convert_df_to_dict(new_df),
+               convert_events_df_to_dict(new_events_df),
+               False,  # is_example_data = False for uploaded files
+               filename,  # store the original filename
+               False)  # reset randomization flag for new data
+
+
+# Separate callback for example data button
+@app.callback(
+    [Output('last-click-time', 'data', allow_duplicate=True),
+     Output('full-df', 'data', allow_duplicate=True),
+     Output('current-window-df', 'data', allow_duplicate=True),
+     Output('events-df', 'data', allow_duplicate=True),
+     Output('is-example-data', 'data', allow_duplicate=True),
+     Output('data-source-name', 'data', allow_duplicate=True),
+     Output('randomization-initialized', 'data', allow_duplicate=True)],
+    [Input('use-example-data-button', 'n_clicks')],
+    [State('points-control', 'value')],
+    prevent_initial_call=True
+)
+def handle_example_data_button(example_button_clicks: Optional[int], points_value: Optional[int]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool]:
+    """Handle use example data button click"""
+    if not example_button_clicks:
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update
     
-    # Handle use example data button
-    elif trigger_id == 'use-example-data-button':
+    with start_action(action_type=u"handle_example_data_button"):
+        current_time = int(time.time() * 1000)
+        
         # Load fresh example data
         new_full_df, new_events_df = load_glucose_data()
         
@@ -771,6 +752,7 @@ def handle_prediction_page_interactions(upload_contents: Optional[str], example_
         new_full_df = new_full_df.with_columns(pl.lit(0.0).alias("prediction"))
         new_df = new_df.with_columns(pl.lit(0.0).alias("prediction"))
         
+        
         return (current_time, 
                convert_df_to_dict(new_full_df),
                convert_df_to_dict(new_df),
@@ -778,25 +760,56 @@ def handle_prediction_page_interactions(upload_contents: Optional[str], example_
                True,  # is_example_data = True for example data
                "example.csv",  # data_source_name for example data
                False)  # reset randomization flag for new data
+
+
+# Separate callback for points control
+@app.callback(
+    [Output('last-click-time', 'data', allow_duplicate=True),
+     Output('current-window-df', 'data', allow_duplicate=True)],
+    [Input('points-control', 'value')],
+    [State('time-slider', 'value'),
+     State('full-df', 'data')],
+    prevent_initial_call=True
+)
+def handle_points_control(points_value: Optional[int], current_position: Optional[int], 
+                         full_df_data: Optional[Dict]) -> Tuple[int, Dict[str, List[Any]]]:
+    """Handle points control slider changes"""
+    if not points_value or not full_df_data:
+        return no_update, no_update
     
-    # Handle points control
-    elif trigger_id == 'points-control':
+    with start_action(action_type=u"handle_points_control", points_value=points_value):
+        current_time = int(time.time() * 1000)
+        
+        full_df = reconstruct_dataframe_from_dict(full_df_data)
         points = max(MIN_POINTS, min(MAX_POINTS, points_value))
         new_max = len(full_df) - points
         new_start = min(current_position or 0, new_max)
         new_start = max(0, new_start)
         new_df = full_df.slice(new_start, points)
         
-        return (current_time,
-               no_update,
-               convert_df_to_dict(new_df),
-               no_update,
-               no_update,
-               no_update,
-               no_update)
+        return current_time, convert_df_to_dict(new_df)
+
+
+# Separate callback for time slider
+@app.callback(
+    [Output('last-click-time', 'data', allow_duplicate=True),
+     Output('current-window-df', 'data', allow_duplicate=True)],
+    [Input('time-slider', 'value')],
+    [State('points-control', 'value'),
+     State('full-df', 'data')],
+    prevent_initial_call=True
+)
+def handle_time_slider(slider_value: Optional[int], current_points: Optional[int], 
+                      full_df_data: Optional[Dict]) -> Tuple[int, Dict[str, List[Any]]]:
+    """Handle time slider changes"""
+    if slider_value is None or not full_df_data:
+        return no_update, no_update
     
-    # Handle time slider
-    elif trigger_id == 'time-slider':
+    with start_action(action_type=u"handle_time_slider", slider_value=slider_value):
+        current_time = int(time.time() * 1000)
+        
+        full_df = reconstruct_dataframe_from_dict(full_df_data)
+        
         # Ensure we don't go beyond the available data
         points = max(MIN_POINTS, min(MAX_POINTS, current_points or DEFAULT_POINTS))
         max_start = len(full_df) - points
@@ -805,17 +818,7 @@ def handle_prediction_page_interactions(upload_contents: Optional[str], example_
         
         new_df = full_df.slice(safe_slider_value, points)
         
-        return (current_time,
-               no_update,
-               convert_df_to_dict(new_df),
-               no_update,
-               no_update,
-               no_update,
-               no_update)
-    
-    # Graph interactions handled by separate glucose chart callbacks
-    
-    return last_click_time, no_update, no_update, no_update, no_update, no_update, no_update
+        return current_time, convert_df_to_dict(new_df)
 
 # Separate callback for glucose graph interactions (only active on prediction page)
 @app.callback(
@@ -842,14 +845,6 @@ def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optiona
     predictions_values = df.get_column("prediction").to_list()
     visible_points = len(df) - PREDICTION_HOUR_OFFSET
     
-    def convert_df_to_dict(df_in: pl.DataFrame) -> Dict[str, List[Any]]:
-        return {
-            'time': df_in.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
-            'gl': df_in.get_column('gl').to_list(),
-            'prediction': df_in.get_column('prediction').to_list(),
-            'age': df_in.get_column('age').to_list(),
-            'user_id': df_in.get_column('user_id').to_list()
-        }
     
     def snap_index(x_value: Optional[float]) -> Optional[int]:
         """Snap a drawn x-coordinate to the nearest data index while respecting prediction bounds."""
@@ -1048,58 +1043,60 @@ def randomize_slider_on_prediction_page(slider_max: int, pathname: str, full_df_
     return no_update, no_update
 
 
-# Add simplified callbacks for UI updates only
+# Separate UI callback for upload success message
 @app.callback(
-    [Output('example-data-warning', 'children'),
-     Output('time-slider', 'max'),
-     Output('time-slider', 'value')],
-    [Input('upload-data', 'contents'),
-     Input('use-example-data-button', 'n_clicks'),
-     Input('points-control', 'value')],
+    Output('example-data-warning', 'children'),
+    [Input('upload-data', 'contents')],
     [State('upload-data', 'filename'),
-     State('time-slider', 'value'),
-     State('full-df', 'data'),
-     State('is-example-data', 'data'),
-     State('data-source-name', 'data')],
+     State('is-example-data', 'data')],
     prevent_initial_call=True
 )
-def update_ui_components(upload_contents: Optional[str], example_button_clicks: Optional[int],
-                        points_value: Optional[int], filename: Optional[str], current_position: Optional[int], 
-                        full_df_data: Optional[Dict], is_example_data: Optional[bool], 
-                        data_source_name: Optional[str]) -> Tuple[Optional[html.Div], int, int]:
-    """Update UI components based on file upload and points control"""
+def update_upload_success_message(upload_contents: Optional[str], filename: Optional[str], 
+                                 is_example_data: Optional[bool]) -> Optional[html.Div]:
+    """Show success message when file is uploaded"""
+    if not upload_contents:
+        return no_update
     
-    ctx = dash.callback_context
-    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    if not is_example_data:  # File was successfully uploaded
+        return html.Div([
+            html.I(className="fas fa-check-circle", style={'marginRight': '8px'}),
+            f"Successfully loaded data from {filename}. This data will be used for predictions."
+        ], style={
+            'color': '#2f855a',
+            'backgroundColor': '#c6f6d5',
+            'padding': '10px',
+            'borderRadius': '5px',
+            'textAlign': 'center'
+        })
+    return None
+
+
+# Separate UI callback for example data button message
+@app.callback(
+    [Output('example-data-warning', 'children', allow_duplicate=True),
+     Output('time-slider', 'max'),
+     Output('time-slider', 'value'),
+     Output('upload-data', 'contents'),  # Reset upload contents
+     Output('upload-data', 'filename')],  # Reset filename
+    [Input('use-example-data-button', 'n_clicks')],
+    [State('points-control', 'value'),
+     State('time-slider', 'value'),
+     State('full-df', 'data')],
+    prevent_initial_call=True
+)
+def update_example_data_ui(example_button_clicks: Optional[int], points_value: Optional[int],
+                          current_position: Optional[int], full_df_data: Optional[Dict]) -> Tuple[Optional[html.Div], int, int, None, None]:
+    """Update UI when example data button is clicked and reset upload component"""
+    if not example_button_clicks or not full_df_data:
+        return no_update, no_update, no_update, no_update, no_update
     
-    if not full_df_data:
-        return no_update, no_update, no_update
-    
-    # Reconstruct full_df to get its length
-    full_df = reconstruct_dataframe_from_dict(full_df_data)
-    
-    if trigger_id == 'upload-data' and upload_contents:
-        if not is_example_data:  # File was successfully uploaded
-            success_msg = html.Div([
-                html.I(className="fas fa-check-circle", style={'marginRight': '8px'}),
-                f"Successfully loaded data from {filename}. This data will be used for predictions."
-            ], style={
-                'color': '#2f855a',
-                'backgroundColor': '#c6f6d5',
-                'padding': '10px',
-                'borderRadius': '5px',
-                'textAlign': 'center'
-            })
-        else:
-            success_msg = None
-        
-        # Avoid changing slider on upload to prevent time-slider triggers racing with data-source-name
-        return success_msg, no_update, no_update
-    
-    elif trigger_id == 'use-example-data-button':
+    with start_action(action_type=u"update_example_data_ui_with_upload_reset"):
+        full_df = reconstruct_dataframe_from_dict(full_df_data)
         points = max(MIN_POINTS, min(MAX_POINTS, points_value))
         new_max = len(full_df) - points
         new_start = min(current_position, new_max)
+        
+        print("DEBUG: Resetting upload component to allow re-upload of same file")
         
         # Show message that we're now using example data
         example_msg = html.Div([
@@ -1113,28 +1110,65 @@ def update_ui_components(upload_contents: Optional[str], example_button_clicks: 
             'textAlign': 'center'
         })
         
-        return example_msg, new_max, max(0, new_start)
+        # Reset upload component by clearing contents and filename
+        # This allows the same file to be uploaded again after switching to example data
+        return example_msg, new_max, max(0, new_start), None, None
+
+
+# Separate UI callback for points control
+@app.callback(
+    [Output('example-data-warning', 'children', allow_duplicate=True),
+     Output('time-slider', 'max', allow_duplicate=True),
+     Output('time-slider', 'value', allow_duplicate=True)],
+    [Input('points-control', 'value')],
+    [State('time-slider', 'value'),
+     State('full-df', 'data'),
+     State('is-example-data', 'data')],
+    prevent_initial_call=True
+)
+def update_points_control_ui(points_value: Optional[int], current_position: Optional[int], 
+                            full_df_data: Optional[Dict], is_example_data: Optional[bool]) -> Tuple[Optional[html.Div], int, int]:
+    """Update UI when points control changes"""
+    if not points_value or not full_df_data:
+        return no_update, no_update, no_update
     
-    elif trigger_id == 'points-control':
-        points = max(MIN_POINTS, min(MAX_POINTS, points_value))
-        new_max = len(full_df) - points
-        new_start = min(current_position, new_max)
-        
-        # Show warning if using example data
-        warning = html.Div([
-            html.I(className="fas fa-exclamation-triangle", style={'marginRight': '8px'}),
-            "Currently using example data. Upload your own Dexcom/Libre CSV file for personalized analysis."
-        ], style={
-            'color': '#b7791f',
-            'backgroundColor': '#fefcbf',
-            'padding': '10px',
-            'borderRadius': '5px',
-            'textAlign': 'center'
-        }) if is_example_data else None
-        
-        return warning, new_max, max(0, new_start)
+    full_df = reconstruct_dataframe_from_dict(full_df_data)
+    points = max(MIN_POINTS, min(MAX_POINTS, points_value))
+    new_max = len(full_df) - points
+    new_start = min(current_position, new_max)
     
-    return no_update, no_update, no_update
+    # Show warning if using example data
+    warning = html.Div([
+        html.I(className="fas fa-exclamation-triangle", style={'marginRight': '8px'}),
+        "Currently using example data. Upload your own Dexcom/Libre CSV file for personalized analysis."
+    ], style={
+        'color': '#b7791f',
+        'backgroundColor': '#fefcbf',
+        'padding': '10px',
+        'borderRadius': '5px',
+        'textAlign': 'center'
+    }) if is_example_data else None
+    
+    return warning, new_max, max(0, new_start)
+
+def convert_df_to_dict(df: pl.DataFrame) -> Dict[str, List[Any]]:
+    """Convert a Polars DataFrame to a session-store dictionary."""
+    return {
+        'time': df.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
+        'gl': df.get_column('gl').to_list(),
+        'prediction': df.get_column('prediction').to_list(),
+        'age': df.get_column('age').to_list(),
+        'user_id': df.get_column('user_id').to_list()
+    }
+
+def convert_events_df_to_dict(df: pl.DataFrame) -> Dict[str, List[Any]]:
+    """Convert an events Polars DataFrame to a session-store dictionary."""
+    return {
+        'time': df.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
+        'event_type': df.get_column('event_type').to_list(),
+        'event_subtype': df.get_column('event_subtype').to_list(),
+        'insulin_value': df.get_column('insulin_value').to_list()
+    }
 
 def reconstruct_dataframe_from_dict(df_data: Dict[str, List[Any]]) -> pl.DataFrame:
     """Safely reconstruct a Polars DataFrame from a dictionary with proper type handling."""
