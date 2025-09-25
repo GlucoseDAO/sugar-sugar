@@ -587,18 +587,21 @@ def handle_submit_button(n_clicks: Optional[int], user_info: Optional[Dict[str, 
 @app.callback(
     [Output('url', 'pathname', allow_duplicate=True),
      Output('user-info-store', 'data', allow_duplicate=True),
-     Output('glucose-chart-mode', 'data', allow_duplicate=True)],
+     Output('glucose-chart-mode', 'data', allow_duplicate=True),
+     Output('randomization-initialized', 'data', allow_duplicate=True)],
     [Input('exit-button', 'n_clicks')],
     prevent_initial_call=True
 )
-def handle_exit_button(n_clicks: Optional[int]) -> Tuple[str, None, Dict[str, bool]]:
+def handle_exit_button(n_clicks: Optional[int]) -> Tuple[str, None, Dict[str, bool], bool]:
     """Handle exit button - navigate to start and clear user info. Data reset handled elsewhere."""
     if n_clicks:
-        print("DEBUG: Exit button clicked")
+        with start_action(action_type=u"handle_exit_button") as action:
+            action.log(message_type="exit_clicked")
         # Reset chart mode to hide last hour when going back to prediction
         chart_mode = {'hide_last_hour': True}
-        return '/', None, chart_mode
-    return no_update, no_update, no_update
+        # Reset randomization flag to trigger new random position
+        return '/', None, chart_mode, False
+    return no_update, no_update, no_update, no_update
 
 # Add client-side callback to scroll to top when ending page loads
 app.clientside_callback(
@@ -624,32 +627,38 @@ app.clientside_callback(
      Output('events-df', 'data', allow_duplicate=True),
      Output('is-example-data', 'data', allow_duplicate=True),
      Output('data-source-name', 'data', allow_duplicate=True),
-     Output('randomization-initialized', 'data', allow_duplicate=True)],
+     Output('randomization-initialized', 'data', allow_duplicate=True),
+     Output('initial-slider-value', 'data', allow_duplicate=True)],
     [Input('url', 'pathname')],
     [State('full-df', 'data')],
     prevent_initial_call=True
 )
-def initialize_data_on_url_change(pathname: Optional[str], full_df_data: Optional[Dict]) -> Tuple[Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool]:
+def initialize_data_on_url_change(pathname: Optional[str], full_df_data: Optional[Dict]) -> Tuple[Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int]:
     """Initialize data when URL changes or on first load"""
     # Handle URL-driven initialization without requiring existing data
     if pathname == '/ending':
-        return no_update, no_update, no_update, no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update
     # If prediction page and data already present, preserve
     if pathname == '/prediction' and full_df_data is not None:
-        return no_update, no_update, no_update, no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update
     
     # Initialize fresh example data (startup or first load)
     full_df, events_df = load_glucose_data()
     df, random_start = get_random_data_window(full_df, DEFAULT_POINTS)
     full_df = full_df.with_columns(pl.lit(0.0).alias('prediction'))
     df = df.with_columns(pl.lit(0.0).alias('prediction'))
+    
+    with start_action(action_type=u"initialize_data_on_url_change") as action:
+        action.log(message_type="new_random_start", random_start=random_start)
+    
     return (
-        dataframe_to_store_dict(full_df),
-        dataframe_to_store_dict(df),
-        events_dataframe_to_store_dict(events_df),
+        convert_df_to_dict(full_df),
+        convert_df_to_dict(df),
+        convert_events_df_to_dict(events_df),
         True,
         'example.csv',
-        False  # Keep randomization flag false so slider can be randomized
+        False,  # Keep randomization flag false so slider can be randomized
+        random_start  # Update the initial slider value
     )
 
 # Separate callback for file upload handling
@@ -660,17 +669,18 @@ def initialize_data_on_url_change(pathname: Optional[str], full_df_data: Optiona
      Output('events-df', 'data', allow_duplicate=True),
      Output('is-example-data', 'data', allow_duplicate=True),
      Output('data-source-name', 'data', allow_duplicate=True),
-     Output('randomization-initialized', 'data', allow_duplicate=True)],
+     Output('randomization-initialized', 'data', allow_duplicate=True),
+     Output('initial-slider-value', 'data', allow_duplicate=True)],
     [Input('upload-data', 'contents')],
     [State('upload-data', 'filename'),
      State('points-control', 'value')],
     prevent_initial_call=True
 )
 def handle_file_upload(upload_contents: Optional[str], filename: Optional[str], 
-                      points_value: Optional[int]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool]:
+                      points_value: Optional[int]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int]:
     """Handle file upload and data loading"""
     if not upload_contents:
-        return no_update, no_update, no_update, no_update, no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
     
     with start_action(action_type=u"handle_file_upload", filename=filename):
         current_time = int(time.time() * 1000)
@@ -678,7 +688,7 @@ def handle_file_upload(upload_contents: Optional[str], filename: Optional[str],
         # Parse upload contents
         if ',' not in upload_contents:
             print(f"ERROR: Invalid upload format for file {filename}")
-            return current_time, no_update, no_update, no_update, no_update, no_update, no_update
+            return current_time, no_update, no_update, no_update, no_update, no_update, no_update, no_update
         
         content_type, content_string = upload_contents.split(',', 1)
         decoded = base64.b64decode(content_string)
@@ -714,7 +724,8 @@ def handle_file_upload(upload_contents: Optional[str], filename: Optional[str],
                convert_events_df_to_dict(new_events_df),
                False,  # is_example_data = False for uploaded files
                filename,  # store the original filename
-               False)  # reset randomization flag for new data
+               False,  # reset randomization flag for new data
+               random_start)  # Update initial slider value
 
 
 # Separate callback for example data button
@@ -726,15 +737,16 @@ def handle_file_upload(upload_contents: Optional[str], filename: Optional[str],
      Output('is-example-data', 'data', allow_duplicate=True),
      Output('data-source-name', 'data', allow_duplicate=True),
      Output('randomization-initialized', 'data', allow_duplicate=True),
-     Output('time-slider', 'value', allow_duplicate=True)],  # Add slider value update
+     Output('time-slider', 'value', allow_duplicate=True),
+     Output('initial-slider-value', 'data', allow_duplicate=True)],  # Add initial slider value update
     [Input('use-example-data-button', 'n_clicks')],
     [State('points-control', 'value')],
     prevent_initial_call=True
 )
-def handle_example_data_button(example_button_clicks: Optional[int], points_value: Optional[int]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int]:
+def handle_example_data_button(example_button_clicks: Optional[int], points_value: Optional[int]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int, int]:
     """Handle use example data button click"""
     if not example_button_clicks:
-        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
     
     with start_action(action_type=u"handle_example_data_button"):
         current_time = int(time.time() * 1000)
@@ -759,7 +771,8 @@ def handle_example_data_button(example_button_clicks: Optional[int], points_valu
                True,  # is_example_data = True for example data
                "example.csv",  # data_source_name for example data
                False,  # reset randomization flag for new data
-               random_start)  # Set slider to the random start position
+               random_start,  # Set slider to the random start position
+               random_start)  # Update initial slider value
 
 
 # Separate callback for points control
