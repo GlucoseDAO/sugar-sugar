@@ -6,8 +6,15 @@ from sugar_sugar.config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS
 
 
 class HeaderComponent(Div):
-    def __init__(self, show_time_slider: bool = True, children: Optional[Sequence[Any]] = None, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        show_time_slider: bool = True,
+        children: Optional[Sequence[Any]] = None,
+        initial_slider_value: int = 0,
+        **kwargs: Any
+    ) -> None:
         self.show_time_slider = show_time_slider
+        self.initial_slider_value = initial_slider_value
         if children is None:
             children = self._create_header_content()
 
@@ -55,7 +62,7 @@ class HeaderComponent(Div):
                 id='time-slider',
                 min=0,
                 max=100,  # This will be updated by callback
-                value=0,
+                value=self.initial_slider_value,
                 marks=None,
                 tooltip={"placement": "bottom", "always_visible": True},
                 updatemode='mouseup',

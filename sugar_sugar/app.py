@@ -40,8 +40,66 @@ from sugar_sugar.components.ending import EndingPage
 TableData = List[Dict[str, str]]  # Format for the predictions table data
 Figure = go.Figure  # Plotly figure type
 
-# Load example data once at startup for initial session storage
+def dataframe_to_store_dict(df_in: pl.DataFrame) -> Dict[str, List[Any]]:
+    """Convert a Polars DataFrame into a session-store friendly dictionary."""
+    return {
+        'time': df_in.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
+        'gl': df_in.get_column('gl').to_list(),
+        'prediction': df_in.get_column('prediction').to_list(),
+        'age': df_in.get_column('age').to_list(),
+        'user_id': df_in.get_column('user_id').to_list()
+    }
+
+
+def events_dataframe_to_store_dict(df_in: pl.DataFrame) -> Dict[str, List[Any]]:
+    """Convert an events Polars DataFrame into a session-store dictionary."""
+    return {
+        'time': df_in.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
+        'event_type': df_in.get_column('event_type').to_list(),
+        'event_subtype': df_in.get_column('event_subtype').to_list(),
+        'insulin_value': df_in.get_column('insulin_value').to_list()
+    }
+
+
+def get_random_data_window(full_df: pl.DataFrame, points: int) -> Tuple[pl.DataFrame, int]:
+    """
+    Get a random window of data from the full DataFrame.
+    
+    Args:
+        full_df: The full glucose DataFrame
+        points: Number of points to include in the window
+        
+    Returns:
+        Tuple of (windowed_df, random_start_index)
+    """
+    import random
+    max_start_index = len(full_df) - points
+    if max_start_index > 0:
+        # Generate random start position that is a multiple of the number of points
+        max_multiple = max_start_index // points
+        if max_multiple > 0:
+            random_multiple = random.randint(0, max_multiple)
+            if random_multiple == 0 and max_multiple >= 1:
+                random_multiple = random.randint(1, max_multiple)
+            random_start = random_multiple * points
+        else:
+            random_start = 0
+    else:
+        random_start = 0
+    
+    windowed_df = full_df.slice(random_start, points)
+    return windowed_df, random_start
+
+# Load example data once at startup for initial session storage with randomization
 example_full_df, example_events_df = load_glucose_data()  # Unpack both dataframes
+example_full_df = example_full_df.with_columns(pl.lit(0.0).alias('prediction'))
+example_initial_df, example_initial_start = get_random_data_window(example_full_df, DEFAULT_POINTS)
+example_initial_df = example_initial_df.with_columns(pl.lit(0.0).alias('prediction'))
+
+example_full_df_store = dataframe_to_store_dict(example_full_df)
+example_initial_df_store = dataframe_to_store_dict(example_initial_df)
+example_events_df_store = events_dataframe_to_store_dict(example_events_df)
+example_initial_slider_value = example_initial_start
 
 external_stylesheets = [
     'https://codepen.io/chriddyp/pen/bWLwgP.css',
@@ -70,7 +128,7 @@ glucose_chart = GlucoseChart(id='glucose-graph', hide_last_hour=True)  # Hide la
 prediction_table = PredictionTableComponent()
 metrics_component = MetricsComponent()
 submit_component = SubmitComponent()
-header_component = HeaderComponent(show_time_slider=False)  # Create a persistent header component
+header_component = HeaderComponent(show_time_slider=False, initial_slider_value=example_initial_slider_value)
 # startup_page will be created in main() after debug mode is set
 startup_page = None  # Will be initialized in main()
 ending_page = EndingPage()
@@ -80,9 +138,9 @@ app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
     dcc.Store(id='user-info-store', data=None),
     dcc.Store(id='last-click-time', data=0),
-    dcc.Store(id='current-window-df', data=None),
-    dcc.Store(id='full-df', data=None),
-    dcc.Store(id='events-df', data=None),
+    dcc.Store(id='current-window-df', data=example_initial_df_store),
+    dcc.Store(id='full-df', data=example_full_df_store),
+    dcc.Store(id='events-df', data=example_events_df_store),
     dcc.Store(id='is-example-data', data=True),
     dcc.Store(id='data-source-name', data="example.csv"),  # Store source filename
     dcc.Store(id='randomization-initialized', data=False),  # Track if randomization has been done
@@ -567,16 +625,10 @@ app.clientside_callback(
      Output('data-source-name', 'data', allow_duplicate=True),
      Output('randomization-initialized', 'data', allow_duplicate=True)],
     [Input('url', 'pathname')],
-    [State('full-df', 'data'),
-     State('current-window-df', 'data'),
-     State('events-df', 'data'),
-     State('is-example-data', 'data'),
-     State('data-source-name', 'data')],
+    [State('full-df', 'data')],
     prevent_initial_call=True
 )
-def initialize_data_on_url_change(pathname: Optional[str], full_df_data: Optional[Dict], 
-                                current_df_data: Optional[Dict], events_df_data: Optional[Dict], 
-                                is_example_data: Optional[bool], current_source_name: Optional[str]) -> Tuple[Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool]:
+def initialize_data_on_url_change(pathname: Optional[str], full_df_data: Optional[Dict]) -> Tuple[Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool]:
     """Initialize data when URL changes or on first load"""
     # Handle URL-driven initialization without requiring existing data
     if pathname == '/ending':
@@ -587,43 +639,16 @@ def initialize_data_on_url_change(pathname: Optional[str], full_df_data: Optiona
     
     # Initialize fresh example data (startup or first load)
     full_df, events_df = load_glucose_data()
-    import random
-    points = DEFAULT_POINTS
-    max_start_index = len(full_df) - points
-    if max_start_index > 0:
-        max_multiple = max_start_index // points
-        if max_multiple > 0:
-            random_multiple = random.randint(0, max_multiple)
-            random_start = random_multiple * points
-        else:
-            random_start = 0
-    else:
-        random_start = 0
-    df = full_df.slice(random_start, points)
+    df, random_start = get_random_data_window(full_df, DEFAULT_POINTS)
     full_df = full_df.with_columns(pl.lit(0.0).alias('prediction'))
     df = df.with_columns(pl.lit(0.0).alias('prediction'))
-    def convert_df_to_dict(df_in: pl.DataFrame) -> Dict[str, List[Any]]:
-        return {
-            'time': df_in.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
-            'gl': df_in.get_column('gl').to_list(),
-            'prediction': df_in.get_column('prediction').to_list(),
-            'age': df_in.get_column('age').to_list(),
-            'user_id': df_in.get_column('user_id').to_list()
-        }
-    def convert_events_df_to_dict(df_in: pl.DataFrame) -> Dict[str, List[Any]]:
-        return {
-            'time': df_in.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
-            'event_type': df_in.get_column('event_type').to_list(),
-            'event_subtype': df_in.get_column('event_subtype').to_list(),
-            'insulin_value': df_in.get_column('insulin_value').to_list()
-        }
     return (
-        convert_df_to_dict(full_df),
-        convert_df_to_dict(df),
-        convert_events_df_to_dict(events_df),
+        dataframe_to_store_dict(full_df),
+        dataframe_to_store_dict(df),
+        events_dataframe_to_store_dict(events_df),
         True,
         'example.csv',
-        False
+        True
     )
 
 # Prediction page interactions callback (only for prediction page components)  
@@ -658,7 +683,6 @@ def handle_prediction_page_interactions(upload_contents: Optional[str], example_
                           events_df_data: Optional[Dict], is_example_data: Optional[bool],
                           current_source_name: Optional[str]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool]:
     """Handle prediction page interactions only (upload, example button, controls)"""
-    print(f"DEBUG[app.handle_prediction_page_interactions]: triggered with ctx and last_click={last_click_time}")
     current_time = int(time.time() * 1000)
     ctx = dash.callback_context
     
@@ -666,7 +690,6 @@ def handle_prediction_page_interactions(upload_contents: Optional[str], example_
         return last_click_time, no_update, no_update, no_update, no_update, no_update, no_update
     
     trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
-    print(f"DEBUG[app.handle_prediction_page_interactions]: trigger_id={trigger_id}")
     
     # Get current data from session storage
     if not full_df_data or not current_df_data or not events_df_data:
@@ -721,27 +744,8 @@ def handle_prediction_page_interactions(upload_contents: Optional[str], example_
             new_full_df, new_events_df = load_glucose_data(save_path)
             
             # Start at a random position for uploaded files too
-            import random
             points = max(MIN_POINTS, min(MAX_POINTS, points_value or DEFAULT_POINTS))
-            max_start_index = len(new_full_df) - points
-            
-            if max_start_index > 0:
-                # Generate random start position that is a multiple of the number of points
-                max_multiple = max_start_index // points
-                if max_multiple > 0:
-                    random_multiple = random.randint(0, max_multiple)
-                    random_start = random_multiple * points
-                else:
-                    random_start = 0
-            else:
-                random_start = 0
-            
-            new_df = new_full_df.slice(random_start, points)
-            
-            print(f"DEBUG[app.handle_all_interactions]: loaded uploaded data full_len={len(new_full_df)}, window_len={len(new_df)}, random_start={random_start}")
-            print(f"DEBUG[app.handle_all_interactions]: sample_glucose={new_df.get_column('gl').head(5).to_list()}")
-            print(f"DEBUG[app.handle_all_interactions]: setting data source to {filename}")
-            
+            new_df, random_start = get_random_data_window(new_full_df, points)
             return (current_time, 
                    convert_df_to_dict(new_full_df),
                    convert_df_to_dict(new_df),
@@ -751,38 +755,20 @@ def handle_prediction_page_interactions(upload_contents: Optional[str], example_
                    False)  # reset randomization flag for new data
             
         except Exception as e:
-            print(f"ERROR[app.handle_all_interactions]: error loading file: {e}")
             return current_time, no_update, no_update, no_update, no_update, no_update, no_update
     
     # Handle use example data button
     elif trigger_id == 'use-example-data-button':
-        print("DEBUG[app.handle_all_interactions]: Use example data button clicked")
         # Load fresh example data
         new_full_df, new_events_df = load_glucose_data()
         
         # Start at a random position for example data too
-        import random
         points = max(MIN_POINTS, min(MAX_POINTS, points_value or DEFAULT_POINTS))
-        max_start_index = len(new_full_df) - points
-        
-        if max_start_index > 0:
-            # Generate random start position that is a multiple of the number of points
-            max_multiple = max_start_index // points
-            if max_multiple > 0:
-                random_multiple = random.randint(0, max_multiple)
-                random_start = random_multiple * points
-            else:
-                random_start = 0
-        else:
-            random_start = 0
-        
-        new_df = new_full_df.slice(random_start, points)
+        new_df, random_start = get_random_data_window(new_full_df, points)
         
         # Reset predictions
         new_full_df = new_full_df.with_columns(pl.lit(0.0).alias("prediction"))
         new_df = new_df.with_columns(pl.lit(0.0).alias("prediction"))
-        
-        print(f"DEBUG[app.handle_all_interactions]: example data random_start={random_start}")
         
         return (current_time, 
                convert_df_to_dict(new_full_df),
@@ -799,8 +785,6 @@ def handle_prediction_page_interactions(upload_contents: Optional[str], example_
         new_start = min(current_position or 0, new_max)
         new_start = max(0, new_start)
         new_df = full_df.slice(new_start, points)
-        
-        print(f"DEBUG[app.handle_all_interactions]: points control changed to {points}, start {new_start}")
         
         return (current_time,
                no_update,
@@ -819,8 +803,6 @@ def handle_prediction_page_interactions(upload_contents: Optional[str], example_
         safe_slider_value = max(0, safe_slider_value)
         
         new_df = full_df.slice(safe_slider_value, points)
-        
-        print(f"DEBUG[app.handle_all_interactions]: slider moved to {safe_slider_value}, window size {points}")
         
         return (current_time,
                no_update,
@@ -1050,16 +1032,10 @@ def update_data_source_display(pathname: str, source_name: Optional[str]) -> str
 def randomize_slider_on_prediction_page(slider_max: int, pathname: str, full_df_data: Optional[Dict], points_value: int, randomization_initialized: bool) -> int:
     """Set slider to a random valid window start when slider mounts on prediction page. Only returns slider value."""
     if pathname == '/prediction' and full_df_data and slider_max is not None and not randomization_initialized:
-        import random
         full_df = reconstruct_dataframe_from_dict(full_df_data)
         points = max(MIN_POINTS, min(MAX_POINTS, points_value or DEFAULT_POINTS))
-        max_start_index = len(full_df) - points
-        if max_start_index > 0:
-            max_multiple = max_start_index // points
-            if max_multiple > 0:
-                random_multiple = random.randint(0, max_multiple)
-                return random_multiple * points
-        return 0
+        _, random_start = get_random_data_window(full_df, points)
+        return random_start
     return no_update
 
 
