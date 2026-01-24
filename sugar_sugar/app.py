@@ -152,15 +152,6 @@ app.layout = html.Div([
 
     html.Div(id='mobile-warning', style={'margin': '12px 0'}),
 
-    html.A(
-        "Fork me on GitHub",
-        href="https://github.com/GlucoseDAO/sugar-sugar",
-        target="_blank",
-        rel="noopener noreferrer",
-        className="github-fork-ribbon github-fork-ribbon-right-bottom fixed",
-        **{"data-ribbon": "Fork me on GitHub"}
-    ),
-
     html.Div(id='page-content', children=[])  # Will be populated in main()
 ])
 
@@ -800,9 +791,30 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
             'rounds': [],
             'max_rounds': MAX_ROUNDS,
             'current_round_number': 1,
-            'statistics_saved': False
+            'statistics_saved': False,
+            'is_example_data': True,
+            'data_source_name': 'example.csv'
         }
     return no_update, no_update
+
+
+@app.callback(
+    Output('user-info-store', 'data', allow_duplicate=True),
+    [Input('data-source-name', 'data'),
+     Input('is-example-data', 'data')],
+    [State('user-info-store', 'data')],
+    prevent_initial_call=True
+)
+def sync_data_source_into_user_info(
+    data_source_name: Optional[str],
+    is_example_data: Optional[bool],
+    user_info: Optional[Dict[str, Any]]
+) -> Dict[str, Any]:
+    if not user_info:
+        raise PreventUpdate
+    user_info['data_source_name'] = data_source_name or user_info.get('data_source_name') or 'example.csv'
+    user_info['is_example_data'] = bool(is_example_data) if is_example_data is not None else bool(user_info.get('is_example_data', True))
+    return user_info
 
 @app.callback(
     [Output('url', 'pathname', allow_duplicate=True),

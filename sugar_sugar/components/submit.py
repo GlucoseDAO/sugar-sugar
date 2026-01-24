@@ -146,6 +146,8 @@ class SubmitComponent(html.Div):
             'number': self._get_next_number(),
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'email': user_info.get('email', ''),
+            'is_example_data': bool(user_info.get('is_example_data', True)),
+            'data_source_name': str(user_info.get('data_source_name', 'example.csv')),
             'age': age,
             'user_id': user_id,
             'gender': user_info.get('gender', ''),
@@ -162,8 +164,33 @@ class SubmitComponent(html.Div):
         
         # Write to CSV
         file_exists = csv_file_path.exists()
+        desired_fieldnames = list(data.keys())
+
+        if file_exists:
+            # If the file exists but header is missing new columns, upgrade it in place.
+            with csv_file_path.open('r', newline='') as file_handle:
+                reader = csv.DictReader(file_handle)
+                existing_fieldnames = reader.fieldnames or []
+                existing_rows = list(reader)
+
+            if any(field not in existing_fieldnames for field in desired_fieldnames):
+                upgraded_fieldnames = list(existing_fieldnames)
+                for field in desired_fieldnames:
+                    if field not in upgraded_fieldnames:
+                        upgraded_fieldnames.append(field)
+
+                tmp_path = csv_file_path.with_suffix('.tmp')
+                with tmp_path.open('w', newline='') as out_handle:
+                    writer = csv.DictWriter(out_handle, fieldnames=upgraded_fieldnames)
+                    writer.writeheader()
+                    for row in existing_rows:
+                        writer.writerow({key: row.get(key, "") for key in upgraded_fieldnames})
+
+                tmp_path.replace(csv_file_path)
+
+        # Append row (header is guaranteed to be present now)
         with csv_file_path.open('a', newline='') as file_handle:
-            writer = csv.DictWriter(file_handle, fieldnames=list(data.keys()))
+            writer = csv.DictWriter(file_handle, fieldnames=desired_fieldnames)
             if not file_exists:
                 writer.writeheader()
             writer.writerow(data)
