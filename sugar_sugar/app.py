@@ -158,6 +158,18 @@ app.layout = html.Div([
 ])
 
 
+@app.callback(
+    Output('glucose-unit', 'data', allow_duplicate=True),
+    [Input('url', 'pathname')],
+    prevent_initial_call='initial_duplicate'
+)
+def reset_glucose_unit_on_start_page(pathname: Optional[str]) -> str:
+    """Always reset units to mg/dL on the start page to avoid carry-over between runs/users."""
+    if pathname == '/':
+        return 'mg/dL'
+    raise PreventUpdate
+
+
 
 @app.callback(
     [Output('page-content', 'children'),
@@ -1118,11 +1130,12 @@ def handle_finish_study_from_ending(
     [Output('url', 'pathname', allow_duplicate=True),
      Output('user-info-store', 'data', allow_duplicate=True),
      Output('glucose-chart-mode', 'data', allow_duplicate=True),
-     Output('randomization-initialized', 'data', allow_duplicate=True)],
+     Output('randomization-initialized', 'data', allow_duplicate=True),
+     Output('glucose-unit', 'data', allow_duplicate=True)],
     [Input('restart-button', 'n_clicks')],
     prevent_initial_call=True
 )
-def handle_restart_button(n_clicks: Optional[int]) -> Tuple[str, None, Dict[str, bool], bool]:
+def handle_restart_button(n_clicks: Optional[int]) -> Tuple[str, None, Dict[str, bool], bool, str]:
     """Handle restart button - navigate to start and clear user info. Data reset handled elsewhere."""
     if n_clicks:
         with start_action(action_type=u"handle_restart_button") as action:
@@ -1130,8 +1143,8 @@ def handle_restart_button(n_clicks: Optional[int]) -> Tuple[str, None, Dict[str,
         # Reset chart mode to hide last hour when going back to prediction
         chart_mode = {'hide_last_hour': True}
         # Reset randomization flag to trigger new random position
-        return '/', None, chart_mode, False
-    return no_update, no_update, no_update, no_update
+        return '/', None, chart_mode, False, 'mg/dL'
+    return no_update, no_update, no_update, no_update, no_update
 
 # Add client-side callback to scroll to top when ending page loads
 app.clientside_callback(

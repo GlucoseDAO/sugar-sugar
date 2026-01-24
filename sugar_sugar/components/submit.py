@@ -157,9 +157,10 @@ class SubmitComponent(html.Div):
             'other_medical_conditions': user_info.get('other_medical_conditions', ''),
             'medical_conditions_description': user_info.get('medical_conditions_input', ''),
             'location': user_info.get('location', ''),
-            'parameters': str(parameters),  # Convert list to string
-            'actual_values': str(actual_values),  # Convert list to string
-            'prediction_time': str(prediction_times)  # Convert list to string
+            # Clear naming: "real" == ground truth, "predicted" == user prediction
+            'predicted_values': str(parameters),
+            'real_values': str(actual_values),
+            'prediction_times': str(prediction_times)
         }
         
         # Write to CSV
@@ -173,18 +174,36 @@ class SubmitComponent(html.Div):
                 existing_fieldnames = reader.fieldnames or []
                 existing_rows = list(reader)
 
-            if any(field not in existing_fieldnames for field in desired_fieldnames):
-                upgraded_fieldnames = list(existing_fieldnames)
-                for field in desired_fieldnames:
-                    if field not in upgraded_fieldnames:
-                        upgraded_fieldnames.append(field)
+            legacy_to_new = {
+                'parameters': 'predicted_values',
+                'actual_values': 'real_values',
+                'prediction_time': 'prediction_times',
+            }
+
+            # If we have legacy columns, rewrite with the new names (and keep other columns).
+            needs_upgrade = (
+                any(field in existing_fieldnames for field in legacy_to_new.keys())
+                or any(field not in existing_fieldnames for field in desired_fieldnames)
+            )
+
+            if needs_upgrade:
+                # Keep all existing non-legacy fields, then enforce desired new schema ordering.
+                preserved_existing = [f for f in existing_fieldnames if f and f not in legacy_to_new.keys()]
+                upgraded_fieldnames = []
+                for f in preserved_existing + desired_fieldnames:
+                    if f not in upgraded_fieldnames:
+                        upgraded_fieldnames.append(f)
 
                 tmp_path = csv_file_path.with_suffix('.tmp')
                 with tmp_path.open('w', newline='') as out_handle:
                     writer = csv.DictWriter(out_handle, fieldnames=upgraded_fieldnames)
                     writer.writeheader()
                     for row in existing_rows:
-                        writer.writerow({key: row.get(key, "") for key in upgraded_fieldnames})
+                        upgraded_row: dict[str, Any] = {key: row.get(key, "") for key in upgraded_fieldnames}
+                        for old_key, new_key in legacy_to_new.items():
+                            if upgraded_row.get(new_key, "") in ("", None) and old_key in row:
+                                upgraded_row[new_key] = row.get(old_key, "")
+                        writer.writerow(upgraded_row)
 
                 tmp_path.replace(csv_file_path)
 
