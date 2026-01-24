@@ -40,6 +40,21 @@ class SubmitComponent(html.Div):
                 disabled=True,  # Start disabled
                 style={'width': '300px', 'fontSize': '25px', 'padding': '15px 0', 'textAlign': 'center', 'verticalAlign': 'middle', 'lineHeight': '1.5', 'height': '60px'}
             ),
+            dbc.Button(
+                "Finish / Exit",
+                id="finish-study-button",
+                color="secondary",
+                className="mt-3",
+                style={
+                    'width': '300px',
+                    'fontSize': '18px',
+                    'padding': '12px 0',
+                    'textAlign': 'center',
+                    'verticalAlign': 'middle',
+                    'lineHeight': '1.5',
+                    'height': '50px'
+                }
+            ),
             dcc.Store(id='prediction-stats-store', data=None)
         ], style={'display': 'flex', 'flexDirection': 'column', 'justifyContent': 'center', 'alignItems': 'center'})
 
@@ -58,38 +73,68 @@ class SubmitComponent(html.Div):
             return 0
 
     def save_statistics(self, df: pl.DataFrame, user_info: dict[str, Any]) -> None:
-        """Save prediction statistics to CSV file"""
+        """Save prediction statistics to CSV file.
+
+        This writes a single row for the whole "study entry".
+        If `user_info["rounds"]` is present, statistics are aggregated across rounds.
+        """
         csv_file_path = self._stats_csv_path
         
-        # Extract parameters, actual values, and prediction time from the prediction table
-        table_data = user_info.get('prediction_table_data', [])
-        parameters = []
-        actual_values = []
-        prediction_times = []
-        
-        if len(table_data) >= 2:  # Check if we have prediction data
-            # Get actual values (first row)
-            actual_row = table_data[0]
-            # Get predictions (second row)
-            prediction_row = table_data[1]
-            
-            # Get times from the DataFrame
-            time_col = df.get_column('time')
+        rounds: list[dict[str, Any]] = user_info.get('rounds') or []
+        parameters: list[dict[str, Any]] = []
+        actual_values: list[dict[str, Any]] = []
+        prediction_times: list[dict[str, Any]] = []
+
+        def _time_list(window_df: pl.DataFrame) -> list[str]:
+            time_col = window_df.get_column('time')
             if time_col.dtype == pl.String:
-                times = time_col.to_list()
-            else:
-                times = time_col.dt.strftime('%Y-%m-%d %H:%M:%S').to_list()
-            
-            # Group values by time point
-            for i in range(len(df)):
-                time_key = f't{i}'
-                if time_key in prediction_row and prediction_row[time_key] != '-':
-                    # Add prediction
-                    parameters.append(prediction_row[time_key])
-                    # Add corresponding actual value
-                    actual_values.append(actual_row[time_key])
-                    # Add corresponding time
-                    prediction_times.append(times[i])
+                return [str(t) for t in time_col.to_list()]
+            return time_col.dt.strftime('%Y-%m-%d %H:%M:%S').to_list()
+
+        if rounds:
+            # Aggregate across played rounds
+            for round_idx, round_info in enumerate(rounds, start=1):
+                table_data = round_info.get('prediction_table_data') or []
+                if len(table_data) < 2:
+                    continue
+
+                window_start = int(round_info.get('prediction_window_start') or 0)
+                window_size = int(round_info.get('prediction_window_size') or 0)
+                if window_size <= 0:
+                    continue
+
+                max_start = max(0, len(df) - window_size)
+                safe_start = max(0, min(window_start, max_start))
+                window_df = df.slice(safe_start, window_size)
+
+                actual_row = table_data[0]
+                prediction_row = table_data[1]
+                times = _time_list(window_df)
+
+                for i in range(window_size):
+                    time_key = f"t{i}"
+                    pred_str = prediction_row.get(time_key, "-")
+                    act_str = actual_row.get(time_key, "-")
+                    if pred_str != "-" and act_str != "-" and i < len(times):
+                        parameters.append({"round": round_idx, "value": pred_str})
+                        actual_values.append({"round": round_idx, "value": act_str})
+                        prediction_times.append({"round": round_idx, "time": times[i]})
+        else:
+            # Backwards-compatible single-round behavior (still a single row)
+            table_data = user_info.get('prediction_table_data', []) or []
+            if len(table_data) >= 2:
+                actual_row = table_data[0]
+                prediction_row = table_data[1]
+                times = _time_list(df)
+
+                for i in range(len(df)):
+                    time_key = f"t{i}"
+                    pred_str = prediction_row.get(time_key, "-")
+                    act_str = actual_row.get(time_key, "-")
+                    if pred_str != "-" and act_str != "-" and i < len(times):
+                        parameters.append({"round": 1, "value": pred_str})
+                        actual_values.append({"round": 1, "value": act_str})
+                        prediction_times.append({"round": 1, "time": times[i]})
         
         # Get age and user_id from DataFrame
         age = df.get_column('age')[0] if 'age' in df.columns else 0

@@ -40,6 +40,8 @@ from sugar_sugar.components.ending import EndingPage
 TableData = List[Dict[str, str]]  # Format for the predictions table data
 Figure = go.Figure  # Plotly figure type
 
+MAX_ROUNDS: int = 12
+
 def dataframe_to_store_dict(df_in: pl.DataFrame) -> Dict[str, List[Any]]:
     """Convert a Polars DataFrame into a session-store friendly dictionary."""
     return {
@@ -202,12 +204,40 @@ def display_page(pathname: Optional[str], user_info: Optional[Dict[str, Any]],
                     ], style={'textAlign': 'center'})
                 ]), warning_content
             return create_ending_layout(full_df_data, events_df_data, user_info), warning_content
+        if pathname == '/final':
+            if not full_df_data or not user_info or 'rounds' not in user_info:
+                return html.Div([
+                    html.H2("Session Expired", style={'textAlign': 'center', 'marginTop': '50px'}),
+                    html.P("Please start over from the beginning.", style={'textAlign': 'center', 'marginBottom': '30px'}),
+                    html.Div([
+                        html.A(
+                            "Go to Start Page",
+                            href="/",
+                            style={
+                                'backgroundColor': '#007bff',
+                                'color': 'white',
+                                'padding': '15px 30px',
+                                'textDecoration': 'none',
+                                'borderRadius': '5px',
+                                'fontSize': '18px'
+                            }
+                        )
+                    ], style={'textAlign': 'center'})
+                ]), warning_content
+            return create_final_layout(full_df_data, user_info), warning_content
         return (startup_page if startup_page else html.Div("Loading..."), warning_content)  # Return the startup page component
 
 def create_prediction_layout() -> html.Div:
     """Create the prediction page layout"""
     return html.Div([
         header_component,
+        html.Div(id='round-indicator', style={
+            'textAlign': 'center',
+            'fontSize': '18px',
+            'fontWeight': '600',
+            'color': '#2c5282',
+            'marginBottom': '10px'
+        }),
         html.Div([
             html.Div(
                 glucose_chart,
@@ -222,6 +252,22 @@ def create_prediction_layout() -> html.Div:
         'flexDirection': 'column',
         'gap': '20px'
     })
+
+@app.callback(
+    Output('round-indicator', 'children'),
+    [Input('url', 'pathname'),
+     Input('user-info-store', 'data')],
+    prevent_initial_call=False
+)
+def update_round_indicator(pathname: Optional[str], user_info: Optional[Dict[str, Any]]) -> str:
+    if pathname != '/prediction':
+        raise PreventUpdate
+    if not user_info:
+        return ""
+    rounds_played = len(user_info.get('rounds') or [])
+    current_round = int(user_info.get('current_round_number') or (rounds_played + 1))
+    max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS)
+    return f"Round {current_round} of {max_rounds}"
 
 def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[Dict], user_info: Optional[Dict] = None) -> html.Div:
     """Create the ending page layout"""
@@ -302,6 +348,11 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
     ]
 
     # Create the page content with metrics container that will be populated by the callback
+    rounds_played = len(user_info.get('rounds') or []) if user_info else 0
+    max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS) if user_info else MAX_ROUNDS
+    current_round_number = int(user_info.get('current_round_number') or rounds_played) if user_info else rounds_played
+    is_last_round = current_round_number >= max_rounds
+
     return html.Div([
         # Add a scroll-to-top trigger element
         html.Div(id='scroll-to-top-trigger', style={'display': 'none'}),
@@ -311,6 +362,16 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
             'fontSize': 'clamp(24px, 4vw, 48px)',  # Responsive font size
             'padding': '0 10px'
         }),
+        html.Div(
+            f"Round {current_round_number} of {max_rounds}",
+            style={
+                'textAlign': 'center',
+                'marginBottom': '15px',
+                'fontSize': 'clamp(16px, 2.5vw, 22px)',
+                'fontWeight': '600',
+                'color': '#2c5282'
+            }
+        ),
         
         # Graph section - reuse the same glucose chart component
         html.Div([
@@ -401,21 +462,243 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
         # Buttons section
         html.Div([
             html.Button(
-                'Exit',
-                id='exit-button',
-                autoFocus=False,
+                'Next round',
+                id='next-round-button',
+                disabled=is_last_round,
                 style={
-                    'backgroundColor': '#6c757d',  # Bootstrap secondary color
-                    'color': 'white',
-                    'padding': 'clamp(15px, 2vw, 20px) clamp(20px, 3vw, 30px)',
+                    'backgroundColor': '#007bff' if not is_last_round else '#cccccc',
+                    'color': 'white' if not is_last_round else '#666666',
+                    'padding': 'clamp(12px, 2vw, 16px) clamp(18px, 3vw, 26px)',
                     'border': 'none',
                     'borderRadius': '5px',
-                    'fontSize': 'clamp(18px, 3vw, 24px)',  # Responsive font size
+                    'fontSize': 'clamp(16px, 2.5vw, 22px)',
+                    'cursor': 'pointer' if not is_last_round else 'not-allowed',
+                    'minWidth': '200px',
+                    'maxWidth': '400px',
+                    'width': '100%',
+                    'height': 'clamp(55px, 7vh, 70px)',
+                    'display': 'flex',
+                    'alignItems': 'center',
+                    'justifyContent': 'center',
+                    'lineHeight': '1.2'
+                }
+            ),
+            html.Button(
+                'View complete analysis' if is_last_round else 'Finish / Exit',
+                id='finish-study-button-ending',
+                autoFocus=False,
+                style={
+                    'backgroundColor': '#6c757d',
+                    'color': 'white',
+                    'padding': 'clamp(12px, 2vw, 16px) clamp(18px, 3vw, 26px)',
+                    'border': 'none',
+                    'borderRadius': '5px',
+                    'fontSize': 'clamp(16px, 2.5vw, 22px)',
                     'cursor': 'pointer',
                     'minWidth': '200px',
                     'maxWidth': '400px',
                     'width': '100%',
-                    'height': 'clamp(60px, 8vh, 80px)',  # Responsive height
+                    'height': 'clamp(55px, 7vh, 70px)',
+                    'display': 'flex',
+                    'alignItems': 'center',
+                    'justifyContent': 'center',
+                    'lineHeight': '1.2'
+                }
+            ),
+        ], style={
+            'display': 'flex',
+            'justifyContent': 'center',
+            'alignItems': 'center',
+            'gap': 'clamp(10px, 2vw, 20px)',
+            'marginTop': '20px',
+            'padding': '0 10px'
+        })
+    ], style={
+        'maxWidth': '100%',  # Allow full width usage
+        'width': '100%',
+        'margin': '0 auto',
+        'padding': 'clamp(10px, 2vw, 20px)',  # Responsive padding
+        'display': 'flex',
+        'flexDirection': 'column',
+        'minHeight': '100vh',
+        'gap': 'clamp(10px, 2vh, 20px)',  # Responsive gap
+        'boxSizing': 'border-box'
+    })
+
+
+def _count_valid_pairs_from_table_data(table_data: list[dict[str, str]]) -> int:
+    if len(table_data) < 2:
+        return 0
+    actual_row = table_data[0]
+    prediction_row = table_data[1]
+    count = 0
+    for key, actual_str in actual_row.items():
+        if key == 'metric':
+            continue
+        pred_str = prediction_row.get(key, "-")
+        if actual_str != "-" and pred_str != "-":
+            count += 1
+    return count
+
+
+def _build_aggregate_table_data(rounds: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Build a synthetic table_data for aggregated metrics across rounds."""
+    actual_row: dict[str, str] = {'metric': 'Actual Glucose'}
+    prediction_row: dict[str, str] = {'metric': 'Predicted'}
+    out_idx = 0
+
+    for round_info in rounds:
+        table_data = round_info.get('prediction_table_data') or []
+        if len(table_data) < 2:
+            continue
+
+        round_actual = table_data[0]
+        round_pred = table_data[1]
+
+        # Ensure deterministic order t0..tN
+        i = 0
+        while True:
+            key = f"t{i}"
+            if key not in round_actual or key not in round_pred:
+                break
+            actual_row[f"t{out_idx}"] = round_actual.get(key, "-")
+            prediction_row[f"t{out_idx}"] = round_pred.get(key, "-")
+            out_idx += 1
+            i += 1
+
+    return [actual_row, prediction_row]
+
+
+def create_final_layout(full_df_data: Dict, user_info: Dict[str, Any]) -> html.Div:
+    rounds: list[dict[str, Any]] = user_info.get('rounds') or []
+    max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS)
+
+    metrics_component_final = MetricsComponent()
+    aggregate_table_data = _build_aggregate_table_data(rounds)
+    overall_metrics = metrics_component_final._calculate_metrics_from_table_data(aggregate_table_data)
+    overall_metrics_display = MetricsComponent.create_ending_metrics_display(overall_metrics) if overall_metrics else [
+        html.H3("Accuracy Metrics", style={'textAlign': 'center'}),
+        html.Div(
+            "No metrics available - insufficient prediction data",
+            style={
+                'color': 'gray',
+                'fontStyle': 'italic',
+                'fontSize': '16px',
+                'padding': '10px',
+                'textAlign': 'center'
+            }
+        )
+    ]
+
+    round_rows: list[dict[str, Any]] = []
+    for round_info in rounds:
+        round_number = int(round_info.get('round_number') or (len(round_rows) + 1))
+        table_data = round_info.get('prediction_table_data') or []
+        valid_pairs = _count_valid_pairs_from_table_data(table_data)
+        round_metrics = metrics_component_final._calculate_metrics_from_table_data(table_data) if len(table_data) >= 2 else {}
+
+        def _metric_value(metric_name: str) -> Optional[float]:
+            metric = round_metrics.get(metric_name)
+            if not metric:
+                return None
+            val = metric.get('value')
+            return float(val) if val is not None else None
+
+        round_rows.append({
+            'Round': round_number,
+            'Pairs': valid_pairs,
+            'MAE': _metric_value('MAE'),
+            'MSE': _metric_value('MSE'),
+            'RMSE': _metric_value('RMSE'),
+            'MAPE': _metric_value('MAPE'),
+        })
+
+    return html.Div([
+        html.Div(id='scroll-to-top-trigger', style={'display': 'none'}),
+        html.H1("Complete Analysis", style={
+            'textAlign': 'center',
+            'marginBottom': '10px',
+            'fontSize': 'clamp(24px, 4vw, 48px)',
+            'padding': '0 10px'
+        }),
+        html.Div(
+            f"Rounds played: {len(rounds)} / {max_rounds}",
+            style={
+                'textAlign': 'center',
+                'marginBottom': '20px',
+                'fontSize': 'clamp(16px, 2.5vw, 22px)',
+                'fontWeight': '600',
+                'color': '#2c5282'
+            }
+        ),
+        html.Div(
+            overall_metrics_display,
+            style={
+                'padding': 'clamp(10px, 2vw, 20px)',
+                'backgroundColor': 'white',
+                'borderRadius': '10px',
+                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+                'marginBottom': '20px',
+                'width': '100%',
+                'boxSizing': 'border-box'
+            }
+        ),
+        html.Div([
+            html.H3("Per-round metrics", style={
+                'textAlign': 'center',
+                'marginBottom': '15px',
+                'fontSize': 'clamp(18px, 3vw, 24px)'
+            }),
+            dash_table.DataTable(
+                data=round_rows,
+                columns=[
+                    {'name': 'Round', 'id': 'Round', 'type': 'numeric'},
+                    {'name': 'Pairs', 'id': 'Pairs', 'type': 'numeric'},
+                    {'name': 'MAE', 'id': 'MAE', 'type': 'numeric'},
+                    {'name': 'MSE', 'id': 'MSE', 'type': 'numeric'},
+                    {'name': 'RMSE', 'id': 'RMSE', 'type': 'numeric'},
+                    {'name': 'MAPE', 'id': 'MAPE', 'type': 'numeric'},
+                ],
+                style_table={
+                    'width': '100%',
+                    'overflowX': 'auto'
+                },
+                style_cell={
+                    'textAlign': 'center',
+                    'padding': '8px',
+                    'fontSize': '14px',
+                    'whiteSpace': 'nowrap'
+                },
+                style_header={
+                    'backgroundColor': '#f8fafc',
+                    'fontWeight': 'bold'
+                }
+            )
+        ], style={
+            'marginBottom': '20px',
+            'padding': 'clamp(10px, 2vw, 20px)',
+            'backgroundColor': 'white',
+            'borderRadius': '10px',
+            'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+            'width': '100%',
+            'boxSizing': 'border-box'
+        }),
+        html.Div([
+            html.Button(
+                'Start Over',
+                id='restart-button',
+                style={
+                    'backgroundColor': '#007bff',
+                    'color': 'white',
+                    'padding': 'clamp(15px, 2vw, 20px) clamp(20px, 3vw, 30px)',
+                    'border': 'none',
+                    'borderRadius': '5px',
+                    'fontSize': 'clamp(18px, 3vw, 24px)',
+                    'cursor': 'pointer',
+                    'minWidth': '200px',
+                    'maxWidth': '400px',
+                    'width': '100%',
+                    'height': 'clamp(60px, 8vh, 80px)',
                     'display': 'flex',
                     'alignItems': 'center',
                     'justifyContent': 'center',
@@ -430,15 +713,12 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
             'padding': '0 10px'
         })
     ], style={
-        'maxWidth': '100%',  # Allow full width usage
+        'maxWidth': '100%',
         'width': '100%',
         'margin': '0 auto',
-        'padding': 'clamp(10px, 2vw, 20px)',  # Responsive padding
+        'padding': 'clamp(10px, 2vw, 20px)',
         'display': 'flex',
-        'flexDirection': 'column',
-        'minHeight': '100vh',
-        'gap': 'clamp(10px, 2vh, 20px)',  # Responsive gap
-        'boxSizing': 'border-box'
+        'flexDirection': 'column'
     })
 
 def render_mobile_warning(user_agent: Optional[str]) -> Optional[html.Div]:
@@ -516,6 +796,11 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
             'other_medical_conditions': medical_conditions,
             'medical_conditions_input': medical_conditions_input,
             'location': location
+            ,
+            'rounds': [],
+            'max_rounds': MAX_ROUNDS,
+            'current_round_number': 1,
+            'statistics_saved': False
         }
     return no_update, no_update
 
@@ -550,6 +835,10 @@ def handle_submit_button(n_clicks: Optional[int], user_info: Optional[Dict[str, 
         # Generate prediction table data directly from DataFrame instead of relying on component
         if user_info is None:
             user_info = {}
+
+        rounds: list[dict[str, Any]] = user_info.get('rounds') or []
+        max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS)
+        round_number = len(rounds) + 1
         
         # Store the window position information for the ending page
         user_info['prediction_window_start'] = slider_value or 0
@@ -559,14 +848,26 @@ def handle_submit_button(n_clicks: Optional[int], user_info: Optional[Dict[str, 
         temp_prediction_table = PredictionTableComponent()
         prediction_table_data = temp_prediction_table._generate_table_data(current_df)
         user_info['prediction_table_data'] = prediction_table_data
+        user_info['current_round_number'] = round_number
+
+        round_info: dict[str, Any] = {
+            'round_number': round_number,
+            'prediction_window_start': user_info['prediction_window_start'],
+            'prediction_window_size': user_info['prediction_window_size'],
+            'prediction_table_data': prediction_table_data
+        }
+        rounds.append(round_info)
+        user_info['rounds'] = rounds
         
         # Debug: Check what predictions we have
         prediction_count = current_df.filter(pl.col("prediction") != 0.0).height
         print(f"DEBUG: Submit button - Found {prediction_count} predictions in current_df")
         print(f"DEBUG: Submit button - Sample predictions: {current_df.filter(pl.col('prediction') != 0.0).select(['time', 'prediction']).head(5).to_dicts()}")
-        
-        # Save statistics before redirecting
-        submit_component.save_statistics(current_full_df, user_info)
+
+        # Save exactly once when finishing the study (round 12 or user exits early)
+        if round_number >= max_rounds and not bool(user_info.get('statistics_saved')):
+            submit_component.save_statistics(current_full_df, user_info)
+            user_info['statistics_saved'] = True
         
         # Update chart mode to show ground truth and return the full window with ground truth
         chart_mode = {'hide_last_hour': False}
@@ -584,19 +885,137 @@ def handle_submit_button(n_clicks: Optional[int], user_info: Optional[Dict[str, 
         return '/ending', user_info, chart_mode, convert_df_to_dict(current_df)
     return no_update, no_update, no_update, no_update
 
+
+@app.callback(
+    [Output('url', 'pathname', allow_duplicate=True),
+     Output('user-info-store', 'data', allow_duplicate=True),
+     Output('glucose-chart-mode', 'data', allow_duplicate=True),
+     Output('full-df', 'data', allow_duplicate=True),
+     Output('current-window-df', 'data', allow_duplicate=True),
+     Output('randomization-initialized', 'data', allow_duplicate=True),
+     Output('initial-slider-value', 'data', allow_duplicate=True)],
+    [Input('next-round-button', 'n_clicks')],
+    [State('user-info-store', 'data'),
+     State('full-df', 'data')],
+    prevent_initial_call=True
+)
+def handle_next_round_button(
+    n_clicks: Optional[int],
+    user_info: Optional[Dict[str, Any]],
+    full_df_data: Optional[Dict]
+) -> Tuple[str, Dict[str, Any], Dict[str, bool], Dict[str, List[Any]], Dict[str, List[Any]], bool, int]:
+    if not n_clicks or not user_info or not full_df_data:
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update
+
+    rounds: list[dict[str, Any]] = user_info.get('rounds') or []
+    max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS)
+    next_round_number = len(rounds) + 1
+    if next_round_number > max_rounds:
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update
+
+    with start_action(action_type=u"handle_next_round_button", next_round=next_round_number):
+        full_df = reconstruct_dataframe_from_dict(full_df_data)
+        # Reset any previous predictions before starting a fresh round
+        full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
+
+        points = int(user_info.get('prediction_window_size') or DEFAULT_POINTS)
+        points = max(MIN_POINTS, min(MAX_POINTS, points))
+        new_df, random_start = get_random_data_window(full_df, points)
+        new_df = new_df.with_columns(pl.lit(0.0).alias("prediction"))
+
+        user_info['current_round_number'] = next_round_number
+        chart_mode = {'hide_last_hour': True}
+
+        return (
+            '/prediction',
+            user_info,
+            chart_mode,
+            convert_df_to_dict(full_df),
+            convert_df_to_dict(new_df),
+            False,  # let slider init set it from initial-slider-value
+            random_start
+        )
+
+
+@app.callback(
+    [Output('url', 'pathname', allow_duplicate=True),
+     Output('user-info-store', 'data', allow_duplicate=True),
+     Output('glucose-chart-mode', 'data', allow_duplicate=True)],
+    [Input('finish-study-button', 'n_clicks')],
+    [State('user-info-store', 'data'),
+     State('full-df', 'data')],
+    prevent_initial_call=True
+)
+def handle_finish_study_from_prediction(
+    n_clicks: Optional[int],
+    user_info: Optional[Dict[str, Any]],
+    full_df_data: Optional[Dict]
+) -> Tuple[str, Optional[Dict[str, Any]], Dict[str, bool]]:
+    if not n_clicks:
+        return no_update, no_update, no_update
+
+    if not user_info:
+        return '/', None, {'hide_last_hour': True}
+
+    rounds: list[dict[str, Any]] = user_info.get('rounds') or []
+    if not rounds:
+        return '/', None, {'hide_last_hour': True}
+
+    if full_df_data and not bool(user_info.get('statistics_saved')):
+        with start_action(action_type=u"handle_finish_study_from_prediction"):
+            full_df = reconstruct_dataframe_from_dict(full_df_data)
+            submit_component.save_statistics(full_df, user_info)
+            user_info['statistics_saved'] = True
+
+    return '/final', user_info, {'hide_last_hour': False}
+
+
+@app.callback(
+    [Output('url', 'pathname', allow_duplicate=True),
+     Output('user-info-store', 'data', allow_duplicate=True),
+     Output('glucose-chart-mode', 'data', allow_duplicate=True)],
+    [Input('finish-study-button-ending', 'n_clicks')],
+    [State('user-info-store', 'data'),
+     State('full-df', 'data')],
+    prevent_initial_call=True
+)
+def handle_finish_study_from_ending(
+    n_clicks: Optional[int],
+    user_info: Optional[Dict[str, Any]],
+    full_df_data: Optional[Dict]
+) -> Tuple[str, Optional[Dict[str, Any]], Dict[str, bool]]:
+    if not n_clicks:
+        return no_update, no_update, no_update
+
+    if not user_info:
+        return '/', None, {'hide_last_hour': True}
+
+    rounds: list[dict[str, Any]] = user_info.get('rounds') or []
+    if not rounds:
+        return '/', None, {'hide_last_hour': True}
+
+    if full_df_data and not bool(user_info.get('statistics_saved')):
+        with start_action(action_type=u"handle_finish_study_from_ending"):
+            full_df = reconstruct_dataframe_from_dict(full_df_data)
+            submit_component.save_statistics(full_df, user_info)
+            user_info['statistics_saved'] = True
+
+    return '/final', user_info, {'hide_last_hour': False}
+
+
 @app.callback(
     [Output('url', 'pathname', allow_duplicate=True),
      Output('user-info-store', 'data', allow_duplicate=True),
      Output('glucose-chart-mode', 'data', allow_duplicate=True),
      Output('randomization-initialized', 'data', allow_duplicate=True)],
-    [Input('exit-button', 'n_clicks')],
+    [Input('restart-button', 'n_clicks')],
     prevent_initial_call=True
 )
-def handle_exit_button(n_clicks: Optional[int]) -> Tuple[str, None, Dict[str, bool], bool]:
-    """Handle exit button - navigate to start and clear user info. Data reset handled elsewhere."""
+def handle_restart_button(n_clicks: Optional[int]) -> Tuple[str, None, Dict[str, bool], bool]:
+    """Handle restart button - navigate to start and clear user info. Data reset handled elsewhere."""
     if n_clicks:
-        with start_action(action_type=u"handle_exit_button") as action:
-            action.log(message_type="exit_clicked")
+        with start_action(action_type=u"handle_restart_button") as action:
+            action.log(message_type="restart_clicked")
         # Reset chart mode to hide last hour when going back to prediction
         chart_mode = {'hide_last_hour': True}
         # Reset randomization flag to trigger new random position
@@ -607,7 +1026,7 @@ def handle_exit_button(n_clicks: Optional[int]) -> Tuple[str, None, Dict[str, bo
 app.clientside_callback(
     """
     function(pathname) {
-        if (pathname === '/ending') {
+        if (pathname === '/ending' || pathname === '/final') {
             window.scrollTo(0, 0);
             return '';
         }

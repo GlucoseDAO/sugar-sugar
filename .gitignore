@@ -172,3 +172,4 @@ cython_debug/
 
 # Application generated files
 prediction_statistics.csv
+claude_summary.md
