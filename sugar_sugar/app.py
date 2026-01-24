@@ -12,6 +12,7 @@ import base64
 import dash_bootstrap_components as dbc
 import os
 import typer
+import uuid
 from dotenv import load_dotenv
 from eliot import start_action, start_task
 from pycomfort.logging import to_nice_file, to_nice_stdout
@@ -664,6 +665,37 @@ def create_final_layout(full_df_data: Dict, user_info: Dict[str, Any], glucose_u
     rounds: list[dict[str, Any]] = user_info.get('rounds') or []
     max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS)
     unit = glucose_unit if glucose_unit in ('mg/dL', 'mmol/L') else 'mg/dL'
+    study_id = str(user_info.get('study_id') or '')
+
+    def _rank_text() -> Optional[str]:
+        """Return 'You are X out of Y' based on overall MAE (mg/dL) if possible."""
+        if not study_id:
+            return None
+        ranking_path = project_root / 'data' / 'input' / 'prediction_ranking.csv'
+        if not ranking_path.exists():
+            return None
+        try:
+            ranking_df = pl.read_csv(ranking_path)
+        except Exception:
+            return None
+        if 'study_id' not in ranking_df.columns or 'overall_mae_mgdl' not in ranking_df.columns:
+            return None
+
+        df2 = ranking_df.select(['study_id', 'overall_mae_mgdl'])
+        df2 = df2.with_columns(
+            pl.col('overall_mae_mgdl').cast(pl.Float64, strict=False)
+        ).filter(pl.col('overall_mae_mgdl').is_not_null())
+        total = df2.height
+        if total == 0:
+            return None
+
+        # Lower MAE is better. Break ties by study_id for determinism.
+        df_sorted = df2.sort(['overall_mae_mgdl', 'study_id'])
+        matches = df_sorted.with_row_index('rank_idx').filter(pl.col('study_id') == study_id)
+        if matches.height == 0:
+            return None
+        rank = int(matches.get_column('rank_idx')[0]) + 1
+        return f"You are ranked {rank} out of {total} (by overall MAE, mg/dL)."
 
     metrics_component_final = MetricsComponent()
     aggregate_table_data = _convert_table_data_units(_build_aggregate_table_data(rounds), unit)
@@ -722,6 +754,16 @@ def create_final_layout(full_df_data: Dict, user_info: Dict[str, Any], glucose_u
                 'fontSize': 'clamp(16px, 2.5vw, 22px)',
                 'fontWeight': '600',
                 'color': '#2c5282'
+            }
+        ),
+        html.Div(
+            _rank_text() or "",
+            style={
+                'textAlign': 'center',
+                'marginBottom': '15px',
+                'color': '#4a5568',
+                'fontSize': '14px',
+                'display': 'block' if _rank_text() else 'none'
             }
         ),
         html.Div(
@@ -889,6 +931,7 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
     if n_clicks and email and age:
         print("DEBUG: Start button clicked")
         return '/prediction', {
+            'study_id': str(uuid.uuid4()),
             'email': email,
             'age': age,
             'gender': gender,

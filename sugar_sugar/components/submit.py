@@ -7,6 +7,7 @@ import uuid
 import csv
 from pathlib import Path
 from sugar_sugar.config import PREDICTION_HOUR_OFFSET
+from sugar_sugar.components.metrics import MetricsComponent
 
 class SubmitComponent(html.Div):
     def __init__(self) -> None:
@@ -15,6 +16,12 @@ class SubmitComponent(html.Div):
             / 'data'
             / 'input'
             / 'prediction_statistics.csv'
+        )
+        self._ranking_csv_path = (
+            Path(__file__).resolve().parents[2]
+            / 'data'
+            / 'input'
+            / 'prediction_ranking.csv'
         )
         self._stats_csv_path.parent.mkdir(parents=True, exist_ok=True)
         legacy_csv_path = Path(__file__).resolve().parents[2] / 'prediction_statistics.csv'
@@ -85,11 +92,83 @@ class SubmitComponent(html.Div):
         actual_values: list[dict[str, Any]] = []
         prediction_times: list[dict[str, Any]] = []
 
+        # Stable ID across derived outputs (stats + ranking)
+        study_id = user_info.get('study_id')
+        if not study_id:
+            study_id = str(uuid.uuid4())
+            user_info['study_id'] = study_id
+
+        metrics_component = MetricsComponent()
+
+        def _metrics_from_table(table_data: list[dict[str, str]]) -> dict[str, Optional[float]]:
+            metrics = metrics_component._calculate_metrics_from_table_data(table_data) if len(table_data) >= 2 else {}
+            def _val(name: str) -> Optional[float]:
+                item = metrics.get(name)
+                if not item:
+                    return None
+                v = item.get('value')
+                return float(v) if v is not None else None
+            return {
+                'mae': _val('MAE'),
+                'mse': _val('MSE'),
+                'rmse': _val('RMSE'),
+                'mape': _val('MAPE'),
+            }
+
+        def _build_aggregate_table_data(rounds_in: list[dict[str, Any]]) -> list[dict[str, str]]:
+            actual_row: dict[str, str] = {'metric': 'Actual Glucose'}
+            pred_row: dict[str, str] = {'metric': 'Predicted'}
+            out_idx = 0
+            for round_info in rounds_in:
+                table_data = round_info.get('prediction_table_data') or []
+                if len(table_data) < 2:
+                    continue
+                round_actual = table_data[0]
+                round_pred = table_data[1]
+                i = 0
+                while True:
+                    key = f"t{i}"
+                    if key not in round_actual or key not in round_pred:
+                        break
+                    actual_row[f"t{out_idx}"] = round_actual.get(key, "-")
+                    pred_row[f"t{out_idx}"] = round_pred.get(key, "-")
+                    out_idx += 1
+                    i += 1
+            return [actual_row, pred_row]
+
         def _time_list(window_df: pl.DataFrame) -> list[str]:
             time_col = window_df.get_column('time')
             if time_col.dtype == pl.String:
                 return [str(t) for t in time_col.to_list()]
             return time_col.dt.strftime('%Y-%m-%d %H:%M:%S').to_list()
+
+        # Per-round + overall metrics (computed in mg/dL, regardless of UI unit)
+        per_round_metrics: list[dict[str, Any]] = []
+        if rounds:
+            for round_info in rounds:
+                table_data = round_info.get('prediction_table_data') or []
+                round_number = int(round_info.get('round_number') or (len(per_round_metrics) + 1))
+                m = _metrics_from_table(table_data)
+                per_round_metrics.append({
+                    'round_number': round_number,
+                    'mae': m['mae'],
+                    'mse': m['mse'],
+                    'rmse': m['rmse'],
+                    'mape': m['mape'],
+                })
+        else:
+            table_data = user_info.get('prediction_table_data', []) or []
+            m = _metrics_from_table(table_data)
+            per_round_metrics.append({
+                'round_number': 1,
+                'mae': m['mae'],
+                'mse': m['mse'],
+                'rmse': m['rmse'],
+                'mape': m['mape'],
+            })
+
+        overall_table_data = _build_aggregate_table_data(rounds) if rounds else (user_info.get('prediction_table_data', []) or [])
+        overall = _metrics_from_table(overall_table_data)
 
         if rounds:
             # Aggregate across played rounds
@@ -141,8 +220,9 @@ class SubmitComponent(html.Div):
         user_id = df.get_column('user_id')[0] if 'user_id' in df.columns else 1
         
         # Prepare the data dictionary
+        rounds_played = len(rounds) if rounds else 1
         data = {
-            'id': str(uuid.uuid4()),
+            'study_id': study_id,
             'number': self._get_next_number(),
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'email': user_info.get('email', ''),
@@ -157,62 +237,92 @@ class SubmitComponent(html.Div):
             'other_medical_conditions': user_info.get('other_medical_conditions', ''),
             'medical_conditions_description': user_info.get('medical_conditions_input', ''),
             'location': user_info.get('location', ''),
+            'rounds_played': rounds_played,
             # Clear naming: "real" == ground truth, "predicted" == user prediction
             'predicted_values': str(parameters),
             'real_values': str(actual_values),
-            'prediction_times': str(prediction_times)
+            'prediction_times': str(prediction_times),
+            # Metrics
+            'overall_mae_mgdl': overall['mae'],
+            'overall_mse_mgdl': overall['mse'],
+            'overall_rmse_mgdl': overall['rmse'],
+            'overall_mape_pct': overall['mape'],
+            'per_round_metrics': str(per_round_metrics),
         }
         
-        # Write to CSV
-        file_exists = csv_file_path.exists()
-        desired_fieldnames = list(data.keys())
+        def _upgrade_and_append_csv(
+            path: Path,
+            row: dict[str, Any],
+            legacy_to_new: dict[str, str]
+        ) -> None:
+            file_exists = path.exists()
+            desired_fieldnames = list(row.keys())
 
-        if file_exists:
-            # If the file exists but header is missing new columns, upgrade it in place.
-            with csv_file_path.open('r', newline='') as file_handle:
-                reader = csv.DictReader(file_handle)
-                existing_fieldnames = reader.fieldnames or []
-                existing_rows = list(reader)
+            if file_exists:
+                with path.open('r', newline='') as file_handle:
+                    reader = csv.DictReader(file_handle)
+                    existing_fieldnames = reader.fieldnames or []
+                    existing_rows = list(reader)
 
-            legacy_to_new = {
+                needs_upgrade = (
+                    any(field in existing_fieldnames for field in legacy_to_new.keys())
+                    or any(field not in existing_fieldnames for field in desired_fieldnames)
+                )
+
+                if needs_upgrade:
+                    preserved_existing = [f for f in existing_fieldnames if f and f not in legacy_to_new.keys()]
+                    upgraded_fieldnames: list[str] = []
+                    for f in preserved_existing + desired_fieldnames:
+                        if f not in upgraded_fieldnames:
+                            upgraded_fieldnames.append(f)
+
+                    tmp_path = path.with_suffix('.tmp')
+                    with tmp_path.open('w', newline='') as out_handle:
+                        writer = csv.DictWriter(out_handle, fieldnames=upgraded_fieldnames)
+                        writer.writeheader()
+                        for old_row in existing_rows:
+                            upgraded_row: dict[str, Any] = {key: old_row.get(key, "") for key in upgraded_fieldnames}
+                            for old_key, new_key in legacy_to_new.items():
+                                if upgraded_row.get(new_key, "") in ("", None) and old_key in old_row:
+                                    upgraded_row[new_key] = old_row.get(old_key, "")
+                            writer.writerow(upgraded_row)
+                    tmp_path.replace(path)
+
+            with path.open('a', newline='') as file_handle:
+                writer = csv.DictWriter(file_handle, fieldnames=desired_fieldnames)
+                if not file_exists:
+                    writer.writeheader()
+                writer.writerow(row)
+
+        # Write full statistics row
+        _upgrade_and_append_csv(
+            csv_file_path,
+            data,
+            legacy_to_new={
+                'id': 'study_id',
                 'parameters': 'predicted_values',
                 'actual_values': 'real_values',
                 'prediction_time': 'prediction_times',
             }
+        )
 
-            # If we have legacy columns, rewrite with the new names (and keep other columns).
-            needs_upgrade = (
-                any(field in existing_fieldnames for field in legacy_to_new.keys())
-                or any(field not in existing_fieldnames for field in desired_fieldnames)
-            )
-
-            if needs_upgrade:
-                # Keep all existing non-legacy fields, then enforce desired new schema ordering.
-                preserved_existing = [f for f in existing_fieldnames if f and f not in legacy_to_new.keys()]
-                upgraded_fieldnames = []
-                for f in preserved_existing + desired_fieldnames:
-                    if f not in upgraded_fieldnames:
-                        upgraded_fieldnames.append(f)
-
-                tmp_path = csv_file_path.with_suffix('.tmp')
-                with tmp_path.open('w', newline='') as out_handle:
-                    writer = csv.DictWriter(out_handle, fieldnames=upgraded_fieldnames)
-                    writer.writeheader()
-                    for row in existing_rows:
-                        upgraded_row: dict[str, Any] = {key: row.get(key, "") for key in upgraded_fieldnames}
-                        for old_key, new_key in legacy_to_new.items():
-                            if upgraded_row.get(new_key, "") in ("", None) and old_key in row:
-                                upgraded_row[new_key] = row.get(old_key, "")
-                        writer.writerow(upgraded_row)
-
-                tmp_path.replace(csv_file_path)
-
-        # Append row (header is guaranteed to be present now)
-        with csv_file_path.open('a', newline='') as file_handle:
-            writer = csv.DictWriter(file_handle, fieldnames=desired_fieldnames)
-            if not file_exists:
-                writer.writeheader()
-            writer.writerow(data)
+        # Write ranking row for fast leaderboard lookups
+        ranking_row = {
+            'study_id': study_id,
+            'timestamp': data['timestamp'],
+            'rounds_played': rounds_played,
+            'is_example_data': data['is_example_data'],
+            'data_source_name': data['data_source_name'],
+            'overall_mae_mgdl': overall['mae'],
+            'overall_mse_mgdl': overall['mse'],
+            'overall_rmse_mgdl': overall['rmse'],
+            'overall_mape_pct': overall['mape'],
+        }
+        _upgrade_and_append_csv(
+            self._ranking_csv_path,
+            ranking_row,
+            legacy_to_new={}
+        )
 
         # Reset the prediction
         df = df.with_columns(pl.lit(0.0).alias("prediction"))
