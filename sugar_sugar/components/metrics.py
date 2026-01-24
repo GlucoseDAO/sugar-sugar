@@ -42,9 +42,10 @@ class MetricsComponent(html.Div):
         
         @app.callback(
             Output('metrics-store', 'data'),
-            [Input('current-window-df', 'data')]  # Listen to session storage instead
+            [Input('current-window-df', 'data'),
+             Input('glucose-unit', 'data')]  # Listen to session storage instead
         )
-        def store_metrics_data(df_data: Optional[dict]) -> Optional[dict]:
+        def store_metrics_data(df_data: Optional[dict], glucose_unit: Optional[str]) -> Optional[dict]:
             """Calculate and store metrics when DataFrame changes"""
             if not df_data:
                 return None
@@ -53,7 +54,8 @@ class MetricsComponent(html.Div):
             df = self._reconstruct_dataframe_from_dict(df_data)
             
             # Calculate metrics using the table data
-            table_data = self._generate_table_data(df)
+            unit = glucose_unit if glucose_unit in ('mg/dL', 'mmol/L') else 'mg/dL'
+            table_data = self._generate_table_data(df, unit)
             
             if len(table_data) < 4:  # Need actual, predicted, absolute error, relative error rows
                 return None
@@ -223,49 +225,54 @@ class MetricsComponent(html.Div):
             'user_id': pl.Series([int(float(x)) for x in df_data['user_id']], dtype=pl.Int64)
         })
 
-    def _generate_table_data(self, df: pl.DataFrame) -> list[dict[str, str]]:
-        """Generates the table data with actual values, predictions, and errors."""
-        table_data = []
-        
-        # Row 1: Actual glucose values
-        glucose_row = {'metric': 'Actual Glucose'}
-        for i, gl in enumerate(df.get_column("gl")):
-            glucose_row[f't{i}'] = f"{gl:.1f}" if gl is not None else "-"
-        table_data.append(glucose_row)
-        
-        # Row 2: Predicted values with interpolation
-        prediction_row = {'metric': 'Predicted'}
-        predictions = df.get_column("prediction")
-        non_zero_indices = [i for i, p in enumerate(predictions) if p != 0]
-        
+    def _generate_table_data(self, df: pl.DataFrame, glucose_unit: str = 'mg/dL') -> list[dict[str, str]]:
+        """Generates the table data with actual values, predictions, and errors (display-only units)."""
+        factor = 1.0 / 18.0 if glucose_unit == 'mmol/L' else 1.0
+        n = len(df)
+
+        actual_mg = [float(x) for x in df.get_column("gl")]
+        pred_col = [float(x) for x in df.get_column("prediction")]
+
+        pred_mg: list[Optional[float]] = [None] * n
+        non_zero_indices = [i for i, p in enumerate(pred_col) if p != 0.0]
         if len(non_zero_indices) >= 2:
             start_idx = non_zero_indices[0]
             end_idx = non_zero_indices[-1]
-            
-            for i in range(len(predictions)):
+            for i in range(n):
                 if i < start_idx or i > end_idx:
-                    prediction_row[f't{i}'] = "-"
-                elif predictions[i] != 0:
-                    prediction_row[f't{i}'] = f"{predictions[i]:.1f}"
+                    pred_mg[i] = None
+                elif pred_col[i] != 0.0:
+                    pred_mg[i] = pred_col[i]
                 else:
-                    prev_idx = max([j for j in non_zero_indices if j < i])
-                    next_idx = min([j for j in non_zero_indices if j > i])
+                    prev_idx = max(j for j in non_zero_indices if j < i)
+                    next_idx = min(j for j in non_zero_indices if j > i)
                     total_steps = next_idx - prev_idx
                     current_step = i - prev_idx
-                    prev_val = predictions[prev_idx]
-                    next_val = predictions[next_idx]
-                    interpolated = prev_val + (next_val - prev_val) * (current_step / total_steps)
-                    prediction_row[f't{i}'] = f"{interpolated:.1f}"
+                    prev_val = pred_col[prev_idx]
+                    next_val = pred_col[next_idx]
+                    pred_mg[i] = prev_val + (next_val - prev_val) * (current_step / total_steps)
         else:
-            for i, pred_val in enumerate(predictions):
-                prediction_row[f't{i}'] = f"{pred_val:.1f}" if pred_val != 0 else "-"
-        
-        table_data.append(prediction_row)
-        
-        # Add error rows
-        table_data.extend(self._calculate_error_rows(df, prediction_row))
-        
-        return table_data
+            for i in range(n):
+                pred_mg[i] = pred_col[i] if pred_col[i] != 0.0 else None
+
+        glucose_row: dict[str, str] = {'metric': 'Actual Glucose'}
+        prediction_row: dict[str, str] = {'metric': 'Predicted'}
+        abs_error_row: dict[str, str] = {'metric': 'Absolute Error'}
+        rel_error_row: dict[str, str] = {'metric': 'Relative Error (%)'}
+
+        for i in range(n):
+            glucose_row[f"t{i}"] = f"{actual_mg[i] * factor:.1f}"
+            if pred_mg[i] is None:
+                prediction_row[f"t{i}"] = "-"
+                abs_error_row[f"t{i}"] = "-"
+                rel_error_row[f"t{i}"] = "-"
+            else:
+                prediction_row[f"t{i}"] = f"{pred_mg[i] * factor:.1f}"
+                err = abs(actual_mg[i] - pred_mg[i])
+                abs_error_row[f"t{i}"] = f"{err * factor:.1f}"
+                rel_error_row[f"t{i}"] = f"{(err / actual_mg[i] * 100):.1f}%" if actual_mg[i] != 0 else "-"
+
+        return [glucose_row, prediction_row, abs_error_row, rel_error_row]
 
     def _calculate_error_rows(self, df: pl.DataFrame, prediction_row: dict[str, str]) -> list[dict[str, str]]:
         """Calculates absolute and relative error rows for the table."""

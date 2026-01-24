@@ -49,6 +49,8 @@ class GlucoseChart(html.Div):
         ])
         self.id = id
         self.hide_last_hour = hide_last_hour
+        self._display_unit: str = "mg/dL"
+        self._display_factor: float = 1.0
 
     def _create_empty_figure(self) -> go.Figure:
         """Create an empty figure with basic layout"""
@@ -94,13 +96,15 @@ class GlucoseChart(html.Div):
             [Input(f'{self.id}-df-store', 'data'),
              Input(f'{self.id}-events-store', 'data'),
              Input(f'{self.id}-source-store', 'data'),
-             Input('glucose-chart-mode', 'data')]
+             Input('glucose-chart-mode', 'data'),
+             Input('glucose-unit', 'data')]
         )
         def update_chart_figure(
             df_data: Optional[dict[str, Any]],
             events_data: Optional[dict[str, Any]],
             source_name: Optional[str],
-            mode_data: Optional[dict[str, Any]]
+            mode_data: Optional[dict[str, Any]],
+            glucose_unit: Optional[str]
         ) -> go.Figure:
             """Update the chart figure when data changes"""
             if not df_data:
@@ -112,6 +116,8 @@ class GlucoseChart(html.Div):
             hide_mode = mode_data or {'hide_last_hour': self.hide_last_hour}
             hide_last_hour_flag = hide_mode.get('hide_last_hour', self.hide_last_hour)
             self.hide_last_hour = hide_last_hour_flag
+            self._display_unit = glucose_unit if glucose_unit in ("mg/dL", "mmol/L") else "mg/dL"
+            self._display_factor = (1.0 / 18.0) if self._display_unit == "mmol/L" else 1.0
             
             with start_action(
                 action_type=u"glucose_update_figure",
@@ -164,9 +170,10 @@ class GlucoseChart(html.Div):
 
     def _add_range_rectangles(self, figure: go.Figure) -> None:
         """Add colored range rectangles to indicate glucose ranges."""
+        f = self._display_factor
         # Add rectangle for high range (>180 mg/dL)
         figure.add_hrect(
-            y0=180, y1=400,
+            y0=180 * f, y1=400 * f,
             fillcolor="rgba(255, 0, 0, 0.1)",
             line_width=0,
             xref='x',
@@ -175,7 +182,7 @@ class GlucoseChart(html.Div):
         
         # Add rectangle for low range (<70 mg/dL)
         figure.add_hrect(
-            y0=0, y1=70,
+            y0=0 * f, y1=70 * f,
             fillcolor="rgba(255, 0, 0, 0.1)",
             line_width=0,
             xref='x',
@@ -184,7 +191,7 @@ class GlucoseChart(html.Div):
         
         # Add rectangle for target range (70-180 mg/dL)
         figure.add_hrect(
-            y0=70, y1=180,
+            y0=70 * f, y1=180 * f,
             fillcolor="rgba(0, 255, 0, 0.1)",
             line_width=0,
             xref='x',
@@ -193,18 +200,19 @@ class GlucoseChart(html.Div):
 
     def _calculate_y_axis_range(self) -> tuple[float, float]:
         """Calculates the y-axis range based on glucose and prediction values."""
-        STANDARD_MIN = 40  # Standard lower bound for CGM charts
-        STANDARD_MAX = 300  # Upper bound for CGM chart
+        f = self._display_factor
+        STANDARD_MIN = 40 * f  # Standard lower bound for CGM charts
+        STANDARD_MAX = 300 * f  # Upper bound for CGM chart
         
         line_points = self._current_df.filter(pl.col("prediction") != 0.0)
         
         # Get actual data ranges
-        data_min = self._current_df.get_column("gl").min()
-        data_max = self._current_df.get_column("gl").max()
+        data_min = float(self._current_df.get_column("gl").min()) * f
+        data_max = float(self._current_df.get_column("gl").max()) * f
         
         # Include prediction values in range calculation if they exist
         if line_points.height > 0:
-            pred_max = line_points.get_column("prediction").max()
+            pred_max = float(line_points.get_column("prediction").max()) * f
             data_max = max(data_max, pred_max)
         
         # Set bounds with some padding
@@ -215,17 +223,18 @@ class GlucoseChart(html.Div):
 
     def _add_glucose_trace(self, figure: go.Figure) -> None:
         """Adds the main glucose data line to the figure."""
+        f = self._display_factor
         # Determine how many points to show based on hide_last_hour setting
         if self.hide_last_hour:
             # Show only data points minus PREDICTION_HOUR_OFFSET (hide last hour)
             visible_points = len(self._current_df) - PREDICTION_HOUR_OFFSET +1
             visible_df = self._current_df.slice(0, visible_points)
             x_indices = list(range(visible_points))
-            glucose_values = visible_df['gl']
+            glucose_values = visible_df['gl'] * f
         else:
             # Show all data points
             x_indices = list(range(len(self._current_df)))
-            glucose_values = self._current_df['gl']
+            glucose_values = self._current_df['gl'] * f
         
         figure.add_trace(go.Scatter(
             x=x_indices,
@@ -246,6 +255,7 @@ class GlucoseChart(html.Div):
 
     def _add_prediction_traces(self, figure: go.Figure) -> None:
         """Adds prediction points and connecting lines to the figure."""
+        f = self._display_factor
         line_points = self._current_df.filter(pl.col("prediction") != 0.0)
         if line_points.height > 0:
             x_positions = [self._get_time_position(t) for t in line_points.get_column("time")]
@@ -268,7 +278,7 @@ class GlucoseChart(html.Div):
                 if filtered_data:
                     x_positions, predictions, custom_data = zip(*filtered_data)
                     x_positions = list(x_positions)
-                    predictions = list(predictions)
+                    predictions = [float(p) * f for p in list(predictions)]
                     custom_data = list(custom_data)
                 else:
                     x_positions, predictions, custom_data = [], [], []
@@ -288,10 +298,10 @@ class GlucoseChart(html.Div):
                 if unique_data:
                     x_positions, predictions, custom_data = zip(*unique_data)
                     x_positions = list(x_positions)
-                    predictions = list(predictions)
+                    predictions = [float(p) * f for p in list(predictions)]
                     custom_data = list(custom_data)
                 else:
-                    predictions = line_points.get_column("prediction")
+                    predictions = (line_points.get_column("prediction") * f).to_list()
                     custom_data = line_points.get_column("time").to_list()
             
             if x_positions:  # Only add traces if we have data to show
@@ -327,6 +337,7 @@ class GlucoseChart(html.Div):
         """Adds event markers (insulin, exercise, carbs) to the figure."""
         if self._current_events.height == 0:
             return
+        f = self._display_factor
             
         # Filter events to only those within the current time window
         start_time = self._current_df.get_column("time")[0]
@@ -369,10 +380,10 @@ class GlucoseChart(html.Div):
                     # Calculate position and glucose value
                     if df_times[before_idx] == event_time:
                         x_pos = before_idx
-                        glucose_value = self._current_df.get_column("gl")[before_idx]
+                        glucose_value = float(self._current_df.get_column("gl")[before_idx]) * f
                     elif before_idx == after_idx:
                         x_pos = before_idx
-                        glucose_value = self._current_df.get_column("gl")[before_idx]
+                        glucose_value = float(self._current_df.get_column("gl")[before_idx]) * f
                     else:
                         # Interpolate position and glucose value
                         before_time = df_times[before_idx].timestamp()
@@ -384,7 +395,7 @@ class GlucoseChart(html.Div):
                         
                         before_glucose = self._current_df.get_column("gl")[before_idx]
                         after_glucose = self._current_df.get_column("gl")[after_idx]
-                        glucose_value = before_glucose + (after_glucose - before_glucose) * factor
+                        glucose_value = float(before_glucose + (after_glucose - before_glucose) * factor) * f
                     
                     y_positions.append(glucose_value)
                     x_positions.append(x_pos)
@@ -443,7 +454,7 @@ class GlucoseChart(html.Div):
                 range=[-0.5, len(self._current_df) - 0.5]
             ),
             yaxis=dict(
-                title='Glucose Level (mg/dL)',
+                title=f'Glucose Level ({self._display_unit})',
                 fixedrange=True,
                 showspikes=True,
                 spikemode='across',

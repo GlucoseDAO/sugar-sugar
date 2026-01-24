@@ -41,6 +41,7 @@ TableData = List[Dict[str, str]]  # Format for the predictions table data
 Figure = go.Figure  # Plotly figure type
 
 MAX_ROUNDS: int = 12
+GLUCOSE_MGDL_PER_MMOLL: float = 18.0
 
 def dataframe_to_store_dict(df_in: pl.DataFrame) -> Dict[str, List[Any]]:
     """Convert a Polars DataFrame into a session-store friendly dictionary."""
@@ -147,6 +148,7 @@ app.layout = html.Div([
     dcc.Store(id='data-source-name', data="example.csv"),  # Store source filename
     dcc.Store(id='randomization-initialized', data=False),  # Track if randomization has been done
     dcc.Store(id='glucose-chart-mode', data={'hide_last_hour': True}),
+    dcc.Store(id='glucose-unit', data='mg/dL', storage_type='session'),
     dcc.Store(id='user-agent', data=None, storage_type='session'),
     dcc.Store(id='initial-slider-value', data=example_initial_slider_value),  # Store initial random start
 
@@ -164,11 +166,12 @@ app.layout = html.Div([
     [State('user-info-store', 'data'),
      State('full-df', 'data'),
      State('events-df', 'data'),
+     State('glucose-unit', 'data'),
      State('user-agent', 'data')],
     prevent_initial_call=False
 )
 def display_page(pathname: Optional[str], user_info: Optional[Dict[str, Any]], 
-                full_df_data: Optional[Dict], events_df_data: Optional[Dict], user_agent: Optional[str]) -> tuple[html.Div, Optional[html.Div]]:
+                full_df_data: Optional[Dict], events_df_data: Optional[Dict], glucose_unit: Optional[str], user_agent: Optional[str]) -> tuple[html.Div, Optional[html.Div]]:
     with start_action(action_type=u"display_page", pathname=pathname):
         warning_content = render_mobile_warning(user_agent)
         if pathname == '/prediction' and user_info:
@@ -194,7 +197,7 @@ def display_page(pathname: Optional[str], user_info: Optional[Dict[str, Any]],
                         )
                     ], style={'textAlign': 'center'})
                 ]), warning_content
-            return create_ending_layout(full_df_data, events_df_data, user_info), warning_content
+            return create_ending_layout(full_df_data, events_df_data, user_info, glucose_unit), warning_content
         if pathname == '/final':
             if not full_df_data or not user_info or 'rounds' not in user_info:
                 return html.Div([
@@ -215,7 +218,7 @@ def display_page(pathname: Optional[str], user_info: Optional[Dict[str, Any]],
                         )
                     ], style={'textAlign': 'center'})
                 ]), warning_content
-            return create_final_layout(full_df_data, user_info), warning_content
+            return create_final_layout(full_df_data, user_info, glucose_unit), warning_content
         return (startup_page if startup_page else html.Div("Loading..."), warning_content)  # Return the startup page component
 
 def create_prediction_layout() -> html.Div:
@@ -227,6 +230,24 @@ def create_prediction_layout() -> html.Div:
             'fontSize': '18px',
             'fontWeight': '600',
             'color': '#2c5282',
+            'marginBottom': '10px'
+        }),
+        html.Div([
+            html.Div("Units:", style={'fontWeight': '600', 'marginRight': '10px'}),
+            dbc.RadioItems(
+                id='glucose-unit-selector',
+                options=[
+                    {'label': 'mg/dL', 'value': 'mg/dL'},
+                    {'label': 'mmol/L', 'value': 'mmol/L'}
+                ],
+                value='mg/dL',
+                inline=True
+            ),
+        ], style={
+            'display': 'flex',
+            'justifyContent': 'center',
+            'alignItems': 'center',
+            'gap': '10px',
             'marginBottom': '10px'
         }),
         html.Div([
@@ -244,6 +265,29 @@ def create_prediction_layout() -> html.Div:
         'gap': '20px'
     })
 
+
+@app.callback(
+    Output('glucose-unit', 'data', allow_duplicate=True),
+    [Input('glucose-unit-selector', 'value')],
+    prevent_initial_call=True
+)
+def set_glucose_unit(unit_value: Optional[str]) -> str:
+    if unit_value not in ('mg/dL', 'mmol/L'):
+        raise PreventUpdate
+    return unit_value
+
+
+@app.callback(
+    Output('glucose-unit-selector', 'value'),
+    [Input('url', 'pathname'),
+     Input('glucose-unit', 'data')],
+    prevent_initial_call=False
+)
+def sync_glucose_unit_selector(pathname: Optional[str], glucose_unit: Optional[str]) -> str:
+    if pathname != '/prediction':
+        raise PreventUpdate
+    return glucose_unit if glucose_unit in ('mg/dL', 'mmol/L') else 'mg/dL'
+
 @app.callback(
     Output('round-indicator', 'children'),
     [Input('url', 'pathname'),
@@ -260,7 +304,7 @@ def update_round_indicator(pathname: Optional[str], user_info: Optional[Dict[str
     max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS)
     return f"Round {current_round} of {max_rounds}"
 
-def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[Dict], user_info: Optional[Dict] = None) -> html.Div:
+def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[Dict], user_info: Optional[Dict] = None, glucose_unit: Optional[str] = None) -> html.Div:
     """Create the ending page layout"""
     if not full_df_data:
         print("DEBUG: No data available for ending page")
@@ -282,7 +326,8 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
     # Check if we have stored prediction data from the submit button
     if user_info and 'prediction_table_data' in user_info:
         print("DEBUG: Using stored prediction table data from submit button")
-        prediction_table_data = user_info['prediction_table_data']
+        unit = glucose_unit if glucose_unit in ('mg/dL', 'mmol/L') else 'mg/dL'
+        prediction_table_data = _convert_table_data_units(user_info['prediction_table_data'], unit)
         
         # Check if we have predictions in the stored data
         if len(prediction_table_data) >= 2:
@@ -361,6 +406,15 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
                 'fontSize': 'clamp(16px, 2.5vw, 22px)',
                 'fontWeight': '600',
                 'color': '#2c5282'
+            }
+        ),
+        html.Div(
+            f"Units: {unit}",
+            style={
+                'textAlign': 'center',
+                'marginBottom': '15px',
+                'color': '#4a5568',
+                'fontSize': '14px'
             }
         ),
         
@@ -532,6 +586,40 @@ def _count_valid_pairs_from_table_data(table_data: list[dict[str, str]]) -> int:
     return count
 
 
+def _convert_table_data_units(table_data: list[dict[str, str]], glucose_unit: str) -> list[dict[str, str]]:
+    """Convert table display values between mg/dL and mmol/L (display only)."""
+    if glucose_unit != 'mmol/L':
+        return table_data
+
+    converted: list[dict[str, str]] = []
+    for row in table_data:
+        metric = row.get('metric', '')
+        new_row: dict[str, str] = {'metric': metric}
+
+        # Only convert numeric glucose-like rows. Keep % rows untouched.
+        convert_row = metric in {'Actual Glucose', 'Predicted', 'Absolute Error'}
+
+        for key, val in row.items():
+            if key == 'metric':
+                continue
+            if not convert_row or val == "-" or val is None:
+                new_row[key] = val
+                continue
+            if isinstance(val, str) and '%' in val:
+                new_row[key] = val
+                continue
+            try:
+                num = float(val)
+            except (TypeError, ValueError):
+                new_row[key] = val
+                continue
+            new_row[key] = f"{(num / GLUCOSE_MGDL_PER_MMOLL):.1f}"
+
+        converted.append(new_row)
+
+    return converted
+
+
 def _build_aggregate_table_data(rounds: list[dict[str, Any]]) -> list[dict[str, str]]:
     """Build a synthetic table_data for aggregated metrics across rounds."""
     actual_row: dict[str, str] = {'metric': 'Actual Glucose'}
@@ -560,12 +648,13 @@ def _build_aggregate_table_data(rounds: list[dict[str, Any]]) -> list[dict[str, 
     return [actual_row, prediction_row]
 
 
-def create_final_layout(full_df_data: Dict, user_info: Dict[str, Any]) -> html.Div:
+def create_final_layout(full_df_data: Dict, user_info: Dict[str, Any], glucose_unit: Optional[str]) -> html.Div:
     rounds: list[dict[str, Any]] = user_info.get('rounds') or []
     max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS)
+    unit = glucose_unit if glucose_unit in ('mg/dL', 'mmol/L') else 'mg/dL'
 
     metrics_component_final = MetricsComponent()
-    aggregate_table_data = _build_aggregate_table_data(rounds)
+    aggregate_table_data = _convert_table_data_units(_build_aggregate_table_data(rounds), unit)
     overall_metrics = metrics_component_final._calculate_metrics_from_table_data(aggregate_table_data)
     overall_metrics_display = MetricsComponent.create_ending_metrics_display(overall_metrics) if overall_metrics else [
         html.H3("Accuracy Metrics", style={'textAlign': 'center'}),
@@ -584,7 +673,8 @@ def create_final_layout(full_df_data: Dict, user_info: Dict[str, Any]) -> html.D
     round_rows: list[dict[str, Any]] = []
     for round_info in rounds:
         round_number = int(round_info.get('round_number') or (len(round_rows) + 1))
-        table_data = round_info.get('prediction_table_data') or []
+        table_data_raw = round_info.get('prediction_table_data') or []
+        table_data = _convert_table_data_units(table_data_raw, unit)
         valid_pairs = _count_valid_pairs_from_table_data(table_data)
         round_metrics = metrics_component_final._calculate_metrics_from_table_data(table_data) if len(table_data) >= 2 else {}
 
@@ -640,6 +730,15 @@ def create_final_layout(full_df_data: Dict, user_info: Dict[str, Any]) -> html.D
                 'marginBottom': '15px',
                 'fontSize': 'clamp(18px, 3vw, 24px)'
             }),
+            html.Div(
+                f"Units: {unit}",
+                style={
+                    'textAlign': 'center',
+                    'marginBottom': '10px',
+                    'color': '#4a5568',
+                    'fontSize': '14px'
+                }
+            ),
             dash_table.DataTable(
                 data=round_rows,
                 columns=[
@@ -1273,16 +1372,24 @@ def handle_time_slider(slider_value: Optional[int], current_points: Optional[int
      Input('glucose-graph-graph', 'relayoutData')],
     [State('last-click-time', 'data'),
      State('full-df', 'data'),
-     State('current-window-df', 'data')],
+     State('current-window-df', 'data'),
+     State('glucose-unit', 'data')],
     prevent_initial_call=True
 )
 def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optional[Dict],
                             last_click_time: int, full_df_data: Optional[Dict], 
-                            current_df_data: Optional[Dict]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]]]:
+                            current_df_data: Optional[Dict], glucose_unit: Optional[str]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]]]:
     """Handle glucose graph click and draw interactions"""
     if not full_df_data or not current_df_data:
         return no_update, no_update, no_update
     
+    unit = glucose_unit if glucose_unit in ('mg/dL', 'mmol/L') else 'mg/dL'
+
+    def to_mgdl(y_value: float) -> float:
+        if unit == 'mmol/L':
+            return float(y_value) * GLUCOSE_MGDL_PER_MMOLL
+        return float(y_value)
+
     current_time = int(time.time() * 1000)
     full_df = reconstruct_dataframe_from_dict(full_df_data)
     df = reconstruct_dataframe_from_dict(current_df_data)
@@ -1318,7 +1425,7 @@ def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optiona
         nearest_time = df.get_column("time")[snapped_idx]
         
         # Check if this is the first prediction point at the boundary - snap to ground truth
-        prediction_y = click_y
+        prediction_y = to_mgdl(float(click_y))
         if snapped_idx == visible_points:  # First point in hidden area
             # Check if this is the start of a new prediction sequence
             existing_predictions = df.filter(pl.col("prediction") != 0.0).height
@@ -1366,7 +1473,7 @@ def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optiona
                 start_time = df.get_column("time")[start_idx]
                 
                 # Check if this is the first prediction starting at the boundary - snap to ground truth
-                actual_start_y = start_y
+                actual_start_y = to_mgdl(float(start_y))
                 if start_idx == visible_points:  # Starting at first point in hidden area
                     # Check if this is the start of a new prediction sequence
                     existing_predictions = df.filter(pl.col("prediction") != 0.0).height
@@ -1376,7 +1483,7 @@ def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optiona
                 
                 # Calculate the intersection with the first vertical guideline after start
                 actual_end_x, actual_end_y = calculate_first_guideline_intersection(
-                    float(start_idx), actual_start_y, float(end_idx), end_y, df
+                    float(start_idx), float(actual_start_y), float(end_idx), to_mgdl(float(end_y)), df
                 )
                 snapped_end_idx = snap_index(actual_end_x)
                 if snapped_end_idx is None:
