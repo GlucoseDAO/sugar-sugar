@@ -38,51 +38,37 @@ class LandingPage(html.Div):
         language_picker = html.Div(
             [
                 html.Button(
-                    "🇬🇧",
+                    [
+                        html.Img(src="/assets/flags/gb.svg", className="lang-flag"),
+                        html.Span("EN", className="lang-label"),
+                    ],
                     id="lang-en",
-                    title=t("ui.language.en", locale=locale),
-                    style={
-                        "border": "1px solid rgba(15, 23, 42, 0.20)",
-                        "background": "white",
-                        "borderRadius": "10px",
-                        "padding": "6px 10px",
-                        "fontSize": "18px",
-                        "cursor": "pointer",
-                    },
+                    title="EN",
+                    **{"aria-label": "EN"},
+                    className="lang-btn" + (" active" if locale == "en" else ""),
                 ),
                 html.Button(
-                    "🇩🇪",
+                    [
+                        html.Img(src="/assets/flags/de.svg", className="lang-flag"),
+                        html.Span("DE", className="lang-label"),
+                    ],
                     id="lang-de",
-                    title=t("ui.language.de", locale=locale),
-                    style={
-                        "border": "1px solid rgba(15, 23, 42, 0.20)",
-                        "background": "white",
-                        "borderRadius": "10px",
-                        "padding": "6px 10px",
-                        "fontSize": "18px",
-                        "cursor": "pointer",
-                    },
+                    title="DE",
+                    **{"aria-label": "DE"},
+                    className="lang-btn" + (" active" if locale == "de" else ""),
                 ),
                 html.Button(
-                    "🇺🇦",
+                    [
+                        html.Img(src="/assets/flags/ua.svg", className="lang-flag"),
+                        html.Span("UA", className="lang-label"),
+                    ],
                     id="lang-uk",
-                    title=t("ui.language.uk", locale=locale),
-                    style={
-                        "border": "1px solid rgba(15, 23, 42, 0.20)",
-                        "background": "white",
-                        "borderRadius": "10px",
-                        "padding": "6px 10px",
-                        "fontSize": "18px",
-                        "cursor": "pointer",
-                    },
+                    title="UA",
+                    **{"aria-label": "UA"},
+                    className="lang-btn" + (" active" if locale == "uk" else ""),
                 ),
             ],
-            style={
-                "display": "flex",
-                "gap": "8px",
-                "justifyContent": "flex-end",
-                "marginBottom": "12px",
-            },
+            className="lang-picker",
         )
 
         hero = dbc.Row(

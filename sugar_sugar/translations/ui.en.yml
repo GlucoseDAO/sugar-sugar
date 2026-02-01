@@ -120,6 +120,13 @@ en:
       rmse: "Similar to MAE but penalizes large errors more"
       mape: "Average percentage difference from actual values"
 
+  table:
+    metric_header: "Metric"
+    actual_glucose: "Actual Glucose"
+    predicted: "Predicted"
+    absolute_error: "Absolute Error"
+    relative_error_pct: "Relative Error (%{pct})"
+
   session_expired:
     title: "Session Expired"
     text: "Please start over from the beginning."

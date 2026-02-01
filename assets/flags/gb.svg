@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="60" height="40" viewBox="0 0 60 40">
+  <!-- Simplified Union Jack (good enough for UI icon) -->
+  <rect width="60" height="40" fill="#012169"/>
+
+  <!-- White diagonals -->
+  <path d="M0,0 L7,0 L60,33 L60,40 L53,40 L0,7 Z" fill="#FFFFFF"/>
+  <path d="M60,0 L53,0 L0,33 L0,40 L7,40 L60,7 Z" fill="#FFFFFF"/>
+
+  <!-- Red diagonals -->
+  <path d="M0,0 L4.5,0 L60,34.5 L60,40 L55.5,40 L0,5.5 Z" fill="#C8102E"/>
+  <path d="M60,0 L55.5,0 L0,34.5 L0,40 L4.5,40 L60,5.5 Z" fill="#C8102E"/>
+
+  <!-- White cross -->
+  <rect x="0" y="16" width="60" height="8" fill="#FFFFFF"/>
+  <rect x="26" y="0" width="8" height="40" fill="#FFFFFF"/>
+
+  <!-- Red cross -->
+  <rect x="0" y="18" width="60" height="4" fill="#C8102E"/>
+  <rect x="28" y="0" width="4" height="40" fill="#C8102E"/>
+</svg>
+

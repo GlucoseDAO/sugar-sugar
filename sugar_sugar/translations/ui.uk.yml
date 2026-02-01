@@ -120,6 +120,13 @@ uk:
       rmse: "Схоже на MAE, але сильніше штрафує великі помилки"
       mape: "Середня відсоткова різниця від реальних значень"
 
+  table:
+    metric_header: "Показник"
+    actual_glucose: "Фактична глюкоза"
+    predicted: "Прогноз"
+    absolute_error: "Абсолютна помилка"
+    relative_error_pct: "Відносна помилка (%{pct})"
+
   session_expired:
     title: "Сесію втрачено"
     text: "Будь ласка, почни спочатку."

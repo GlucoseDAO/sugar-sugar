@@ -120,6 +120,13 @@ de:
       rmse: "Ähnlich wie MAE, bestraft große Fehler stärker"
       mape: "Durchschnittliche prozentuale Abweichung vom Messwert"
 
+  table:
+    metric_header: "Metrik"
+    actual_glucose: "Gemessene Glukose"
+    predicted: "Vorhersage"
+    absolute_error: "Absoluter Fehler"
+    relative_error_pct: "Relativer Fehler (%{pct})"
+
   session_expired:
     title: "Sitzung abgelaufen"
     text: "Bitte von vorne beginnen."

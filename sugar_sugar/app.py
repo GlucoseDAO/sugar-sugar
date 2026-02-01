@@ -128,6 +128,7 @@ external_stylesheets = [
 
 app = dash.Dash(__name__, 
     external_stylesheets=external_stylesheets,
+    assets_folder=str(project_root / 'assets'),
     suppress_callback_exceptions=True
 )
 app.title = "Sugar Sugar - Glucose Prediction Game"
@@ -441,6 +442,22 @@ def create_ending_layout(
     if len(prediction_table_data) >= 2:  # Need at least actual and predicted rows
         stored_metrics = metrics_component_ending._calculate_metrics_from_table_data(prediction_table_data)
     
+    def _translate_metric_label(metric: str) -> str:
+        mapping: dict[str, str] = {
+            "Actual Glucose": t("ui.table.actual_glucose", locale=locale),
+            "Predicted": t("ui.table.predicted", locale=locale),
+            "Absolute Error": t("ui.table.absolute_error", locale=locale),
+            "Relative Error (%)": t("ui.table.relative_error_pct", locale=locale, pct="%"),
+        }
+        return mapping.get(metric, metric)
+
+    prediction_table_data_display: list[dict[str, str]] = []
+    for row in prediction_table_data:
+        metric_val = str(row.get("metric", ""))
+        new_row = dict(row)
+        new_row["metric"] = _translate_metric_label(metric_val)
+        prediction_table_data_display.append(new_row)
+
     # Create metrics display directly
     metrics_display = MetricsComponent.create_ending_metrics_display(stored_metrics, locale=locale) if stored_metrics else [
         html.H3(t("ui.metrics.title_accuracy_metrics", locale=locale), style={'textAlign': 'center'}),
@@ -516,8 +533,8 @@ def create_ending_layout(
             }),
             # Create prediction table directly from stored data
             dash_table.DataTable(
-                data=prediction_table_data,
-                columns=[{'name': 'Metric', 'id': 'metric'}] + [
+                data=prediction_table_data_display,
+                columns=[{'name': t("ui.table.metric_header", locale=locale), 'id': 'metric'}] + [
                     {'name': f'T{i}', 'id': f't{i}', 'type': 'text'} 
                     for i in range(len(prediction_table_data[0]) - 1) if prediction_table_data
                 ],

@@ -40,7 +40,8 @@ def setup_i18n(*, extra_load_paths: Optional[Iterable[Path]] = None) -> None:
             i18n.load_path.append(sp)
 
     # Load and cache all translations upfront.
-    i18n.load_everything()
+    # Using reload ensures changes to translation files are picked up on process start.
+    i18n.reload_everything()
 
 
 def t(key: str, *, locale: Optional[str] = None, **kwargs: object) -> str:

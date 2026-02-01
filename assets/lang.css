@@ -1,0 +1,56 @@
+.lang-picker {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+  align-items: flex-start;
+}
+
+.lang-btn {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  width: 42px;
+  padding: 4px 4px 6px 4px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  background: transparent;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.lang-btn.active {
+  border: 1px solid rgba(29, 78, 216, 0.85);
+  box-shadow: 0 4px 10px rgba(29, 78, 216, 0.20);
+}
+
+.lang-flag {
+  width: 30px;
+  height: 20px;
+  object-fit: cover;
+  display: block;
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #ffffff;
+}
+
+.lang-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #0f172a;
+  line-height: 1;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 120ms ease-in-out, transform 120ms ease-in-out;
+  pointer-events: none;
+}
+
+.lang-btn:hover .lang-label,
+.lang-btn.active .lang-label {
+  opacity: 1;
+  transform: translateY(0);
+}
+
