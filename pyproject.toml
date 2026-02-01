@@ -18,6 +18,7 @@ dependencies = [
     "pycomfort>=0.0.18",
     "dotenv>=0.9.9",
     "eliot>=1.15.0",
+    "i18nice[yaml]>=0.16.0",
 ]
 
 [project.scripts]

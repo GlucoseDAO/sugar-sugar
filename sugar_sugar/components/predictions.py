@@ -158,19 +158,22 @@ class PredictionTableComponent(html.Div):
         factor = 1.0 / GLUCOSE_MGDL_PER_MMOLL if glucose_unit == 'mmol/L' else 1.0
         n = len(df)
 
-        actual_mg = [float(x) for x in df.get_column("gl")]
-        pred_col = [float(x) for x in df.get_column("prediction")]
+        actual_raw = df.get_column("gl").to_list()
+        pred_raw = df.get_column("prediction").to_list()
+
+        actual_mg: list[Optional[float]] = [None if x is None else float(x) for x in actual_raw]
+        pred_col: list[Optional[float]] = [None if x is None else float(x) for x in pred_raw]
 
         # Build predicted values in mg/dL, with interpolation inside the drawn segment.
         pred_mg: list[Optional[float]] = [None] * n
-        non_zero_indices = [i for i, p in enumerate(pred_col) if p != 0.0]
+        non_zero_indices = [i for i, p in enumerate(pred_col) if (p is not None and p != 0.0)]
         if len(non_zero_indices) >= 2:
             start_idx = non_zero_indices[0]
             end_idx = non_zero_indices[-1]
             for i in range(n):
                 if i < start_idx or i > end_idx:
                     pred_mg[i] = None
-                elif pred_col[i] != 0.0:
+                elif pred_col[i] is not None and pred_col[i] != 0.0:
                     pred_mg[i] = pred_col[i]
                 else:
                     prev_idx = max(j for j in non_zero_indices if j < i)
@@ -179,10 +182,14 @@ class PredictionTableComponent(html.Div):
                     current_step = i - prev_idx
                     prev_val = pred_col[prev_idx]
                     next_val = pred_col[next_idx]
-                    pred_mg[i] = prev_val + (next_val - prev_val) * (current_step / total_steps)
+                    if prev_val is None or next_val is None:
+                        pred_mg[i] = None
+                    else:
+                        pred_mg[i] = prev_val + (next_val - prev_val) * (current_step / total_steps)
         else:
             for i in range(n):
-                pred_mg[i] = pred_col[i] if pred_col[i] != 0.0 else None
+                p = pred_col[i]
+                pred_mg[i] = p if (p is not None and p != 0.0) else None
 
         # Rows
         glucose_row: dict[str, str] = {'metric': 'Actual Glucose'}
@@ -191,16 +198,19 @@ class PredictionTableComponent(html.Div):
         rel_error_row: dict[str, str] = {'metric': 'Relative Error (%)'}
 
         for i in range(n):
-            glucose_row[f"t{i}"] = f"{actual_mg[i] * factor:.1f}"
-            if pred_mg[i] is None:
+            a = actual_mg[i]
+            p = pred_mg[i]
+
+            glucose_row[f"t{i}"] = "-" if a is None else f"{a * factor:.1f}"
+            if p is None or a is None:
                 prediction_row[f"t{i}"] = "-"
                 abs_error_row[f"t{i}"] = "-"
                 rel_error_row[f"t{i}"] = "-"
             else:
-                prediction_row[f"t{i}"] = f"{pred_mg[i] * factor:.1f}"
-                err = abs(actual_mg[i] - pred_mg[i])
+                prediction_row[f"t{i}"] = f"{p * factor:.1f}"
+                err = abs(a - p)
                 abs_error_row[f"t{i}"] = f"{err * factor:.1f}"
-                rel_error_row[f"t{i}"] = f"{(err / actual_mg[i] * 100):.1f}%" if actual_mg[i] != 0 else "-"
+                rel_error_row[f"t{i}"] = f"{(err / a * 100):.1f}%" if a != 0 else "-"
 
         return [glucose_row, prediction_row, abs_error_row, rel_error_row]
 
