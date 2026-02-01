@@ -11,7 +11,7 @@ import dash_bootstrap_components as dbc
 from dash import dcc, html, no_update
 from dash.dependencies import Input, Output, State
 
-from sugar_sugar.consent import append_consent_agreement_row
+from sugar_sugar.consent import ensure_consent_agreement_row, get_next_study_number
 
 
 @lru_cache(maxsize=4)
@@ -264,24 +264,34 @@ class LandingPage(html.Div):
 
                 info["study_id"] = str(uuid.uuid4())
 
+            any_selected = bool(play_only_value) or bool(receive_results_value) or bool(keep_updated_value)
+            no_selection = not any_selected
+
             play_only = bool(play_only_value and "play_only" in play_only_value)
             receive_results = bool(receive_results_value and "receive_results" in receive_results_value)
             keep_updated = bool(keep_updated_value and "keep_updated" in keep_updated_value)
 
             info["consent_play_only"] = play_only
-            info["consent_participate_in_study"] = not play_only
+            # If user didn't select anything, record that they did not consent to participate.
+            info["consent_participate_in_study"] = (not play_only) and (not no_selection)
             info["consent_receive_results_later"] = receive_results
             info["consent_keep_up_to_date"] = keep_updated
+            info["consent_no_selection"] = no_selection
             info["consent_timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-            append_consent_agreement_row(
+            if info.get("number") is None:
+                info["number"] = get_next_study_number()
+
+            ensure_consent_agreement_row(
                 {
                     "study_id": info["study_id"],
+                    "number": info.get("number", ""),
                     "timestamp": info["consent_timestamp"],
                     "play_only": play_only,
-                    "participate_in_study": (not play_only),
+                    "participate_in_study": info["consent_participate_in_study"],
                     "receive_results_later": receive_results,
                     "keep_up_to_date": keep_updated,
+                    "no_selection": no_selection,
                 }
             )
 

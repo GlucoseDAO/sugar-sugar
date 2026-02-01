@@ -17,6 +17,47 @@ def consent_csv_path() -> Path:
     )
 
 
+def prediction_statistics_csv_path() -> Path:
+    return (
+        Path(__file__).resolve().parents[1]
+        / "data"
+        / "input"
+        / "prediction_statistics.csv"
+    )
+
+
+def get_next_study_number() -> int:
+    """
+    Return the next sequential `number` used for study exports.
+
+    This reads `data/input/prediction_statistics.csv` and returns max(number)+1, or 0 if missing/empty.
+    """
+    path = prediction_statistics_csv_path()
+    if not path.exists():
+        return 0
+
+    with path.open("r", newline="", encoding="utf-8") as file_handle:
+        reader = csv.DictReader(file_handle)
+        numbers: list[int] = []
+        for row in reader:
+            raw = (row.get("number") or "").strip()
+            if raw.isdigit():
+                numbers.append(int(raw))
+        return (max(numbers) + 1) if numbers else 0
+
+
+def consent_row_exists(study_id: str) -> bool:
+    path = consent_csv_path()
+    if not path.exists():
+        return False
+    with path.open("r", newline="", encoding="utf-8") as file_handle:
+        reader = csv.DictReader(file_handle)
+        for row in reader:
+            if (row.get("study_id") or "") == study_id:
+                return True
+    return False
+
+
 def append_consent_agreement_row(row: dict[str, Any]) -> None:
     """
     Append a consent agreement row to `data/input/consent_agreement.csv`.
@@ -65,4 +106,18 @@ def append_consent_agreement_row(row: dict[str, Any]) -> None:
         with path.open("a", newline="", encoding="utf-8") as file_handle:
             writer = csv.DictWriter(file_handle, fieldnames=existing_fieldnames)
             writer.writerow(normalized)
+
+
+def ensure_consent_agreement_row(row: dict[str, Any]) -> None:
+    """
+    Ensure there is at least one consent row for this `study_id`.
+
+    If the row already exists, this is a no-op (prevents duplicates when users bypass the landing page).
+    """
+    study_id = str(row.get("study_id") or "")
+    if not study_id:
+        return
+    if consent_row_exists(study_id):
+        return
+    append_consent_agreement_row(row)
 

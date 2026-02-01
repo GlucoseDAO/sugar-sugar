@@ -920,22 +920,25 @@ def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) ->
     [State('email-input', 'value'),
      State('age-input', 'value'),
      State('gender-dropdown', 'value'),
+     State('cgm-dropdown', 'value'),
+     State('cgm-duration-input', 'value'),
      State('diabetic-dropdown', 'value'),
      State('diabetic-type-dropdown', 'value'),
      State('diabetes-duration-input', 'value'),
-     State('medical-conditions-dropdown', 'value'),
-     State('medical-conditions-input', 'value'),
      State('location-input', 'value'),
      State('user-info-store', 'data')],
     prevent_initial_call=True
 )
 def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Optional[int], 
-                       gender: Optional[str], diabetic: Optional[bool], diabetic_type: Optional[str], 
-                       diabetes_duration: Optional[int], medical_conditions: Optional[bool], 
-                       medical_conditions_input: Optional[str], location: Optional[str],
+                       gender: Optional[str], uses_cgm: Optional[bool], cgm_duration_years: Optional[float],
+                       diabetic: Optional[bool], diabetic_type: Optional[str], 
+                       diabetes_duration: Optional[float], location: Optional[str],
                        existing_user_info: Optional[Dict[str, Any]] = None) -> Tuple[str, Dict[str, Any]]:
     """Handle start button on startup page"""
     if n_clicks and age and gender and diabetic is not None and location:
+        from datetime import datetime
+        from sugar_sugar.consent import ensure_consent_agreement_row, get_next_study_number
+
         info: Dict[str, Any] = dict(existing_user_info or {})
         study_id = info.get('study_id') or str(uuid.uuid4())
 
@@ -944,11 +947,11 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
             'email': email or info.get('email') or '',
             'age': age,
             'gender': gender,
+            'uses_cgm': uses_cgm,
+            'cgm_duration_years': cgm_duration_years,
             'diabetic': diabetic,
             'diabetic_type': diabetic_type,
             'diabetes_duration': diabetes_duration,
-            'other_medical_conditions': medical_conditions,
-            'medical_conditions_input': medical_conditions_input,
             'location': location,
             'rounds': info.get('rounds') or [],
             'max_rounds': int(info.get('max_rounds') or MAX_ROUNDS),
@@ -957,6 +960,38 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
             'is_example_data': bool(info.get('is_example_data', True)),
             'data_source_name': str(info.get('data_source_name', 'example.csv')),
         })
+
+        # Ensure stable "number" across consent + stats + ranking CSVs.
+        if info.get("number") is None:
+            info["number"] = get_next_study_number()
+
+        # Ensure consent fields are explicit booleans (avoid null/missing keys in session storage).
+        if "consent_play_only" not in info:
+            info["consent_play_only"] = False
+        if "consent_participate_in_study" not in info:
+            info["consent_participate_in_study"] = False
+        if "consent_receive_results_later" not in info:
+            info["consent_receive_results_later"] = False
+        if "consent_keep_up_to_date" not in info:
+            info["consent_keep_up_to_date"] = False
+        if "consent_no_selection" not in info:
+            info["consent_no_selection"] = True
+        if "consent_timestamp" not in info:
+            info["consent_timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # Ensure consent CSV always has a row for this study_id (even when users bypass landing).
+        ensure_consent_agreement_row(
+            {
+                "study_id": info["study_id"],
+                "number": info.get("number", ""),
+                "timestamp": info.get("consent_timestamp", ""),
+                "play_only": bool(info.get("consent_play_only", False)),
+                "participate_in_study": bool(info.get("consent_participate_in_study", False)),
+                "receive_results_later": bool(info.get("consent_receive_results_later", False)),
+                "keep_up_to_date": bool(info.get("consent_keep_up_to_date", False)),
+                "no_selection": bool(info.get("consent_no_selection", True)),
+            }
+        )
         return '/prediction', info
     return no_update, no_update
 

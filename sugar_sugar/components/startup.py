@@ -72,6 +72,29 @@ class StartupPage(html.Div):
                         placeholder='Select your gender',
                         style={'fontSize': '20px', 'marginBottom': '20px'}
                     ),
+
+                    html.Label("Do you use CGM?", style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333'}),
+                    dcc.Dropdown(
+                        id='cgm-dropdown',
+                        options=[
+                            {'label': 'Yes', 'value': True},
+                            {'label': 'No', 'value': False}
+                        ],
+                        placeholder='Select if you use CGM',
+                        style={'fontSize': '20px', 'marginBottom': '20px'}
+                    ),
+
+                    html.Div(id='cgm-details', children=[
+                        html.Label("Please specify duration of usage (in years)", style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333'}),
+                        dcc.Input(
+                            id='cgm-duration-input',
+                            type='number',
+                            placeholder='Enter number of years',
+                            min=0,
+                            max=100,
+                            style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
+                        )
+                    ]),
                     
                     html.Div([
                         html.Label("Are you diabetic?", style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333', 'display': 'inline-block'}),
@@ -114,26 +137,6 @@ class StartupPage(html.Div):
                             min=0,
                             max=100,
                             style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
-                        )
-                    ]),
-                    
-                    html.Label("Do you have other medical conditions?", style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333'}),
-                    dcc.Dropdown(
-                        id='medical-conditions-dropdown',
-                        options=[
-                            {'label': 'Yes', 'value': True},
-                            {'label': 'No', 'value': False}
-                        ],
-                        placeholder='Select if you have other medical conditions',
-                        style={'fontSize': '20px', 'marginBottom': '20px'}
-                    ),
-                    
-                    html.Div(id='medical-conditions-details', children=[
-                        html.Label("Description of Medical Conditions", style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333'}),
-                        dcc.Textarea(
-                            id='medical-conditions-input',
-                            placeholder='Describe your medical conditions',
-                            style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px', 'minHeight': '100px'}
                         )
                     ]),
                     
@@ -267,19 +270,22 @@ class StartupPage(html.Div):
                 return {'display': 'none'}, 'N/A', 0
 
         @app.callback(
-            [Output('medical-conditions-details', 'style'),
-             Output('medical-conditions-input', 'value')],
-            [Input('medical-conditions-dropdown', 'value')]
+            [Output('cgm-details', 'style'),
+             Output('cgm-duration-input', 'value')],
+            [Input('cgm-dropdown', 'value')],
+            [State('test-me-button', 'n_clicks'),
+             State('email-input', 'value')]
         )
-        def update_medical_conditions_details(
-            has_conditions: Optional[bool]
-        ) -> tuple[dict[str, str], Optional[str]]:
-            if has_conditions is None:
-                return {'display': 'none'}, None
-            elif has_conditions:
+        def update_cgm_details(
+            uses_cgm: Optional[bool],
+            test_clicks: Optional[int],
+            email: Optional[str],
+        ) -> tuple[dict[str, str], Optional[float]]:
+            if uses_cgm is True:
+                if test_clicks and email and 'test.user@example.com' in str(email):
+                    return {'display': 'block'}, 3
                 return {'display': 'block'}, None
-            else:
-                return {'display': 'none'}, 'N/A'
+            return {'display': 'none'}, None
 
         @app.callback(
             [Output('start-button', 'disabled'),
@@ -384,14 +390,14 @@ class StartupPage(html.Div):
 
         # <!-- START INSERTION: Test Me Button Callback -->
         # Callback for "Just Test Me" button
-        # Note: diabetic-type-dropdown, diabetes-duration-input, and medical-conditions-input
-        # are handled by their respective callbacks when diabetic-dropdown and medical-conditions-dropdown change
+        # Note: diabetic-type-dropdown and diabetes-duration-input are handled
+        # by their respective callback when diabetic-dropdown changes
         @app.callback(
             [Output('email-input', 'value'),
              Output('age-input', 'value'),
              Output('gender-dropdown', 'value'),
+             Output('cgm-dropdown', 'value'),
              Output('diabetic-dropdown', 'value'),
-             Output('medical-conditions-dropdown', 'value'),
              Output('location-input', 'value')],
             [Input('test-me-button', 'n_clicks')],
             prevent_initial_call=True
@@ -404,8 +410,8 @@ class StartupPage(html.Div):
                     'test.user@example.com',  # email
                     28,                       # age
                     'F',                      # gender (Female)
+                    True,                     # uses_cgm
                     True,                     # is_diabetic (Yes) - this will trigger diabetic details callback
-                    False,                    # medical_conditions (No) - this will trigger medical conditions callback
                     'San Francisco, CA'       # location
                 )
             

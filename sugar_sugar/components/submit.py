@@ -221,9 +221,13 @@ class SubmitComponent(html.Div):
         
         # Prepare the data dictionary
         rounds_played = len(rounds) if rounds else 1
+        number = user_info.get("number")
+        if number is None or (isinstance(number, str) and number.strip() == ""):
+            number = self._get_next_number()
+            user_info["number"] = number
         data = {
             'study_id': study_id,
-            'number': self._get_next_number(),
+            'number': number,
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'email': user_info.get('email', ''),
             'is_example_data': bool(user_info.get('is_example_data', True)),
@@ -231,11 +235,11 @@ class SubmitComponent(html.Div):
             'age': age,
             'user_id': user_id,
             'gender': user_info.get('gender', ''),
+            'uses_cgm': user_info.get('uses_cgm', ''),
+            'cgm_duration_years': user_info.get('cgm_duration_years', ''),
             'diabetic': user_info.get('diabetic', ''),
             'diabetic_type': user_info.get('diabetic_type', ''),
             'diabetes_duration': user_info.get('diabetes_duration', ''),
-            'other_medical_conditions': user_info.get('other_medical_conditions', ''),
-            'medical_conditions_description': user_info.get('medical_conditions_input', ''),
             'location': user_info.get('location', ''),
             'rounds_played': rounds_played,
             # Clear naming: "real" == ground truth, "predicted" == user prediction
@@ -309,6 +313,7 @@ class SubmitComponent(html.Div):
         # Write ranking row for fast leaderboard lookups
         ranking_row = {
             'study_id': study_id,
+            'number': data['number'],
             'timestamp': data['timestamp'],
             'rounds_played': rounds_played,
             'is_example_data': data['is_example_data'],
