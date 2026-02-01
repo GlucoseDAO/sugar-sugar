@@ -1,0 +1,139 @@
+en:
+  common:
+    app_title: "Sugar Sugar"
+    units: "Units"
+    round_of: "Round %{current} of %{total}"
+    go_to_start: "Go to Start Page"
+    loading: "Loading..."
+    continue: "Continue"
+    finish_exit: "Finish / Exit"
+
+  language:
+    choose: "Language"
+    en: "English"
+    de: "Deutsch"
+    uk: "Українська"
+
+  landing:
+    tagline: "A game to test your glucose-predicting superpowers."
+    how_it_works: "How it works"
+    how_it_works_steps:
+      - "Upload Dexcom/Libre CSV (or use the sample dataset)"
+      - "Draw your predicted glucose trend on the chart"
+      - "Compare predictions to the real values"
+      - "See accuracy metrics (MAE/RMSE/MAPE)"
+    preview: "Preview"
+    about_study_title: "About the study"
+    about_study_text: "We're studying how accurate humans are at predicting glucose trends, and what patterns experienced CGM users notice. If you choose to participate, your gameplay and uploaded CGM data may be used for further research."
+    your_choices_title: "Your choices"
+    your_choices_text: "By default, we assume you agree to participate in the study. If you only want to play, check the first box."
+    consent_play_only: "I just want to play (do not store my CGM / gameplay data)"
+    consent_receive_results: "I want to receive my results later"
+    consent_keep_updated: "Keep me up to date about project updates"
+    next_hint: "Next: you'll fill in a short form, then upload CGM data (or use the sample dataset)."
+
+  startup:
+    fork_me: "Fork me on GitHub"
+    required_fields_note: "* Required fields"
+    email_label: "Email"
+    email_placeholder: "Enter your email (optional unless you want results/updates)"
+    age_label: "Age"
+    age_placeholder: "Enter your age"
+    gender_label: "Gender"
+    gender_placeholder: "Select your gender"
+    gender_male: "Male"
+    gender_female: "Female"
+    gender_na: "N/A"
+    cgm_label: "Do you use CGM?"
+    cgm_placeholder: "Select if you use CGM"
+    yes: "Yes"
+    no: "No"
+    cgm_duration_label: "Please specify duration of usage (in years)"
+    cgm_duration_placeholder: "Enter number of years"
+    diabetic_label: "Are you diabetic?"
+    diabetic_placeholder: "Select your diabetic status"
+    diabetes_type_label: "Type of Diabetes"
+    diabetes_type_placeholder: "Select type of diabetes"
+    diabetes_type_1: "Type 1"
+    diabetes_type_2: "Type 2"
+    diabetes_duration_label: "Duration of Diabetes (years)"
+    diabetes_duration_placeholder: "Enter number of years"
+    location_label: "Location"
+    location_placeholder: "Enter your location"
+    contact_prefs_title: "Contact preferences"
+    contact_prefs_text: "Email is only required if you asked to receive results later or to be kept up to date."
+    just_test_me: "Just Test Me"
+    start_prediction: "Start Prediction"
+
+  header:
+    points_label: "Number of points to show:"
+    time_window_label: "Time Window Position:"
+    upload_prompt_1: "Drag and Drop or "
+    upload_prompt_2: "Upload Your Data Here"
+    use_example_data: "Use Example Data"
+    upload_success: "Successfully loaded data from %{filename}. This data will be used for predictions."
+    example_data_now_using: "Now using example data. Upload a CSV file for personalized analysis."
+    example_data_warning: "Currently using example data. Upload your own Dexcom/Libre CSV file for personalized analysis."
+    current_data_source: "Current Data Source:"
+    description_1: "Test your glucose prediction skills!"
+    description_2: "Click on the graph or draw lines to predict future glucose values."
+    description_3: "The game will show you how accurate your predictions are compared to actual measurements."
+    how_to_play: "How to play:"
+    how_to_play_1: "1. Click and drag in the graph to add predictions"
+    how_to_play_2: "2. Draw one line after another to create prediction curves"
+    how_to_play_3: "3. Try to predict at least 5 points to see your accuracy metrics"
+
+  prediction:
+    units_label: "Units:"
+
+  submit:
+    progress_no_data: "Make predictions to the end of the hidden area to submit"
+    progress_some: "Continue predictions to the end (%{done}/%{total} points)"
+    progress_ready: "✓ Ready to submit!"
+    progress_hidden_area: "Make predictions in the hidden area to submit"
+    submit: "Submit"
+
+  mobile_warning:
+    text: "Note: Sugar Sugar is optimised for desktop at the moment. Mobile support is coming soon!"
+
+  chart:
+    title: "Glucose Levels (%{start} to %{end})"
+    source_suffix: " - Source: %{source}"
+    x_axis: "Time"
+    y_axis: "Glucose Level (%{unit})"
+    trace_glucose: "Glucose Level"
+    trace_predictions: "Prediction Points"
+    hover_insulin: "Insulin: %{value}u<br>%{time}"
+    event_insulin: "Insulin"
+    event_exercise: "Exercise"
+    event_carbohydrates: "Carbohydrates"
+
+  metrics:
+    title: "Metrics"
+    prediction_accuracy: "Prediction Accuracy"
+    placeholder_need_5: "Add at least 5 prediction points to see accuracy metrics"
+    title_accuracy_metrics: "Accuracy Metrics"
+    no_metrics_available: "No metrics available"
+    desc:
+      mae: "Average difference between predicted and actual values"
+      mse: "Emphasizes larger prediction errors"
+      rmse: "Similar to MAE but penalizes large errors more"
+      mape: "Average percentage difference from actual values"
+
+  session_expired:
+    title: "Session Expired"
+    text: "Please start over from the beginning."
+
+  ending:
+    title: "Prediction Summary"
+    prediction_results: "Prediction Results"
+    units_line: "Units: %{unit}"
+    next_round: "Next round"
+    view_complete_analysis: "View complete analysis"
+
+  final:
+    title: "Complete Analysis"
+    rounds_played: "Rounds played: %{played} / %{total}"
+    per_round_metrics: "Per-round metrics"
+    start_over: "Start Over"
+

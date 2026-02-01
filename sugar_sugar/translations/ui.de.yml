@@ -1,0 +1,139 @@
+de:
+  common:
+    app_title: "Sugar Sugar"
+    units: "Einheiten"
+    round_of: "Runde %{current} von %{total}"
+    go_to_start: "Zur Startseite"
+    loading: "Lädt..."
+    continue: "Weiter"
+    finish_exit: "Beenden / Verlassen"
+
+  language:
+    choose: "Sprache"
+    en: "Englisch"
+    de: "Deutsch"
+    uk: "Ukrainisch"
+
+  landing:
+    tagline: "Ein Spiel, um deine Fähigkeiten zur Glukose‑Vorhersage zu testen."
+    how_it_works: "So funktioniert es"
+    how_it_works_steps:
+      - "Dexcom/Libre‑CSV hochladen (oder Beispieldaten verwenden)"
+      - "Deinen erwarteten Glukose‑Verlauf im Chart einzeichnen"
+      - "Vorhersagen mit den echten Werten vergleichen"
+      - "Genauigkeitsmetriken ansehen (MAE/RMSE/MAPE)"
+    preview: "Vorschau"
+    about_study_title: "Über die Studie"
+    about_study_text: "Wir untersuchen, wie genau Menschen Glukose‑Trends vorhersagen und welche Muster erfahrene CGM‑Nutzer erkennen. Wenn du teilnimmst, können dein Spielverlauf und deine hochgeladenen CGM‑Daten für weitere Forschung verwendet werden."
+    your_choices_title: "Deine Auswahl"
+    your_choices_text: "Standardmäßig gehen wir davon aus, dass du an der Studie teilnehmen möchtest. Wenn du nur spielen willst, aktiviere das erste Kästchen."
+    consent_play_only: "Ich möchte nur spielen (meine CGM‑/Spieldaten nicht speichern)"
+    consent_receive_results: "Ich möchte meine Ergebnisse später erhalten"
+    consent_keep_updated: "Haltet mich über Projekt‑Updates auf dem Laufenden"
+    next_hint: "Als Nächstes: kurzes Formular ausfüllen und dann CGM‑Daten hochladen (oder Beispieldaten verwenden)."
+
+  startup:
+    fork_me: "Fork me on GitHub"
+    required_fields_note: "* Pflichtfelder"
+    email_label: "E‑Mail"
+    email_placeholder: "E‑Mail eingeben (optional, außer wenn du Ergebnisse/Updates willst)"
+    age_label: "Alter"
+    age_placeholder: "Alter eingeben"
+    gender_label: "Geschlecht"
+    gender_placeholder: "Geschlecht auswählen"
+    gender_male: "Männlich"
+    gender_female: "Weiblich"
+    gender_na: "k. A."
+    cgm_label: "Verwendest du ein CGM?"
+    cgm_placeholder: "Auswählen, ob du CGM verwendest"
+    yes: "Ja"
+    no: "Nein"
+    cgm_duration_label: "Bitte Nutzungsdauer angeben (in Jahren)"
+    cgm_duration_placeholder: "Anzahl Jahre eingeben"
+    diabetic_label: "Hast du Diabetes?"
+    diabetic_placeholder: "Diabetes‑Status auswählen"
+    diabetes_type_label: "Diabetes‑Typ"
+    diabetes_type_placeholder: "Diabetes‑Typ auswählen"
+    diabetes_type_1: "Typ 1"
+    diabetes_type_2: "Typ 2"
+    diabetes_duration_label: "Dauer des Diabetes (Jahre)"
+    diabetes_duration_placeholder: "Anzahl Jahre eingeben"
+    location_label: "Ort"
+    location_placeholder: "Ort eingeben"
+    contact_prefs_title: "Kontakt‑Einstellungen"
+    contact_prefs_text: "E‑Mail ist nur erforderlich, wenn du Ergebnisse später erhalten oder über Updates informiert werden möchtest."
+    just_test_me: "Nur testen"
+    start_prediction: "Vorhersage starten"
+
+  header:
+    points_label: "Anzahl der angezeigten Punkte:"
+    time_window_label: "Position des Zeitfensters:"
+    upload_prompt_1: "Drag & Drop oder "
+    upload_prompt_2: "Daten hier hochladen"
+    use_example_data: "Beispieldaten verwenden"
+    upload_success: "Daten aus %{filename} wurden erfolgreich geladen. Diese Daten werden für Vorhersagen verwendet."
+    example_data_now_using: "Jetzt werden Beispieldaten verwendet. Lade eine CSV‑Datei für eine personalisierte Analyse hoch."
+    example_data_warning: "Aktuell werden Beispieldaten verwendet. Lade deine eigene Dexcom/Libre‑CSV für eine personalisierte Analyse hoch."
+    current_data_source: "Aktuelle Datenquelle:"
+    description_1: "Teste deine Glukose‑Vorhersage!"
+    description_2: "Klicke im Chart oder zeichne Linien, um zukünftige Glukosewerte vorherzusagen."
+    description_3: "Das Spiel zeigt dir, wie genau deine Vorhersagen im Vergleich zu den Messwerten sind."
+    how_to_play: "So spielst du:"
+    how_to_play_1: "1. Im Chart klicken und ziehen, um Vorhersagen hinzuzufügen"
+    how_to_play_2: "2. Linie für Linie zeichnen, um Vorhersagekurven zu erstellen"
+    how_to_play_3: "3. Mindestens 5 Punkte vorhersagen, um Genauigkeitsmetriken zu sehen"
+
+  prediction:
+    units_label: "Einheiten:"
+
+  submit:
+    progress_no_data: "Mache Vorhersagen bis zum Ende des ausgeblendeten Bereichs, um zu senden"
+    progress_some: "Vorhersagen bis zum Ende fortsetzen (%{done}/%{total} Punkte)"
+    progress_ready: "✓ Bereit zum Senden!"
+    progress_hidden_area: "Mache Vorhersagen im ausgeblendeten Bereich, um zu senden"
+    submit: "Senden"
+
+  mobile_warning:
+    text: "Hinweis: Sugar Sugar ist derzeit für Desktop optimiert. Mobile Unterstützung folgt bald!"
+
+  chart:
+    title: "Glukosewerte (%{start} bis %{end})"
+    source_suffix: " - Quelle: %{source}"
+    x_axis: "Zeit"
+    y_axis: "Glukose (%{unit})"
+    trace_glucose: "Glukose"
+    trace_predictions: "Vorhersagepunkte"
+    hover_insulin: "Insulin: %{value}u<br>%{time}"
+    event_insulin: "Insulin"
+    event_exercise: "Bewegung"
+    event_carbohydrates: "Kohlenhydrate"
+
+  metrics:
+    title: "Metriken"
+    prediction_accuracy: "Vorhersagegenauigkeit"
+    placeholder_need_5: "Füge mindestens 5 Vorhersagepunkte hinzu, um Genauigkeitsmetriken zu sehen"
+    title_accuracy_metrics: "Genauigkeitsmetriken"
+    no_metrics_available: "Keine Metriken verfügbar"
+    desc:
+      mae: "Durchschnittliche Abweichung zwischen Vorhersage und Messwert"
+      mse: "Gewichtet größere Vorhersagefehler stärker"
+      rmse: "Ähnlich wie MAE, bestraft große Fehler stärker"
+      mape: "Durchschnittliche prozentuale Abweichung vom Messwert"
+
+  session_expired:
+    title: "Sitzung abgelaufen"
+    text: "Bitte von vorne beginnen."
+
+  ending:
+    title: "Vorhersage‑Zusammenfassung"
+    prediction_results: "Vorhersage‑Ergebnisse"
+    units_line: "Einheiten: %{unit}"
+    next_round: "Nächste Runde"
+    view_complete_analysis: "Komplette Analyse ansehen"
+
+  final:
+    title: "Komplette Analyse"
+    rounds_played: "Gespielte Runden: %{played} / %{total}"
+    per_round_metrics: "Metriken pro Runde"
+    start_over: "Neu starten"
+

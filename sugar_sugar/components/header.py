@@ -3,16 +3,20 @@ from dash import dcc, html
 
 from dash.html import Div
 from sugar_sugar.config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS
+from sugar_sugar.i18n import t
 
 
 class HeaderComponent(Div):
     def __init__(
         self,
+        *,
+        locale: str = "en",
         show_time_slider: bool = True,
         children: Optional[Sequence[Any]] = None,
         initial_slider_value: int = 0,
         **kwargs: Any
     ) -> None:
+        self._locale: str = locale
         self.show_time_slider = show_time_slider
         self.initial_slider_value = initial_slider_value
         if children is None:
@@ -36,7 +40,7 @@ class HeaderComponent(Div):
             html.Div([
                 # Points control
                 html.Div([
-                    html.Label('Number of points to show:', style={'marginRight': '10px'}),
+                    html.Label(t("ui.header.points_label", locale=self._locale), style={'marginRight': '10px'}),
                     dcc.Input(
                         id='points-control',
                         type='number',
@@ -57,7 +61,7 @@ class HeaderComponent(Div):
 
         # Always include the time slider for functionality, but conditionally hide it
         time_slider_div = html.Div([
-            html.Label('Time Window Position:', style={'marginRight': '10px'}),
+            html.Label(t("ui.header.time_window_label", locale=self._locale), style={'marginRight': '10px'}),
             dcc.Slider(
                 id='time-slider',
                 min=0,
@@ -90,8 +94,8 @@ class HeaderComponent(Div):
             dcc.Upload(
                 id='upload-data',
                 children=html.Div([
-                    'Drag and Drop or ',
-                    html.A('Upload Your Data Here')
+                    t("ui.header.upload_prompt_1", locale=self._locale),
+                    html.A(t("ui.header.upload_prompt_2", locale=self._locale))
                 ]),
                 style={
                     'width': '100%',
@@ -105,7 +109,7 @@ class HeaderComponent(Div):
                 }
             ),
             html.Button(
-                'Use Example Data',
+                t("ui.header.use_example_data", locale=self._locale),
                 id='use-example-data-button',
                 style={
                     'width': '100%',
@@ -124,7 +128,7 @@ class HeaderComponent(Div):
     def _create_header_content(self) -> Sequence[Any]:
         """Create the header section content with title and description"""
         return [
-            html.H1('Sugar Sugar',
+            html.H1(t("ui.common.app_title", locale=self._locale),
                     style={
                         'textAlign': 'center',
                         'color': '#2c5282',
@@ -136,10 +140,10 @@ class HeaderComponent(Div):
                 # Left column - Game description and instructions
                 html.Div([
                     html.P([
-                        'Test your glucose prediction skills! ',
+                        t("ui.header.description_1", locale=self._locale) + " ",
                         html.Br(),
-                        'Click on the graph or draw lines to predict future glucose values. ',
-                        'The game will show you how accurate your predictions are compared to actual measurements.'
+                        t("ui.header.description_2", locale=self._locale) + " ",
+                        t("ui.header.description_3", locale=self._locale),
                     ], style={
                         'fontSize': '18px',
                         'color': '#4a5568',
@@ -147,13 +151,13 @@ class HeaderComponent(Div):
                         'marginBottom': '15px'
                     }),
                     html.P([
-                        html.Strong('How to play:'),
+                        html.Strong(t("ui.header.how_to_play", locale=self._locale)),
                         html.Br(),
-                        '1. Click and drag in the graph to add predictions',
+                        t("ui.header.how_to_play_1", locale=self._locale),
                         html.Br(),
-                        '2. Draw one line after another to create prediction curves',
+                        t("ui.header.how_to_play_2", locale=self._locale),
                         html.Br(),
-                        '3. Try to predict at least 5 points to see your accuracy metrics'
+                        t("ui.header.how_to_play_3", locale=self._locale),
                     ], style={
                         'fontSize': '16px',
                         'color': '#4a5568',
@@ -167,7 +171,7 @@ class HeaderComponent(Div):
                     self.create_upload_section(),
                     # Add data source indicator with improved visibility
                     html.Div([
-                        html.Label('Current Data Source:', style={
+                        html.Label(t("ui.header.current_data_source", locale=self._locale), style={
                             'fontWeight': 'bold',
                             'marginRight': '8px',
                             'color': '#4a5568',

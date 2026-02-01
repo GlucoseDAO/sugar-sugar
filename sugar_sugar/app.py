@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional, Tuple, Union
 import dash
-from dash import dcc, html, Output, Input, State, no_update, dash_table
+from dash import dcc, html, Output, Input, State, no_update, dash_table, ctx
 from dash.exceptions import PreventUpdate
 import plotly.graph_objs as go
 
@@ -11,6 +11,7 @@ from pathlib import Path
 import base64
 import dash_bootstrap_components as dbc
 import os
+import sys
 import typer
 import uuid
 from dotenv import load_dotenv
@@ -22,10 +23,22 @@ project_root = Path(__file__).parent.parent
 env_path = project_root / '.env'
 load_dotenv(env_path)
 
+# Ensure unicode (e.g. Ukrainian) is printable on Windows terminals.
+try:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 logs_dir = project_root / 'logs'
 logs_dir.mkdir(exist_ok=True)
 to_nice_stdout()
 to_nice_file(logs_dir / 'sugar_sugar.json', logs_dir / 'sugar_sugar.log')
+
+from sugar_sugar.i18n import setup_i18n, normalize_locale, t
+setup_i18n()
 
 from sugar_sugar.data import load_glucose_data
 from sugar_sugar.config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS, DOUBLE_CLICK_THRESHOLD, PREDICTION_HOUR_OFFSET
@@ -152,6 +165,7 @@ app.layout = html.Div([
     dcc.Store(id='randomization-initialized', data=False),  # Track if randomization has been done
     dcc.Store(id='glucose-chart-mode', data={'hide_last_hour': True}),
     dcc.Store(id='glucose-unit', data='mg/dL', storage_type='session'),
+    dcc.Store(id='interface-language', data='en', storage_type='session'),
     dcc.Store(id='user-agent', data=None, storage_type='session'),
     dcc.Store(id='initial-slider-value', data=example_initial_slider_value),  # Store initial random start
 
@@ -173,11 +187,36 @@ def reset_glucose_unit_on_start_page(pathname: Optional[str]) -> str:
     raise PreventUpdate
 
 
+@app.callback(
+    Output('interface-language', 'data'),
+    [Input('lang-en', 'n_clicks'),
+     Input('lang-de', 'n_clicks'),
+     Input('lang-uk', 'n_clicks')],
+    prevent_initial_call=True
+)
+def set_interface_language(
+    n_en: Optional[int],
+    n_de: Optional[int],
+    n_uk: Optional[int],
+) -> str:
+    """Set the interface language (session-scoped) from landing page flag buttons."""
+    _ = (n_en, n_de, n_uk)
+    triggered = ctx.triggered_id
+    if triggered == 'lang-en':
+        return 'en'
+    if triggered == 'lang-de':
+        return 'de'
+    if triggered == 'lang-uk':
+        return 'uk'
+    raise PreventUpdate
+
+
 
 @app.callback(
     [Output('page-content', 'children'),
      Output('mobile-warning', 'children')],
-    [Input('url', 'pathname')],
+    [Input('url', 'pathname'),
+     Input('interface-language', 'data')],
     [State('user-info-store', 'data'),
      State('full-df', 'data'),
      State('events-df', 'data'),
@@ -185,23 +224,31 @@ def reset_glucose_unit_on_start_page(pathname: Optional[str]) -> str:
      State('user-agent', 'data')],
     prevent_initial_call=False
 )
-def display_page(pathname: Optional[str], user_info: Optional[Dict[str, Any]], 
-                full_df_data: Optional[Dict], events_df_data: Optional[Dict], glucose_unit: Optional[str], user_agent: Optional[str]) -> tuple[html.Div, Optional[html.Div]]:
-    with start_action(action_type=u"display_page", pathname=pathname):
-        warning_content = render_mobile_warning(user_agent)
+def display_page(
+    pathname: Optional[str],
+    interface_language: Optional[str],
+    user_info: Optional[Dict[str, Any]],
+    full_df_data: Optional[Dict],
+    events_df_data: Optional[Dict],
+    glucose_unit: Optional[str],
+    user_agent: Optional[str],
+) -> tuple[html.Div, Optional[html.Div]]:
+    locale = normalize_locale(interface_language)
+    with start_action(action_type=u"display_page", pathname=pathname, locale=locale):
+        warning_content = render_mobile_warning(user_agent, locale=locale)
         if pathname == '/prediction' and user_info:
-            return create_prediction_layout(), warning_content
+            return create_prediction_layout(locale=locale), warning_content
         if pathname == '/startup':
-            return (startup_page if startup_page else html.Div("Loading..."), warning_content)
+            return (StartupPage(locale=locale), warning_content)
         if pathname == '/ending':
             # Check if we have the required data for ending page
             if not full_df_data or not user_info or 'prediction_table_data' not in user_info:
                 return html.Div([
-                    html.H2("Session Expired", style={'textAlign': 'center', 'marginTop': '50px'}),
-                    html.P("Please start over from the beginning.", style={'textAlign': 'center', 'marginBottom': '30px'}),
+                    html.H2(t("ui.session_expired.title", locale=locale), style={'textAlign': 'center', 'marginTop': '50px'}),
+                    html.P(t("ui.session_expired.text", locale=locale), style={'textAlign': 'center', 'marginBottom': '30px'}),
                     html.Div([
                         html.A(
-                            "Go to Start Page", 
+                            t("ui.common.go_to_start", locale=locale),
                             href="/",
                             style={
                                 'backgroundColor': '#007bff',
@@ -214,15 +261,15 @@ def display_page(pathname: Optional[str], user_info: Optional[Dict[str, Any]],
                         )
                     ], style={'textAlign': 'center'})
                 ]), warning_content
-            return create_ending_layout(full_df_data, events_df_data, user_info, glucose_unit), warning_content
+            return create_ending_layout(full_df_data, events_df_data, user_info, glucose_unit, locale=locale), warning_content
         if pathname == '/final':
             if not full_df_data or not user_info or 'rounds' not in user_info:
                 return html.Div([
-                    html.H2("Session Expired", style={'textAlign': 'center', 'marginTop': '50px'}),
-                    html.P("Please start over from the beginning.", style={'textAlign': 'center', 'marginBottom': '30px'}),
+                    html.H2(t("ui.session_expired.title", locale=locale), style={'textAlign': 'center', 'marginTop': '50px'}),
+                    html.P(t("ui.session_expired.text", locale=locale), style={'textAlign': 'center', 'marginBottom': '30px'}),
                     html.Div([
                         html.A(
-                            "Go to Start Page",
+                            t("ui.common.go_to_start", locale=locale),
                             href="/",
                             style={
                                 'backgroundColor': '#007bff',
@@ -235,14 +282,14 @@ def display_page(pathname: Optional[str], user_info: Optional[Dict[str, Any]],
                         )
                     ], style={'textAlign': 'center'})
                 ]), warning_content
-            return create_final_layout(full_df_data, user_info, glucose_unit), warning_content
+            return create_final_layout(full_df_data, user_info, glucose_unit, locale=locale), warning_content
         # Default route: landing page
-        return (landing_page if landing_page else html.Div("Loading..."), warning_content)
+        return (LandingPage(locale=locale), warning_content)
 
-def create_prediction_layout() -> html.Div:
+def create_prediction_layout(*, locale: str) -> html.Div:
     """Create the prediction page layout"""
     return html.Div([
-        header_component,
+        HeaderComponent(show_time_slider=False, initial_slider_value=example_initial_slider_value, locale=locale),
         html.Div(id='round-indicator', style={
             'textAlign': 'center',
             'fontSize': '18px',
@@ -251,7 +298,7 @@ def create_prediction_layout() -> html.Div:
             'marginBottom': '10px'
         }),
         html.Div([
-            html.Div("Units:", style={'fontWeight': '600', 'marginRight': '10px'}),
+            html.Div(t("ui.prediction.units_label", locale=locale), style={'fontWeight': '600', 'marginRight': '10px'}),
             dbc.RadioItems(
                 id='glucose-unit-selector',
                 options=[
@@ -270,10 +317,10 @@ def create_prediction_layout() -> html.Div:
         }),
         html.Div([
             html.Div(
-                glucose_chart,
+                GlucoseChart(id='glucose-graph', hide_last_hour=True),
                 id='prediction-glucose-chart-container'
             ),
-            submit_component
+            SubmitComponent(locale=locale)
         ], style={'flex': '1'})
     ], style={
         'margin': '0 auto',
@@ -309,10 +356,11 @@ def sync_glucose_unit_selector(pathname: Optional[str], glucose_unit: Optional[s
 @app.callback(
     Output('round-indicator', 'children'),
     [Input('url', 'pathname'),
-     Input('user-info-store', 'data')],
+     Input('user-info-store', 'data'),
+     Input('interface-language', 'data')],
     prevent_initial_call=False
 )
-def update_round_indicator(pathname: Optional[str], user_info: Optional[Dict[str, Any]]) -> str:
+def update_round_indicator(pathname: Optional[str], user_info: Optional[Dict[str, Any]], interface_language: Optional[str]) -> str:
     if pathname != '/prediction':
         raise PreventUpdate
     if not user_info:
@@ -320,9 +368,16 @@ def update_round_indicator(pathname: Optional[str], user_info: Optional[Dict[str
     rounds_played = len(user_info.get('rounds') or [])
     current_round = int(user_info.get('current_round_number') or (rounds_played + 1))
     max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS)
-    return f"Round {current_round} of {max_rounds}"
+    return t("ui.common.round_of", locale=normalize_locale(interface_language), current=current_round, total=max_rounds)
 
-def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[Dict], user_info: Optional[Dict] = None, glucose_unit: Optional[str] = None) -> html.Div:
+def create_ending_layout(
+    full_df_data: Optional[Dict],
+    events_df_data: Optional[Dict],
+    user_info: Optional[Dict] = None,
+    glucose_unit: Optional[str] = None,
+    *,
+    locale: str,
+) -> html.Div:
     """Create the ending page layout"""
     if not full_df_data:
         print("DEBUG: No data available for ending page")
@@ -387,10 +442,10 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
         stored_metrics = metrics_component_ending._calculate_metrics_from_table_data(prediction_table_data)
     
     # Create metrics display directly
-    metrics_display = MetricsComponent.create_ending_metrics_display(stored_metrics) if stored_metrics else [
-        html.H3("Accuracy Metrics", style={'textAlign': 'center'}),
+    metrics_display = MetricsComponent.create_ending_metrics_display(stored_metrics, locale=locale) if stored_metrics else [
+        html.H3(t("ui.metrics.title_accuracy_metrics", locale=locale), style={'textAlign': 'center'}),
         html.Div(
-            "No metrics available - insufficient prediction data", 
+            t("ui.metrics.no_metrics_available", locale=locale),
             style={
                 'color': 'gray',
                 'fontStyle': 'italic',
@@ -410,14 +465,14 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
     return html.Div([
         # Add a scroll-to-top trigger element
         html.Div(id='scroll-to-top-trigger', style={'display': 'none'}),
-        html.H1("Prediction Summary", style={
+        html.H1(t("ui.ending.title", locale=locale), style={
             'textAlign': 'center', 
             'marginBottom': '20px',
             'fontSize': 'clamp(24px, 4vw, 48px)',  # Responsive font size
             'padding': '0 10px'
         }),
         html.Div(
-            f"Round {current_round_number} of {max_rounds}",
+            t("ui.common.round_of", locale=locale, current=current_round_number, total=max_rounds),
             style={
                 'textAlign': 'center',
                 'marginBottom': '15px',
@@ -427,7 +482,7 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
             }
         ),
         html.Div(
-            f"Units: {unit}",
+            t("ui.ending.units_line", locale=locale, unit=unit),
             style={
                 'textAlign': 'center',
                 'marginBottom': '15px',
@@ -454,7 +509,7 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
         
         # Prediction table section with responsive flexbox layout
         html.Div([
-            html.H3("Prediction Results", style={
+            html.H3(t("ui.ending.prediction_results", locale=locale), style={
                 'textAlign': 'center', 
                 'marginBottom': '15px',
                 'fontSize': 'clamp(18px, 3vw, 24px)'  # Responsive font size
@@ -525,7 +580,7 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
         # Buttons section
         html.Div([
             html.Button(
-                'Next round',
+                t("ui.ending.next_round", locale=locale),
                 id='next-round-button',
                 disabled=is_last_round,
                 style={
@@ -547,7 +602,7 @@ def create_ending_layout(full_df_data: Optional[Dict], events_df_data: Optional[
                 }
             ),
             html.Button(
-                'View complete analysis' if is_last_round else 'Finish / Exit',
+                t("ui.ending.view_complete_analysis", locale=locale) if is_last_round else t("ui.common.finish_exit", locale=locale),
                 id='finish-study-button-ending',
                 autoFocus=False,
                 style={
@@ -666,7 +721,7 @@ def _build_aggregate_table_data(rounds: list[dict[str, Any]]) -> list[dict[str, 
     return [actual_row, prediction_row]
 
 
-def create_final_layout(full_df_data: Dict, user_info: Dict[str, Any], glucose_unit: Optional[str]) -> html.Div:
+def create_final_layout(full_df_data: Dict, user_info: Dict[str, Any], glucose_unit: Optional[str], *, locale: str) -> html.Div:
     rounds: list[dict[str, Any]] = user_info.get('rounds') or []
     max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS)
     unit = glucose_unit if glucose_unit in ('mg/dL', 'mmol/L') else 'mg/dL'
@@ -705,10 +760,10 @@ def create_final_layout(full_df_data: Dict, user_info: Dict[str, Any], glucose_u
     metrics_component_final = MetricsComponent()
     aggregate_table_data = _convert_table_data_units(_build_aggregate_table_data(rounds), unit)
     overall_metrics = metrics_component_final._calculate_metrics_from_table_data(aggregate_table_data)
-    overall_metrics_display = MetricsComponent.create_ending_metrics_display(overall_metrics) if overall_metrics else [
-        html.H3("Accuracy Metrics", style={'textAlign': 'center'}),
+    overall_metrics_display = MetricsComponent.create_ending_metrics_display(overall_metrics, locale=locale) if overall_metrics else [
+        html.H3(t("ui.metrics.title_accuracy_metrics", locale=locale), style={'textAlign': 'center'}),
         html.Div(
-            "No metrics available - insufficient prediction data",
+            t("ui.metrics.no_metrics_available", locale=locale),
             style={
                 'color': 'gray',
                 'fontStyle': 'italic',
@@ -745,14 +800,14 @@ def create_final_layout(full_df_data: Dict, user_info: Dict[str, Any], glucose_u
 
     return html.Div([
         html.Div(id='scroll-to-top-trigger', style={'display': 'none'}),
-        html.H1("Complete Analysis", style={
+        html.H1(t("ui.final.title", locale=locale), style={
             'textAlign': 'center',
             'marginBottom': '10px',
             'fontSize': 'clamp(24px, 4vw, 48px)',
             'padding': '0 10px'
         }),
         html.Div(
-            f"Rounds played: {len(rounds)} / {max_rounds}",
+            t("ui.final.rounds_played", locale=locale, played=len(rounds), total=max_rounds),
             style={
                 'textAlign': 'center',
                 'marginBottom': '20px',
@@ -784,13 +839,13 @@ def create_final_layout(full_df_data: Dict, user_info: Dict[str, Any], glucose_u
             }
         ),
         html.Div([
-            html.H3("Per-round metrics", style={
+            html.H3(t("ui.final.per_round_metrics", locale=locale), style={
                 'textAlign': 'center',
                 'marginBottom': '15px',
                 'fontSize': 'clamp(18px, 3vw, 24px)'
             }),
             html.Div(
-                f"Units: {unit}",
+                t("ui.ending.units_line", locale=locale, unit=unit),
                 style={
                     'textAlign': 'center',
                     'marginBottom': '10px',
@@ -834,7 +889,7 @@ def create_final_layout(full_df_data: Dict, user_info: Dict[str, Any], glucose_u
         }),
         html.Div([
             html.Button(
-                'Start Over',
+                t("ui.final.start_over", locale=locale),
                 id='restart-button',
                 style={
                     'backgroundColor': '#007bff',
@@ -870,14 +925,14 @@ def create_final_layout(full_df_data: Dict, user_info: Dict[str, Any], glucose_u
         'flexDirection': 'column'
     })
 
-def render_mobile_warning(user_agent: Optional[str]) -> Optional[html.Div]:
+def render_mobile_warning(user_agent: Optional[str], *, locale: str) -> Optional[html.Div]:
     if not user_agent:
         return None
     ua = user_agent.lower()
     mobile_keywords = ("iphone", "android", "ipad", "mobile", "opera mini", "mobi")
     if any(keyword in ua for keyword in mobile_keywords):
         return html.Div(
-            "Note: Sugar Sugar is optimised for desktop at the moment. Mobile support is coming soon!",
+            t("ui.mobile_warning.text", locale=locale),
             style={
                 'backgroundColor': '#fff3cd',
                 'border': '1px solid #ffeeba',
@@ -1221,11 +1276,12 @@ def handle_finish_study_from_ending(
      Output('user-info-store', 'data', allow_duplicate=True),
      Output('glucose-chart-mode', 'data', allow_duplicate=True),
      Output('randomization-initialized', 'data', allow_duplicate=True),
-     Output('glucose-unit', 'data', allow_duplicate=True)],
+     Output('glucose-unit', 'data', allow_duplicate=True),
+     Output('interface-language', 'data', allow_duplicate=True)],
     [Input('restart-button', 'n_clicks')],
     prevent_initial_call=True
 )
-def handle_restart_button(n_clicks: Optional[int]) -> Tuple[str, None, Dict[str, bool], bool, str]:
+def handle_restart_button(n_clicks: Optional[int]) -> Tuple[str, None, Dict[str, bool], bool, str, str]:
     """Handle restart button - navigate to start and clear user info. Data reset handled elsewhere."""
     if n_clicks:
         with start_action(action_type=u"handle_restart_button") as action:
@@ -1233,8 +1289,9 @@ def handle_restart_button(n_clicks: Optional[int]) -> Tuple[str, None, Dict[str,
         # Reset chart mode to hide last hour when going back to prediction
         chart_mode = {'hide_last_hour': True}
         # Reset randomization flag to trigger new random position
-        return '/', None, chart_mode, False, 'mg/dL'
-    return no_update, no_update, no_update, no_update, no_update
+        # Reset interface language to English when restarting the game
+        return '/', None, chart_mode, False, 'mg/dL', 'en'
+    return no_update, no_update, no_update, no_update, no_update, no_update
 
 # Add client-side callback to scroll to top when ending page loads
 app.clientside_callback(
@@ -1700,13 +1757,18 @@ def randomize_slider_on_prediction_page(slider_max: int, pathname: str, full_df_
 # Separate UI callback for upload success message
 @app.callback(
     Output('example-data-warning', 'children'),
-    [Input('upload-data', 'contents')],
+    [Input('upload-data', 'contents'),
+     Input('interface-language', 'data')],
     [State('upload-data', 'filename'),
      State('is-example-data', 'data')],
     prevent_initial_call=True
 )
-def update_upload_success_message(upload_contents: Optional[str], filename: Optional[str], 
-                                 is_example_data: Optional[bool]) -> Optional[html.Div]:
+def update_upload_success_message(
+    upload_contents: Optional[str],
+    interface_language: Optional[str],
+    filename: Optional[str],
+    is_example_data: Optional[bool],
+) -> Optional[html.Div]:
     """Show success message when file is uploaded"""
     if not upload_contents:
         return no_update
@@ -1714,7 +1776,7 @@ def update_upload_success_message(upload_contents: Optional[str], filename: Opti
     if not is_example_data:  # File was successfully uploaded
         return html.Div([
             html.I(className="fas fa-check-circle", style={'marginRight': '8px'}),
-            f"Successfully loaded data from {filename}. This data will be used for predictions."
+            t("ui.header.upload_success", locale=normalize_locale(interface_language), filename=filename or "")
         ], style={
             'color': '#2f855a',
             'backgroundColor': '#c6f6d5',
@@ -1733,11 +1795,13 @@ def update_upload_success_message(upload_contents: Optional[str], filename: Opti
      Output('upload-data', 'filename', allow_duplicate=True)],  # Reset filename
     [Input('use-example-data-button', 'n_clicks')],
     [State('points-control', 'value'),
-     State('full-df', 'data')],
+     State('full-df', 'data'),
+     State('interface-language', 'data')],
     prevent_initial_call=True
 )
 def reset_upload_on_example_data(example_button_clicks: Optional[int], points_value: Optional[int], 
-                                full_df_data: Optional[Dict]) -> Tuple[Optional[html.Div], int, None, None]:
+                                full_df_data: Optional[Dict],
+                                interface_language: Optional[str]) -> Tuple[Optional[html.Div], int, None, None]:
     """Reset upload component and show message when example data button is clicked"""
     if not example_button_clicks or not full_df_data:
         return no_update, no_update, no_update, no_update
@@ -1752,7 +1816,7 @@ def reset_upload_on_example_data(example_button_clicks: Optional[int], points_va
         # Show message that we're now using example data
         example_msg = html.Div([
             html.I(className="fas fa-info-circle", style={'marginRight': '8px'}),
-            "Now using example data. Upload a CSV file for personalized analysis."
+            t("ui.header.example_data_now_using", locale=normalize_locale(interface_language))
         ], style={
             'color': '#0c5460',
             'backgroundColor': '#d1ecf1',
@@ -1774,11 +1838,12 @@ def reset_upload_on_example_data(example_button_clicks: Optional[int], points_va
     [Input('points-control', 'value')],
     [State('time-slider', 'value'),
      State('full-df', 'data'),
-     State('is-example-data', 'data')],
+     State('is-example-data', 'data'),
+     State('interface-language', 'data')],
     prevent_initial_call=True
 )
 def update_points_control_ui(points_value: Optional[int], current_position: Optional[int], 
-                            full_df_data: Optional[Dict], is_example_data: Optional[bool]) -> Tuple[Optional[html.Div], int, int]:
+                            full_df_data: Optional[Dict], is_example_data: Optional[bool], interface_language: Optional[str]) -> Tuple[Optional[html.Div], int, int]:
     """Update UI when points control changes"""
     if not points_value or not full_df_data:
         return no_update, no_update, no_update
@@ -1791,7 +1856,7 @@ def update_points_control_ui(points_value: Optional[int], current_position: Opti
     # Show warning if using example data
     warning = html.Div([
         html.I(className="fas fa-exclamation-triangle", style={'marginRight': '8px'}),
-        "Currently using example data. Upload your own Dexcom/Libre CSV file for personalized analysis."
+        t("ui.header.example_data_warning", locale=normalize_locale(interface_language))
     ], style={
         'color': '#b7791f',
         'backgroundColor': '#fefcbf',

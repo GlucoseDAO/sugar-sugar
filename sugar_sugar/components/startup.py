@@ -4,22 +4,24 @@ from dash import no_update
 import dash
 from typing import Any, Optional
 # DEBUG_MODE will be imported dynamically to get the latest value
+from sugar_sugar.i18n import t
 
 class StartupPage(html.Div):
-    def __init__(self) -> None:
+    def __init__(self, *, locale: str = "en") -> None:
         self.component_id: str = 'startup-page'
+        self._locale: str = locale
         
         # Create the layout
         layout = [
             html.A(
-                "Fork me on GitHub",
+                t("ui.startup.fork_me", locale=locale),
                 href="https://github.com/GlucoseDAO/sugar-sugar",
                 target="_blank",
                 rel="noopener noreferrer",
                 className="github-fork-ribbon github-fork-ribbon-right-bottom fixed",
                 **{"data-ribbon": "Fork me on GitHub"}
             ),
-            html.H1("Sugar Sugar", 
+            html.H1(t("ui.common.app_title", locale=locale), 
                 style={
                     'textAlign': 'center', 
                     'marginBottom': '30px', 
@@ -31,65 +33,65 @@ class StartupPage(html.Div):
             html.Div([
                 html.Div([
                     html.Div([
-                        html.P("* Required fields", style={'color': '#666', 'fontSize': '16px', 'fontStyle': 'italic', 'marginBottom': '20px', 'textAlign': 'right'})
+                        html.P(t("ui.startup.required_fields_note", locale=locale), style={'color': '#666', 'fontSize': '16px', 'fontStyle': 'italic', 'marginBottom': '20px', 'textAlign': 'right'})
                     ]),
                     
                     html.Div([
-                        html.Label("Email", style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333', 'display': 'inline-block'}),
+                        html.Label(t("ui.startup.email_label", locale=locale), style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333', 'display': 'inline-block'}),
                         html.Span(id='email-required', children=' *', style={'color': '#d32f2f', 'fontSize': '24px', 'fontWeight': 'bold'})
                     ], style={'marginBottom': '10px'}),
                     dcc.Input(
                         id='email-input',
                         type='email',
-                        placeholder='Enter your email (optional unless you want results/updates)',
+                        placeholder=t("ui.startup.email_placeholder", locale=locale),
                         style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
                     ),
                     
                     html.Div([
-                        html.Label("Age", style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333', 'display': 'inline-block'}),
+                        html.Label(t("ui.startup.age_label", locale=locale), style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333', 'display': 'inline-block'}),
                         html.Span(id='age-required', children=' *', style={'color': '#d32f2f', 'fontSize': '24px', 'fontWeight': 'bold'})
                     ], style={'marginBottom': '10px'}),
                     dcc.Input(
                         id='age-input',
                         type='number',
-                        placeholder='Enter your age',
+                        placeholder=t("ui.startup.age_placeholder", locale=locale),
                         min=0,
                         max=120,
                         style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
                     ),
                     
                     html.Div([
-                        html.Label("Gender", style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333', 'display': 'inline-block'}),
+                        html.Label(t("ui.startup.gender_label", locale=locale), style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333', 'display': 'inline-block'}),
                         html.Span(id='gender-required', children=' *', style={'color': '#d32f2f', 'fontSize': '24px', 'fontWeight': 'bold'})
                     ], style={'marginBottom': '10px'}),
                     dcc.Dropdown(
                         id='gender-dropdown',
                         options=[
-                            {'label': 'Male', 'value': 'M'},
-                            {'label': 'Female', 'value': 'F'},
-                            {'label': 'N/A', 'value': 'N/A'}
+                            {'label': t("ui.startup.gender_male", locale=locale), 'value': 'M'},
+                            {'label': t("ui.startup.gender_female", locale=locale), 'value': 'F'},
+                            {'label': t("ui.startup.gender_na", locale=locale), 'value': 'N/A'}
                         ],
-                        placeholder='Select your gender',
+                        placeholder=t("ui.startup.gender_placeholder", locale=locale),
                         style={'fontSize': '20px', 'marginBottom': '20px'}
                     ),
 
-                    html.Label("Do you use CGM?", style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333'}),
+                    html.Label(t("ui.startup.cgm_label", locale=locale), style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333'}),
                     dcc.Dropdown(
                         id='cgm-dropdown',
                         options=[
-                            {'label': 'Yes', 'value': True},
-                            {'label': 'No', 'value': False}
+                            {'label': t("ui.startup.yes", locale=locale), 'value': True},
+                            {'label': t("ui.startup.no", locale=locale), 'value': False}
                         ],
-                        placeholder='Select if you use CGM',
+                        placeholder=t("ui.startup.cgm_placeholder", locale=locale),
                         style={'fontSize': '20px', 'marginBottom': '20px'}
                     ),
 
                     html.Div(id='cgm-details', children=[
-                        html.Label("Please specify duration of usage (in years)", style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333'}),
+                        html.Label(t("ui.startup.cgm_duration_label", locale=locale), style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333'}),
                         dcc.Input(
                             id='cgm-duration-input',
                             type='number',
-                            placeholder='Enter number of years',
+                            placeholder=t("ui.startup.cgm_duration_placeholder", locale=locale),
                             min=0,
                             max=100,
                             style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
@@ -97,43 +99,43 @@ class StartupPage(html.Div):
                     ]),
                     
                     html.Div([
-                        html.Label("Are you diabetic?", style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333', 'display': 'inline-block'}),
+                        html.Label(t("ui.startup.diabetic_label", locale=locale), style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333', 'display': 'inline-block'}),
                         html.Span(id='diabetic-required', children=' *', style={'color': '#d32f2f', 'fontSize': '24px', 'fontWeight': 'bold'})
                     ], style={'marginBottom': '10px'}),
                     dcc.Dropdown(
                         id='diabetic-dropdown',
                         options=[
-                            {'label': 'Yes', 'value': True},
-                            {'label': 'No', 'value': False}
+                            {'label': t("ui.startup.yes", locale=locale), 'value': True},
+                            {'label': t("ui.startup.no", locale=locale), 'value': False}
                         ],
-                        placeholder='Select your diabetic status',
+                        placeholder=t("ui.startup.diabetic_placeholder", locale=locale),
                         style={'fontSize': '20px', 'marginBottom': '20px'}
                     ),
                     
                     html.Div(id='diabetic-details', children=[
                         html.Div([
-                            html.Label("Type of Diabetes", style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333', 'display': 'inline-block'}),
+                            html.Label(t("ui.startup.diabetes_type_label", locale=locale), style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333', 'display': 'inline-block'}),
                             html.Span(id='diabetic-type-required', children=' *', style={'color': '#d32f2f', 'fontSize': '24px', 'fontWeight': 'bold'})
                         ], style={'marginBottom': '10px'}),
                         dcc.Dropdown(
                             id='diabetic-type-dropdown',
                             options=[
-                                {'label': 'Type 1', 'value': 'Type 1'},
-                                {'label': 'Type 2', 'value': 'Type 2'},
-                                {'label': 'N/A', 'value': 'N/A'}
+                                {'label': t("ui.startup.diabetes_type_1", locale=locale), 'value': 'Type 1'},
+                                {'label': t("ui.startup.diabetes_type_2", locale=locale), 'value': 'Type 2'},
+                                {'label': t("ui.startup.gender_na", locale=locale), 'value': 'N/A'}
                             ],
-                            placeholder='Select type of diabetes',
+                            placeholder=t("ui.startup.diabetes_type_placeholder", locale=locale),
                             style={'fontSize': '20px', 'marginBottom': '20px'}
                         ),
                         
                         html.Div([
-                            html.Label("Duration of Diabetes (years)", style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333', 'display': 'inline-block'}),
+                            html.Label(t("ui.startup.diabetes_duration_label", locale=locale), style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333', 'display': 'inline-block'}),
                             html.Span(id='diabetes-duration-required', children=' *', style={'color': '#d32f2f', 'fontSize': '24px', 'fontWeight': 'bold'})
                         ], style={'marginBottom': '10px'}),
                         dcc.Input(
                             id='diabetes-duration-input',
                             type='number',
-                            placeholder='Enter number of years',
+                            placeholder=t("ui.startup.diabetes_duration_placeholder", locale=locale),
                             min=0,
                             max=100,
                             style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
@@ -141,13 +143,13 @@ class StartupPage(html.Div):
                     ]),
                     
                     html.Div([
-                        html.Label("Location", style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333', 'display': 'inline-block'}),
+                        html.Label(t("ui.startup.location_label", locale=locale), style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333', 'display': 'inline-block'}),
                         html.Span(id='location-required', children=' *', style={'color': '#d32f2f', 'fontSize': '24px', 'fontWeight': 'bold'})
                     ], style={'marginBottom': '10px'}),
                     dcc.Input(
                         id='location-input',
                         type='text',
-                        placeholder='Enter your location',
+                        placeholder=t("ui.startup.location_placeholder", locale=locale),
                         style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
                     ),
                     
@@ -155,11 +157,11 @@ class StartupPage(html.Div):
                         [
                             html.Hr(style={'margin': '30px 0', 'border': '1px solid #ddd'}),
                             html.H3(
-                                "Contact preferences",
+                                t("ui.startup.contact_prefs_title", locale=locale),
                                 style={'fontSize': '24px', 'marginBottom': '12px', 'color': '#2c5282'}
                             ),
                             html.P(
-                                "Email is only required if you asked to receive results later or to be kept up to date.",
+                                t("ui.startup.contact_prefs_text", locale=locale),
                                 style={'fontSize': '18px', 'lineHeight': '1.6', 'marginBottom': '0', 'color': '#555'}
                             ),
                         ],
@@ -169,7 +171,7 @@ class StartupPage(html.Div):
                     # <!-- START INSERTION: Just Test Me Button (Debug Mode Only) --> 
                     html.Div([
                         html.Button(
-                            'Just Test Me',
+                            t("ui.startup.just_test_me", locale=locale),
                             id='test-me-button',
                             style={
                                 'backgroundColor': '#2196F3',
@@ -197,7 +199,7 @@ class StartupPage(html.Div):
                     
                     html.Div([
                         html.Button(
-                            'Start Prediction',
+                            t("ui.startup.start_prediction", locale=locale),
                             id='start-button',
                             disabled=True,  # Initially disabled until consent is given
                             style={

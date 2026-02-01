@@ -2,6 +2,8 @@ from typing import Optional, Any
 from dash import Dash, html, dcc, Output, Input
 import polars as pl
 
+from sugar_sugar.i18n import normalize_locale, t
+
 
 class MetricsComponent(html.Div):
     def __init__(self) -> None:
@@ -12,9 +14,9 @@ class MetricsComponent(html.Div):
                 html.Div(
                     id='metrics-container',
                     children=[
-                        html.H4("Metrics", style={'fontSize': '20px', 'marginBottom': '10px'}),
+                        html.H4(t("ui.metrics.title", locale="en"), style={'fontSize': '20px', 'marginBottom': '10px'}),
                         html.Div(
-                            "Add at least 5 prediction points to see accuracy metrics", 
+                            t("ui.metrics.placeholder_need_5", locale="en"),
                             style={
                                 'color': 'gray',
                                 'fontStyle': 'italic',
@@ -75,18 +77,23 @@ class MetricsComponent(html.Div):
 
         @app.callback(
             Output('metrics-container', 'children'),
-            [Input('metrics-store', 'data')]
+            [Input('metrics-store', 'data'),
+             Input('interface-language', 'data')]
         )
-        def update_metrics_display(stored_metrics: Optional[dict[str, Any]]) -> list[html.Div]:
+        def update_metrics_display(
+            stored_metrics: Optional[dict[str, Any]],
+            interface_language: Optional[str],
+        ) -> list[html.Div]:
             """Updates the metrics display based on stored metrics."""
             print(f"DEBUG: update_metrics_display called with stored metrics: {bool(stored_metrics)}")
+            locale = normalize_locale(interface_language)
             
             if not stored_metrics:
                 # Return placeholder when no metrics available
                 return [
-                    html.H4("Metrics", style={'fontSize': '20px', 'marginBottom': '10px'}),
+                    html.H4(t("ui.metrics.title", locale=locale), style={'fontSize': '20px', 'marginBottom': '10px'}),
                     html.Div(
-                        "Add at least 5 prediction points to see accuracy metrics", 
+                        t("ui.metrics.placeholder_need_5", locale=locale),
                         style={
                             'color': 'gray',
                             'fontStyle': 'italic',
@@ -101,14 +108,14 @@ class MetricsComponent(html.Div):
             
             # Create metrics display from stored data
             return [
-                html.H4("Prediction Accuracy", style={'fontSize': '20px', 'marginBottom': '10px'}),
+                html.H4(t("ui.metrics.prediction_accuracy", locale=locale), style={'fontSize': '20px', 'marginBottom': '10px'}),
                 html.Div([
                     html.Div([
                         html.Div([
                             html.Strong(f"{metric}", style={'fontSize': '16px'}),
                             html.Div(f"{data['value']:.2f}" + ("%" if metric == "MAPE" else ""), 
                                    style={'fontSize': '20px', 'color': '#2c5282', 'margin': '5px 0'}),
-                            html.Div(data['description'],
+                            html.Div(_metric_description(metric, locale=locale),
                                    style={'fontSize': '14px', 'color': '#4a5568'})
                         ], style={
                             'padding': '10px',
@@ -137,15 +144,15 @@ class MetricsComponent(html.Div):
             ]
 
     @staticmethod
-    def create_ending_metrics_display(stored_metrics: Optional[dict[str, Any]]) -> list[html.Div]:
+    def create_ending_metrics_display(stored_metrics: Optional[dict[str, Any]], *, locale: str = "en") -> list[html.Div]:
         """Create metrics display for the ending page"""
         print(f"DEBUG: create_ending_metrics_display called with stored metrics: {bool(stored_metrics)}")
         
         if not stored_metrics:
             return [
-                html.H3("Accuracy Metrics", style={'textAlign': 'center'}),
+                html.H3(t("ui.metrics.title_accuracy_metrics", locale=locale), style={'textAlign': 'center'}),
                 html.Div(
-                    "No metrics available", 
+                    t("ui.metrics.no_metrics_available", locale=locale),
                     style={
                         'color': 'gray',
                         'fontStyle': 'italic',
@@ -158,7 +165,7 @@ class MetricsComponent(html.Div):
         
         # Create metrics display from stored data
         return [
-            html.H3("Accuracy Metrics", style={
+            html.H3(t("ui.metrics.title_accuracy_metrics", locale=locale), style={
                 'textAlign': 'center',
                 'fontSize': 'clamp(20px, 3vw, 28px)',  # Responsive font size
                 'marginBottom': 'clamp(10px, 2vh, 20px)'
@@ -178,7 +185,7 @@ class MetricsComponent(html.Div):
                                    'margin': '5px 0',
                                    'fontWeight': 'bold'
                                }),
-                        html.Div(data['description'],
+                        html.Div(_metric_description(metric, locale=locale),
                                style={
                                    'fontSize': 'clamp(12px, 2vw, 16px)',  # Responsive font size 
                                    'color': '#4a5568',
@@ -345,18 +352,31 @@ class MetricsComponent(html.Div):
         return {
             "MAE": {
                 "value": mae,
-                "description": "Average difference between predicted and actual values"
+                "description": ""
             },
             "MSE": {
                 "value": mse,
-                "description": "Emphasizes larger prediction errors"
+                "description": ""
             },
             "RMSE": {
                 "value": rmse,
-                "description": "Similar to MAE but penalizes large errors more"
+                "description": ""
             },
             "MAPE": {
                 "value": mape,
-                "description": "Average percentage difference from actual values"
+                "description": ""
             }
         } 
+
+
+def _metric_description(metric: str, *, locale: str) -> str:
+    key = metric.upper()
+    if key == "MAE":
+        return t("ui.metrics.desc.mae", locale=locale)
+    if key == "MSE":
+        return t("ui.metrics.desc.mse", locale=locale)
+    if key == "RMSE":
+        return t("ui.metrics.desc.rmse", locale=locale)
+    if key == "MAPE":
+        return t("ui.metrics.desc.mape", locale=locale)
+    return ""

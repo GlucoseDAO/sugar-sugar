@@ -6,6 +6,7 @@ from dash import dcc, Output, Input
 from dash import Dash, html
 from eliot import start_action
 from sugar_sugar.config import PREDICTION_HOUR_OFFSET
+from sugar_sugar.i18n import normalize_locale, t
 
 
 class GlucoseChart(html.Div):
@@ -97,18 +98,21 @@ class GlucoseChart(html.Div):
              Input(f'{self.id}-events-store', 'data'),
              Input(f'{self.id}-source-store', 'data'),
              Input('glucose-chart-mode', 'data'),
-             Input('glucose-unit', 'data')]
+             Input('glucose-unit', 'data'),
+             Input('interface-language', 'data')]
         )
         def update_chart_figure(
             df_data: Optional[dict[str, Any]],
             events_data: Optional[dict[str, Any]],
             source_name: Optional[str],
             mode_data: Optional[dict[str, Any]],
-            glucose_unit: Optional[str]
+            glucose_unit: Optional[str],
+            interface_language: Optional[str],
         ) -> go.Figure:
             """Update the chart figure when data changes"""
             if not df_data:
                 return self._create_empty_figure()
+            locale = normalize_locale(interface_language)
             
             # Reconstruct DataFrames from stored data
             df = self._reconstruct_dataframe_from_dict(df_data)
@@ -128,7 +132,7 @@ class GlucoseChart(html.Div):
                 hide_last_hour=hide_last_hour_flag
             ):
                 # Create the figure with source information
-                return self._build_figure(df, events_df, source_name)
+                return self._build_figure(df, events_df, source_name, locale=locale)
 
     def _reconstruct_dataframe_from_dict(self, df_data: dict[str, list[Any]]) -> pl.DataFrame:
         """Reconstruct a Polars DataFrame from stored dictionary data"""
@@ -150,7 +154,7 @@ class GlucoseChart(html.Div):
             'insulin_value': pl.Series(events_data['insulin_value']).cast(pl.Float64, strict=False)
         })
 
-    def _build_figure(self, df: pl.DataFrame, events_df: pl.DataFrame, source_name: Optional[str] = None) -> go.Figure:
+    def _build_figure(self, df: pl.DataFrame, events_df: pl.DataFrame, source_name: Optional[str] = None, *, locale: str = "en") -> go.Figure:
         """Build complete figure with all components"""
         figure = go.Figure()
         
@@ -161,10 +165,10 @@ class GlucoseChart(html.Div):
         
         # Build all components
         self._add_range_rectangles(figure)
-        self._add_glucose_trace(figure)
-        self._add_prediction_traces(figure)
-        self._add_event_markers(figure)
-        self._update_layout(figure)
+        self._add_glucose_trace(figure, locale=locale)
+        self._add_prediction_traces(figure, locale=locale)
+        self._add_event_markers(figure, locale=locale)
+        self._update_layout(figure, locale=locale)
         
         return figure
 
@@ -221,7 +225,7 @@ class GlucoseChart(html.Div):
         
         return lower_bound, upper_bound
 
-    def _add_glucose_trace(self, figure: go.Figure) -> None:
+    def _add_glucose_trace(self, figure: go.Figure, *, locale: str) -> None:
         """Adds the main glucose data line to the figure."""
         f = self._display_factor
         # Determine how many points to show based on hide_last_hour setting
@@ -240,7 +244,7 @@ class GlucoseChart(html.Div):
             x=x_indices,
             y=glucose_values,
             mode='lines+markers',
-            name='Glucose Level',
+            name=t("ui.chart.trace_glucose", locale=locale),
             line=dict(color='blue'),
         ))
 
@@ -248,12 +252,12 @@ class GlucoseChart(html.Div):
     def _get_time_position(self, time_point: datetime) -> float:
         """Converts a datetime to its corresponding x-axis position."""
         time_series = self._current_df.get_column("time")
-        for idx, t in enumerate(time_series):
-            if t == time_point:
+        for idx, time_val in enumerate(time_series):
+            if time_val == time_point:
                 return idx
         return 0
 
-    def _add_prediction_traces(self, figure: go.Figure) -> None:
+    def _add_prediction_traces(self, figure: go.Figure, *, locale: str) -> None:
         """Adds prediction points and connecting lines to the figure."""
         f = self._display_factor
         line_points = self._current_df.filter(pl.col("prediction") != 0.0)
@@ -310,7 +314,7 @@ class GlucoseChart(html.Div):
                     x=x_positions,
                     y=predictions,
                     mode='markers',
-                    name='Prediction Points',
+                    name=t("ui.chart.trace_predictions", locale=locale),
                     marker=dict(
                         color='red',
                         size=8,
@@ -333,7 +337,7 @@ class GlucoseChart(html.Div):
                             hoverinfo='skip'
                         ))
 
-    def _add_event_markers(self, figure: go.Figure) -> None:
+    def _add_event_markers(self, figure: go.Figure, *, locale: str) -> None:
         """Adds event markers (insulin, exercise, carbs) to the figure."""
         if self._current_events.height == 0:
             return
@@ -348,6 +352,12 @@ class GlucoseChart(html.Div):
             (pl.col("time") <= end_time)
         )
         
+        legend_name_by_type: dict[str, str] = {
+            "Insulin": t("ui.chart.event_insulin", locale=locale),
+            "Exercise": t("ui.chart.event_exercise", locale=locale),
+            "Carbohydrates": t("ui.chart.event_carbohydrates", locale=locale),
+        }
+
         # Add traces for each event type
         for event_type, style in self.EVENT_STYLES.items():
             events = window_events.filter(pl.col("event_type") == event_type)
@@ -365,10 +375,10 @@ class GlucoseChart(html.Div):
                     before_idx = None
                     after_idx = None
                     
-                    for i, t in enumerate(df_times):
-                        if t <= event_time:
+                    for i, time_val in enumerate(df_times):
+                        if time_val <= event_time:
                             before_idx = i
-                        if t >= event_time and after_idx is None:
+                        if time_val >= event_time and after_idx is None:
                             after_idx = i
                     
                     # Handle edge cases and interpolation
@@ -403,7 +413,12 @@ class GlucoseChart(html.Div):
                     # Create hover text
                     event_row = events.filter(pl.col("time") == event_time)
                     if event_type == 'Insulin':
-                        hover_text = f"Insulin: {event_row.get_column('insulin_value')[0]}u<br>{event_time.strftime('%H:%M')}"
+                        hover_text = t(
+                            "ui.chart.hover_insulin",
+                            locale=locale,
+                            value=event_row.get_column('insulin_value')[0],
+                            time=event_time.strftime('%H:%M'),
+                        )
                     else:
                         hover_text = f"{event_type}<br>{event_time.strftime('%H:%M')}"
                     hover_texts.append(hover_text)
@@ -412,7 +427,7 @@ class GlucoseChart(html.Div):
                     x=x_positions,
                     y=y_positions,
                     mode='markers',
-                    name=event_type,
+                    name=legend_name_by_type.get(event_type, event_type),
                     marker=dict(
                         symbol=style['symbol'],
                         size=style['size'],
@@ -424,7 +439,7 @@ class GlucoseChart(html.Div):
                     hoverinfo='text'
                 ))
 
-    def _update_layout(self, figure: go.Figure) -> None:
+    def _update_layout(self, figure: go.Figure, *, locale: str) -> None:
         """Updates the figure layout with axes, margins, and interaction settings."""
         y_range = self._calculate_y_axis_range()
         
@@ -433,18 +448,18 @@ class GlucoseChart(html.Div):
         end_time = self._current_df.get_column("time")[-1].strftime('%H:%M')
         
         # Create title with source information
-        title_text = f'Glucose Levels ({start_time} to {end_time})'
+        title_text = t("ui.chart.title", locale=locale, start=start_time, end=end_time)
         if self._current_source:
-            title_text += f' - Source: {self._current_source}'
+            title_text += t("ui.chart.source_suffix", locale=locale, source=self._current_source)
         
         figure.update_layout(
             title=title_text,
             autosize=True,
             xaxis=dict(
-                title='Time',
+                title=t("ui.chart.x_axis", locale=locale),
                 tickmode='array',
                 tickvals=list(range(len(self._current_df))),
-                ticktext=[t.strftime('%H:%M') for t in self._current_df.get_column("time")],
+                ticktext=[time_val.strftime('%H:%M') for time_val in self._current_df.get_column("time")],
                 fixedrange=True,
                 showspikes=True,
                 spikemode='across',
@@ -454,7 +469,7 @@ class GlucoseChart(html.Div):
                 range=[-0.5, len(self._current_df) - 0.5]
             ),
             yaxis=dict(
-                title=f'Glucose Level ({self._display_unit})',
+                title=t("ui.chart.y_axis", locale=locale, unit=self._display_unit),
                 fixedrange=True,
                 showspikes=True,
                 spikemode='across',

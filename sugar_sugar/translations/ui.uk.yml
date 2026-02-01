@@ -1,0 +1,139 @@
+uk:
+  common:
+    app_title: "Sugar Sugar"
+    units: "Одиниці"
+    round_of: "Раунд %{current} з %{total}"
+    go_to_start: "На стартову сторінку"
+    loading: "Завантаження..."
+    continue: "Продовжити"
+    finish_exit: "Завершити / Вийти"
+
+  language:
+    choose: "Мова"
+    en: "Англійська"
+    de: "Німецька"
+    uk: "Українська"
+
+  landing:
+    tagline: "Гра, щоб перевірити твої здібності прогнозувати глюкозу."
+    how_it_works: "Як це працює"
+    how_it_works_steps:
+      - "Завантаж Dexcom/Libre CSV (або використай приклад)"
+      - "Намалюй прогнозований тренд глюкози на графіку"
+      - "Порівняй прогноз із реальними значеннями"
+      - "Переглянь метрики точності (MAE/RMSE/MAPE)"
+    preview: "Попередній перегляд"
+    about_study_title: "Про дослідження"
+    about_study_text: "Ми досліджуємо, наскільки точно люди прогнозують тренди глюкози та які патерни помічають досвідчені користувачі CGM. Якщо ти вирішиш взяти участь, твоя гра та завантажені CGM‑дані можуть бути використані для подальших досліджень."
+    your_choices_title: "Твій вибір"
+    your_choices_text: "За замовчуванням ми вважаємо, що ти погоджуєшся взяти участь у дослідженні. Якщо ти хочеш лише пограти — познач перший пункт."
+    consent_play_only: "Я хочу лише пограти (не зберігати мої CGM/ігрові дані)"
+    consent_receive_results: "Я хочу отримати свої результати пізніше"
+    consent_keep_updated: "Повідомляйте мене про оновлення проєкту"
+    next_hint: "Далі: коротка анкета, потім завантаження CGM‑даних (або використання прикладу)."
+
+  startup:
+    fork_me: "Fork me on GitHub"
+    required_fields_note: "* Обовʼязкові поля"
+    email_label: "Ел. пошта"
+    email_placeholder: "Введи ел. пошту (необовʼязково, якщо не потрібні результати/оновлення)"
+    age_label: "Вік"
+    age_placeholder: "Введи свій вік"
+    gender_label: "Стать"
+    gender_placeholder: "Обери стать"
+    gender_male: "Чоловіча"
+    gender_female: "Жіноча"
+    gender_na: "Н/Д"
+    cgm_label: "Ти використовуєш CGM?"
+    cgm_placeholder: "Обери, чи використовуєш CGM"
+    yes: "Так"
+    no: "Ні"
+    cgm_duration_label: "Вкажи тривалість використання (у роках)"
+    cgm_duration_placeholder: "Введи кількість років"
+    diabetic_label: "Ти маєш діабет?"
+    diabetic_placeholder: "Обери статус"
+    diabetes_type_label: "Тип діабету"
+    diabetes_type_placeholder: "Обери тип діабету"
+    diabetes_type_1: "Тип 1"
+    diabetes_type_2: "Тип 2"
+    diabetes_duration_label: "Тривалість діабету (роки)"
+    diabetes_duration_placeholder: "Введи кількість років"
+    location_label: "Локація"
+    location_placeholder: "Введи локацію"
+    contact_prefs_title: "Налаштування звʼязку"
+    contact_prefs_text: "Ел. пошта потрібна лише якщо ти попросив/ла надіслати результати пізніше або хочеш отримувати оновлення."
+    just_test_me: "Тестовий режим"
+    start_prediction: "Почати прогноз"
+
+  header:
+    points_label: "Кількість точок для показу:"
+    time_window_label: "Позиція часового вікна:"
+    upload_prompt_1: "Перетягни файл або "
+    upload_prompt_2: "завантаж дані тут"
+    use_example_data: "Використати приклад"
+    upload_success: "Дані з %{filename} успішно завантажено. Вони будуть використані для прогнозів."
+    example_data_now_using: "Зараз використовується приклад. Завантаж CSV для персоналізованого аналізу."
+    example_data_warning: "Зараз використовується приклад. Завантаж свій Dexcom/Libre CSV для персоналізованого аналізу."
+    current_data_source: "Поточне джерело даних:"
+    description_1: "Перевір свої навички прогнозу глюкози!"
+    description_2: "Клікай по графіку або малюй лінії, щоб прогнозувати майбутні значення."
+    description_3: "Гра покаже, наскільки точний твій прогноз порівняно з реальними вимірюваннями."
+    how_to_play: "Як грати:"
+    how_to_play_1: "1. Клікай і тягни на графіку, щоб додати прогноз"
+    how_to_play_2: "2. Малюй лінії одну за одною, щоб створювати криві прогнозу"
+    how_to_play_3: "3. Спробуй спрогнозувати щонайменше 5 точок, щоб побачити метрики"
+
+  prediction:
+    units_label: "Одиниці:"
+
+  submit:
+    progress_no_data: "Зроби прогноз до кінця прихованої області, щоб надіслати"
+    progress_some: "Продовжуй до кінця (%{done}/%{total} точок)"
+    progress_ready: "✓ Готово до надсилання!"
+    progress_hidden_area: "Зроби прогноз у прихованій області, щоб надіслати"
+    submit: "Надіслати"
+
+  mobile_warning:
+    text: "Примітка: Sugar Sugar наразі оптимізовано для десктопу. Підтримка мобільних скоро буде!"
+
+  chart:
+    title: "Рівні глюкози (%{start}–%{end})"
+    source_suffix: " — Джерело: %{source}"
+    x_axis: "Час"
+    y_axis: "Глюкоза (%{unit})"
+    trace_glucose: "Глюкоза"
+    trace_predictions: "Точки прогнозу"
+    hover_insulin: "Інсулін: %{value}u<br>%{time}"
+    event_insulin: "Інсулін"
+    event_exercise: "Фізична активність"
+    event_carbohydrates: "Вуглеводи"
+
+  metrics:
+    title: "Метрики"
+    prediction_accuracy: "Точність прогнозу"
+    placeholder_need_5: "Додай щонайменше 5 точок прогнозу, щоб побачити метрики точності"
+    title_accuracy_metrics: "Метрики точності"
+    no_metrics_available: "Метрики недоступні"
+    desc:
+      mae: "Середня різниця між прогнозом і реальними значеннями"
+      mse: "Сильніше враховує великі помилки прогнозу"
+      rmse: "Схоже на MAE, але сильніше штрафує великі помилки"
+      mape: "Середня відсоткова різниця від реальних значень"
+
+  session_expired:
+    title: "Сесію втрачено"
+    text: "Будь ласка, почни спочатку."
+
+  ending:
+    title: "Підсумок прогнозу"
+    prediction_results: "Результати прогнозу"
+    units_line: "Одиниці: %{unit}"
+    next_round: "Наступний раунд"
+    view_complete_analysis: "Переглянути повний аналіз"
+
+  final:
+    title: "Повний аналіз"
+    rounds_played: "Зіграно раундів: %{played} / %{total}"
+    per_round_metrics: "Метрики по раундах"
+    start_over: "Почати заново"
+

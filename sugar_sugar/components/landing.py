@@ -12,6 +12,7 @@ from dash import dcc, html, no_update
 from dash.dependencies import Input, Output, State
 
 from sugar_sugar.consent import ensure_consent_agreement_row, get_next_study_number
+from sugar_sugar.i18n import t, t_list
 
 
 @lru_cache(maxsize=4)
@@ -26,19 +27,70 @@ def _image_data_uri(path: Path) -> Optional[str]:
 
 
 class LandingPage(html.Div):
-    def __init__(self) -> None:
+    def __init__(self, *, locale: str = "en") -> None:
         self.component_id: str = "landing-page"
+        self._locale: str = locale
 
         project_root = Path(__file__).resolve().parents[2]
         screenshot_path = project_root / "images" / "screenshot.png"
         screenshot_src = _image_data_uri(screenshot_path)
+
+        language_picker = html.Div(
+            [
+                html.Button(
+                    "🇬🇧",
+                    id="lang-en",
+                    title=t("ui.language.en", locale=locale),
+                    style={
+                        "border": "1px solid rgba(15, 23, 42, 0.20)",
+                        "background": "white",
+                        "borderRadius": "10px",
+                        "padding": "6px 10px",
+                        "fontSize": "18px",
+                        "cursor": "pointer",
+                    },
+                ),
+                html.Button(
+                    "🇩🇪",
+                    id="lang-de",
+                    title=t("ui.language.de", locale=locale),
+                    style={
+                        "border": "1px solid rgba(15, 23, 42, 0.20)",
+                        "background": "white",
+                        "borderRadius": "10px",
+                        "padding": "6px 10px",
+                        "fontSize": "18px",
+                        "cursor": "pointer",
+                    },
+                ),
+                html.Button(
+                    "🇺🇦",
+                    id="lang-uk",
+                    title=t("ui.language.uk", locale=locale),
+                    style={
+                        "border": "1px solid rgba(15, 23, 42, 0.20)",
+                        "background": "white",
+                        "borderRadius": "10px",
+                        "padding": "6px 10px",
+                        "fontSize": "18px",
+                        "cursor": "pointer",
+                    },
+                ),
+            ],
+            style={
+                "display": "flex",
+                "gap": "8px",
+                "justifyContent": "flex-end",
+                "marginBottom": "12px",
+            },
+        )
 
         hero = dbc.Row(
             [
                 dbc.Col(
                     [
                         html.H1(
-                            "Sugar Sugar",
+                            t("ui.common.app_title", locale=locale),
                             style={
                                 "fontSize": "56px",
                                 "fontWeight": "800",
@@ -47,7 +99,7 @@ class LandingPage(html.Div):
                             },
                         ),
                         html.Div(
-                            "A game to test your glucose-predicting superpowers.",
+                            t("ui.landing.tagline", locale=locale),
                             style={
                                 "fontSize": "20px",
                                 "color": "#334155",
@@ -58,7 +110,7 @@ class LandingPage(html.Div):
                         html.Div(
                             [
                                 html.Div(
-                                    "How it works",
+                                    t("ui.landing.how_it_works", locale=locale),
                                     style={
                                         "fontWeight": "700",
                                         "marginBottom": "8px",
@@ -66,12 +118,7 @@ class LandingPage(html.Div):
                                     },
                                 ),
                                 html.Ul(
-                                    [
-                                        html.Li("Upload Dexcom/Libre CSV (or use the sample dataset)"),
-                                        html.Li("Draw your predicted glucose trend on the chart"),
-                                        html.Li("Compare predictions to the real values"),
-                                        html.Li("See accuracy metrics (MAE/RMSE/MAPE)"),
-                                    ],
+                                    [html.Li(item) for item in t_list("ui.landing.how_it_works_steps", locale=locale)],
                                     style={
                                         "marginBottom": "0",
                                         "color": "#334155",
@@ -110,7 +157,7 @@ class LandingPage(html.Div):
                                             style={"fontSize": "56px", "color": "#1d4ed8"},
                                         ),
                                         html.Div(
-                                            "Preview",
+                                            t("ui.landing.preview", locale=locale),
                                             style={"fontWeight": "700", "marginTop": "10px"},
                                         ),
                                     ],
@@ -139,12 +186,11 @@ class LandingPage(html.Div):
             dbc.CardBody(
                 [
                     html.H3(
-                        "About the study",
+                        t("ui.landing.about_study_title", locale=locale),
                         style={"fontSize": "22px", "fontWeight": "800", "color": "#0f172a"},
                     ),
                     html.Div(
-                        "We're studying how accurate humans are at predicting glucose trends, and what patterns experienced CGM users notice. "
-                        "If you choose to participate, your gameplay and uploaded CGM data may be used for further research.",
+                        t("ui.landing.about_study_text", locale=locale),
                         style={"color": "#334155", "lineHeight": "1.6"},
                     ),
                 ]
@@ -156,18 +202,18 @@ class LandingPage(html.Div):
             dbc.CardBody(
                 [
                     html.H3(
-                        "Your choices",
+                        t("ui.landing.your_choices_title", locale=locale),
                         style={"fontSize": "22px", "fontWeight": "800", "color": "#0f172a"},
                     ),
                     html.Div(
-                        "By default, we assume you agree to participate in the study. If you only want to play, check the first box.",
+                        t("ui.landing.your_choices_text", locale=locale),
                         style={"color": "#334155", "lineHeight": "1.6", "marginBottom": "10px"},
                     ),
                     dbc.Checklist(
                         id="consent-play-only",
                         options=[
                             {
-                                "label": " I just want to play (do not store my CGM / gameplay data)",
+                                "label": f" {t('ui.landing.consent_play_only', locale=locale)}",
                                 "value": "play_only",
                             }
                         ],
@@ -176,13 +222,13 @@ class LandingPage(html.Div):
                     ),
                     dbc.Checklist(
                         id="consent-receive-results",
-                        options=[{"label": " I want to receive my results later", "value": "receive_results"}],
+                        options=[{"label": f" {t('ui.landing.consent_receive_results', locale=locale)}", "value": "receive_results"}],
                         value=[],
                         style={"fontSize": "16px", "marginTop": "10px"},
                     ),
                     dbc.Checklist(
                         id="consent-keep-updated",
-                        options=[{"label": " Keep me up to date about project updates", "value": "keep_updated"}],
+                        options=[{"label": f" {t('ui.landing.consent_keep_updated', locale=locale)}", "value": "keep_updated"}],
                         value=[],
                         style={"fontSize": "16px", "marginTop": "10px"},
                     ),
@@ -191,13 +237,13 @@ class LandingPage(html.Div):
                         style={"marginTop": "12px"},
                     ),
                     dbc.Button(
-                        "Continue",
+                        t("ui.common.continue", locale=locale),
                         id="landing-continue",
                         color="primary",
                         style={"marginTop": "14px", "width": "220px", "fontWeight": "700"},
                     ),
                     html.Div(
-                        "Next: you'll fill in a short form, then upload CGM data (or use the sample dataset).",
+                        t("ui.landing.next_hint", locale=locale),
                         style={"color": "#64748b", "marginTop": "10px", "fontSize": "14px"},
                     ),
                 ]
@@ -207,6 +253,7 @@ class LandingPage(html.Div):
 
         layout = dbc.Container(
             [
+                language_picker,
                 hero,
                 html.Div(style={"height": "18px"}),
                 dbc.Row(

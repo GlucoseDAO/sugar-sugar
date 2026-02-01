@@ -8,9 +8,11 @@ import csv
 from pathlib import Path
 from sugar_sugar.config import PREDICTION_HOUR_OFFSET
 from sugar_sugar.components.metrics import MetricsComponent
+from sugar_sugar.i18n import t, normalize_locale
 
 class SubmitComponent(html.Div):
-    def __init__(self) -> None:
+    def __init__(self, *, locale: str = "en") -> None:
+        self._locale: str = normalize_locale(locale)
         self._stats_csv_path = (
             Path(__file__).resolve().parents[2]
             / 'data'
@@ -30,7 +32,7 @@ class SubmitComponent(html.Div):
         super().__init__([
             html.Div(
                 id="prediction-progress-label",
-                children="Make predictions to the end of the hidden area to submit",
+                children=t("ui.submit.progress_no_data", locale=self._locale),
                 style={
                     'textAlign': 'center',
                     'marginBottom': '10px',
@@ -40,7 +42,7 @@ class SubmitComponent(html.Div):
                 }
             ),
             dbc.Button(
-                "Submit",
+                t("ui.submit.submit", locale=self._locale),
                 id="submit-button",
                 color="primary",
                 className="mt-4",
@@ -48,7 +50,7 @@ class SubmitComponent(html.Div):
                 style={'width': '300px', 'fontSize': '25px', 'padding': '15px 0', 'textAlign': 'center', 'verticalAlign': 'middle', 'lineHeight': '1.5', 'height': '60px'}
             ),
             dbc.Button(
-                "Finish / Exit",
+                t("ui.common.finish_exit", locale=self._locale),
                 id="finish-study-button",
                 color="secondary",
                 className="mt-3",
@@ -340,11 +342,16 @@ class SubmitComponent(html.Div):
              Output('submit-button', 'style'),
              Output('prediction-progress-label', 'children'),
              Output('prediction-progress-label', 'style')],
-            [Input('current-window-df', 'data')],
+            [Input('current-window-df', 'data'),
+             Input('interface-language', 'data')],
             prevent_initial_call=False
         )
-        def update_submit_button_state(df_data: Optional[dict[str, Any]]) -> tuple[bool, dict[str, str], str, dict[str, str]]:
+        def update_submit_button_state(
+            df_data: Optional[dict[str, Any]],
+            interface_language: Optional[str],
+        ) -> tuple[bool, dict[str, str], str, dict[str, str]]:
             """Enable submit button only when there are predictions to the end of the hidden area"""
+            locale = normalize_locale(interface_language)
             base_style = {
                 'width': '300px', 
                 'fontSize': '25px', 
@@ -366,7 +373,7 @@ class SubmitComponent(html.Div):
                 # No data, keep disabled with gray style
                 disabled_style = {**base_style, 'backgroundColor': '#cccccc', 'color': '#666666', 'cursor': 'not-allowed'}
                 label_style = {**base_label_style, 'color': '#6c757d'}
-                return True, disabled_style, "Make predictions to the end of the hidden area to submit", label_style
+                return True, disabled_style, t("ui.submit.progress_no_data", locale=locale), label_style
             
             # Reconstruct DataFrame to check for predictions
             df = self._reconstruct_dataframe_from_dict(df_data)
@@ -412,18 +419,23 @@ class SubmitComponent(html.Div):
                     # Enable button - predictions reach the end
                     enabled_style = {**base_style, 'backgroundColor': '#28a745', 'color': 'white', 'cursor': 'pointer'}
                     label_style = {**base_label_style, 'color': '#28a745', 'fontWeight': 'bold'}
-                    return False, enabled_style, "✓ Ready to submit!", label_style
+                    return False, enabled_style, t("ui.submit.progress_ready", locale=locale), label_style
                 else:
                     # Some predictions but not to the end
                     disabled_style = {**base_style, 'backgroundColor': '#ffc107', 'color': '#212529', 'cursor': 'not-allowed'}
                     label_style = {**base_label_style, 'color': '#856404'}
-                    status_text = f"Continue predictions to the end ({user_predictions_count}/{required_user_predictions} points)"
+                    status_text = t(
+                        "ui.submit.progress_some",
+                        locale=locale,
+                        done=user_predictions_count,
+                        total=required_user_predictions,
+                    )
                     return True, disabled_style, status_text, label_style
             else:
                 # No predictions in hidden area
                 disabled_style = {**base_style, 'backgroundColor': '#cccccc', 'color': '#666666', 'cursor': 'not-allowed'}
                 label_style = {**base_label_style, 'color': '#6c757d'}
-                return True, disabled_style, "Make predictions in the hidden area to submit", label_style
+                return True, disabled_style, t("ui.submit.progress_hidden_area", locale=locale), label_style
 
     def _reconstruct_dataframe_from_dict(self, df_data: dict[str, list[Any]]) -> pl.DataFrame:
         """Reconstruct a Polars DataFrame from stored dictionary data"""
