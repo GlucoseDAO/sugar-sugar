@@ -110,7 +110,16 @@ Note: Debug mode adds a "Just Test Me" button for quickly filling in the form du
 This is an early-stage project meant for research and experimentation. The app now supports multiple users with session-based state management.
 
 ### Do you use my personal data?
-No, we only use the data you upload to allow you play the game. We do not store any data from your uploads (the data is loaded to temp folder and deleted after the game session is over).
+Sugar-sugar supports **two modes**:
+
+- **Play-only mode**: if you check **"I just want to play (do not store my CGM / gameplay data)"** on the landing page, the app will **not save study outputs** (no prediction statistics are written).
+- **Study mode** (default): if you do *not* check play-only, the app may write **consent + study outputs** to CSV for research.
+
+Notes:
+
+- **Raw uploaded CGM files are used to run the game**. The app is designed to avoid keeping raw uploads permanently.
+- In **study mode**, the app writes derived outputs (e.g. predictions vs ground truth + accuracy metrics) to `data/input/prediction_statistics.csv` and ranking info to `data/input/prediction_ranking.csv`.
+- Consent choices are recorded to `data/input/consent_agreement.csv` (keyed by the same `study_id`).
 
 ### How accurate can glucose predictions be?
 Glucose prediction is complex! Research shows that CGM data alone often isn't enough for highly accurate predictions. Other factors like physical activity, meals, insulin, and stress play crucial roles. For a deep dive into state-of-the-art machine learning approaches to glucose prediction, check out [GlucoBench](https://github.com/IrinaStatsLab/GlucoBench) ([paper](https://arxiv.org/abs/2410.05780)), which provides benchmarks and datasets for glucose prediction models.
@@ -131,7 +140,7 @@ Great! Feel free to:
 
 ## Technical Architecture
 
-sugar-sugar is built with [Plotly Dash](https://dash.plotly.com/), creating an interactive web application for glucose prediction gaming. The app uses session-based state management to support multiple users and processes CGM data from Dexcom and Libre devices without storing any personal information permanently.
+sugar-sugar is built with [Plotly Dash](https://dash.plotly.com/), creating an interactive web application for glucose prediction gaming. The app uses session-based state management to support multiple users and processes CGM data from Dexcom and Libre devices.
 
 ### Application Structure
 
@@ -140,8 +149,10 @@ sugar_sugar/
 ├── app.py                  # Main application and routing logic
 ├── config.py              # Application constants and configuration
 ├── data.py                 # Data loading and processing utilities
+├── consent.py              # Consent CSV persistence utilities
 └── components/             # Modular UI components
-    ├── startup.py          # User registration and consent page
+    ├── landing.py          # Landing + consent/choices page
+    ├── startup.py          # User registration (demographics/medical history)
     ├── header.py           # Game controls and file upload
     ├── glucose.py          # Interactive glucose visualization
     ├── predictions.py      # Prediction data table
@@ -155,20 +166,26 @@ sugar_sugar/
 #### 1. **Application Core (`app.py`)**
 - **Purpose**: Main application orchestration and routing
 - **Key Features**:
-  - Multi-page routing (startup → prediction → ending)
+  - Multi-page routing (landing → startup → prediction → ending)
   - Session storage management for user state
   - Component integration and callback coordination
   - Data format conversion between session storage and components
 
-#### 2. **Startup Page (`startup.py`)**
-- **Purpose**: User onboarding and data consent
+#### 2. **Landing Page (`landing.py`)**
+- **Purpose**: First screen (study info + consent/choices)
+- **Key Features**:
+  - Play-only vs study mode selection
+  - Optional checkboxes to receive results later / get updates
+  - Consent choices saved to `data/input/consent_agreement.csv` (by `study_id`)
+
+#### 3. **Startup Page (`startup.py`)**
+- **Purpose**: User onboarding form (demographics / medical history)
 - **Key Features**:
   - Comprehensive user information collection (demographics, medical history)
-  - Data usage consent and privacy information
   - Form validation with required field indicators
   - Debug mode for development testing
 
-#### 3. **Header Component (`header.py`)**
+#### 4. **Header Component (`header.py`)**
 - **Purpose**: Game controls and data management
 - **Key Features**:
   - CGM file upload (Dexcom/Libre CSV formats)
@@ -176,7 +193,7 @@ sugar_sugar/
   - Points control for adjusting visible data range (24-48 points)
   - Game instructions and user guidance
 
-#### 4. **Glucose Chart (`glucose.py`)**
+#### 5. **Glucose Chart (`glucose.py`)**
 - **Purpose**: Interactive glucose data visualization and prediction interface
 - **Key Features**:
   - Displays historical glucose data from uploaded CSV files
@@ -186,7 +203,7 @@ sugar_sugar/
   - Dynamic y-axis scaling based on data range
   - Session storage integration for state persistence
 
-#### 5. **Prediction Table (`predictions.py`)**
+#### 6. **Prediction Table (`predictions.py`)**
 - **Purpose**: Structured display comparing user predictions against ground truth
 - **Key Features**:
   - Side-by-side comparison of predicted vs actual glucose values (from CSV)
@@ -195,7 +212,7 @@ sugar_sugar/
   - Absolute and relative error calculations showing prediction accuracy
   - Time-indexed columns for easy temporal comparison
 
-#### 6. **Metrics Component (`metrics.py`)**
+#### 7. **Metrics Component (`metrics.py`)**
 - **Purpose**: Statistical accuracy measurement comparing predictions to ground truth
 - **Key Features**:
   - Multiple accuracy metrics (MAE, RMSE, MAPE, R²) calculated against actual CSV values
@@ -203,7 +220,7 @@ sugar_sugar/
   - Real-time calculation updates as more predictions are added
   - Detailed metric descriptions for user education about prediction quality
 
-#### 7. **Submit Component (`submit.py`)**
+#### 8. **Submit Component (`submit.py`)**
 - **Purpose**: Game completion and data export
 - **Key Features**:
   - Prediction statistics export to CSV
@@ -211,7 +228,7 @@ sugar_sugar/
   - Unique session ID generation
   - Research data collection (anonymized)
 
-#### 8. **Ending Page (`ending.py`)**
+#### 9. **Ending Page (`ending.py`)**
 - **Purpose**: Results summary and game completion
 - **Key Features**:
   - Complete prediction visualization
@@ -240,5 +257,5 @@ The application uses Dash's session storage (`dcc.Store`) for state management:
 - **Multi-CGM Support**: Handles both Dexcom G6 and Libre 3 data formats
 - **Real-time Interactivity**: Immediate feedback as users make predictions
 - **Responsive Design**: Bootstrap-based UI that works on various screen sizes
-- **Privacy-First**: No server-side data storage, all processing client-side
-- **Research Integration**: Optional anonymized data collection for glucose prediction research
+- **Play-only option**: You can play without writing study outputs
+- **Research Integration**: In study mode, the app can write consent + derived prediction metrics for research

@@ -173,3 +173,5 @@ cython_debug/
 # Application generated files
 prediction_statistics.csv
 claude_summary.md
+prediction_ranking.csv
+consent_agreement.csv

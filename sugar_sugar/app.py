@@ -33,6 +33,7 @@ from sugar_sugar.components.glucose import GlucoseChart
 from sugar_sugar.components.metrics import MetricsComponent
 from sugar_sugar.components.predictions import PredictionTableComponent
 from sugar_sugar.components.startup import StartupPage
+from sugar_sugar.components.landing import LandingPage
 from sugar_sugar.components.submit import SubmitComponent
 from sugar_sugar.components.header import HeaderComponent
 from sugar_sugar.components.ending import EndingPage
@@ -135,6 +136,7 @@ submit_component = SubmitComponent()
 header_component = HeaderComponent(show_time_slider=False, initial_slider_value=example_initial_slider_value)
 # startup_page will be created in main() after debug mode is set
 startup_page = None  # Will be initialized in main()
+landing_page = None  # Will be initialized in main()
 ending_page = EndingPage()
 
 # Set initial layout to startup page
@@ -166,7 +168,7 @@ app.layout = html.Div([
 )
 def reset_glucose_unit_on_start_page(pathname: Optional[str]) -> str:
     """Always reset units to mg/dL on the start page to avoid carry-over between runs/users."""
-    if pathname == '/':
+    if pathname in ('/', '/startup'):
         return 'mg/dL'
     raise PreventUpdate
 
@@ -189,6 +191,8 @@ def display_page(pathname: Optional[str], user_info: Optional[Dict[str, Any]],
         warning_content = render_mobile_warning(user_agent)
         if pathname == '/prediction' and user_info:
             return create_prediction_layout(), warning_content
+        if pathname == '/startup':
+            return (startup_page if startup_page else html.Div("Loading..."), warning_content)
         if pathname == '/ending':
             # Check if we have the required data for ending page
             if not full_df_data or not user_info or 'prediction_table_data' not in user_info:
@@ -232,7 +236,8 @@ def display_page(pathname: Optional[str], user_info: Optional[Dict[str, Any]],
                     ], style={'textAlign': 'center'})
                 ]), warning_content
             return create_final_layout(full_df_data, user_info, glucose_unit), warning_content
-        return (startup_page if startup_page else html.Div("Loading..."), warning_content)  # Return the startup page component
+        # Default route: landing page
+        return (landing_page if landing_page else html.Div("Loading..."), warning_content)
 
 def create_prediction_layout() -> html.Div:
     """Create the prediction page layout"""
@@ -920,19 +925,23 @@ def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) ->
      State('diabetes-duration-input', 'value'),
      State('medical-conditions-dropdown', 'value'),
      State('medical-conditions-input', 'value'),
-     State('location-input', 'value')],
+     State('location-input', 'value'),
+     State('user-info-store', 'data')],
     prevent_initial_call=True
 )
 def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Optional[int], 
                        gender: Optional[str], diabetic: Optional[bool], diabetic_type: Optional[str], 
                        diabetes_duration: Optional[int], medical_conditions: Optional[bool], 
-                       medical_conditions_input: Optional[str], location: Optional[str]) -> Tuple[str, Dict[str, Any]]:
+                       medical_conditions_input: Optional[str], location: Optional[str],
+                       existing_user_info: Optional[Dict[str, Any]] = None) -> Tuple[str, Dict[str, Any]]:
     """Handle start button on startup page"""
-    if n_clicks and email and age:
-        print("DEBUG: Start button clicked")
-        return '/prediction', {
-            'study_id': str(uuid.uuid4()),
-            'email': email,
+    if n_clicks and age and gender and diabetic is not None and location:
+        info: Dict[str, Any] = dict(existing_user_info or {})
+        study_id = info.get('study_id') or str(uuid.uuid4())
+
+        info.update({
+            'study_id': study_id,
+            'email': email or info.get('email') or '',
             'age': age,
             'gender': gender,
             'diabetic': diabetic,
@@ -940,15 +949,15 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
             'diabetes_duration': diabetes_duration,
             'other_medical_conditions': medical_conditions,
             'medical_conditions_input': medical_conditions_input,
-            'location': location
-            ,
-            'rounds': [],
-            'max_rounds': MAX_ROUNDS,
-            'current_round_number': 1,
-            'statistics_saved': False,
-            'is_example_data': True,
-            'data_source_name': 'example.csv'
-        }
+            'location': location,
+            'rounds': info.get('rounds') or [],
+            'max_rounds': int(info.get('max_rounds') or MAX_ROUNDS),
+            'current_round_number': int(info.get('current_round_number') or 1),
+            'statistics_saved': bool(info.get('statistics_saved') or False),
+            'is_example_data': bool(info.get('is_example_data', True)),
+            'data_source_name': str(info.get('data_source_name', 'example.csv')),
+        })
+        return '/prediction', info
     return no_update, no_update
 
 
@@ -1031,7 +1040,8 @@ def handle_submit_button(n_clicks: Optional[int], user_info: Optional[Dict[str, 
         print(f"DEBUG: Submit button - Sample predictions: {current_df.filter(pl.col('prediction') != 0.0).select(['time', 'prediction']).head(5).to_dicts()}")
 
         # Save exactly once when finishing the study (round 12 or user exits early)
-        if round_number >= max_rounds and not bool(user_info.get('statistics_saved')):
+        play_only = bool(user_info.get('consent_play_only'))
+        if (not play_only) and round_number >= max_rounds and not bool(user_info.get('statistics_saved')):
             submit_component.save_statistics(current_full_df, user_info)
             user_info['statistics_saved'] = True
         
@@ -1127,7 +1137,8 @@ def handle_finish_study_from_prediction(
     if not rounds:
         return '/', None, {'hide_last_hour': True}
 
-    if full_df_data and not bool(user_info.get('statistics_saved')):
+    play_only = bool(user_info.get('consent_play_only')) if user_info else False
+    if full_df_data and (not play_only) and not bool(user_info.get('statistics_saved')):
         with start_action(action_type=u"handle_finish_study_from_prediction"):
             full_df = reconstruct_dataframe_from_dict(full_df_data)
             submit_component.save_statistics(full_df, user_info)
@@ -1160,7 +1171,8 @@ def handle_finish_study_from_ending(
     if not rounds:
         return '/', None, {'hide_last_hour': True}
 
-    if full_df_data and not bool(user_info.get('statistics_saved')):
+    play_only = bool(user_info.get('consent_play_only')) if user_info else False
+    if full_df_data and (not play_only) and not bool(user_info.get('statistics_saved')):
         with start_action(action_type=u"handle_finish_study_from_ending"):
             full_df = reconstruct_dataframe_from_dict(full_df_data)
             submit_component.save_statistics(full_df, user_info)
@@ -1904,17 +1916,20 @@ def main(
     
     # Create components after setting debug mode
     global startup_page
+    global landing_page
+    landing_page = LandingPage()
     startup_page = StartupPage()
     
     prediction_table.register_callbacks(app)  # Register the prediction table callbacks
     metrics_component.register_callbacks(app, prediction_table)  # Register the metrics component callbacks
     glucose_chart.register_callbacks(app)  # Register the glucose chart callbacks
     submit_component.register_callbacks(app)  # Register the submit component callbacks
+    landing_page.register_callbacks(app)  # Register landing page callbacks
     startup_page.register_callbacks(app)  # Register the startup page callbacks
     ending_page.register_callbacks(app)  # Register the ending page callbacks
     
-    # Update the app layout with the new startup page
-    app.layout.children[-1].children = [startup_page]
+    # Initial content: landing page (routing callback will handle the rest)
+    app.layout.children[-1].children = [landing_page]
     
     with start_action(
         action_type=u"start_dash_server",

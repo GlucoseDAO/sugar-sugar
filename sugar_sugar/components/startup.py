@@ -2,7 +2,7 @@ from dash import html, dcc
 from dash.dependencies import Input, Output, State
 from dash import no_update
 import dash
-from typing import Optional
+from typing import Any, Optional
 # DEBUG_MODE will be imported dynamically to get the latest value
 
 class StartupPage(html.Div):
@@ -41,7 +41,7 @@ class StartupPage(html.Div):
                     dcc.Input(
                         id='email-input',
                         type='email',
-                        placeholder='Enter your email',
+                        placeholder='Enter your email (optional unless you want results/updates)',
                         style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
                     ),
                     
@@ -148,27 +148,20 @@ class StartupPage(html.Div):
                         style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
                     ),
                     
-                    # Data usage explanation and consent
-                    html.Div([
-                        html.Hr(style={'margin': '30px 0', 'border': '1px solid #ddd'}),
-                        html.H3("Data Usage Information", 
-                               style={'fontSize': '24px', 'marginBottom': '15px', 'color': '#2c5282'}),
-                        html.P([
-                            "Your data will be used to study human glucose prediction accuracy and improve our understanding of blood sugar patterns. ",
-                            "This research helps advance diabetes care and glucose monitoring technology. ",
-                            "All data is handled confidentially and used solely for research purposes."
-                        ], style={'fontSize': '18px', 'lineHeight': '1.6', 'marginBottom': '20px', 'color': '#555'}),
-                        
-                        html.Div([
-                            dcc.Checklist(
-                                id='consent-checkbox',
-                                options=[
-                                    {'label': ' I understand and consent to my data being used for glucose prediction research', 'value': 'consent'}
-                                ],
-                                style={'fontSize': '18px', 'marginBottom': '20px'}
-                            )
-                        ])
-                    ], style={'backgroundColor': '#f8f9fa', 'padding': '20px', 'borderRadius': '8px', 'marginBottom': '20px'}),
+                    html.Div(
+                        [
+                            html.Hr(style={'margin': '30px 0', 'border': '1px solid #ddd'}),
+                            html.H3(
+                                "Contact preferences",
+                                style={'fontSize': '24px', 'marginBottom': '12px', 'color': '#2c5282'}
+                            ),
+                            html.P(
+                                "Email is only required if you asked to receive results later or to be kept up to date.",
+                                style={'fontSize': '18px', 'lineHeight': '1.6', 'marginBottom': '0', 'color': '#555'}
+                            ),
+                        ],
+                        style={'backgroundColor': '#f8f9fa', 'padding': '20px', 'borderRadius': '8px', 'marginBottom': '20px'}
+                    ),
                     
                     # <!-- START INSERTION: Just Test Me Button (Debug Mode Only) --> 
                     html.Div([
@@ -298,24 +291,24 @@ class StartupPage(html.Div):
              Output('diabetic-type-required', 'style'),
              Output('diabetes-duration-required', 'style'),
              Output('location-required', 'style')],
-            [Input('consent-checkbox', 'value'),
-             Input('email-input', 'value'),
+            [Input('email-input', 'value'),
              Input('age-input', 'value'),
              Input('gender-dropdown', 'value'),
              Input('diabetic-dropdown', 'value'),
              Input('diabetic-type-dropdown', 'value'),
              Input('diabetes-duration-input', 'value'),
-             Input('location-input', 'value')]
+             Input('location-input', 'value'),
+             Input('user-info-store', 'data')]
         )
         def update_form_validation(
-            consent_value: Optional[list[str]], 
             email: Optional[str], 
             age: Optional[int | float], 
             gender: Optional[str], 
             is_diabetic: Optional[bool], 
             diabetic_type: Optional[str], 
             diabetes_duration: Optional[int | float], 
-            location: Optional[str]
+            location: Optional[str],
+            user_info: Optional[dict[str, Any]]
         ) -> tuple[
             bool,
             dict[str, str | int],
@@ -327,15 +320,18 @@ class StartupPage(html.Div):
             dict[str, str | int],
             dict[str, str | int]
         ]:
-            # Check if consent is given
-            consent_given = consent_value and 'consent' in consent_value
-            
             # Base asterisk style (hidden when field is filled, red when empty)
             hidden_style = {'display': 'none'}
             required_style = {'color': '#d32f2f', 'fontSize': '24px', 'fontWeight': 'bold'}
+
+            info: dict[str, Any] = dict(user_info or {})
+            wants_contact = bool(
+                info.get('consent_receive_results_later') or
+                info.get('consent_keep_up_to_date')
+            )
             
             # Check each required field and set asterisk visibility
-            email_asterisk = hidden_style if email else required_style
+            email_asterisk = hidden_style if (not wants_contact or email) else required_style
             age_asterisk = hidden_style if age else required_style
             gender_asterisk = hidden_style if gender else required_style
             diabetic_asterisk = hidden_style if is_diabetic is not None else required_style
@@ -345,12 +341,13 @@ class StartupPage(html.Div):
             
             # Check if all required fields are filled
             all_required_filled = (
-                email and age and gender and is_diabetic is not None and location and
+                (email if wants_contact else True) and
+                age and gender and is_diabetic is not None and location and
                 (not is_diabetic or (diabetic_type and diabetes_duration is not None))
             )
             
-            # Enable button only if consent is given and all required fields are filled
-            if consent_given and all_required_filled:
+            # Enable button only if all required fields are filled
+            if all_required_filled:
                 button_style = {
                     'backgroundColor': '#4CAF50',
                     'color': 'white',
@@ -395,12 +392,11 @@ class StartupPage(html.Div):
              Output('gender-dropdown', 'value'),
              Output('diabetic-dropdown', 'value'),
              Output('medical-conditions-dropdown', 'value'),
-             Output('location-input', 'value'),
-             Output('consent-checkbox', 'value')],
+             Output('location-input', 'value')],
             [Input('test-me-button', 'n_clicks')],
             prevent_initial_call=True
         )
-        def fill_form_data(n_clicks: Optional[int]) -> tuple[str, int, str, bool, bool, str, list[str]]:
+        def fill_form_data(n_clicks: Optional[int]) -> tuple[str, int, str, bool, bool, str]:
             if n_clicks:
                 # Fill the form with realistic test data and tick consent checkbox
                 # Note: diabetic-type and diabetes-duration will be auto-filled by existing callbacks
@@ -410,10 +406,9 @@ class StartupPage(html.Div):
                     'F',                      # gender (Female)
                     True,                     # is_diabetic (Yes) - this will trigger diabetic details callback
                     False,                    # medical_conditions (No) - this will trigger medical conditions callback
-                    'San Francisco, CA',      # location
-                    ['consent']               # consent checkbox
+                    'San Francisco, CA'       # location
                 )
             
-            return no_update, no_update, no_update, no_update, no_update, no_update, no_update 
+            return no_update, no_update, no_update, no_update, no_update, no_update 
 
  
