@@ -229,9 +229,11 @@ class SubmitComponent(html.Div):
             user_info["number"] = number
         data = {
             'study_id': study_id,
+            'run_id': str(user_info.get('run_id') or ''),
             'number': number,
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'email': user_info.get('email', ''),
+            'format': str(user_info.get('run_format') or user_info.get('format') or ''),
             'is_example_data': bool(user_info.get('is_example_data', True)),
             'data_source_name': str(user_info.get('data_source_name', 'example.csv')),
             'age': age,
@@ -315,8 +317,10 @@ class SubmitComponent(html.Div):
         # Write ranking row for fast leaderboard lookups
         ranking_row = {
             'study_id': study_id,
+            'run_id': str(user_info.get('run_id') or ''),
             'number': data['number'],
             'timestamp': data['timestamp'],
+            'format': data['format'],
             'rounds_played': rounds_played,
             'is_example_data': data['is_example_data'],
             'data_source_name': data['data_source_name'],

@@ -6,6 +6,7 @@ en:
     go_to_start: "Go to Start Page"
     loading: "Loading..."
     continue: "Continue"
+    back: "Back"
     finish_exit: "Finish / Exit"
 
   language:
@@ -30,7 +31,29 @@ en:
     consent_play_only: "I just want to play (do not store my CGM / gameplay data)"
     consent_receive_results: "I want to receive my results later"
     consent_keep_updated: "Keep me up to date about project updates"
+    consent_acknowledge_label: "I am 18+ years old and I have read the consent form."
+    open_consent_form: "Open consent form"
+    consent_required_error: "Please confirm you are 18+ and have read the consent form to continue."
     next_hint: "Next: you'll fill in a short form, then upload CGM data (or use the sample dataset)."
+
+  consent_form:
+    title: "Consent form"
+    subtitle: "Please read this information before you continue. This is a basic consent form and will be updated."
+    adults_only: "You must be 18+ years old to participate in this study."
+    summary_title: "Summary"
+    summary_bullets:
+      - "You will play a glucose prediction game for up to 12 rounds."
+      - "We may store your gameplay (predictions, accuracy metrics) for research."
+      - "If you choose to upload your own CGM data, we may use it to run the game and for research."
+      - "Participation is voluntary and you can stop at any time."
+    data_title: "Data use"
+    data_bullets:
+      - "Sample (generic) data can be used without uploading any personal sensor data."
+      - "If you upload a file, it may contain sensitive health information."
+      - "We will only use the data according to your selections on the startup page."
+    withdraw_title: "Withdrawal"
+    withdraw_text: "You can stop participating at any time by closing the browser tab/window. If you want your data removed, please contact the study organizers."
+    footer_note: "After reading, return to the app and continue on the startup page."
 
   startup:
     fork_me: "Fork me on GitHub"
@@ -39,6 +62,7 @@ en:
     email_placeholder: "Enter your email (optional unless you want results/updates)"
     age_label: "Age"
     age_placeholder: "Enter your age"
+    age_must_be_18_error: "You must be 18+ to participate in the study."
     gender_label: "Gender"
     gender_placeholder: "Select your gender"
     gender_male: "Male"
@@ -64,6 +88,16 @@ en:
     contact_prefs_text: "Email is only required if you asked to receive results later or to be kept up to date."
     just_test_me: "Just Test Me"
     start_prediction: "Start Prediction"
+    format_label: "Format"
+    format_placeholder: "Choose A, B, or C"
+    format_a_label: "A"
+    format_b_label: "B"
+    format_c_label: "C"
+    format_help_a: "A — use generic data (no sensor data required). 12 rounds using a sample set."
+    format_help_b: "B — use your own data. Upload your own file and predict only on it."
+    format_help_c: "C — try both. You will upload your own file, but each round uses either sample data or your own data."
+    data_usage_consent_label: "I agree to the use of my uploaded CGM data for this study."
+    data_usage_consent_required: "Please confirm data usage consent to continue."
 
   header:
     points_label: "Number of points to show:"
@@ -71,6 +105,7 @@ en:
     upload_prompt_1: "Drag and Drop or "
     upload_prompt_2: "Upload Your Data Here"
     use_example_data: "Use Example Data"
+    upload_required: "Upload required"
     upload_success: "Successfully loaded data from %{filename}. This data will be used for predictions."
     example_data_now_using: "Now using example data. Upload a CSV file for personalized analysis."
     example_data_warning: "Currently using example data. Upload your own Dexcom/Libre CSV file for personalized analysis."
@@ -85,6 +120,7 @@ en:
 
   prediction:
     units_label: "Units:"
+    upload_required_alert: "This format requires your own CGM data. Please upload a CSV file to start."
 
   submit:
     progress_no_data: "Make predictions to the end of the hidden area to submit"
@@ -143,4 +179,10 @@ en:
     rounds_played: "Rounds played: %{played} / %{total}"
     per_round_metrics: "Per-round metrics"
     start_over: "Start Over"
+
+  switch_format:
+    title: "Try another option"
+    try_a: "Try A"
+    try_b: "Try B"
+    try_c: "Try C"
 

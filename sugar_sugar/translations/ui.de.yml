@@ -6,6 +6,7 @@ de:
     go_to_start: "Zur Startseite"
     loading: "Lädt..."
     continue: "Weiter"
+    back: "Zurück"
     finish_exit: "Beenden / Verlassen"
 
   language:
@@ -30,7 +31,29 @@ de:
     consent_play_only: "Ich möchte nur spielen (meine CGM‑/Spieldaten nicht speichern)"
     consent_receive_results: "Ich möchte meine Ergebnisse später erhalten"
     consent_keep_updated: "Haltet mich über Projekt‑Updates auf dem Laufenden"
+    consent_acknowledge_label: "Ich bin mindestens 18 Jahre alt und habe das Einwilligungsformular gelesen."
+    open_consent_form: "Einwilligungsformular öffnen"
+    consent_required_error: "Bitte bestätige, dass du 18+ bist und das Einwilligungsformular gelesen hast, um fortzufahren."
     next_hint: "Als Nächstes: kurzes Formular ausfüllen und dann CGM‑Daten hochladen (oder Beispieldaten verwenden)."
+
+  consent_form:
+    title: "Einwilligungsformular"
+    subtitle: "Bitte lies diese Informationen, bevor du fortfährst. Dies ist eine Basis‑Version und wird noch aktualisiert."
+    adults_only: "Du musst mindestens 18 Jahre alt sein, um an dieser Studie teilzunehmen."
+    summary_title: "Zusammenfassung"
+    summary_bullets:
+      - "Du spielst ein Glukose‑Vorhersage‑Spiel mit bis zu 12 Runden."
+      - "Wir können deinen Spielverlauf (Vorhersagen, Genauigkeitsmetriken) zu Forschungszwecken speichern."
+      - "Wenn du eigene CGM‑Daten hochlädst, können wir sie für das Spiel und zu Forschungszwecken verwenden."
+      - "Die Teilnahme ist freiwillig und du kannst jederzeit aufhören."
+    data_title: "Datennutzung"
+    data_bullets:
+      - "Beispieldaten können ohne Upload persönlicher Sensordaten genutzt werden."
+      - "Wenn du eine Datei hochlädst, kann sie sensible Gesundheitsdaten enthalten."
+      - "Wir verwenden die Daten nur entsprechend deiner Auswahl auf der Startseite."
+    withdraw_title: "Abbruch"
+    withdraw_text: "Du kannst jederzeit abbrechen, indem du den Browser‑Tab/das Fenster schließt. Wenn du möchtest, dass deine Daten entfernt werden, kontaktiere bitte die Studienorganisation."
+    footer_note: "Nach dem Lesen kehre zur App zurück und fahre auf der Startseite fort."
 
   startup:
     fork_me: "Fork me on GitHub"
@@ -39,6 +62,7 @@ de:
     email_placeholder: "E‑Mail eingeben (optional, außer wenn du Ergebnisse/Updates willst)"
     age_label: "Alter"
     age_placeholder: "Alter eingeben"
+    age_must_be_18_error: "Du musst 18+ sein, um an der Studie teilzunehmen."
     gender_label: "Geschlecht"
     gender_placeholder: "Geschlecht auswählen"
     gender_male: "Männlich"
@@ -64,6 +88,16 @@ de:
     contact_prefs_text: "E‑Mail ist nur erforderlich, wenn du Ergebnisse später erhalten oder über Updates informiert werden möchtest."
     just_test_me: "Nur testen"
     start_prediction: "Vorhersage starten"
+    format_label: "Format"
+    format_placeholder: "A, B oder C auswählen"
+    format_a_label: "A"
+    format_b_label: "B"
+    format_c_label: "C"
+    format_help_a: "A — generische Daten (keine Sensordaten nötig). 12 Runden mit einem Beispieldatensatz."
+    format_help_b: "B — eigene Daten. Lade eine eigene Datei hoch und prognostiziere nur darauf."
+    format_help_c: "C — beides ausprobieren. Du lädst eine eigene Datei hoch, aber pro Runde werden entweder Beispiel‑ oder eigene Daten genutzt."
+    data_usage_consent_label: "Ich stimme der Nutzung meiner hochgeladenen CGM‑Daten für diese Studie zu."
+    data_usage_consent_required: "Bitte bestätige die Einwilligung zur Datennutzung, um fortzufahren."
 
   header:
     points_label: "Anzahl der angezeigten Punkte:"
@@ -71,6 +105,7 @@ de:
     upload_prompt_1: "Drag & Drop oder "
     upload_prompt_2: "Daten hier hochladen"
     use_example_data: "Beispieldaten verwenden"
+    upload_required: "Upload erforderlich"
     upload_success: "Daten aus %{filename} wurden erfolgreich geladen. Diese Daten werden für Vorhersagen verwendet."
     example_data_now_using: "Jetzt werden Beispieldaten verwendet. Lade eine CSV‑Datei für eine personalisierte Analyse hoch."
     example_data_warning: "Aktuell werden Beispieldaten verwendet. Lade deine eigene Dexcom/Libre‑CSV für eine personalisierte Analyse hoch."
@@ -85,6 +120,7 @@ de:
 
   prediction:
     units_label: "Einheiten:"
+    upload_required_alert: "Dieses Format erfordert eigene CGM‑Daten. Bitte lade eine CSV‑Datei hoch, um zu starten."
 
   submit:
     progress_no_data: "Mache Vorhersagen bis zum Ende des ausgeblendeten Bereichs, um zu senden"
@@ -143,4 +179,10 @@ de:
     rounds_played: "Gespielte Runden: %{played} / %{total}"
     per_round_metrics: "Metriken pro Runde"
     start_over: "Neu starten"
+
+  switch_format:
+    title: "Andere Option ausprobieren"
+    try_a: "A ausprobieren"
+    try_b: "B ausprobieren"
+    try_c: "C ausprobieren"
 

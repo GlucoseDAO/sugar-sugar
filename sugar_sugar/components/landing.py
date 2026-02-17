@@ -195,6 +195,31 @@ class LandingPage(html.Div):
                         t("ui.landing.your_choices_text", locale=locale),
                         style={"color": "#334155", "lineHeight": "1.6", "marginBottom": "10px"},
                     ),
+                    html.Div(
+                        [
+                            dbc.Button(
+                                t("ui.landing.open_consent_form", locale=locale),
+                                href="/consent-form",
+                                target="_blank",
+                                rel="noopener noreferrer",
+                                color="secondary",
+                                outline=True,
+                                style={"marginBottom": "10px", "fontWeight": "700"},
+                            ),
+                            dbc.Checklist(
+                                id="consent-acknowledge",
+                                options=[
+                                    {
+                                        "label": f" {t('ui.landing.consent_acknowledge_label', locale=locale)}",
+                                        "value": "ack",
+                                    }
+                                ],
+                                value=[],
+                                style={"fontSize": "16px"},
+                            ),
+                        ],
+                        style={"marginBottom": "10px"},
+                    ),
                     dbc.Checklist(
                         id="consent-play-only",
                         options=[
@@ -270,25 +295,41 @@ class LandingPage(html.Div):
 
     def register_callbacks(self, app: dash.Dash) -> None:
         @app.callback(
-            [Output("url", "pathname", allow_duplicate=True), Output("user-info-store", "data", allow_duplicate=True)],
+            [
+                Output("url", "pathname", allow_duplicate=True),
+                Output("user-info-store", "data", allow_duplicate=True),
+                Output("landing-error", "children"),
+            ],
             [Input("landing-continue", "n_clicks")],
             [
+                State("consent-acknowledge", "value"),
                 State("consent-play-only", "value"),
                 State("consent-receive-results", "value"),
                 State("consent-keep-updated", "value"),
                 State("user-info-store", "data"),
+                State("interface-language", "data"),
             ],
             prevent_initial_call=True,
         )
         def handle_landing_continue(
             n_clicks: Optional[int],
+            acknowledge_value: Optional[list[str]],
             play_only_value: Optional[list[str]],
             receive_results_value: Optional[list[str]],
             keep_updated_value: Optional[list[str]],
             user_info: Optional[dict[str, Any]],
-        ) -> tuple[str, dict[str, Any]]:
+            interface_language: Optional[str],
+        ) -> tuple[str, dict[str, Any], Any]:
             if not n_clicks:
-                return no_update, no_update
+                return no_update, no_update, no_update
+
+            acknowledged = bool(acknowledge_value and "ack" in acknowledge_value)
+            if not acknowledged:
+                return (
+                    no_update,
+                    no_update,
+                    dbc.Alert(t("ui.landing.consent_required_error", locale=interface_language), color="danger"),
+                )
 
             info: dict[str, Any] = dict(user_info or {})
             if not info.get("study_id"):
@@ -328,5 +369,5 @@ class LandingPage(html.Div):
                 }
             )
 
-            return "/startup", info
+            return "/startup", info, None
 

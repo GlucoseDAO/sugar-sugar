@@ -12,12 +12,16 @@ class HeaderComponent(Div):
         *,
         locale: str = "en",
         show_time_slider: bool = True,
+        show_upload_section: bool = True,
+        show_example_button: bool = True,
         children: Optional[Sequence[Any]] = None,
         initial_slider_value: int = 0,
         **kwargs: Any
     ) -> None:
         self._locale: str = locale
         self.show_time_slider = show_time_slider
+        self.show_upload_section = show_upload_section
+        self.show_example_button = show_example_button
         self.initial_slider_value = initial_slider_value
         if children is None:
             children = self._create_header_content()
@@ -90,7 +94,7 @@ class HeaderComponent(Div):
 
     def create_upload_section(self) -> html.Div:
         """Create the file upload section"""
-        return html.Div([
+        children: list[Any] = [
             dcc.Upload(
                 id='upload-data',
                 children=html.Div([
@@ -108,25 +112,123 @@ class HeaderComponent(Div):
                     'marginBottom': '10px'
                 }
             ),
-            html.Button(
-                t("ui.header.use_example_data", locale=self._locale),
-                id='use-example-data-button',
-                style={
-                    'width': '100%',
-                    'height': '40px',
-                    'backgroundColor': '#f8f9fa',
-                    'border': '1px solid #dee2e6',
-                    'borderRadius': '5px',
-                    'cursor': 'pointer',
-                    'fontSize': '14px',
-                    'color': '#6c757d'
-                }
-            ),
-            html.Div(id='example-data-warning', style={'marginTop': '10px'})
+        ]
+
+        if self.show_example_button:
+            children.append(
+                html.Button(
+                    t("ui.header.use_example_data", locale=self._locale),
+                    id='use-example-data-button',
+                    style={
+                        'width': '100%',
+                        'height': '40px',
+                        'backgroundColor': '#f8f9fa',
+                        'border': '1px solid #dee2e6',
+                        'borderRadius': '5px',
+                        'cursor': 'pointer',
+                        'fontSize': '14px',
+                        'color': '#6c757d'
+                    }
+                )
+            )
+            children.append(html.Div(id='example-data-warning', style={'marginTop': '10px'}))
+
+        return html.Div([
+            *children
         ])
 
     def _create_header_content(self) -> Sequence[Any]:
         """Create the header section content with title and description"""
+        right_column_children: list[Any] = [
+            self.create_controls(),
+        ]
+
+        if self.show_upload_section:
+            right_column_children.extend(
+                [
+                    self.create_upload_section(),
+                    # Add data source indicator with improved visibility
+                    html.Div(
+                        [
+                            html.Label(
+                                t("ui.header.current_data_source", locale=self._locale),
+                                style={
+                                    'fontWeight': 'bold',
+                                    'marginRight': '8px',
+                                    'color': '#4a5568',
+                                    'fontSize': '14px',
+                                },
+                            ),
+                            html.Div(
+                                id='data-source-display',
+                                children="example.csv",
+                                style={
+                                    'color': '#2c5282',
+                                    'fontStyle': 'italic',
+                                    'fontSize': '14px',
+                                    'fontWeight': '500',
+                                    'overflow': 'hidden',
+                                    'textOverflow': 'ellipsis',
+                                    'maxWidth': '300px',
+                                    'whiteSpace': 'nowrap',
+                                },
+                            ),
+                        ],
+                        style={
+                            'marginTop': '15px',
+                            'padding': '10px',
+                            'backgroundColor': '#f7fafc',
+                            'borderRadius': '5px',
+                            'display': 'flex',
+                            'alignItems': 'center',
+                            'width': '100%',
+                            'boxShadow': '0 1px 2px rgba(0,0,0,0.05)',
+                        },
+                    ),
+                ]
+            )
+        else:
+            # Keep the data source label visible even when uploads are disabled.
+            right_column_children.append(
+                html.Div(
+                    [
+                        html.Label(
+                            t("ui.header.current_data_source", locale=self._locale),
+                            style={
+                                'fontWeight': 'bold',
+                                'marginRight': '8px',
+                                'color': '#4a5568',
+                                'fontSize': '14px',
+                            },
+                        ),
+                        html.Div(
+                            id='data-source-display',
+                            children="example.csv",
+                            style={
+                                'color': '#2c5282',
+                                'fontStyle': 'italic',
+                                'fontSize': '14px',
+                                'fontWeight': '500',
+                                'overflow': 'hidden',
+                                'textOverflow': 'ellipsis',
+                                'maxWidth': '300px',
+                                'whiteSpace': 'nowrap',
+                            },
+                        ),
+                    ],
+                    style={
+                        'marginTop': '15px',
+                        'padding': '10px',
+                        'backgroundColor': '#f7fafc',
+                        'borderRadius': '5px',
+                        'display': 'flex',
+                        'alignItems': 'center',
+                        'width': '100%',
+                        'boxShadow': '0 1px 2px rgba(0,0,0,0.05)',
+                    },
+                )
+            )
+
         return [
             html.H1(t("ui.common.app_title", locale=self._locale),
                     style={
@@ -167,36 +269,7 @@ class HeaderComponent(Div):
 
                 # Right column - Upload and controls
                 html.Div([
-                    self.create_controls(),
-                    self.create_upload_section(),
-                    # Add data source indicator with improved visibility
-                    html.Div([
-                        html.Label(t("ui.header.current_data_source", locale=self._locale), style={
-                            'fontWeight': 'bold',
-                            'marginRight': '8px',
-                            'color': '#4a5568',
-                            'fontSize': '14px'
-                        }),
-                        html.Div(id='data-source-display', children="example.csv", style={
-                            'color': '#2c5282',
-                            'fontStyle': 'italic',
-                            'fontSize': '14px',
-                            'fontWeight': '500',
-                            'overflow': 'hidden',
-                            'textOverflow': 'ellipsis',
-                            'maxWidth': '300px',
-                            'whiteSpace': 'nowrap'
-                        })
-                    ], style={
-                        'marginTop': '15px',
-                        'padding': '10px',
-                        'backgroundColor': '#f7fafc',
-                        'borderRadius': '5px',
-                        'display': 'flex',
-                        'alignItems': 'center',
-                        'width': '100%',
-                        'boxShadow': '0 1px 2px rgba(0,0,0,0.05)'
-                    })
+                    *right_column_children
                 ], style={'flex': '1'})
             ], style={
                 'display': 'flex',

@@ -59,6 +59,11 @@ class StartupPage(html.Div):
                         max=120,
                         style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
                     ),
+                    html.Div(
+                        id='age-error',
+                        children='',
+                        style={'color': '#d32f2f', 'fontSize': '16px', 'marginTop': '-12px', 'marginBottom': '20px'}
+                    ),
                     
                     html.Div([
                         html.Label(t("ui.startup.gender_label", locale=locale), style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333', 'display': 'inline-block'}),
@@ -97,6 +102,46 @@ class StartupPage(html.Div):
                             style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
                         )
                     ]),
+
+                    html.Div([
+                        html.Div([
+                            html.Label(t("ui.startup.format_label", locale=locale), style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333', 'display': 'inline-block'}),
+                            html.Span(id='format-required', children=' *', style={'color': '#d32f2f', 'fontSize': '24px', 'fontWeight': 'bold'})
+                        ], style={'marginBottom': '10px'}),
+                        dcc.Dropdown(
+                            id='format-dropdown',
+                            options=[
+                                {'label': t("ui.startup.format_a_label", locale=locale), 'value': 'A'},
+                                {'label': t("ui.startup.format_b_label", locale=locale), 'value': 'B', 'disabled': True},
+                                {'label': t("ui.startup.format_c_label", locale=locale), 'value': 'C', 'disabled': True},
+                            ],
+                            placeholder=t("ui.startup.format_placeholder", locale=locale),
+                            style={'fontSize': '20px', 'marginBottom': '10px'}
+                        ),
+                        html.Div(
+                            [
+                                html.Small(t("ui.startup.format_help_a", locale=locale)),
+                                html.Br(),
+                                html.Small(t("ui.startup.format_help_b", locale=locale)),
+                                html.Br(),
+                                html.Small(t("ui.startup.format_help_c", locale=locale)),
+                            ],
+                            style={'color': '#666', 'fontSize': '14px', 'marginBottom': '20px', 'lineHeight': '1.4'}
+                        ),
+                        html.Div(
+                            id='data-usage-consent-container',
+                            children=[
+                                dcc.Checklist(
+                                    id='data-usage-consent',
+                                    options=[{'label': t("ui.startup.data_usage_consent_label", locale=locale), 'value': 'agree'}],
+                                    value=[],
+                                    style={'fontSize': '16px'}
+                                ),
+                                html.Div(id='data-usage-error', style={'marginTop': '8px', 'color': '#d32f2f', 'fontSize': '16px'})
+                            ],
+                            style={'display': 'none', 'marginBottom': '20px'}
+                        ),
+                    ], style={'marginBottom': '10px'}),
                     
                     html.Div([
                         html.Label(t("ui.startup.diabetic_label", locale=locale), style={'fontSize': '24px', 'marginBottom': '10px', 'color': '#333', 'display': 'inline-block'}),
@@ -248,6 +293,45 @@ class StartupPage(html.Div):
 
     def register_callbacks(self, app: dash.Dash) -> None:
         @app.callback(
+            [Output('format-dropdown', 'options'),
+             Output('format-dropdown', 'value')],
+            [Input('cgm-dropdown', 'value'),
+             Input('interface-language', 'data')],
+            [State('format-dropdown', 'value')]
+        )
+        def update_format_options(
+            uses_cgm: Optional[bool],
+            interface_language: Optional[str],
+            current_format: Optional[str],
+        ) -> tuple[list[dict[str, Any]], Optional[str]]:
+            allow_all = uses_cgm is True
+            options: list[dict[str, Any]] = [
+                {'label': t("ui.startup.format_a_label", locale=interface_language), 'value': 'A'},
+                {'label': t("ui.startup.format_b_label", locale=interface_language), 'value': 'B', 'disabled': not allow_all},
+                {'label': t("ui.startup.format_c_label", locale=interface_language), 'value': 'C', 'disabled': not allow_all},
+            ]
+
+            if not current_format:
+                return options, 'A'
+            if not allow_all and current_format in ('B', 'C'):
+                return options, 'A'
+            return options, current_format
+
+        @app.callback(
+            [Output('data-usage-consent-container', 'style'),
+             Output('data-usage-consent', 'value')],
+            [Input('format-dropdown', 'value')],
+            [State('data-usage-consent', 'value')],
+        )
+        def toggle_data_usage_consent(
+            format_value: Optional[str],
+            current_value: Optional[list[str]],
+        ) -> tuple[dict[str, str], list[str]]:
+            if format_value in ('B', 'C'):
+                return {'display': 'block', 'marginBottom': '20px'}, list(current_value or [])
+            return {'display': 'none', 'marginBottom': '20px'}, []
+
+        @app.callback(
             [Output('diabetic-details', 'style'),
              Output('diabetic-type-dropdown', 'value'),
              Output('diabetes-duration-input', 'value')],
@@ -298,25 +382,34 @@ class StartupPage(html.Div):
              Output('diabetic-required', 'style'),
              Output('diabetic-type-required', 'style'),
              Output('diabetes-duration-required', 'style'),
-             Output('location-required', 'style')],
+             Output('location-required', 'style'),
+             Output('format-required', 'style'),
+             Output('age-error', 'children'),
+             Output('data-usage-error', 'children')],
             [Input('email-input', 'value'),
              Input('age-input', 'value'),
              Input('gender-dropdown', 'value'),
+             Input('format-dropdown', 'value'),
+             Input('data-usage-consent', 'value'),
              Input('diabetic-dropdown', 'value'),
              Input('diabetic-type-dropdown', 'value'),
              Input('diabetes-duration-input', 'value'),
              Input('location-input', 'value'),
-             Input('user-info-store', 'data')]
+             Input('user-info-store', 'data'),
+             Input('interface-language', 'data')]
         )
         def update_form_validation(
             email: Optional[str], 
             age: Optional[int | float], 
             gender: Optional[str], 
+            format_value: Optional[str],
+            data_usage_consent: Optional[list[str]],
             is_diabetic: Optional[bool], 
             diabetic_type: Optional[str], 
             diabetes_duration: Optional[int | float], 
             location: Optional[str],
-            user_info: Optional[dict[str, Any]]
+            user_info: Optional[dict[str, Any]],
+            interface_language: Optional[str],
         ) -> tuple[
             bool,
             dict[str, str | int],
@@ -326,7 +419,10 @@ class StartupPage(html.Div):
             dict[str, str | int],
             dict[str, str | int],
             dict[str, str | int],
-            dict[str, str | int]
+            dict[str, str | int],
+            dict[str, str | int],
+            str,
+            str
         ]:
             # Base asterisk style (hidden when field is filled, red when empty)
             hidden_style = {'display': 'none'}
@@ -342,15 +438,28 @@ class StartupPage(html.Div):
             email_asterisk = hidden_style if (not wants_contact or email) else required_style
             age_asterisk = hidden_style if age else required_style
             gender_asterisk = hidden_style if gender else required_style
+            format_asterisk = hidden_style if format_value else required_style
             diabetic_asterisk = hidden_style if is_diabetic is not None else required_style
             diabetic_type_asterisk = hidden_style if (not is_diabetic or diabetic_type) else required_style
             diabetes_duration_asterisk = hidden_style if (not is_diabetic or diabetes_duration is not None) else required_style
             location_asterisk = hidden_style if location else required_style
+
+            is_adult = (age is not None) and (float(age) >= 18)
+            age_error = t("ui.startup.age_must_be_18_error", locale=interface_language) if (age is not None and not is_adult) else ""
+
+            needs_data_consent = format_value in ("B", "C")
+            has_data_consent = bool(data_usage_consent and "agree" in data_usage_consent)
+            data_usage_error = (
+                t("ui.startup.data_usage_consent_required", locale=interface_language)
+                if (needs_data_consent and not has_data_consent)
+                else ""
+            )
             
             # Check if all required fields are filled
             all_required_filled = (
                 (email if wants_contact else True) and
-                age and gender and is_diabetic is not None and location and
+                age and is_adult and gender and format_value and is_diabetic is not None and location and
+                (not needs_data_consent or has_data_consent) and
                 (not is_diabetic or (diabetic_type and diabetes_duration is not None))
             )
             
@@ -371,7 +480,20 @@ class StartupPage(html.Div):
                     'justifyContent': 'center',
                     'lineHeight': '1.2'
                 }
-                return False, button_style, email_asterisk, age_asterisk, gender_asterisk, diabetic_asterisk, diabetic_type_asterisk, diabetes_duration_asterisk, location_asterisk
+                return (
+                    False,
+                    button_style,
+                    email_asterisk,
+                    age_asterisk,
+                    gender_asterisk,
+                    diabetic_asterisk,
+                    diabetic_type_asterisk,
+                    diabetes_duration_asterisk,
+                    location_asterisk,
+                    format_asterisk,
+                    age_error,
+                    data_usage_error,
+                )
             else:
                 button_style = {
                     'backgroundColor': '#cccccc',
@@ -388,7 +510,20 @@ class StartupPage(html.Div):
                     'justifyContent': 'center',
                     'lineHeight': '1.2'
                 }
-                return True, button_style, email_asterisk, age_asterisk, gender_asterisk, diabetic_asterisk, diabetic_type_asterisk, diabetes_duration_asterisk, location_asterisk 
+                return (
+                    True,
+                    button_style,
+                    email_asterisk,
+                    age_asterisk,
+                    gender_asterisk,
+                    diabetic_asterisk,
+                    diabetic_type_asterisk,
+                    diabetes_duration_asterisk,
+                    location_asterisk,
+                    format_asterisk,
+                    age_error,
+                    data_usage_error,
+                )
 
         # <!-- START INSERTION: Test Me Button Callback -->
         # Callback for "Just Test Me" button

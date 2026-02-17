@@ -47,6 +47,7 @@ from sugar_sugar.components.metrics import MetricsComponent
 from sugar_sugar.components.predictions import PredictionTableComponent
 from sugar_sugar.components.startup import StartupPage
 from sugar_sugar.components.landing import LandingPage
+from sugar_sugar.components.consent_form import ConsentFormPage
 from sugar_sugar.components.submit import SubmitComponent
 from sugar_sugar.components.header import HeaderComponent
 from sugar_sugar.components.ending import EndingPage
@@ -237,8 +238,11 @@ def display_page(
     locale = normalize_locale(interface_language)
     with start_action(action_type=u"display_page", pathname=pathname, locale=locale):
         warning_content = render_mobile_warning(user_agent, locale=locale)
+        if pathname == "/consent-form":
+            return ConsentFormPage(locale=locale), warning_content
         if pathname == '/prediction' and user_info:
-            return create_prediction_layout(locale=locale), warning_content
+            format_value = str(user_info.get("format") or "A")
+            return create_prediction_layout(locale=locale, format_value=format_value), warning_content
         if pathname == '/startup':
             return (StartupPage(locale=locale), warning_content)
         if pathname == '/ending':
@@ -287,10 +291,18 @@ def display_page(
         # Default route: landing page
         return (LandingPage(locale=locale), warning_content)
 
-def create_prediction_layout(*, locale: str) -> html.Div:
+def create_prediction_layout(*, locale: str, format_value: str) -> html.Div:
     """Create the prediction page layout"""
+    show_upload = format_value in ("B", "C")
     return html.Div([
-        HeaderComponent(show_time_slider=False, initial_slider_value=example_initial_slider_value, locale=locale),
+        HeaderComponent(
+            show_time_slider=False,
+            show_upload_section=show_upload,
+            show_example_button=(format_value == "A"),
+            initial_slider_value=example_initial_slider_value,
+            locale=locale,
+        ),
+        html.Div(id="upload-required-alert", style={'margin': '0 auto', 'maxWidth': '900px'}),
         html.Div(id='round-indicator', style={
             'textAlign': 'center',
             'fontSize': '18px',
@@ -370,6 +382,35 @@ def update_round_indicator(pathname: Optional[str], user_info: Optional[Dict[str
     current_round = int(user_info.get('current_round_number') or (rounds_played + 1))
     max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS)
     return t("ui.common.round_of", locale=normalize_locale(interface_language), current=current_round, total=max_rounds)
+
+
+@app.callback(
+    Output("upload-required-alert", "children"),
+    [Input("url", "pathname"),
+     Input("current-window-df", "data"),
+     Input("user-info-store", "data"),
+     Input("interface-language", "data")],
+    prevent_initial_call=False,
+)
+def show_upload_required_alert(
+    pathname: Optional[str],
+    current_df_data: Optional[Dict[str, Any]],
+    user_info: Optional[Dict[str, Any]],
+    interface_language: Optional[str],
+) -> Optional[html.Div]:
+    if pathname != "/prediction":
+        return None
+    fmt = str((user_info or {}).get("format") or "A")
+    if fmt not in ("B", "C"):
+        return None
+    if current_df_data:
+        return None
+    locale = normalize_locale(interface_language)
+    return dbc.Alert(
+        t("ui.prediction.upload_required_alert", locale=locale),
+        color="info",
+        style={"marginBottom": "10px"},
+    )
 
 def create_ending_layout(
     full_df_data: Optional[Dict],
@@ -478,6 +519,13 @@ def create_ending_layout(
     max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS) if user_info else MAX_ROUNDS
     current_round_number = int(user_info.get('current_round_number') or rounds_played) if user_info else rounds_played
     is_last_round = current_round_number >= max_rounds
+    current_format = str((user_info or {}).get("format") or "A")
+    allowed_formats: list[str] = ["A"] + (["B", "C"] if bool((user_info or {}).get("uses_cgm")) else [])
+    switch_targets: list[str] = [f for f in allowed_formats if f != current_format]
+    needs_switch_data_consent = bool(
+        (not bool((user_info or {}).get("consent_use_uploaded_data")))
+        and any(f in ("B", "C") for f in switch_targets)
+    )
 
     return html.Div([
         # Add a scroll-to-top trigger element
@@ -647,7 +695,76 @@ def create_ending_layout(
             'gap': 'clamp(10px, 2vw, 20px)',
             'marginTop': '20px',
             'padding': '0 10px'
-        })
+        }),
+        html.Div(
+            [
+                html.H3(
+                    t("ui.switch_format.title", locale=locale),
+                    style={'textAlign': 'center', 'marginTop': '20px', 'marginBottom': '10px', 'fontSize': 'clamp(18px, 3vw, 24px)'},
+                ),
+                html.Div(id="switch-format-error", style={'marginBottom': '10px'}),
+                dcc.Checklist(
+                    id="switch-data-usage-consent",
+                    options=[{'label': t("ui.startup.data_usage_consent_label", locale=locale), 'value': 'agree'}],
+                    value=[],
+                    style={'fontSize': '16px', 'marginBottom': '12px', 'display': 'block' if needs_switch_data_consent else 'none'},
+                ),
+                html.Div(
+                    [
+                        html.Button(
+                            t("ui.switch_format.try_a", locale=locale),
+                            id="switch-format-a",
+                            style={
+                                'backgroundColor': '#1d4ed8',
+                                'color': 'white',
+                                'padding': '12px 18px',
+                                'border': 'none',
+                                'borderRadius': '6px',
+                                'fontSize': '16px',
+                                'cursor': 'pointer',
+                            },
+                        ) if "A" in switch_targets else None,
+                        html.Button(
+                            t("ui.switch_format.try_b", locale=locale),
+                            id="switch-format-b",
+                            style={
+                                'backgroundColor': '#1d4ed8',
+                                'color': 'white',
+                                'padding': '12px 18px',
+                                'border': 'none',
+                                'borderRadius': '6px',
+                                'fontSize': '16px',
+                                'cursor': 'pointer',
+                            },
+                        ) if "B" in switch_targets else None,
+                        html.Button(
+                            t("ui.switch_format.try_c", locale=locale),
+                            id="switch-format-c",
+                            style={
+                                'backgroundColor': '#1d4ed8',
+                                'color': 'white',
+                                'padding': '12px 18px',
+                                'border': 'none',
+                                'borderRadius': '6px',
+                                'fontSize': '16px',
+                                'cursor': 'pointer',
+                            },
+                        ) if "C" in switch_targets else None,
+                    ],
+                    style={'display': 'flex', 'justifyContent': 'center', 'gap': '12px', 'flexWrap': 'wrap'},
+                ),
+            ],
+            style={
+                'marginTop': '10px',
+                'padding': 'clamp(10px, 2vw, 20px)',
+                'backgroundColor': 'white',
+                'borderRadius': '10px',
+                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+                'width': '100%',
+                'boxSizing': 'border-box',
+                'display': 'block' if (is_last_round and switch_targets) else 'none',
+            },
+        ),
     ], style={
         'maxWidth': '100%',  # Allow full width usage
         'width': '100%',
@@ -743,6 +860,13 @@ def create_final_layout(full_df_data: Dict, user_info: Dict[str, Any], glucose_u
     max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS)
     unit = glucose_unit if glucose_unit in ('mg/dL', 'mmol/L') else 'mg/dL'
     study_id = str(user_info.get('study_id') or '')
+    current_format = str(user_info.get("format") or "A")
+    allowed_formats: list[str] = ["A"] + (["B", "C"] if bool(user_info.get("uses_cgm")) else [])
+    switch_targets: list[str] = [f for f in allowed_formats if f != current_format]
+    needs_switch_data_consent = bool(
+        (not bool(user_info.get("consent_use_uploaded_data")))
+        and any(f in ("B", "C") for f in switch_targets)
+    )
 
     def _rank_text() -> Optional[str]:
         """Return 'You are X out of Y' based on overall MAE (mg/dL) if possible."""
@@ -904,6 +1028,75 @@ def create_final_layout(full_df_data: Dict, user_info: Dict[str, Any], glucose_u
             'width': '100%',
             'boxSizing': 'border-box'
         }),
+        html.Div(
+            [
+                html.H3(
+                    t("ui.switch_format.title", locale=locale),
+                    style={'textAlign': 'center', 'marginBottom': '10px', 'fontSize': 'clamp(18px, 3vw, 24px)'},
+                ),
+                html.Div(id="switch-format-error", style={'marginBottom': '10px'}),
+                dcc.Checklist(
+                    id="switch-data-usage-consent",
+                    options=[{'label': t("ui.startup.data_usage_consent_label", locale=locale), 'value': 'agree'}],
+                    value=[],
+                    style={'fontSize': '16px', 'marginBottom': '12px', 'display': 'block' if needs_switch_data_consent else 'none'},
+                ),
+                html.Div(
+                    [
+                        html.Button(
+                            t("ui.switch_format.try_a", locale=locale),
+                            id="switch-format-a",
+                            style={
+                                'backgroundColor': '#1d4ed8',
+                                'color': 'white',
+                                'padding': '12px 18px',
+                                'border': 'none',
+                                'borderRadius': '6px',
+                                'fontSize': '16px',
+                                'cursor': 'pointer',
+                            },
+                        ) if "A" in switch_targets else None,
+                        html.Button(
+                            t("ui.switch_format.try_b", locale=locale),
+                            id="switch-format-b",
+                            style={
+                                'backgroundColor': '#1d4ed8',
+                                'color': 'white',
+                                'padding': '12px 18px',
+                                'border': 'none',
+                                'borderRadius': '6px',
+                                'fontSize': '16px',
+                                'cursor': 'pointer',
+                            },
+                        ) if "B" in switch_targets else None,
+                        html.Button(
+                            t("ui.switch_format.try_c", locale=locale),
+                            id="switch-format-c",
+                            style={
+                                'backgroundColor': '#1d4ed8',
+                                'color': 'white',
+                                'padding': '12px 18px',
+                                'border': 'none',
+                                'borderRadius': '6px',
+                                'fontSize': '16px',
+                                'cursor': 'pointer',
+                            },
+                        ) if "C" in switch_targets else None,
+                    ],
+                    style={'display': 'flex', 'justifyContent': 'center', 'gap': '12px', 'flexWrap': 'wrap'},
+                ),
+            ],
+            style={
+                'marginBottom': '20px',
+                'padding': 'clamp(10px, 2vw, 20px)',
+                'backgroundColor': 'white',
+                'borderRadius': '10px',
+                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+                'width': '100%',
+                'boxSizing': 'border-box',
+                'display': 'block' if switch_targets else 'none',
+            },
+        ),
         html.Div([
             html.Button(
                 t("ui.final.start_over", locale=locale),
@@ -994,6 +1187,8 @@ def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) ->
      State('gender-dropdown', 'value'),
      State('cgm-dropdown', 'value'),
      State('cgm-duration-input', 'value'),
+     State('format-dropdown', 'value'),
+     State('data-usage-consent', 'value'),
      State('diabetic-dropdown', 'value'),
      State('diabetic-type-dropdown', 'value'),
      State('diabetes-duration-input', 'value'),
@@ -1001,26 +1196,39 @@ def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) ->
      State('user-info-store', 'data')],
     prevent_initial_call=True
 )
-def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Optional[int], 
+def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Optional[int | float], 
                        gender: Optional[str], uses_cgm: Optional[bool], cgm_duration_years: Optional[float],
+                       format_value: Optional[str], data_usage_consent: Optional[list[str]],
                        diabetic: Optional[bool], diabetic_type: Optional[str], 
                        diabetes_duration: Optional[float], location: Optional[str],
                        existing_user_info: Optional[Dict[str, Any]] = None) -> Tuple[str, Dict[str, Any]]:
     """Handle start button on startup page"""
-    if n_clicks and age and gender and diabetic is not None and location:
+    if not n_clicks:
+        return no_update, no_update
+
+    is_adult = (age is not None) and (float(age) >= 18)
+    needs_data_consent = format_value in ("B", "C")
+    has_data_consent = bool(data_usage_consent and "agree" in data_usage_consent)
+
+    if age and gender and diabetic is not None and location and format_value and is_adult and (not needs_data_consent or has_data_consent):
         from datetime import datetime
         from sugar_sugar.consent import ensure_consent_agreement_row, get_next_study_number
 
         info: Dict[str, Any] = dict(existing_user_info or {})
         study_id = info.get('study_id') or str(uuid.uuid4())
+        run_id = str(uuid.uuid4())
 
         info.update({
             'study_id': study_id,
+            'run_id': run_id,
             'email': email or info.get('email') or '',
             'age': age,
             'gender': gender,
             'uses_cgm': uses_cgm,
             'cgm_duration_years': cgm_duration_years,
+            'format': format_value,
+            'run_format': format_value,
+            'consent_use_uploaded_data': has_data_consent,
             'diabetic': diabetic,
             'diabetic_type': diabetic_type,
             'diabetes_duration': diabetes_duration,
@@ -1136,7 +1344,10 @@ def handle_submit_button(n_clicks: Optional[int], user_info: Optional[Dict[str, 
             'round_number': round_number,
             'prediction_window_start': user_info['prediction_window_start'],
             'prediction_window_size': user_info['prediction_window_size'],
-            'prediction_table_data': prediction_table_data
+            'prediction_table_data': prediction_table_data,
+            'format': str(user_info.get('format') or ''),
+            'is_example_data': bool(user_info.get('is_example_data', True)),
+            'data_source_name': str(user_info.get('data_source_name', 'example.csv')),
         }
         rounds.append(round_info)
         user_info['rounds'] = rounds
@@ -1175,6 +1386,9 @@ def handle_submit_button(n_clicks: Optional[int], user_info: Optional[Dict[str, 
      Output('glucose-chart-mode', 'data', allow_duplicate=True),
      Output('full-df', 'data', allow_duplicate=True),
      Output('current-window-df', 'data', allow_duplicate=True),
+     Output('events-df', 'data', allow_duplicate=True),
+     Output('is-example-data', 'data', allow_duplicate=True),
+     Output('data-source-name', 'data', allow_duplicate=True),
      Output('randomization-initialized', 'data', allow_duplicate=True),
      Output('initial-slider-value', 'data', allow_duplicate=True)],
     [Input('next-round-button', 'n_clicks')],
@@ -1186,27 +1400,60 @@ def handle_next_round_button(
     n_clicks: Optional[int],
     user_info: Optional[Dict[str, Any]],
     full_df_data: Optional[Dict]
-) -> Tuple[str, Dict[str, Any], Dict[str, bool], Dict[str, List[Any]], Dict[str, List[Any]], bool, int]:
-    if not n_clicks or not user_info or not full_df_data:
-        return no_update, no_update, no_update, no_update, no_update, no_update, no_update
+) -> Tuple[str, Dict[str, Any], Dict[str, bool], Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int]:
+    if not n_clicks or not user_info:
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
 
     rounds: list[dict[str, Any]] = user_info.get('rounds') or []
     max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS)
     next_round_number = len(rounds) + 1
     if next_round_number > max_rounds:
-        return no_update, no_update, no_update, no_update, no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
 
     with start_action(action_type=u"handle_next_round_button", next_round=next_round_number):
-        full_df = reconstruct_dataframe_from_dict(full_df_data)
-        # Reset any previous predictions before starting a fresh round
-        full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
-
+        fmt = str(user_info.get("format") or "A")
         points = int(user_info.get('prediction_window_size') or DEFAULT_POINTS)
         points = max(MIN_POINTS, min(MAX_POINTS, points))
+
+        # Choose dataset based on format.
+        is_example: bool
+        source_name: str
+        if fmt == "A":
+            full_df, events_df = load_glucose_data()
+            is_example = True
+            source_name = "example.csv"
+        elif fmt == "B":
+            uploaded_path = user_info.get("uploaded_data_path")
+            if not uploaded_path:
+                # Should not happen in normal flow, but keep safe empty state.
+                return '/prediction', user_info, {'hide_last_hour': True}, no_update, no_update, no_update, False, "", False, 0
+            full_df, events_df = load_glucose_data(Path(str(uploaded_path)))
+            is_example = False
+            source_name = str(user_info.get("uploaded_data_filename") or user_info.get("data_source_name") or "uploaded.csv")
+        else:
+            # Format C: alternate between uploaded (odd rounds) and example (even rounds)
+            uploaded_path = user_info.get("uploaded_data_path")
+            if not uploaded_path:
+                return '/prediction', user_info, {'hide_last_hour': True}, no_update, no_update, no_update, False, "", False, 0
+            use_example = (next_round_number % 2 == 0)
+            if use_example:
+                full_df, events_df = load_glucose_data()
+                is_example = True
+                source_name = "example.csv"
+            else:
+                full_df, events_df = load_glucose_data(Path(str(uploaded_path)))
+                is_example = False
+                source_name = str(user_info.get("uploaded_data_filename") or user_info.get("data_source_name") or "uploaded.csv")
+
+        # Reset any previous predictions before starting a fresh round.
+        full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
+
         new_df, random_start = get_random_data_window(full_df, points)
         new_df = new_df.with_columns(pl.lit(0.0).alias("prediction"))
 
         user_info['current_round_number'] = next_round_number
+        user_info['is_example_data'] = is_example
+        user_info['data_source_name'] = source_name
         chart_mode = {'hide_last_hour': True}
 
         return (
@@ -1215,6 +1462,9 @@ def handle_next_round_button(
             chart_mode,
             convert_df_to_dict(full_df),
             convert_df_to_dict(new_df),
+            convert_events_df_to_dict(events_df),
+            is_example,
+            source_name,
             False,  # let slider init set it from initial-slider-value
             random_start
         )
@@ -1310,6 +1560,181 @@ def handle_restart_button(n_clicks: Optional[int]) -> Tuple[str, None, Dict[str,
         return '/', None, chart_mode, False, 'mg/dL', 'en'
     return no_update, no_update, no_update, no_update, no_update, no_update
 
+
+@app.callback(
+    [
+        Output('url', 'pathname', allow_duplicate=True),
+        Output('user-info-store', 'data', allow_duplicate=True),
+        Output('glucose-chart-mode', 'data', allow_duplicate=True),
+        Output('full-df', 'data', allow_duplicate=True),
+        Output('current-window-df', 'data', allow_duplicate=True),
+        Output('events-df', 'data', allow_duplicate=True),
+        Output('is-example-data', 'data', allow_duplicate=True),
+        Output('data-source-name', 'data', allow_duplicate=True),
+        Output('randomization-initialized', 'data', allow_duplicate=True),
+        Output('initial-slider-value', 'data', allow_duplicate=True),
+        Output('switch-format-error', 'children', allow_duplicate=True),
+    ],
+    [
+        Input('switch-format-a', 'n_clicks'),
+        Input('switch-format-b', 'n_clicks'),
+        Input('switch-format-c', 'n_clicks'),
+    ],
+    [
+        State('user-info-store', 'data'),
+        State('switch-data-usage-consent', 'value'),
+        State('interface-language', 'data'),
+    ],
+    prevent_initial_call=True,
+)
+def handle_switch_format(
+    n_a: Optional[int],
+    n_b: Optional[int],
+    n_c: Optional[int],
+    user_info: Optional[Dict[str, Any]],
+    switch_data_consent_value: Optional[list[str]],
+    interface_language: Optional[str],
+) -> Tuple[
+    str,
+    Dict[str, Any],
+    Dict[str, bool],
+    Optional[Dict[str, List[Any]]],
+    Optional[Dict[str, List[Any]]],
+    Optional[Dict[str, List[Any]]],
+    bool,
+    str,
+    bool,
+    int,
+    Optional[Any],
+]:
+    _ = (n_a, n_b, n_c)
+    triggered = ctx.triggered_id
+    if triggered not in ('switch-format-a', 'switch-format-b', 'switch-format-c'):
+        raise PreventUpdate
+
+    target_format = {'switch-format-a': 'A', 'switch-format-b': 'B', 'switch-format-c': 'C'}[triggered]
+    locale = normalize_locale(interface_language)
+    info: Dict[str, Any] = dict(user_info or {})
+
+    # Require explicit data usage consent when switching into B/C from a session that didn't request it yet.
+    if target_format in ("B", "C") and not bool(info.get("consent_use_uploaded_data")):
+        agreed = bool(switch_data_consent_value and "agree" in switch_data_consent_value)
+        if not agreed:
+            return (
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+                dbc.Alert(t("ui.startup.data_usage_consent_required", locale=locale), color="danger"),
+            )
+        info["consent_use_uploaded_data"] = True
+
+    def _archive_current_run(info_in: Dict[str, Any]) -> None:
+        current_fmt = str(info_in.get("format") or "")
+        rounds_now = info_in.get("rounds") or []
+        if not current_fmt or not rounds_now:
+            return
+        runs_by_format: Dict[str, list[Dict[str, Any]]] = dict(info_in.get("runs_by_format") or {})
+        runs_list = list(runs_by_format.get(current_fmt) or [])
+        runs_list.append(
+            {
+                "run_id": str(uuid.uuid4()),
+                "format": current_fmt,
+                "active_run_id": str(info_in.get("run_id") or ""),
+                "ended_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "rounds": rounds_now,
+            }
+        )
+        runs_by_format[current_fmt] = runs_list
+        info_in["runs_by_format"] = runs_by_format
+
+    with start_action(action_type=u"handle_switch_format", target=target_format):
+        _archive_current_run(info)
+
+        # Reset current run state, keep participant + consent fields.
+        info["format"] = target_format
+        info["run_id"] = str(uuid.uuid4())
+        info["run_format"] = target_format
+        info["rounds"] = []
+        info["current_round_number"] = 1
+        info["prediction_table_data"] = None
+        info["prediction_window_start"] = None
+        info["prediction_window_size"] = None
+        info["statistics_saved"] = False
+
+        chart_mode = {'hide_last_hour': True}
+
+        points = int(info.get("prediction_window_size") or DEFAULT_POINTS)
+        points = max(MIN_POINTS, min(MAX_POINTS, points))
+
+        uploaded_path = info.get("uploaded_data_path")
+
+        if target_format == "A":
+            full_df, events_df = load_glucose_data()
+            full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
+            new_df, random_start = get_random_data_window(full_df, points)
+            new_df = new_df.with_columns(pl.lit(0.0).alias("prediction"))
+            info["is_example_data"] = True
+            info["data_source_name"] = "example.csv"
+            return (
+                "/prediction",
+                info,
+                chart_mode,
+                convert_df_to_dict(full_df),
+                convert_df_to_dict(new_df),
+                convert_events_df_to_dict(events_df),
+                True,
+                "example.csv",
+                False,
+                random_start,
+                None,
+            )
+
+        if target_format in ("B", "C") and uploaded_path:
+            full_df, events_df = load_glucose_data(Path(str(uploaded_path)))
+            full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
+            new_df, random_start = get_random_data_window(full_df, points)
+            new_df = new_df.with_columns(pl.lit(0.0).alias("prediction"))
+            source_name = str(info.get("uploaded_data_filename") or info.get("data_source_name") or "uploaded.csv")
+            info["is_example_data"] = False
+            info["data_source_name"] = source_name
+            return (
+                "/prediction",
+                info,
+                chart_mode,
+                convert_df_to_dict(full_df),
+                convert_df_to_dict(new_df),
+                convert_events_df_to_dict(events_df),
+                False,
+                source_name,
+                False,
+                random_start,
+                None,
+            )
+
+        # Upload-required empty state for B/C.
+        info["is_example_data"] = False
+        info["data_source_name"] = ""
+        return (
+            "/prediction",
+            info,
+            chart_mode,
+            None,
+            None,
+            None,
+            False,
+            "",
+            False,
+            0,
+            None,
+        )
+
 # Add client-side callback to scroll to top when ending page loads
 app.clientside_callback(
     """
@@ -1337,17 +1762,37 @@ app.clientside_callback(
      Output('randomization-initialized', 'data', allow_duplicate=True),
      Output('initial-slider-value', 'data', allow_duplicate=True)],
     [Input('url', 'pathname')],
-    [State('full-df', 'data')],
+    [State('full-df', 'data'),
+     State('user-info-store', 'data')],
     prevent_initial_call=True
 )
-def initialize_data_on_url_change(pathname: Optional[str], full_df_data: Optional[Dict]) -> Tuple[Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int]:
+def initialize_data_on_url_change(
+    pathname: Optional[str],
+    full_df_data: Optional[Dict],
+    user_info: Optional[Dict[str, Any]],
+) -> Tuple[
+    Optional[Dict[str, List[Any]]],
+    Optional[Dict[str, List[Any]]],
+    Optional[Dict[str, List[Any]]],
+    bool,
+    str,
+    bool,
+    int,
+]:
     """Initialize data when URL changes or on first load"""
     # Handle URL-driven initialization without requiring existing data
     if pathname == '/ending':
         return no_update, no_update, no_update, no_update, no_update, no_update, no_update
-    # If prediction page and data already present, preserve
-    if pathname == '/prediction' and full_df_data is not None:
-        return no_update, no_update, no_update, no_update, no_update, no_update, no_update
+    if pathname == '/prediction':
+        # For format B/C: require upload, don't auto-load example dataset (even if stores currently have example data).
+        fmt = str((user_info or {}).get("format") or "A")
+        uploaded_path = (user_info or {}).get("uploaded_data_path")
+        if fmt in ("B", "C") and not uploaded_path:
+            return None, None, None, False, "", False, 0
+
+        # If prediction page and data already present, preserve.
+        if full_df_data is not None:
+            return no_update, no_update, no_update, no_update, no_update, no_update, no_update
     
     # Initialize fresh example data (startup or first load)
     full_df, events_df = load_glucose_data()
@@ -1377,17 +1822,20 @@ def initialize_data_on_url_change(pathname: Optional[str], full_df_data: Optiona
      Output('is-example-data', 'data', allow_duplicate=True),
      Output('data-source-name', 'data', allow_duplicate=True),
      Output('randomization-initialized', 'data', allow_duplicate=True),
-     Output('initial-slider-value', 'data', allow_duplicate=True)],
+     Output('initial-slider-value', 'data', allow_duplicate=True),
+     Output('user-info-store', 'data', allow_duplicate=True)],
     [Input('upload-data', 'contents')],
     [State('upload-data', 'filename'),
-     State('points-control', 'value')],
+     State('points-control', 'value'),
+     State('user-info-store', 'data')],
     prevent_initial_call=True
 )
 def handle_file_upload(upload_contents: Optional[str], filename: Optional[str], 
-                      points_value: Optional[int]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int]:
+                      points_value: Optional[int],
+                      user_info: Optional[Dict[str, Any]]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int, Dict[str, Any]]:
     """Handle file upload and data loading"""
     if not upload_contents:
-        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
     
     with start_action(action_type=u"handle_file_upload", filename=filename):
         current_time = int(time.time() * 1000)
@@ -1395,7 +1843,7 @@ def handle_file_upload(upload_contents: Optional[str], filename: Optional[str],
         # Parse upload contents
         if ',' not in upload_contents:
             print(f"ERROR: Invalid upload format for file {filename}")
-            return current_time, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+            return current_time, no_update, no_update, no_update, no_update, no_update, no_update, no_update, dict(user_info or {})
         
         content_type, content_string = upload_contents.split(',', 1)
         decoded = base64.b64decode(content_string)
@@ -1425,14 +1873,23 @@ def handle_file_upload(upload_contents: Optional[str], filename: Optional[str],
         points = max(MIN_POINTS, min(MAX_POINTS, points_value or DEFAULT_POINTS))
         new_df, random_start = get_random_data_window(new_full_df, points)
         
-        return (current_time, 
-               convert_df_to_dict(new_full_df),
-               convert_df_to_dict(new_df),
-               convert_events_df_to_dict(new_events_df),
-               False,  # is_example_data = False for uploaded files
-               filename,  # store the original filename
-               False,  # reset randomization flag for new data
-               random_start)  # Update initial slider value
+        info: Dict[str, Any] = dict(user_info or {})
+        info["uploaded_data_path"] = str(save_path)
+        info["uploaded_data_filename"] = str(filename or "")
+        info["is_example_data"] = False
+        info["data_source_name"] = str(filename or "")
+
+        return (
+            current_time,
+            convert_df_to_dict(new_full_df),
+            convert_df_to_dict(new_df),
+            convert_events_df_to_dict(new_events_df),
+            False,  # is_example_data = False for uploaded files
+            str(filename or ""),  # store the original filename
+            False,  # reset randomization flag for new data
+            random_start,  # Update initial slider value
+            info,
+        )
 
 
 # Separate callback for example data button
@@ -1734,14 +2191,27 @@ def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optiona
 
 @app.callback(
     Output('data-source-display', 'children'),
-    [Input('url', 'pathname'), Input('data-source-name', 'data')],
+    [Input('url', 'pathname'),
+     Input('data-source-name', 'data'),
+     Input('user-info-store', 'data'),
+     Input('interface-language', 'data')],
     prevent_initial_call=True
 )
-def update_data_source_display(pathname: str, source_name: Optional[str]) -> str:
+def update_data_source_display(
+    pathname: str,
+    source_name: Optional[str],
+    user_info: Optional[Dict[str, Any]],
+    interface_language: Optional[str],
+) -> str:
     """Update the visible data source label only when on the prediction page."""
     if pathname != '/prediction':
         raise PreventUpdate
-    return source_name if source_name else "example.csv"
+    if source_name:
+        return source_name
+    fmt = str((user_info or {}).get("format") or "A")
+    if fmt in ("B", "C"):
+        return t("ui.header.upload_required", locale=normalize_locale(interface_language))
+    return "example.csv"
 
 # Add callback for random slider initialization when prediction page components are ready
 @app.callback(
