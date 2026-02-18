@@ -139,6 +139,8 @@ uk:
     y_axis: "Глюкоза (%{unit})"
     trace_glucose: "Глюкоза"
     trace_predictions: "Точки прогнозу"
+    known_label: "Відомо"
+    predicted_label: "Прогноз"
     hover_insulin: "Інсулін: %{value}u<br>%{time}"
     event_insulin: "Інсулін"
     event_exercise: "Фізична активність"
@@ -173,10 +175,12 @@ uk:
     units_line: "Одиниці: %{unit}"
     next_round: "Наступний раунд"
     view_complete_analysis: "Переглянути повний аналіз"
+    graph_explanation: "На графіку показано вікно глюкози, яке ви прогнозували. Помаранчева пунктирна лінія відокремлює відому передісторію (ліворуч) від години, яку ви передбачали (праворуч). Ваші прогнози показані червоним."
 
   final:
     title: "Повний аналіз"
     rounds_played: "Зіграно раундів: %{played} / %{total}"
+    played_formats: "Зіграні формати: %{formats}"
     per_round_metrics: "Метрики по раундах"
     start_over: "Почати заново"
 
@@ -185,4 +189,5 @@ uk:
     try_a: "Спробувати A"
     try_b: "Спробувати B"
     try_c: "Спробувати C"
+    not_eligible_no_cgm: "B/C доступні лише якщо ти вказав(ла), що маєш CGM‑дані."
 

@@ -29,6 +29,7 @@ class SubmitComponent(html.Div):
         legacy_csv_path = Path(__file__).resolve().parents[2] / 'prediction_statistics.csv'
         if legacy_csv_path.exists() and not self._stats_csv_path.exists():
             legacy_csv_path.replace(self._stats_csv_path)
+        self._repair_misaligned_csv_rows()
         super().__init__([
             html.Div(
                 id="prediction-progress-label",
@@ -66,6 +67,111 @@ class SubmitComponent(html.Div):
             ),
             dcc.Store(id='prediction-stats-store', data=None)
         ], style={'display': 'flex', 'flexDirection': 'column', 'justifyContent': 'center', 'alignItems': 'center'})
+
+    def _repair_misaligned_csv_rows(self) -> None:
+        """Repair CSV rows whose columns were written in desired_fieldnames order instead of
+        the file's actual header order.  This happened when run_id and format were inserted
+        near the start of the dict but appended to files that already had run_id/format at
+        the end of the header.
+
+        General algorithm: if the file's header is H and the values were written in order D
+        (desired_names), then corrupted_row[H[i]] = actual value of D[i].
+        To recover: correct_value_for_header_col H[k] = corrupted_row[ H[ D.index(H[k]) ] ].
+        """
+        # The desired dict key order that was used when the bug was present.
+        ranking_desired: list[str] = [
+            'study_id', 'run_id', 'number', 'timestamp', 'format', 'rounds_played',
+            'is_example_data', 'data_source_name', 'overall_mae_mgdl', 'overall_mse_mgdl',
+            'overall_rmse_mgdl', 'overall_mape_pct',
+        ]
+        stats_desired: list[str] = [
+            'study_id', 'run_id', 'number', 'timestamp', 'email', 'format',
+            'is_example_data', 'data_source_name', 'age', 'user_id', 'gender',
+            'uses_cgm', 'cgm_duration_years', 'diabetic', 'diabetic_type',
+            'diabetes_duration', 'location', 'rounds_played', 'predicted_values',
+            'real_values', 'prediction_times', 'overall_mae_mgdl', 'overall_mse_mgdl',
+            'overall_rmse_mgdl', 'overall_mape_pct', 'per_round_metrics',
+        ]
+        self._repair_csv(
+            self._ranking_csv_path,
+            desired_order=ranking_desired,
+            corrupt_check_col='overall_mae_mgdl',
+            corrupt_check=lambda v: not self._is_numeric(v),
+        )
+        self._repair_csv(
+            self._stats_csv_path,
+            desired_order=stats_desired,
+            corrupt_check_col='timestamp',
+            corrupt_check=lambda v: self._is_integer_string(v),
+        )
+
+    @staticmethod
+    def _is_numeric(value: str) -> bool:
+        try:
+            float(value)
+            return True
+        except (ValueError, TypeError):
+            return False
+
+    @staticmethod
+    def _is_integer_string(value: str) -> bool:
+        try:
+            int(str(value).strip())
+            return True
+        except (ValueError, TypeError):
+            return False
+
+    @staticmethod
+    def _repair_csv(
+        path: Path,
+        desired_order: list[str],
+        corrupt_check_col: str,
+        corrupt_check: Any,
+    ) -> None:
+        """Rewrite corrupted rows in-place using the known desired write order."""
+        if not path.exists():
+            return
+        with path.open('r', newline='') as fh:
+            reader = csv.DictReader(fh)
+            header = list(reader.fieldnames or [])
+            rows = list(reader)
+        if not header:
+            return
+        # Only attempt repair when the file already has the upgraded schema
+        # (run_id and format present somewhere after the first column).
+        if 'run_id' not in header or 'format' not in header:
+            return
+
+        # Build a lookup: desired column name → index in desired_order
+        desired_index: dict[str, int] = {name: i for i, name in enumerate(desired_order)}
+
+        repaired: list[dict[str, Any]] = []
+        changed = False
+        for row in rows:
+            if not corrupt_check(row.get(corrupt_check_col, '')):
+                repaired.append(row)
+                continue
+
+            # Recover correct values: correct_row[H[k]] = row[ H[ D.index(H[k]) ] ]
+            fixed: dict[str, str] = {}
+            for k, h_col in enumerate(header):
+                d_idx = desired_index.get(h_col)
+                if d_idx is not None and d_idx < len(header):
+                    fixed[h_col] = row.get(header[d_idx], '')
+                else:
+                    fixed[h_col] = row.get(h_col, '')
+            repaired.append(fixed)
+            changed = True
+
+        if not changed:
+            return
+        tmp_path = path.with_suffix('.tmp')
+        with tmp_path.open('w', newline='') as fh:
+            writer = csv.DictWriter(fh, fieldnames=header)
+            writer.writeheader()
+            for row in repaired:
+                writer.writerow({k: row.get(k, '') for k in header})
+        tmp_path.replace(path)
 
     def _get_next_number(self) -> int:
         """Get the next number for the prediction statistics."""
@@ -265,6 +371,8 @@ class SubmitComponent(html.Div):
         ) -> None:
             file_exists = path.exists()
             desired_fieldnames = list(row.keys())
+            # Track the actual file header order so append uses the same column order.
+            final_fieldnames = desired_fieldnames
 
             if file_exists:
                 with path.open('r', newline='') as file_handle:
@@ -295,9 +403,14 @@ class SubmitComponent(html.Div):
                                     upgraded_row[new_key] = old_row.get(old_key, "")
                             writer.writerow(upgraded_row)
                     tmp_path.replace(path)
+                    # Use the upgraded schema for the append so column order matches header.
+                    final_fieldnames = upgraded_fieldnames
+                else:
+                    # No upgrade needed but must still append in the file's existing column order.
+                    final_fieldnames = list(existing_fieldnames)
 
             with path.open('a', newline='') as file_handle:
-                writer = csv.DictWriter(file_handle, fieldnames=desired_fieldnames)
+                writer = csv.DictWriter(file_handle, fieldnames=final_fieldnames)
                 if not file_exists:
                     writer.writeheader()
                 writer.writerow(row)

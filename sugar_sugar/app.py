@@ -268,7 +268,7 @@ def display_page(
                 ]), warning_content
             return create_ending_layout(full_df_data, events_df_data, user_info, glucose_unit, locale=locale), warning_content
         if pathname == '/final':
-            if not full_df_data or not user_info or 'rounds' not in user_info:
+            if not user_info:
                 return html.Div([
                     html.H2(t("ui.session_expired.title", locale=locale), style={'textAlign': 'center', 'marginTop': '50px'}),
                     html.P(t("ui.session_expired.text", locale=locale), style={'textAlign': 'center', 'marginBottom': '30px'}),
@@ -406,11 +406,20 @@ def show_upload_required_alert(
     if current_df_data:
         return None
     locale = normalize_locale(interface_language)
-    return dbc.Alert(
-        t("ui.prediction.upload_required_alert", locale=locale),
-        color="info",
-        style={"marginBottom": "10px"},
-    )
+    has_prior_rounds = bool((user_info or {}).get("runs_by_format") or (user_info or {}).get("rounds"))
+    children: list[Any] = [t("ui.prediction.upload_required_alert", locale=locale)]
+    if has_prior_rounds:
+        children += [
+            html.Br(),
+            dbc.Button(
+                t("ui.common.back", locale=locale) + " → " + t("ui.final.title", locale=locale),
+                id="back-to-final-from-upload",
+                color="link",
+                size="sm",
+                style={"paddingLeft": "0", "marginTop": "6px"},
+            ),
+        ]
+    return dbc.Alert(children, color="info", style={"marginBottom": "10px"})
 
 def create_ending_layout(
     full_df_data: Optional[Dict],
@@ -520,12 +529,15 @@ def create_ending_layout(
     current_round_number = int(user_info.get('current_round_number') or rounds_played) if user_info else rounds_played
     is_last_round = current_round_number >= max_rounds
     current_format = str((user_info or {}).get("format") or "A")
-    allowed_formats: list[str] = ["A"] + (["B", "C"] if bool((user_info or {}).get("uses_cgm")) else [])
-    switch_targets: list[str] = [f for f in allowed_formats if f != current_format]
-    needs_switch_data_consent = bool(
-        (not bool((user_info or {}).get("consent_use_uploaded_data")))
-        and any(f in ("B", "C") for f in switch_targets)
-    )
+    uses_cgm = bool((user_info or {}).get("uses_cgm", False))
+    allowed_formats: list[str] = ["A"] + (["B", "C"] if uses_cgm else [])
+    runs_by_format: dict[str, list[dict[str, Any]]] = dict((user_info or {}).get("runs_by_format") or {})
+    already_played: set[str] = {str(fmt) for fmt, runs in runs_by_format.items() if runs}
+    if rounds_played > 0:
+        already_played.add(current_format)
+    switch_targets: list[str] = [f for f in allowed_formats if f not in already_played]
+    # Uploaded-data consent is optional; we display the checkbox when B/C are available.
+    show_switch_data_consent = any(f in ("B", "C") for f in switch_targets)
 
     return html.Div([
         # Add a scroll-to-top trigger element
@@ -556,11 +568,40 @@ def create_ending_layout(
             }
         ),
         
-        # Graph section - reuse the same glucose chart component
+        # Graph section - static figure built directly from the stored window (includes predictions)
         html.Div([
+            html.P(
+                t("ui.ending.graph_explanation", locale=locale),
+                style={
+                    'textAlign': 'center',
+                    'color': '#4a5568',
+                    'fontSize': '14px',
+                    'marginBottom': '8px',
+                    'fontStyle': 'italic',
+                },
+            ),
             html.Div(
-                glucose_chart,
-                id='ending-glucose-chart-container'
+                id='ending-glucose-chart-container',
+                children=dcc.Graph(
+                    id='ending-static-graph',
+                    figure=GlucoseChart.build_static_figure(
+                        df,
+                        events_df,
+                        str(user_info.get('data_source_name') or '') if user_info else None,
+                        unit=unit,
+                        locale=locale,
+                        prediction_boundary=len(df) - PREDICTION_HOUR_OFFSET,
+                    ),
+                    config={
+                        'displayModeBar': True,
+                        'scrollZoom': False,
+                        'doubleClick': 'reset',
+                        'showAxisDragHandles': False,
+                        'displaylogo': False,
+                        'editable': False,
+                    },
+                    style={'height': '400px'},
+                )
             )
         ], style={
             'marginBottom': '20px',
@@ -707,7 +748,7 @@ def create_ending_layout(
                     id="switch-data-usage-consent",
                     options=[{'label': t("ui.startup.data_usage_consent_label", locale=locale), 'value': 'agree'}],
                     value=[],
-                    style={'fontSize': '16px', 'marginBottom': '12px', 'display': 'block' if needs_switch_data_consent else 'none'},
+                    style={'fontSize': '16px', 'marginBottom': '12px', 'display': 'block' if show_switch_data_consent else 'none'},
                 ),
                 html.Div(
                     [
@@ -722,8 +763,9 @@ def create_ending_layout(
                                 'borderRadius': '6px',
                                 'fontSize': '16px',
                                 'cursor': 'pointer',
+                                'display': 'inline-block' if "A" in switch_targets else 'none',
                             },
-                        ) if "A" in switch_targets else None,
+                        ),
                         html.Button(
                             t("ui.switch_format.try_b", locale=locale),
                             id="switch-format-b",
@@ -735,8 +777,9 @@ def create_ending_layout(
                                 'borderRadius': '6px',
                                 'fontSize': '16px',
                                 'cursor': 'pointer',
+                                'display': 'inline-block' if "B" in switch_targets else 'none',
                             },
-                        ) if "B" in switch_targets else None,
+                        ),
                         html.Button(
                             t("ui.switch_format.try_c", locale=locale),
                             id="switch-format-c",
@@ -748,8 +791,9 @@ def create_ending_layout(
                                 'borderRadius': '6px',
                                 'fontSize': '16px',
                                 'cursor': 'pointer',
+                                'display': 'inline-block' if "C" in switch_targets else 'none',
                             },
-                        ) if "C" in switch_targets else None,
+                        ),
                     ],
                     style={'display': 'flex', 'justifyContent': 'center', 'gap': '12px', 'flexWrap': 'wrap'},
                 ),
@@ -855,18 +899,30 @@ def _build_aggregate_table_data(rounds: list[dict[str, Any]]) -> list[dict[str, 
     return [actual_row, prediction_row]
 
 
-def create_final_layout(full_df_data: Dict, user_info: Dict[str, Any], glucose_unit: Optional[str], *, locale: str) -> html.Div:
+def create_final_layout(full_df_data: Optional[Dict], user_info: Dict[str, Any], glucose_unit: Optional[str], *, locale: str) -> html.Div:
     rounds: list[dict[str, Any]] = user_info.get('rounds') or []
+    # If current rounds are empty (e.g. user just switched format), fall back to the
+    # most recently archived run so results are still visible.
+    if not rounds:
+        runs_by_format: dict[str, list[dict[str, Any]]] = dict(user_info.get('runs_by_format') or {})
+        all_archived: list[dict[str, Any]] = [run for runs in runs_by_format.values() for run in runs]
+        if all_archived:
+            latest_run = max(all_archived, key=lambda r: r.get('ended_at') or '')
+            rounds = list(latest_run.get('rounds') or [])
     max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS)
     unit = glucose_unit if glucose_unit in ('mg/dL', 'mmol/L') else 'mg/dL'
     study_id = str(user_info.get('study_id') or '')
     current_format = str(user_info.get("format") or "A")
-    allowed_formats: list[str] = ["A"] + (["B", "C"] if bool(user_info.get("uses_cgm")) else [])
-    switch_targets: list[str] = [f for f in allowed_formats if f != current_format]
-    needs_switch_data_consent = bool(
-        (not bool(user_info.get("consent_use_uploaded_data")))
-        and any(f in ("B", "C") for f in switch_targets)
-    )
+    uses_cgm = bool(user_info.get("uses_cgm", False))
+    allowed_formats: list[str] = ["A"] + (["B", "C"] if uses_cgm else [])
+    runs_by_format: dict[str, list[dict[str, Any]]] = dict(user_info.get("runs_by_format") or {})
+    already_played: set[str] = {str(fmt) for fmt, runs in runs_by_format.items() if runs}
+    if rounds:
+        already_played.add(current_format)
+    switch_targets: list[str] = [f for f in allowed_formats if f not in already_played]
+    # Uploaded-data consent is optional; we display the checkbox when B/C are available.
+    show_switch_data_consent = any(f in ("B", "C") for f in switch_targets)
+    played_formats: list[str] = sorted(already_played)
 
     def _rank_text() -> Optional[str]:
         """Return 'You are X out of Y' based on overall MAE (mg/dL) if possible."""
@@ -968,6 +1024,16 @@ def create_final_layout(full_df_data: Dict, user_info: Dict[str, Any], glucose_u
             }
         ),
         html.Div(
+            (t("ui.final.played_formats", locale=locale, formats=", ".join(played_formats)) if played_formats else ""),
+            style={
+                'textAlign': 'center',
+                'marginBottom': '12px',
+                'color': '#4a5568',
+                'fontSize': '14px',
+                'display': 'block' if played_formats else 'none',
+            },
+        ),
+        html.Div(
             overall_metrics_display,
             style={
                 'padding': 'clamp(10px, 2vw, 20px)',
@@ -1039,7 +1105,7 @@ def create_final_layout(full_df_data: Dict, user_info: Dict[str, Any], glucose_u
                     id="switch-data-usage-consent",
                     options=[{'label': t("ui.startup.data_usage_consent_label", locale=locale), 'value': 'agree'}],
                     value=[],
-                    style={'fontSize': '16px', 'marginBottom': '12px', 'display': 'block' if needs_switch_data_consent else 'none'},
+                    style={'fontSize': '16px', 'marginBottom': '12px', 'display': 'block' if show_switch_data_consent else 'none'},
                 ),
                 html.Div(
                     [
@@ -1054,8 +1120,9 @@ def create_final_layout(full_df_data: Dict, user_info: Dict[str, Any], glucose_u
                                 'borderRadius': '6px',
                                 'fontSize': '16px',
                                 'cursor': 'pointer',
+                                'display': 'inline-block' if "A" in switch_targets else 'none',
                             },
-                        ) if "A" in switch_targets else None,
+                        ),
                         html.Button(
                             t("ui.switch_format.try_b", locale=locale),
                             id="switch-format-b",
@@ -1067,8 +1134,9 @@ def create_final_layout(full_df_data: Dict, user_info: Dict[str, Any], glucose_u
                                 'borderRadius': '6px',
                                 'fontSize': '16px',
                                 'cursor': 'pointer',
+                                'display': 'inline-block' if "B" in switch_targets else 'none',
                             },
-                        ) if "B" in switch_targets else None,
+                        ),
                         html.Button(
                             t("ui.switch_format.try_c", locale=locale),
                             id="switch-format-c",
@@ -1080,8 +1148,9 @@ def create_final_layout(full_df_data: Dict, user_info: Dict[str, Any], glucose_u
                                 'borderRadius': '6px',
                                 'fontSize': '16px',
                                 'cursor': 'pointer',
+                                'display': 'inline-block' if "C" in switch_targets else 'none',
                             },
-                        ) if "C" in switch_targets else None,
+                        ),
                     ],
                     style={'display': 'flex', 'justifyContent': 'center', 'gap': '12px', 'flexWrap': 'wrap'},
                 ),
@@ -1207,16 +1276,16 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
         return no_update, no_update
 
     is_adult = (age is not None) and (float(age) >= 18)
-    needs_data_consent = format_value in ("B", "C")
     has_data_consent = bool(data_usage_consent and "agree" in data_usage_consent)
 
-    if age and gender and diabetic is not None and location and format_value and is_adult and (not needs_data_consent or has_data_consent):
+    if age and gender and diabetic is not None and location and format_value and is_adult:
         from datetime import datetime
         from sugar_sugar.consent import ensure_consent_agreement_row, get_next_study_number
 
         info: Dict[str, Any] = dict(existing_user_info or {})
         study_id = info.get('study_id') or str(uuid.uuid4())
         run_id = str(uuid.uuid4())
+        uses_cgm_bool = bool(uses_cgm) if uses_cgm is not None else False
 
         info.update({
             'study_id': study_id,
@@ -1224,11 +1293,13 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
             'email': email or info.get('email') or '',
             'age': age,
             'gender': gender,
-            'uses_cgm': uses_cgm,
+            'uses_cgm': uses_cgm_bool,
             'cgm_duration_years': cgm_duration_years,
             'format': format_value,
             'run_format': format_value,
-            'consent_use_uploaded_data': has_data_consent,
+            # Optional consent for uploaded CGM data usage in study.
+            # Only meaningful for B/C, but we store an explicit boolean for all formats.
+            'consent_use_uploaded_data': bool(has_data_consent) if format_value in ("B", "C") else False,
             'diabetic': diabetic,
             'diabetic_type': diabetic_type,
             'diabetes_duration': diabetes_duration,
@@ -1488,11 +1559,11 @@ def handle_finish_study_from_prediction(
         return no_update, no_update, no_update
 
     if not user_info:
-        return '/', None, {'hide_last_hour': True}
+        return '/final', None, {'hide_last_hour': True}
 
     rounds: list[dict[str, Any]] = user_info.get('rounds') or []
     if not rounds:
-        return '/', None, {'hide_last_hour': True}
+        return '/final', user_info, {'hide_last_hour': True}
 
     play_only = bool(user_info.get('consent_play_only')) if user_info else False
     if full_df_data and (not play_only) and not bool(user_info.get('statistics_saved')):
@@ -1522,11 +1593,11 @@ def handle_finish_study_from_ending(
         return no_update, no_update, no_update
 
     if not user_info:
-        return '/', None, {'hide_last_hour': True}
+        return '/final', None, {'hide_last_hour': True}
 
     rounds: list[dict[str, Any]] = user_info.get('rounds') or []
     if not rounds:
-        return '/', None, {'hide_last_hour': True}
+        return '/final', user_info, {'hide_last_hour': True}
 
     play_only = bool(user_info.get('consent_play_only')) if user_info else False
     if full_df_data and (not play_only) and not bool(user_info.get('statistics_saved')):
@@ -1536,6 +1607,18 @@ def handle_finish_study_from_ending(
             user_info['statistics_saved'] = True
 
     return '/final', user_info, {'hide_last_hour': False}
+
+
+@app.callback(
+    [Output('url', 'pathname', allow_duplicate=True),
+     Output('glucose-chart-mode', 'data', allow_duplicate=True)],
+    Input('back-to-final-from-upload', 'n_clicks'),
+    prevent_initial_call=True,
+)
+def handle_back_to_final_from_upload(n_clicks: Optional[int]) -> Tuple[str, Dict[str, bool]]:
+    if n_clicks:
+        return '/final', {'hide_last_hour': False}
+    raise PreventUpdate
 
 
 @app.callback(
@@ -1607,33 +1690,37 @@ def handle_switch_format(
     int,
     Optional[Any],
 ]:
-    _ = (n_a, n_b, n_c)
     triggered = ctx.triggered_id
     if triggered not in ('switch-format-a', 'switch-format-b', 'switch-format-c'):
+        raise PreventUpdate
+
+    # Guard against spurious fires when buttons are first added to DOM (n_clicks=0 in Dash 3.x)
+    triggered_nclicks = {'switch-format-a': n_a, 'switch-format-b': n_b, 'switch-format-c': n_c}[triggered]
+    if not triggered_nclicks:
         raise PreventUpdate
 
     target_format = {'switch-format-a': 'A', 'switch-format-b': 'B', 'switch-format-c': 'C'}[triggered]
     locale = normalize_locale(interface_language)
     info: Dict[str, Any] = dict(user_info or {})
 
-    # Require explicit data usage consent when switching into B/C from a session that didn't request it yet.
-    if target_format in ("B", "C") and not bool(info.get("consent_use_uploaded_data")):
-        agreed = bool(switch_data_consent_value and "agree" in switch_data_consent_value)
-        if not agreed:
-            return (
-                no_update,
-                no_update,
-                no_update,
-                no_update,
-                no_update,
-                no_update,
-                no_update,
-                no_update,
-                no_update,
-                no_update,
-                dbc.Alert(t("ui.startup.data_usage_consent_required", locale=locale), color="danger"),
-            )
-        info["consent_use_uploaded_data"] = True
+    # Switching into B/C is only available for participants who said they have CGM data.
+    # Consent for uploaded CGM data usage is optional and stored as a boolean.
+    if target_format in ("B", "C") and not bool(info.get("uses_cgm", False)):
+        return (
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            dbc.Alert(t("ui.switch_format.not_eligible_no_cgm", locale=locale), color="warning"),
+        )
+    if target_format in ("B", "C"):
+        info["consent_use_uploaded_data"] = bool(switch_data_consent_value and "agree" in switch_data_consent_value)
 
     def _archive_current_run(info_in: Dict[str, Any]) -> None:
         current_fmt = str(info_in.get("format") or "")
@@ -1649,6 +1736,11 @@ def handle_switch_format(
                 "active_run_id": str(info_in.get("run_id") or ""),
                 "ended_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "rounds": rounds_now,
+                "rounds_played": int(len(rounds_now)),
+                "uses_cgm": bool(info_in.get("uses_cgm", False)),
+                "consent_use_uploaded_data": bool(info_in.get("consent_use_uploaded_data", False)),
+                "is_example_data": bool(info_in.get("is_example_data", True)),
+                "data_source_name": str(info_in.get("data_source_name") or ""),
             }
         )
         runs_by_format[current_fmt] = runs_list
@@ -1781,7 +1873,7 @@ def initialize_data_on_url_change(
 ]:
     """Initialize data when URL changes or on first load"""
     # Handle URL-driven initialization without requiring existing data
-    if pathname == '/ending':
+    if pathname in ('/ending', '/final'):
         return no_update, no_update, no_update, no_update, no_update, no_update, no_update
     if pathname == '/prediction':
         # For format B/C: require upload, don't auto-load example dataset (even if stores currently have example data).

@@ -139,6 +139,8 @@ de:
     y_axis: "Glukose (%{unit})"
     trace_glucose: "Glukose"
     trace_predictions: "Vorhersagepunkte"
+    known_label: "Bekannt"
+    predicted_label: "Vorhergesagt"
     hover_insulin: "Insulin: %{value}u<br>%{time}"
     event_insulin: "Insulin"
     event_exercise: "Bewegung"
@@ -173,10 +175,12 @@ de:
     units_line: "Einheiten: %{unit}"
     next_round: "Nächste Runde"
     view_complete_analysis: "Komplette Analyse ansehen"
+    graph_explanation: "Das Diagramm zeigt das Glukosfenster, das Sie vorhergesagt haben. Die orangefarbene gestrichelte Linie trennt die bekannte Vorgeschichte (links) von der vorhergesagten Stunde (rechts). Ihre Vorhersagen sind rot dargestellt."
 
   final:
     title: "Komplette Analyse"
     rounds_played: "Gespielte Runden: %{played} / %{total}"
+    played_formats: "Gespielte Formate bisher: %{formats}"
     per_round_metrics: "Metriken pro Runde"
     start_over: "Neu starten"
 
@@ -185,4 +189,5 @@ de:
     try_a: "A ausprobieren"
     try_b: "B ausprobieren"
     try_c: "C ausprobieren"
+    not_eligible_no_cgm: "B/C sind nur verfügbar, wenn du angegeben hast, dass du CGM‑Daten hast."
 

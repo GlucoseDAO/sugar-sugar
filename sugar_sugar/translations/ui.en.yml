@@ -139,6 +139,8 @@ en:
     y_axis: "Glucose Level (%{unit})"
     trace_glucose: "Glucose Level"
     trace_predictions: "Prediction Points"
+    known_label: "Known"
+    predicted_label: "Predicted"
     hover_insulin: "Insulin: %{value}u<br>%{time}"
     event_insulin: "Insulin"
     event_exercise: "Exercise"
@@ -173,10 +175,12 @@ en:
     units_line: "Units: %{unit}"
     next_round: "Next round"
     view_complete_analysis: "View complete analysis"
+    graph_explanation: "The chart shows the glucose window you predicted on. The orange dashed line separates the known history (left) from the hour you predicted (right). Your predictions are shown in red."
 
   final:
     title: "Complete Analysis"
     rounds_played: "Rounds played: %{played} / %{total}"
+    played_formats: "Played formats so far: %{formats}"
     per_round_metrics: "Per-round metrics"
     start_over: "Start Over"
 
@@ -185,4 +189,5 @@ en:
     try_a: "Try A"
     try_b: "Try B"
     try_c: "Try C"
+    not_eligible_no_cgm: "B/C are only available if you said you have CGM data."
 

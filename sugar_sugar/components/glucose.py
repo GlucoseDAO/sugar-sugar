@@ -439,6 +439,69 @@ class GlucoseChart(html.Div):
                     hoverinfo='text'
                 ))
 
+    @classmethod
+    def build_static_figure(
+        cls,
+        df: "pl.DataFrame",
+        events_df: "pl.DataFrame",
+        source_name: Optional[str] = None,
+        *,
+        unit: str = "mg/dL",
+        locale: str = "en",
+        prediction_boundary: Optional[int] = None,
+    ) -> go.Figure:
+        """Build a complete figure from given data without touching any instance state.
+
+        Args:
+            df: Window DataFrame with ``gl`` and ``prediction`` columns.
+            events_df: Events DataFrame (may be empty).
+            source_name: Human-readable data source label.
+            unit: ``"mg/dL"`` or ``"mmol/L"`` – controls y-axis scaling.
+            locale: UI locale string.
+            prediction_boundary: Index of the first *predicted* point. When
+                supplied a vertical dashed line is drawn there and both regions
+                are labelled.
+        """
+        instance = cls.__new__(cls)
+        instance.hide_last_hour = False
+        instance._display_unit = unit if unit in ("mg/dL", "mmol/L") else "mg/dL"
+        instance._display_factor = (1.0 / 18.0) if instance._display_unit == "mmol/L" else 1.0
+        instance._current_df = df
+        instance._current_events = events_df
+        instance._current_source = source_name
+        figure = instance._build_figure(df, events_df, source_name, locale=locale)
+
+        if prediction_boundary is not None and 0 < prediction_boundary < len(df):
+            f = instance._display_factor
+            y_min = float(df.get_column("gl").min()) * f * 0.85
+            y_max = max(float(df.get_column("gl").max()) * f * 1.15, 300 * f)
+
+            figure.add_shape(
+                type="line",
+                x0=prediction_boundary - 0.5,
+                x1=prediction_boundary - 0.5,
+                y0=y_min,
+                y1=y_max,
+                line=dict(color="orange", width=2, dash="dash"),
+                xref="x",
+                yref="y",
+            )
+            figure.add_annotation(
+                x=prediction_boundary - 0.5,
+                y=y_max,
+                text=f"← {t('ui.chart.known_label', locale=locale)} | {t('ui.chart.predicted_label', locale=locale)} →",
+                showarrow=False,
+                font=dict(size=11, color="orange"),
+                bgcolor="white",
+                bordercolor="orange",
+                borderwidth=1,
+                xanchor="center",
+                yanchor="top",
+            )
+
+        figure.update_layout(dragmode=False)
+        return figure
+
     def _update_layout(self, figure: go.Figure, *, locale: str) -> None:
         """Updates the figure layout with axes, margins, and interaction settings."""
         y_range = self._calculate_y_axis_range()
