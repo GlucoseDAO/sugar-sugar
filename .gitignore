@@ -178,3 +178,6 @@ prediction_statistics.csv
 claude_summary.md
 prediction_ranking.csv
 consent_agreement.csv
+prediction_ranking_A.csv
+prediction_ranking_B.csv
+prediction_ranking_C.csv

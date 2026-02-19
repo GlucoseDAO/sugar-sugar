@@ -221,6 +221,7 @@ def set_interface_language(
      Input('interface-language', 'data')],
     [State('user-info-store', 'data'),
      State('full-df', 'data'),
+     State('current-window-df', 'data'),
      State('events-df', 'data'),
      State('glucose-unit', 'data'),
      State('user-agent', 'data')],
@@ -231,6 +232,7 @@ def display_page(
     interface_language: Optional[str],
     user_info: Optional[Dict[str, Any]],
     full_df_data: Optional[Dict],
+    current_df_data: Optional[Dict],
     events_df_data: Optional[Dict],
     glucose_unit: Optional[str],
     user_agent: Optional[str],
@@ -266,7 +268,7 @@ def display_page(
                         )
                     ], style={'textAlign': 'center'})
                 ]), warning_content
-            return create_ending_layout(full_df_data, events_df_data, user_info, glucose_unit, locale=locale), warning_content
+            return create_ending_layout(full_df_data, current_df_data, events_df_data, user_info, glucose_unit, locale=locale), warning_content
         if pathname == '/final':
             if not user_info:
                 return html.Div([
@@ -423,6 +425,7 @@ def show_upload_required_alert(
 
 def create_ending_layout(
     full_df_data: Optional[Dict],
+    current_df_data: Optional[Dict],
     events_df_data: Optional[Dict],
     user_info: Optional[Dict] = None,
     glucose_unit: Optional[str] = None,
@@ -467,8 +470,11 @@ def create_ending_layout(
             print("DEBUG: No prediction table data available")
             return html.Div("No predictions to display", style={'textAlign': 'center', 'padding': '50px'})
         
-        # Use the same window that was used for predictions if available
-        if user_info and 'prediction_window_start' in user_info and 'prediction_window_size' in user_info:
+        # Prefer the exact window with predictions as stored in session (fixes missing prediction traces).
+        if current_df_data:
+            df = reconstruct_dataframe_from_dict(current_df_data)
+            print(f"DEBUG: Using current-window-df for ending chart (points={len(df)})")
+        elif user_info and 'prediction_window_start' in user_info and 'prediction_window_size' in user_info:
             window_start = user_info['prediction_window_start']
             window_size = user_info['prediction_window_size']
             # Ensure we don't go beyond the available data
@@ -924,12 +930,14 @@ def create_final_layout(full_df_data: Optional[Dict], user_info: Dict[str, Any],
     show_switch_data_consent = any(f in ("B", "C") for f in switch_targets)
     played_formats: list[str] = sorted(already_played)
 
-    def _rank_text() -> Optional[str]:
-        """Return 'You are X out of Y' based on overall MAE (mg/dL) if possible."""
-        if not study_id:
-            return None
-        ranking_path = project_root / 'data' / 'input' / 'prediction_ranking.csv'
-        if not ranking_path.exists():
+    def _rank_info(
+        ranking_path: Path,
+        *,
+        format_filter: Optional[str],
+        mode: str,
+    ) -> Optional[tuple[int, int]]:
+        """Return (rank, total) by overall MAE (mg/dL) for this study_id."""
+        if not study_id or not ranking_path.exists():
             return None
         try:
             ranking_df = pl.read_csv(ranking_path)
@@ -938,21 +946,64 @@ def create_final_layout(full_df_data: Optional[Dict], user_info: Dict[str, Any],
         if 'study_id' not in ranking_df.columns or 'overall_mae_mgdl' not in ranking_df.columns:
             return None
 
-        df2 = ranking_df.select(['study_id', 'overall_mae_mgdl'])
-        df2 = df2.with_columns(
-            pl.col('overall_mae_mgdl').cast(pl.Float64, strict=False)
-        ).filter(pl.col('overall_mae_mgdl').is_not_null())
-        total = df2.height
+        cols: list[str] = ['study_id', 'overall_mae_mgdl']
+        if 'format' in ranking_df.columns:
+            cols.append('format')
+        if 'timestamp' in ranking_df.columns:
+            cols.append('timestamp')
+        df2 = ranking_df.select([c for c in cols if c in ranking_df.columns])
+        df2 = df2.with_columns(pl.col('overall_mae_mgdl').cast(pl.Float64, strict=False)).filter(
+            pl.col('overall_mae_mgdl').is_not_null()
+        )
+        if format_filter and 'format' in df2.columns:
+            df2 = df2.filter(pl.col('format') == format_filter)
+
+        if mode == "latest" and 'timestamp' in df2.columns:
+            df2 = df2.with_columns(
+                pl.col('timestamp').str.strptime(pl.Datetime, format='%Y-%m-%d %H:%M:%S', strict=False).alias('_ts')
+            )
+            df_pick = (
+                df2.sort(['study_id', '_ts'])
+                .group_by('study_id')
+                .agg(pl.last('overall_mae_mgdl').alias('overall_mae_mgdl'))
+            )
+        else:
+            # Default: keep the best (lowest MAE) per study_id.
+            df_pick = df2.group_by('study_id').agg(pl.col('overall_mae_mgdl').min().alias('overall_mae_mgdl'))
+
+        total = df_pick.height
         if total == 0:
             return None
 
-        # Lower MAE is better. Break ties by study_id for determinism.
-        df_sorted = df2.sort(['overall_mae_mgdl', 'study_id'])
+        df_sorted = df_pick.sort(['overall_mae_mgdl', 'study_id'])
         matches = df_sorted.with_row_index('rank_idx').filter(pl.col('study_id') == study_id)
         if matches.height == 0:
             return None
         rank = int(matches.get_column('rank_idx')[0]) + 1
-        return f"You are ranked {rank} out of {total} (by overall MAE, mg/dL)."
+        return rank, total
+
+    ranking_lines: list[str] = []
+    for fmt in played_formats:
+        if fmt not in ("A", "B", "C"):
+            continue
+        info = _rank_info(
+            project_root / 'data' / 'input' / f'prediction_ranking_{fmt}.csv',
+            format_filter=fmt,
+            mode="best",
+        )
+        if info:
+            rank, total = info
+            ranking_lines.append(t("ui.final.ranking_format_line", locale=locale, format=fmt, rank=rank, total=total))
+
+    # Always show cumulative overall ranking ("ALL"), updated after each finished run.
+    info = _rank_info(
+        project_root / 'data' / 'input' / 'prediction_ranking.csv',
+        format_filter="ALL",
+        mode="latest",
+    )
+    if info:
+        rank, total = info
+        ranking_lines.append(t("ui.final.ranking_overall_line", locale=locale, rank=rank, total=total))
 
     metrics_component_final = MetricsComponent()
     aggregate_table_data = _convert_table_data_units(_build_aggregate_table_data(rounds), unit)
@@ -1014,14 +1065,20 @@ def create_final_layout(full_df_data: Optional[Dict], user_info: Dict[str, Any],
             }
         ),
         html.Div(
-            _rank_text() or "",
+            [
+                html.H3(t("ui.final.ranking_title", locale=locale), style={'textAlign': 'center', 'marginBottom': '10px'}),
+                html.Ul([html.Li(line) for line in ranking_lines], style={'margin': '0 auto', 'maxWidth': '760px'}),
+            ],
             style={
-                'textAlign': 'center',
                 'marginBottom': '15px',
                 'color': '#4a5568',
                 'fontSize': '14px',
-                'display': 'block' if _rank_text() else 'none'
-            }
+                'display': 'block' if ranking_lines else 'none',
+                'padding': 'clamp(10px, 2vw, 16px)',
+                'backgroundColor': 'white',
+                'borderRadius': '10px',
+                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+            },
         ),
         html.Div(
             (t("ui.final.played_formats", locale=locale, formats=", ".join(played_formats)) if played_formats else ""),

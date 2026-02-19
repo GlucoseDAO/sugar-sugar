@@ -181,6 +181,9 @@ uk:
     title: "Повний аналіз"
     rounds_played: "Зіграно раундів: %{played} / %{total}"
     played_formats: "Зіграні формати: %{formats}"
+    ranking_title: "Рейтинг"
+    ranking_format_line: "Рейтинг (%{format}): %{rank} / %{total}"
+    ranking_overall_line: "Загальний рейтинг: %{rank} / %{total}"
     per_round_metrics: "Метрики по раундах"
     start_over: "Почати заново"
 

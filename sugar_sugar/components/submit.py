@@ -19,12 +19,19 @@ class SubmitComponent(html.Div):
             / 'input'
             / 'prediction_statistics.csv'
         )
+        # Overall ranking: written only after participant completed all eligible formats.
         self._ranking_csv_path = (
             Path(__file__).resolve().parents[2]
             / 'data'
             / 'input'
             / 'prediction_ranking.csv'
         )
+        ranking_dir = self._stats_csv_path.parent
+        self._ranking_by_format_paths: dict[str, Path] = {
+            "A": ranking_dir / "prediction_ranking_A.csv",
+            "B": ranking_dir / "prediction_ranking_B.csv",
+            "C": ranking_dir / "prediction_ranking_C.csv",
+        }
         self._stats_csv_path.parent.mkdir(parents=True, exist_ok=True)
         legacy_csv_path = Path(__file__).resolve().parents[2] / 'prediction_statistics.csv'
         if legacy_csv_path.exists() and not self._stats_csv_path.exists():
@@ -98,6 +105,13 @@ class SubmitComponent(html.Div):
             corrupt_check_col='overall_mae_mgdl',
             corrupt_check=lambda v: not self._is_numeric(v),
         )
+        for path in self._ranking_by_format_paths.values():
+            self._repair_csv(
+                path,
+                desired_order=ranking_desired,
+                corrupt_check_col='overall_mae_mgdl',
+                corrupt_check=lambda v: not self._is_numeric(v),
+            )
         self._repair_csv(
             self._stats_csv_path,
             desired_order=stats_desired,
@@ -199,6 +213,7 @@ class SubmitComponent(html.Div):
         parameters: list[dict[str, Any]] = []
         actual_values: list[dict[str, Any]] = []
         prediction_times: list[dict[str, Any]] = []
+        version = str(user_info.get('run_format') or user_info.get('format') or '')
 
         # Stable ID across derived outputs (stats + ranking)
         study_id = user_info.get('study_id')
@@ -303,9 +318,9 @@ class SubmitComponent(html.Div):
                     pred_str = prediction_row.get(time_key, "-")
                     act_str = actual_row.get(time_key, "-")
                     if pred_str != "-" and act_str != "-" and i < len(times):
-                        parameters.append({"round": round_idx, "value": pred_str})
-                        actual_values.append({"round": round_idx, "value": act_str})
-                        prediction_times.append({"round": round_idx, "time": times[i]})
+                        parameters.append({"version": version, "round": round_idx, "value": pred_str})
+                        actual_values.append({"version": version, "round": round_idx, "value": act_str})
+                        prediction_times.append({"version": version, "round": round_idx, "value": times[i]})
         else:
             # Backwards-compatible single-round behavior (still a single row)
             table_data = user_info.get('prediction_table_data', []) or []
@@ -319,9 +334,9 @@ class SubmitComponent(html.Div):
                     pred_str = prediction_row.get(time_key, "-")
                     act_str = actual_row.get(time_key, "-")
                     if pred_str != "-" and act_str != "-" and i < len(times):
-                        parameters.append({"round": 1, "value": pred_str})
-                        actual_values.append({"round": 1, "value": act_str})
-                        prediction_times.append({"round": 1, "time": times[i]})
+                        parameters.append({"version": version, "round": 1, "value": pred_str})
+                        actual_values.append({"version": version, "round": 1, "value": act_str})
+                        prediction_times.append({"version": version, "round": 1, "value": times[i]})
         
         # Get age and user_id from DataFrame
         age = df.get_column('age')[0] if 'age' in df.columns else 0
@@ -339,13 +354,13 @@ class SubmitComponent(html.Div):
             'number': number,
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'email': user_info.get('email', ''),
-            'format': str(user_info.get('run_format') or user_info.get('format') or ''),
+            'format': version,
             'is_example_data': bool(user_info.get('is_example_data', True)),
             'data_source_name': str(user_info.get('data_source_name', 'example.csv')),
             'age': age,
             'user_id': user_id,
             'gender': user_info.get('gender', ''),
-            'uses_cgm': user_info.get('uses_cgm', ''),
+            'uses_cgm': bool(user_info.get('uses_cgm', False)),
             'cgm_duration_years': user_info.get('cgm_duration_years', ''),
             'diabetic': user_info.get('diabetic', ''),
             'diabetic_type': user_info.get('diabetic_type', ''),
@@ -442,10 +457,68 @@ class SubmitComponent(html.Div):
             'overall_rmse_mgdl': overall['rmse'],
             'overall_mape_pct': overall['mape'],
         }
+        # Ranking within the current format/category (A, B, or C)
+        if version in self._ranking_by_format_paths:
+            _upgrade_and_append_csv(
+                self._ranking_by_format_paths[version],
+                ranking_row,
+                legacy_to_new={},
+            )
+
+        # Overall (cumulative) ranking across formats played so far.
+        uses_cgm = bool(user_info.get("uses_cgm", False))
+        eligible_formats: set[str] = {"A"} | ({"B", "C"} if uses_cgm else set())
+        runs_by_format: dict[str, list[dict[str, Any]]] = dict(user_info.get("runs_by_format") or {})
+        played_formats: set[str] = {str(fmt) for fmt, runs in runs_by_format.items() if runs}
+        if rounds_played > 0 and version:
+            played_formats.add(version)
+        all_rounds: list[dict[str, Any]] = []
+        for fmt in sorted(played_formats):
+            for run in (runs_by_format.get(fmt) or []):
+                all_rounds.extend(list(run.get("rounds") or []))
+        # Include the current run (not yet archived)
+        all_rounds.extend(rounds if rounds else [])
+
+        overall_all_table = _build_aggregate_table_data(all_rounds) if all_rounds else overall_table_data
+        overall_all = _metrics_from_table(overall_all_table)
+
+        source_names: set[str] = set()
+        any_uploaded = False
+        for fmt in played_formats:
+            for run in (runs_by_format.get(fmt) or []):
+                any_uploaded = any_uploaded or (not bool(run.get("is_example_data", True)))
+                name = str(run.get("data_source_name") or "")
+                if name:
+                    source_names.add(name)
+        any_uploaded = any_uploaded or (not bool(user_info.get("is_example_data", True)))
+        current_source = str(user_info.get("data_source_name") or "")
+        if current_source:
+            source_names.add(current_source)
+
+        data_source_name = next(iter(source_names)) if len(source_names) == 1 else "multiple"
+        total_rounds_played = int(
+            sum(len(list(run.get("rounds") or [])) for fmt in played_formats for run in (runs_by_format.get(fmt) or []))
+            + (len(rounds) if rounds else 1)
+        )
+
+        overall_ranking_row = {
+            'study_id': study_id,
+            'run_id': str(uuid.uuid4()),
+            'number': data['number'],
+            'timestamp': data['timestamp'],
+            'format': "ALL",
+            'rounds_played': total_rounds_played,
+            'is_example_data': (not any_uploaded),
+            'data_source_name': data_source_name,
+            'overall_mae_mgdl': overall_all['mae'],
+            'overall_mse_mgdl': overall_all['mse'],
+            'overall_rmse_mgdl': overall_all['rmse'],
+            'overall_mape_pct': overall_all['mape'],
+        }
         _upgrade_and_append_csv(
             self._ranking_csv_path,
-            ranking_row,
-            legacy_to_new={}
+            overall_ranking_row,
+            legacy_to_new={},
         )
 
         # Reset the prediction

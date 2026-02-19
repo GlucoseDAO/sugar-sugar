@@ -181,6 +181,9 @@ en:
     title: "Complete Analysis"
     rounds_played: "Rounds played: %{played} / %{total}"
     played_formats: "Played formats so far: %{formats}"
+    ranking_title: "Ranking"
+    ranking_format_line: "Ranking (%{format}): %{rank} / %{total}"
+    ranking_overall_line: "Overall ranking: %{rank} / %{total}"
     per_round_metrics: "Per-round metrics"
     start_over: "Start Over"
 
