@@ -211,16 +211,18 @@ def reset_glucose_unit_on_start_page(pathname: Optional[str]) -> str:
     Output('interface-language', 'data'),
     [Input('lang-en', 'n_clicks'),
      Input('lang-de', 'n_clicks'),
-     Input('lang-uk', 'n_clicks')],
+     Input('lang-uk', 'n_clicks'),
+     Input('lang-ro', 'n_clicks')],
     prevent_initial_call=True
 )
 def set_interface_language(
     n_en: Optional[int],
     n_de: Optional[int],
     n_uk: Optional[int],
+    n_ro: Optional[int],
 ) -> str:
     """Set the interface language (session-scoped) from landing page flag buttons."""
-    _ = (n_en, n_de, n_uk)
+    _ = (n_en, n_de, n_uk, n_ro)
     triggered = ctx.triggered_id
     if triggered == 'lang-en':
         return 'en'
@@ -228,6 +230,8 @@ def set_interface_language(
         return 'de'
     if triggered == 'lang-uk':
         return 'uk'
+    if triggered == 'lang-ro':
+        return 'ro'
     raise PreventUpdate
 
 

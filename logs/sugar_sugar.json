@@ -19549,3 +19549,180 @@
 {"action_status":"succeeded","timestamp":1771874464.5928571,"task_uuid":"d356d483-046c-4967-a77d-69ed94071187","action_type":"initialize_data_on_url_change","task_level":[3]}
 {"action_status":"succeeded","timestamp":1771874471.083461,"task_uuid":"5daf2d99-824e-4705-92d5-1496e151c624","action_type":"start_dash_server","task_level":[2]}
 {"action_status":"succeeded","timestamp":1771874471.1515899,"task_uuid":"d9b79b75-c98e-45d8-a7c9-50d717e8e5f2","action_type":"start_dash_server","task_level":[2]}
+{"file_path":"data\\example.csv","action_status":"started","timestamp":1771875236.2875357,"task_uuid":"add87466-1f07-46df-a311-ed029c03c071","action_type":"load_glucose_data","task_level":[1]}
+{"file_path":"data\\example.csv","action_status":"started","timestamp":1771875236.2875357,"task_uuid":"add87466-1f07-46df-a311-ed029c03c071","action_type":"detect_cgm_type","task_level":[2,1]}
+{"action_status":"succeeded","timestamp":1771875236.2875357,"task_uuid":"add87466-1f07-46df-a311-ed029c03c071","action_type":"detect_cgm_type","task_level":[2,2]}
+{"file_path":"data\\example.csv","action_status":"started","timestamp":1771875236.30321,"task_uuid":"add87466-1f07-46df-a311-ed029c03c071","action_type":"load_dexcom_data","task_level":[3,1]}
+{"action_status":"succeeded","timestamp":1771875236.30321,"task_uuid":"add87466-1f07-46df-a311-ed029c03c071","action_type":"load_dexcom_data","task_level":[3,2]}
+{"action_status":"succeeded","timestamp":1771875236.30321,"task_uuid":"add87466-1f07-46df-a311-ed029c03c071","action_type":"load_glucose_data","task_level":[4]}
+{"host":"127.0.0.1","port":8050,"debug":true,"action_status":"started","timestamp":1771875236.3761137,"task_uuid":"e85de9cc-15f2-44c8-a0f4-3c68287cb283","action_type":"start_dash_server","task_level":[1]}
+{"file_path":"data\\example.csv","action_status":"started","timestamp":1771875237.0419612,"task_uuid":"58969b2a-e11c-40ee-9d9e-627d6e32fd7d","action_type":"load_glucose_data","task_level":[1]}
+{"file_path":"data\\example.csv","action_status":"started","timestamp":1771875237.0419612,"task_uuid":"58969b2a-e11c-40ee-9d9e-627d6e32fd7d","action_type":"detect_cgm_type","task_level":[2,1]}
+{"action_status":"succeeded","timestamp":1771875237.0419612,"task_uuid":"58969b2a-e11c-40ee-9d9e-627d6e32fd7d","action_type":"detect_cgm_type","task_level":[2,2]}
+{"file_path":"data\\example.csv","action_status":"started","timestamp":1771875237.0419612,"task_uuid":"58969b2a-e11c-40ee-9d9e-627d6e32fd7d","action_type":"load_dexcom_data","task_level":[3,1]}
+{"action_status":"succeeded","timestamp":1771875237.0615237,"task_uuid":"58969b2a-e11c-40ee-9d9e-627d6e32fd7d","action_type":"load_dexcom_data","task_level":[3,2]}
+{"action_status":"succeeded","timestamp":1771875237.0632794,"task_uuid":"58969b2a-e11c-40ee-9d9e-627d6e32fd7d","action_type":"load_glucose_data","task_level":[4]}
+{"host":"127.0.0.1","port":8050,"debug":true,"action_status":"started","timestamp":1771875237.1243653,"task_uuid":"a43927c2-6dcb-410f-9638-bff3749f2c4b","action_type":"start_dash_server","task_level":[1]}
+{"pathname":"/","locale":"en","action_status":"started","timestamp":1771875242.457349,"task_uuid":"a4858f97-905f-45de-9e38-ceb5d319f0ab","action_type":"display_page","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875242.473017,"task_uuid":"a4858f97-905f-45de-9e38-ceb5d319f0ab","action_type":"display_page","task_level":[2]}
+{"file_path":"data\\example.csv","action_status":"started","timestamp":1771875242.473017,"task_uuid":"17374360-ee81-46a4-93ec-3d73a9caad4d","action_type":"load_glucose_data","task_level":[1]}
+{"file_path":"data\\example.csv","action_status":"started","timestamp":1771875242.473017,"task_uuid":"17374360-ee81-46a4-93ec-3d73a9caad4d","action_type":"detect_cgm_type","task_level":[2,1]}
+{"action_status":"succeeded","timestamp":1771875242.473017,"task_uuid":"17374360-ee81-46a4-93ec-3d73a9caad4d","action_type":"detect_cgm_type","task_level":[2,2]}
+{"file_path":"data\\example.csv","action_status":"started","timestamp":1771875242.4843185,"task_uuid":"17374360-ee81-46a4-93ec-3d73a9caad4d","action_type":"load_dexcom_data","task_level":[3,1]}
+{"action_status":"succeeded","timestamp":1771875242.4913208,"task_uuid":"17374360-ee81-46a4-93ec-3d73a9caad4d","action_type":"load_dexcom_data","task_level":[3,2]}
+{"action_status":"succeeded","timestamp":1771875242.4993196,"task_uuid":"17374360-ee81-46a4-93ec-3d73a9caad4d","action_type":"load_glucose_data","task_level":[4]}
+{"action_status":"started","timestamp":1771875242.5003252,"task_uuid":"95ad901e-dd14-4884-b455-79918bd52610","action_type":"initialize_data_on_url_change","task_level":[1]}
+{"random_start":3348,"timestamp":1771875242.5003252,"task_uuid":"95ad901e-dd14-4884-b455-79918bd52610","task_level":[2],"message_type":"new_random_start"}
+{"action_status":"succeeded","timestamp":1771875242.5013275,"task_uuid":"95ad901e-dd14-4884-b455-79918bd52610","action_type":"initialize_data_on_url_change","task_level":[3]}
+{"pathname":"/","locale":"en","action_status":"started","timestamp":1771875246.859012,"task_uuid":"40ebfe8d-f924-4598-b526-79a733423e53","action_type":"display_page","task_level":[1]}
+{"file_path":"data\\example.csv","action_status":"started","timestamp":1771875246.8630092,"task_uuid":"bf04f234-dfd6-4955-84dc-33aaead0e78b","action_type":"load_glucose_data","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875246.8650086,"task_uuid":"40ebfe8d-f924-4598-b526-79a733423e53","action_type":"display_page","task_level":[2]}
+{"file_path":"data\\example.csv","action_status":"started","timestamp":1771875246.8650086,"task_uuid":"bf04f234-dfd6-4955-84dc-33aaead0e78b","action_type":"detect_cgm_type","task_level":[2,1]}
+{"action_status":"succeeded","timestamp":1771875246.8701587,"task_uuid":"bf04f234-dfd6-4955-84dc-33aaead0e78b","action_type":"detect_cgm_type","task_level":[2,2]}
+{"file_path":"data\\example.csv","action_status":"started","timestamp":1771875246.8722215,"task_uuid":"bf04f234-dfd6-4955-84dc-33aaead0e78b","action_type":"load_dexcom_data","task_level":[3,1]}
+{"action_status":"succeeded","timestamp":1771875246.8854575,"task_uuid":"bf04f234-dfd6-4955-84dc-33aaead0e78b","action_type":"load_dexcom_data","task_level":[3,2]}
+{"action_status":"succeeded","timestamp":1771875246.8874576,"task_uuid":"bf04f234-dfd6-4955-84dc-33aaead0e78b","action_type":"load_glucose_data","task_level":[4]}
+{"action_status":"started","timestamp":1771875246.8894584,"task_uuid":"d1936b44-77d4-41ec-97b3-a21ad0130ed7","action_type":"initialize_data_on_url_change","task_level":[1]}
+{"random_start":504,"timestamp":1771875246.8904583,"task_uuid":"d1936b44-77d4-41ec-97b3-a21ad0130ed7","task_level":[2],"message_type":"new_random_start"}
+{"action_status":"succeeded","timestamp":1771875246.8914578,"task_uuid":"d1936b44-77d4-41ec-97b3-a21ad0130ed7","action_type":"initialize_data_on_url_change","task_level":[3]}
+{"pathname":"/","locale":"ro","action_status":"started","timestamp":1771875253.040799,"task_uuid":"c2752433-c71f-4377-ac1b-382d241cc086","action_type":"display_page","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875253.0428498,"task_uuid":"c2752433-c71f-4377-ac1b-382d241cc086","action_type":"display_page","task_level":[2]}
+{"path":"D:\\01_1_LIVIA\\LIVIA_DOCS\\CODING\\sources\\sugar-sugar\\data\\input\\consent_agreement.csv","action_status":"started","timestamp":1771875272.112952,"task_uuid":"e0ed894c-97de-4965-91ce-f0a3ba573bb5","action_type":"append_consent_agreement_row","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875272.1149557,"task_uuid":"e0ed894c-97de-4965-91ce-f0a3ba573bb5","action_type":"append_consent_agreement_row","task_level":[2]}
+{"pathname":"/startup","locale":"ro","action_status":"started","timestamp":1771875272.130365,"task_uuid":"04d9a30d-8ddb-4d71-8fc5-d1faa0690aef","action_type":"display_page","task_level":[1]}
+{"file_path":"data\\example.csv","action_status":"started","timestamp":1771875272.1332042,"task_uuid":"75a481c1-3928-41cd-9525-d1cdb18f46de","action_type":"load_glucose_data","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875272.1352105,"task_uuid":"04d9a30d-8ddb-4d71-8fc5-d1faa0690aef","action_type":"display_page","task_level":[2]}
+{"file_path":"data\\example.csv","action_status":"started","timestamp":1771875272.1352105,"task_uuid":"75a481c1-3928-41cd-9525-d1cdb18f46de","action_type":"detect_cgm_type","task_level":[2,1]}
+{"action_status":"succeeded","timestamp":1771875272.1395736,"task_uuid":"75a481c1-3928-41cd-9525-d1cdb18f46de","action_type":"detect_cgm_type","task_level":[2,2]}
+{"file_path":"data\\example.csv","action_status":"started","timestamp":1771875272.1405797,"task_uuid":"75a481c1-3928-41cd-9525-d1cdb18f46de","action_type":"load_dexcom_data","task_level":[3,1]}
+{"action_status":"succeeded","timestamp":1771875272.1508374,"task_uuid":"75a481c1-3928-41cd-9525-d1cdb18f46de","action_type":"load_dexcom_data","task_level":[3,2]}
+{"action_status":"succeeded","timestamp":1771875272.1508374,"task_uuid":"75a481c1-3928-41cd-9525-d1cdb18f46de","action_type":"load_glucose_data","task_level":[4]}
+{"action_status":"started","timestamp":1771875272.1528442,"task_uuid":"29b5f8c3-3569-4115-8118-d2952fb312a4","action_type":"initialize_data_on_url_change","task_level":[1]}
+{"random_start":468,"timestamp":1771875272.1548495,"task_uuid":"29b5f8c3-3569-4115-8118-d2952fb312a4","task_level":[2],"message_type":"new_random_start"}
+{"action_status":"succeeded","timestamp":1771875272.1548495,"task_uuid":"29b5f8c3-3569-4115-8118-d2952fb312a4","action_type":"initialize_data_on_url_change","task_level":[3]}
+{"pathname":"/prediction","locale":"ro","action_status":"started","timestamp":1771875286.9575074,"task_uuid":"d5455269-7e06-4b4e-919e-5a0dc686f973","action_type":"display_page","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875286.9781427,"task_uuid":"d5455269-7e06-4b4e-919e-5a0dc686f973","action_type":"display_page","task_level":[2]}
+{"source":"","action_status":"started","timestamp":1771875287.0067163,"task_uuid":"8279eab2-c6c5-40cb-8a46-1bab2802fe0f","action_type":"glucose_store_chart_data","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875287.009717,"task_uuid":"8279eab2-c6c5-40cb-8a46-1bab2802fe0f","action_type":"glucose_store_chart_data","task_level":[2]}
+{"triggered":"upload-data","filename":null,"action_status":"started","timestamp":1771875287.0492575,"task_uuid":"68e9994c-bb35-4cf6-8562-8794dff70459","action_type":"handle_file_upload","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875287.0512593,"task_uuid":"68e9994c-bb35-4cf6-8562-8794dff70459","action_type":"handle_file_upload","task_level":[2]}
+{"triggered":"upload-data","filename":"Zaharia Livia 06.09.2021 (1)01.05-25.07.2021.csv","action_status":"started","timestamp":1771875296.6854827,"task_uuid":"d28eb2a7-d305-4a0d-a95a-fb3a6055c7d4","action_type":"handle_file_upload","task_level":[1]}
+{"file_path":"D:\\01_1_LIVIA\\LIVIA_DOCS\\CODING\\sources\\sugar-sugar\\data\\input\\users\\20260223_213456_Zaharia_Livia_06.09.2021_(1)01.05-25.07.2021.csv","action_status":"started","timestamp":1771875296.6925466,"task_uuid":"d28eb2a7-d305-4a0d-a95a-fb3a6055c7d4","action_type":"load_glucose_data","task_level":[2,1]}
+{"file_path":"D:\\01_1_LIVIA\\LIVIA_DOCS\\CODING\\sources\\sugar-sugar\\data\\input\\users\\20260223_213456_Zaharia_Livia_06.09.2021_(1)01.05-25.07.2021.csv","action_status":"started","timestamp":1771875296.6935508,"task_uuid":"d28eb2a7-d305-4a0d-a95a-fb3a6055c7d4","action_type":"detect_cgm_type","task_level":[2,2,1]}
+{"action_status":"succeeded","timestamp":1771875296.7035508,"task_uuid":"d28eb2a7-d305-4a0d-a95a-fb3a6055c7d4","action_type":"detect_cgm_type","task_level":[2,2,2]}
+{"file_path":"D:\\01_1_LIVIA\\LIVIA_DOCS\\CODING\\sources\\sugar-sugar\\data\\input\\users\\20260223_213456_Zaharia_Livia_06.09.2021_(1)01.05-25.07.2021.csv","action_status":"started","timestamp":1771875296.7055478,"task_uuid":"d28eb2a7-d305-4a0d-a95a-fb3a6055c7d4","action_type":"load_medtronic_data","task_level":[2,3,1]}
+{"action_status":"succeeded","timestamp":1771875296.8301148,"task_uuid":"d28eb2a7-d305-4a0d-a95a-fb3a6055c7d4","action_type":"load_medtronic_data","task_level":[2,3,2]}
+{"action_status":"succeeded","timestamp":1771875296.8421748,"task_uuid":"d28eb2a7-d305-4a0d-a95a-fb3a6055c7d4","action_type":"load_glucose_data","task_level":[2,4]}
+{"action_status":"succeeded","timestamp":1771875296.8521764,"task_uuid":"d28eb2a7-d305-4a0d-a95a-fb3a6055c7d4","action_type":"handle_file_upload","task_level":[3]}
+{"source":"Zaharia Livia 06.09.2021 (1)01.05-25.07.2021.csv","action_status":"started","timestamp":1771875296.878759,"task_uuid":"3d92470d-ae15-4666-a91a-4faa504b0057","action_type":"glucose_store_chart_data","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875296.8817534,"task_uuid":"3d92470d-ae15-4666-a91a-4faa504b0057","action_type":"glucose_store_chart_data","task_level":[2]}
+{"points":36,"gl_min":58.0,"gl_max":92.0,"source":"Zaharia Livia 06.09.2021 (1)01.05-25.07.2021.csv","hide_last_hour":true,"action_status":"started","timestamp":1771875296.9138274,"task_uuid":"0c7c5b19-a88b-4495-af66-709d2fb90621","action_type":"glucose_update_figure","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875296.9481525,"task_uuid":"0c7c5b19-a88b-4495-af66-709d2fb90621","action_type":"glucose_update_figure","task_level":[2]}
+{"source":"Zaharia Livia 06.09.2021 (1)01.05-25.07.2021.csv","action_status":"started","timestamp":1771875302.4357626,"task_uuid":"772906a0-7822-43fe-991b-d44ac1a001ec","action_type":"glucose_store_chart_data","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875302.4387627,"task_uuid":"772906a0-7822-43fe-991b-d44ac1a001ec","action_type":"glucose_store_chart_data","task_level":[2]}
+{"points":36,"gl_min":58.0,"gl_max":92.0,"source":"Zaharia Livia 06.09.2021 (1)01.05-25.07.2021.csv","hide_last_hour":true,"action_status":"started","timestamp":1771875302.4519258,"task_uuid":"6a275085-73b2-476f-979e-72b250076364","action_type":"glucose_update_figure","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875302.4683554,"task_uuid":"6a275085-73b2-476f-979e-72b250076364","action_type":"glucose_update_figure","task_level":[2]}
+{"source":"Zaharia Livia 06.09.2021 (1)01.05-25.07.2021.csv","action_status":"started","timestamp":1771875303.5299277,"task_uuid":"37d4e4a7-cc98-4c3d-a6e7-5adfae954fde","action_type":"glucose_store_chart_data","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875303.531927,"task_uuid":"37d4e4a7-cc98-4c3d-a6e7-5adfae954fde","action_type":"glucose_store_chart_data","task_level":[2]}
+{"points":36,"gl_min":58.0,"gl_max":92.0,"source":"Zaharia Livia 06.09.2021 (1)01.05-25.07.2021.csv","hide_last_hour":true,"action_status":"started","timestamp":1771875303.5399883,"task_uuid":"2e9f4633-294d-47e0-ae11-2bdc9b2d1e2a","action_type":"glucose_update_figure","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875303.557419,"task_uuid":"2e9f4633-294d-47e0-ae11-2bdc9b2d1e2a","action_type":"glucose_update_figure","task_level":[2]}
+{"source":"Zaharia Livia 06.09.2021 (1)01.05-25.07.2021.csv","action_status":"started","timestamp":1771875304.8667786,"task_uuid":"1cfc5975-3ef7-400e-8de9-6ca731f95f20","action_type":"glucose_store_chart_data","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875304.8687773,"task_uuid":"1cfc5975-3ef7-400e-8de9-6ca731f95f20","action_type":"glucose_store_chart_data","task_level":[2]}
+{"points":36,"gl_min":58.0,"gl_max":92.0,"source":"Zaharia Livia 06.09.2021 (1)01.05-25.07.2021.csv","hide_last_hour":true,"action_status":"started","timestamp":1771875304.8794909,"task_uuid":"ada3b3dd-4169-4c47-89c6-ee5b41af5ef8","action_type":"glucose_update_figure","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875304.9234176,"task_uuid":"ada3b3dd-4169-4c47-89c6-ee5b41af5ef8","action_type":"glucose_update_figure","task_level":[2]}
+{"source":"Zaharia Livia 06.09.2021 (1)01.05-25.07.2021.csv","action_status":"started","timestamp":1771875306.0782845,"task_uuid":"2371b760-3c7c-42dc-a6e9-f89533ee6737","action_type":"glucose_store_chart_data","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875306.080284,"task_uuid":"2371b760-3c7c-42dc-a6e9-f89533ee6737","action_type":"glucose_store_chart_data","task_level":[2]}
+{"points":36,"gl_min":58.0,"gl_max":92.0,"source":"Zaharia Livia 06.09.2021 (1)01.05-25.07.2021.csv","hide_last_hour":true,"action_status":"started","timestamp":1771875306.0872843,"task_uuid":"af4646a4-b0a9-4189-b90f-5c14caa29652","action_type":"glucose_update_figure","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875306.1045604,"task_uuid":"af4646a4-b0a9-4189-b90f-5c14caa29652","action_type":"glucose_update_figure","task_level":[2]}
+{"source":"Zaharia Livia 06.09.2021 (1)01.05-25.07.2021.csv","action_status":"started","timestamp":1771875307.329847,"task_uuid":"485fb51e-821f-498b-84a7-90ec249e6d60","action_type":"glucose_store_chart_data","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875307.3318474,"task_uuid":"485fb51e-821f-498b-84a7-90ec249e6d60","action_type":"glucose_store_chart_data","task_level":[2]}
+{"points":36,"gl_min":58.0,"gl_max":92.0,"source":"Zaharia Livia 06.09.2021 (1)01.05-25.07.2021.csv","hide_last_hour":true,"action_status":"started","timestamp":1771875307.3429773,"task_uuid":"f2252c2a-9ffb-4183-8803-b7251ecca1ad","action_type":"glucose_update_figure","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875307.3620465,"task_uuid":"f2252c2a-9ffb-4183-8803-b7251ecca1ad","action_type":"glucose_update_figure","task_level":[2]}
+{"source":"Zaharia Livia 06.09.2021 (1)01.05-25.07.2021.csv","action_status":"started","timestamp":1771875308.949142,"task_uuid":"af730c13-6338-454b-adcf-2d22230daa0d","action_type":"glucose_store_chart_data","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875308.9511416,"task_uuid":"af730c13-6338-454b-adcf-2d22230daa0d","action_type":"glucose_store_chart_data","task_level":[2]}
+{"points":36,"gl_min":58.0,"gl_max":92.0,"source":"Zaharia Livia 06.09.2021 (1)01.05-25.07.2021.csv","hide_last_hour":true,"action_status":"started","timestamp":1771875308.959238,"task_uuid":"8d1f800c-1943-46f1-b615-73b9fd5e6586","action_type":"glucose_update_figure","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875308.978127,"task_uuid":"8d1f800c-1943-46f1-b615-73b9fd5e6586","action_type":"glucose_update_figure","task_level":[2]}
+{"pathname":"/ending","locale":"ro","action_status":"started","timestamp":1771875311.2334144,"task_uuid":"98cc0ab7-261a-419b-a061-b4157e0cc85f","action_type":"display_page","task_level":[1]}
+{"source":"Zaharia Livia 06.09.2021 (1)01.05-25.07.2021.csv","action_status":"started","timestamp":1771875311.2415578,"task_uuid":"7b370cdb-8f0e-44d3-ab57-81a391f0dee9","action_type":"glucose_store_chart_data","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875311.2617989,"task_uuid":"7b370cdb-8f0e-44d3-ab57-81a391f0dee9","action_type":"glucose_store_chart_data","task_level":[2]}
+{"points":36,"gl_min":58.0,"gl_max":92.0,"source":"Zaharia Livia 06.09.2021 (1)01.05-25.07.2021.csv","hide_last_hour":false,"action_status":"started","timestamp":1771875311.2791321,"task_uuid":"55b8279f-56fc-4cdf-a762-ea869bd36639","action_type":"glucose_update_figure","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875311.2955499,"task_uuid":"98cc0ab7-261a-419b-a061-b4157e0cc85f","action_type":"display_page","task_level":[2]}
+{"action_status":"succeeded","timestamp":1771875311.3085442,"task_uuid":"55b8279f-56fc-4cdf-a762-ea869bd36639","action_type":"glucose_update_figure","task_level":[2]}
+{"next_round":2,"action_status":"started","timestamp":1771875318.114261,"task_uuid":"305e5b5f-4d6f-4ec2-b35b-bd33cc6baf6b","action_type":"handle_next_round_button","task_level":[1]}
+{"file_path":"data\\example.csv","action_status":"started","timestamp":1771875318.1197762,"task_uuid":"305e5b5f-4d6f-4ec2-b35b-bd33cc6baf6b","action_type":"load_glucose_data","task_level":[2,1]}
+{"file_path":"data\\example.csv","action_status":"started","timestamp":1771875318.1197762,"task_uuid":"305e5b5f-4d6f-4ec2-b35b-bd33cc6baf6b","action_type":"detect_cgm_type","task_level":[2,2,1]}
+{"action_status":"succeeded","timestamp":1771875318.1197762,"task_uuid":"305e5b5f-4d6f-4ec2-b35b-bd33cc6baf6b","action_type":"detect_cgm_type","task_level":[2,2,2]}
+{"file_path":"data\\example.csv","action_status":"started","timestamp":1771875318.1291502,"task_uuid":"305e5b5f-4d6f-4ec2-b35b-bd33cc6baf6b","action_type":"load_dexcom_data","task_level":[2,3,1]}
+{"action_status":"succeeded","timestamp":1771875318.1391497,"task_uuid":"305e5b5f-4d6f-4ec2-b35b-bd33cc6baf6b","action_type":"load_dexcom_data","task_level":[2,3,2]}
+{"action_status":"succeeded","timestamp":1771875318.1412785,"task_uuid":"305e5b5f-4d6f-4ec2-b35b-bd33cc6baf6b","action_type":"load_glucose_data","task_level":[2,4]}
+{"action_status":"succeeded","timestamp":1771875318.146278,"task_uuid":"305e5b5f-4d6f-4ec2-b35b-bd33cc6baf6b","action_type":"handle_next_round_button","task_level":[3]}
+{"pathname":"/prediction","locale":"ro","action_status":"started","timestamp":1771875318.16494,"task_uuid":"b513bcf6-2972-474c-b55f-3a937a078cc9","action_type":"display_page","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875318.1793332,"task_uuid":"b513bcf6-2972-474c-b55f-3a937a078cc9","action_type":"display_page","task_level":[2]}
+{"slider_value":3492,"action_status":"started","timestamp":1771875318.2213316,"task_uuid":"3deb4ae9-def5-4e7f-b50a-ec4ec4d8b3b6","action_type":"handle_time_slider","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875318.2283351,"task_uuid":"3deb4ae9-def5-4e7f-b50a-ec4ec4d8b3b6","action_type":"handle_time_slider","task_level":[2]}
+{"source":"example.csv","action_status":"started","timestamp":1771875318.2313316,"task_uuid":"564e88a2-41b5-4b8b-8bef-9ad4a675404c","action_type":"glucose_store_chart_data","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875318.2313316,"task_uuid":"564e88a2-41b5-4b8b-8bef-9ad4a675404c","action_type":"glucose_store_chart_data","task_level":[2]}
+{"triggered":"upload-data","filename":null,"action_status":"started","timestamp":1771875318.2491398,"task_uuid":"972fe574-4e93-42a6-96ff-723f50991074","action_type":"handle_file_upload","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875318.2501378,"task_uuid":"972fe574-4e93-42a6-96ff-723f50991074","action_type":"handle_file_upload","task_level":[2]}
+{"slider_value":72,"action_status":"started","timestamp":1771875318.2521381,"task_uuid":"4baa9a6a-7df8-47f8-9a0c-7cc2c6ed7592","action_type":"handle_time_slider","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875318.257682,"task_uuid":"4baa9a6a-7df8-47f8-9a0c-7cc2c6ed7592","action_type":"handle_time_slider","task_level":[2]}
+{"points":36,"gl_min":82.0,"gl_max":187.0,"source":"example.csv","hide_last_hour":true,"action_status":"started","timestamp":1771875318.2596834,"task_uuid":"9331fcee-54ba-4386-93c6-d41dad920a56","action_type":"glucose_update_figure","task_level":[1]}
+{"points":36,"gl_min":82.0,"gl_max":187.0,"source":"example.csv","hide_last_hour":true,"action_status":"started","timestamp":1771875318.2708852,"task_uuid":"7f600bc6-fadc-485b-bc15-4efb9353d067","action_type":"glucose_update_figure","task_level":[1]}
+{"source":"example.csv","action_status":"started","timestamp":1771875318.2750528,"task_uuid":"0b226833-37c9-4cd5-b0ed-202e46732ad0","action_type":"glucose_store_chart_data","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875318.2829702,"task_uuid":"0b226833-37c9-4cd5-b0ed-202e46732ad0","action_type":"glucose_store_chart_data","task_level":[2]}
+{"action_status":"succeeded","timestamp":1771875318.2958531,"task_uuid":"9331fcee-54ba-4386-93c6-d41dad920a56","action_type":"glucose_update_figure","task_level":[2]}
+{"action_status":"succeeded","timestamp":1771875318.3038578,"task_uuid":"7f600bc6-fadc-485b-bc15-4efb9353d067","action_type":"glucose_update_figure","task_level":[2]}
+{"points":36,"gl_min":82.0,"gl_max":187.0,"source":"example.csv","hide_last_hour":true,"action_status":"started","timestamp":1771875318.3096576,"task_uuid":"f7027d53-3577-4b8a-9fa2-ab100438e8df","action_type":"glucose_update_figure","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875318.330366,"task_uuid":"f7027d53-3577-4b8a-9fa2-ab100438e8df","action_type":"glucose_update_figure","task_level":[2]}
+{"source":"example.csv","action_status":"started","timestamp":1771875321.6983044,"task_uuid":"6179870d-ffad-46a3-927f-a1b8b9fe73a2","action_type":"glucose_store_chart_data","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875321.7003047,"task_uuid":"6179870d-ffad-46a3-927f-a1b8b9fe73a2","action_type":"glucose_store_chart_data","task_level":[2]}
+{"points":36,"gl_min":82.0,"gl_max":187.0,"source":"example.csv","hide_last_hour":true,"action_status":"started","timestamp":1771875321.7078798,"task_uuid":"6d3c7bf9-b1e3-4c15-9bac-30f70194446c","action_type":"glucose_update_figure","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875321.7259712,"task_uuid":"6d3c7bf9-b1e3-4c15-9bac-30f70194446c","action_type":"glucose_update_figure","task_level":[2]}
+{"source":"example.csv","action_status":"started","timestamp":1771875322.7612913,"task_uuid":"03d6d2bb-1c19-4230-9fca-d73d2432a8a7","action_type":"glucose_store_chart_data","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875322.7632906,"task_uuid":"03d6d2bb-1c19-4230-9fca-d73d2432a8a7","action_type":"glucose_store_chart_data","task_level":[2]}
+{"points":36,"gl_min":82.0,"gl_max":187.0,"source":"example.csv","hide_last_hour":true,"action_status":"started","timestamp":1771875322.7729275,"task_uuid":"6ec495b6-5b9c-4c04-98de-5590b4e24fa9","action_type":"glucose_update_figure","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875322.7895737,"task_uuid":"6ec495b6-5b9c-4c04-98de-5590b4e24fa9","action_type":"glucose_update_figure","task_level":[2]}
+{"source":"example.csv","action_status":"started","timestamp":1771875324.0656524,"task_uuid":"b2d257b6-177c-499c-aa6b-b1758cbeeaa9","action_type":"glucose_store_chart_data","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875324.0666528,"task_uuid":"b2d257b6-177c-499c-aa6b-b1758cbeeaa9","action_type":"glucose_store_chart_data","task_level":[2]}
+{"points":36,"gl_min":82.0,"gl_max":187.0,"source":"example.csv","hide_last_hour":true,"action_status":"started","timestamp":1771875324.0726545,"task_uuid":"7964e9ce-72b9-43c0-802e-fc07ce831a30","action_type":"glucose_update_figure","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875324.0935793,"task_uuid":"7964e9ce-72b9-43c0-802e-fc07ce831a30","action_type":"glucose_update_figure","task_level":[2]}
+{"source":"example.csv","action_status":"started","timestamp":1771875325.338707,"task_uuid":"0e7c6226-c351-4d55-a780-28524a024ce4","action_type":"glucose_store_chart_data","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875325.3407695,"task_uuid":"0e7c6226-c351-4d55-a780-28524a024ce4","action_type":"glucose_store_chart_data","task_level":[2]}
+{"points":36,"gl_min":82.0,"gl_max":187.0,"source":"example.csv","hide_last_hour":true,"action_status":"started","timestamp":1771875325.3502824,"task_uuid":"6c1fcacd-3cc5-42e1-9483-8c935aec3cc5","action_type":"glucose_update_figure","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875325.367351,"task_uuid":"6c1fcacd-3cc5-42e1-9483-8c935aec3cc5","action_type":"glucose_update_figure","task_level":[2]}
+{"source":"example.csv","action_status":"started","timestamp":1771875326.6815324,"task_uuid":"8ed9a8ea-3d87-4873-8400-bcc6c19fc832","action_type":"glucose_store_chart_data","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875326.6835325,"task_uuid":"8ed9a8ea-3d87-4873-8400-bcc6c19fc832","action_type":"glucose_store_chart_data","task_level":[2]}
+{"points":36,"gl_min":82.0,"gl_max":187.0,"source":"example.csv","hide_last_hour":true,"action_status":"started","timestamp":1771875326.69273,"task_uuid":"e02e0804-eb25-47c3-9965-0817f30f1abd","action_type":"glucose_update_figure","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875326.7111728,"task_uuid":"e02e0804-eb25-47c3-9965-0817f30f1abd","action_type":"glucose_update_figure","task_level":[2]}
+{"source":"example.csv","action_status":"started","timestamp":1771875328.2500646,"task_uuid":"c8e41988-cc26-4d6f-968c-3532d205b78c","action_type":"glucose_store_chart_data","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875328.2520645,"task_uuid":"c8e41988-cc26-4d6f-968c-3532d205b78c","action_type":"glucose_store_chart_data","task_level":[2]}
+{"points":36,"gl_min":82.0,"gl_max":187.0,"source":"example.csv","hide_last_hour":true,"action_status":"started","timestamp":1771875328.2601302,"task_uuid":"02999830-d7a0-46cd-b5f8-0878ec9a95c1","action_type":"glucose_update_figure","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875328.280315,"task_uuid":"02999830-d7a0-46cd-b5f8-0878ec9a95c1","action_type":"glucose_update_figure","task_level":[2]}
+{"pathname":"/ending","locale":"ro","action_status":"started","timestamp":1771875330.9442492,"task_uuid":"75b405ba-da2d-49ac-b447-70d910ad88d9","action_type":"display_page","task_level":[1]}
+{"source":"example.csv","action_status":"started","timestamp":1771875330.9652953,"task_uuid":"4c4ad105-8618-41d8-8352-ca6dba6f44d8","action_type":"glucose_store_chart_data","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875330.9712946,"task_uuid":"4c4ad105-8618-41d8-8352-ca6dba6f44d8","action_type":"glucose_store_chart_data","task_level":[2]}
+{"action_status":"succeeded","timestamp":1771875330.9836206,"task_uuid":"75b405ba-da2d-49ac-b447-70d910ad88d9","action_type":"display_page","task_level":[2]}
+{"points":36,"gl_min":82.0,"gl_max":187.0,"source":"example.csv","hide_last_hour":false,"action_status":"started","timestamp":1771875330.9897773,"task_uuid":"c7eae454-6278-405b-97dd-a03540aa9fa9","action_type":"glucose_update_figure","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875331.0115175,"task_uuid":"c7eae454-6278-405b-97dd-a03540aa9fa9","action_type":"glucose_update_figure","task_level":[2]}
+{"n_clicks":1,"action_status":"started","timestamp":1771875352.0308113,"task_uuid":"52fd8036-561f-46c3-a00a-9a5a57b9ef46","action_type":"handle_finish_study_from_ending","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875352.0328126,"task_uuid":"52fd8036-561f-46c3-a00a-9a5a57b9ef46","action_type":"handle_finish_study_from_ending","task_level":[2]}
+{"action_status":"started","timestamp":1771875352.0328126,"task_uuid":"c16638dd-368c-41fa-9c38-fa7c69b2fc97","action_type":"handle_finish_study_from_ending","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875352.041219,"task_uuid":"c16638dd-368c-41fa-9c38-fa7c69b2fc97","action_type":"handle_finish_study_from_ending","task_level":[2]}
+{"pathname":"/final","locale":"ro","action_status":"started","timestamp":1771875352.0551777,"task_uuid":"9e905afa-535e-43a0-9dae-6e52f037a012","action_type":"display_page","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875352.0895274,"task_uuid":"9e905afa-535e-43a0-9dae-6e52f037a012","action_type":"display_page","task_level":[2]}
+{"action_status":"started","timestamp":1771875355.7279546,"task_uuid":"56d670e8-24fd-419c-9ca3-582572360185","action_type":"handle_restart_button","task_level":[1]}
+{"timestamp":1771875355.7279546,"task_uuid":"56d670e8-24fd-419c-9ca3-582572360185","task_level":[2],"message_type":"restart_clicked"}
+{"action_status":"succeeded","timestamp":1771875355.7279546,"task_uuid":"56d670e8-24fd-419c-9ca3-582572360185","action_type":"handle_restart_button","task_level":[3]}
+{"pathname":"/","locale":"en","action_status":"started","timestamp":1771875355.7447765,"task_uuid":"abfa92ce-444b-4f2f-8a8e-9c801265fbba","action_type":"display_page","task_level":[1]}
+{"file_path":"data\\example.csv","action_status":"started","timestamp":1771875355.7481039,"task_uuid":"0f20be83-01f2-402c-8d1e-37eab7730ad7","action_type":"load_glucose_data","task_level":[1]}
+{"action_status":"succeeded","timestamp":1771875355.7481039,"task_uuid":"abfa92ce-444b-4f2f-8a8e-9c801265fbba","action_type":"display_page","task_level":[2]}
+{"file_path":"data\\example.csv","action_status":"started","timestamp":1771875355.7520604,"task_uuid":"0f20be83-01f2-402c-8d1e-37eab7730ad7","action_type":"detect_cgm_type","task_level":[2,1]}
+{"action_status":"succeeded","timestamp":1771875355.7561848,"task_uuid":"0f20be83-01f2-402c-8d1e-37eab7730ad7","action_type":"detect_cgm_type","task_level":[2,2]}
+{"file_path":"data\\example.csv","action_status":"started","timestamp":1771875355.7571797,"task_uuid":"0f20be83-01f2-402c-8d1e-37eab7730ad7","action_type":"load_dexcom_data","task_level":[3,1]}
+{"action_status":"succeeded","timestamp":1771875355.7671788,"task_uuid":"0f20be83-01f2-402c-8d1e-37eab7730ad7","action_type":"load_dexcom_data","task_level":[3,2]}
+{"action_status":"succeeded","timestamp":1771875355.7701788,"task_uuid":"0f20be83-01f2-402c-8d1e-37eab7730ad7","action_type":"load_glucose_data","task_level":[4]}
+{"action_status":"started","timestamp":1771875355.7731822,"task_uuid":"a1812526-091d-4a94-9930-c1e631e2d436","action_type":"initialize_data_on_url_change","task_level":[1]}
+{"random_start":3096,"timestamp":1771875355.7761834,"task_uuid":"a1812526-091d-4a94-9930-c1e631e2d436","task_level":[2],"message_type":"new_random_start"}
+{"action_status":"succeeded","timestamp":1771875355.779186,"task_uuid":"a1812526-091d-4a94-9930-c1e631e2d436","action_type":"initialize_data_on_url_change","task_level":[3]}
+{"action_status":"succeeded","timestamp":1771875375.219067,"task_uuid":"a43927c2-6dcb-410f-9638-bff3749f2c4b","action_type":"start_dash_server","task_level":[2]}
+{"action_status":"succeeded","timestamp":1771875375.3215015,"task_uuid":"e85de9cc-15f2-44c8-a0f4-3c68287cb283","action_type":"start_dash_server","task_level":[2]}

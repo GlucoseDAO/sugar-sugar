@@ -67,6 +67,16 @@ class LandingPage(html.Div):
                     **{"aria-label": "UA"},
                     className="lang-btn" + (" active" if locale == "uk" else ""),
                 ),
+                html.Button(
+                    [
+                        html.Img(src="/assets/flags/ro.svg", className="lang-flag"),
+                        html.Span("RO", className="lang-label"),
+                    ],
+                    id="lang-ro",
+                    title="RO",
+                    **{"aria-label": "RO"},
+                    className="lang-btn" + (" active" if locale == "ro" else ""),
+                ),
             ],
             className="lang-picker",
         )

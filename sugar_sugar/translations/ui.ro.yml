@@ -1,0 +1,203 @@
+ro:
+  common:
+    app_title: "Sugar Sugar"
+    units: "Unități"
+    round_of: "Runda %{current} din %{total}"
+    go_to_start: "Mergi la pagina de start"
+    loading: "Se încarcă..."
+    continue: "Continuă"
+    back: "Înapoi"
+    finish_exit: "Finalizează / Ieși"
+
+  language:
+    choose: "Limbă"
+    en: "Engleză"
+    de: "Germană"
+    uk: "Ucraineană"
+    ro: "Română"
+
+  landing:
+    tagline: "Un joc care îți testează superputerile de a prezice glucoza."
+    how_it_works: "Cum funcționează"
+    how_it_works_steps:
+      - "Încarcă un CSV Dexcom/Libre/Medtronic (sau folosește setul de date exemplu)"
+      - "Desenează pe grafic tendința estimată a glucozei"
+      - "Compară predicțiile cu valorile reale"
+      - "Vezi metrici de acuratețe (MAE/RMSE/MAPE)"
+    preview: "Previzualizare"
+    about_study_title: "Despre studiu"
+    about_study_text: "Studiem cât de precis pot oamenii să prezică tendințele glucozei și ce tipare observă utilizatorii CGM cu experiență. Dacă alegi să participi, jocul tău și datele CGM încărcate pot fi folosite pentru cercetare ulterioară."
+    your_choices_title: "Opțiunile tale"
+    your_choices_text: "Implicit, presupunem că ești de acord să participi la studiu. Dacă vrei doar să joci, bifează prima căsuță."
+    consent_play_only: "Vreau doar să joc (nu stocați datele mele CGM / de joc)"
+    consent_receive_results: "Vreau să primesc rezultatele mai târziu"
+    consent_keep_updated: "Țineți-mă la curent cu actualizările proiectului"
+    consent_acknowledge_label: "Am 18+ ani și am citit formularul de consimțământ."
+    open_consent_form: "Deschide formularul de consimțământ"
+    consent_required_error: "Te rugăm să confirmi că ai 18+ ani și ai citit formularul de consimțământ pentru a continua."
+    next_hint: "Urmează: vei completa un formular scurt, apoi vei încărca date CGM (sau vei folosi setul exemplu)."
+
+  consent_form:
+    title: "Formular de consimțământ"
+    subtitle: "Te rugăm să citești aceste informații înainte de a continua. Acesta este un formular de consimțământ de bază și va fi actualizat."
+    adults_only: "Trebuie să ai 18+ ani pentru a participa la acest studiu."
+    summary_title: "Rezumat"
+    summary_bullets:
+      - "Vei juca un joc de predicție a glucozei pentru până la 12 runde."
+      - "Putem stoca jocul tău (predicții, metrici de acuratețe) pentru cercetare."
+      - "Dacă alegi să încarci propriile date CGM, le putem folosi pentru joc și pentru cercetare."
+      - "Participarea este voluntară și te poți opri oricând."
+    data_title: "Utilizarea datelor"
+    data_bullets:
+      - "Datele exemplu (generice) pot fi folosite fără a încărca date personale de la senzor."
+      - "Dacă încarci un fișier, acesta poate conține informații sensibile despre sănătate."
+      - "Vom folosi datele doar conform selecțiilor tale de pe pagina de start."
+    withdraw_title: "Retragere"
+    withdraw_text: "Te poți opri oricând închizând fila/fereastra browserului. Dacă dorești să îți ștergem datele, te rugăm să contactezi organizatorii studiului."
+    footer_note: "După ce ai citit, întoarce-te în aplicație și continuă pe pagina de start."
+
+  startup:
+    fork_me: "Fork pe GitHub"
+    required_fields_note: "* Câmpuri obligatorii"
+    email_label: "Email"
+    email_placeholder: "Introdu emailul (opțional, cu excepția cazului în care vrei rezultate/actualizări)"
+    age_label: "Vârstă"
+    age_placeholder: "Introdu vârsta"
+    age_must_be_18_error: "Trebuie să ai 18+ ani pentru a participa la studiu."
+    gender_label: "Gen"
+    gender_placeholder: "Selectează genul"
+    gender_male: "Bărbat"
+    gender_female: "Femeie"
+    gender_na: "N/A"
+    cgm_label: "Folosești CGM?"
+    cgm_placeholder: "Selectează dacă folosești CGM"
+    yes: "Da"
+    no: "Nu"
+    cgm_duration_label: "Te rugăm să specifici durata utilizării (în ani)"
+    cgm_duration_placeholder: "Introdu numărul de ani"
+    diabetic_label: "Ai diabet?"
+    diabetic_placeholder: "Selectează statusul diabetului"
+    diabetes_type_label: "Tip de diabet"
+    diabetes_type_placeholder: "Selectează tipul de diabet"
+    diabetes_type_1: "Tip 1"
+    diabetes_type_2: "Tip 2"
+    diabetes_duration_label: "Durata diabetului (ani)"
+    diabetes_duration_placeholder: "Introdu numărul de ani"
+    location_label: "Locație"
+    location_placeholder: "Introdu locația"
+    contact_prefs_title: "Preferințe de contact"
+    contact_prefs_text: "Email-ul este obligatoriu doar dacă ai cerut să primești rezultatele mai târziu sau să fii ținut la curent."
+    just_test_me: "Doar testează-mă"
+    start_prediction: "Pornește predicția"
+    format_label: "Format"
+    format_placeholder: "Alege o opțiune"
+    format_a_label: "A = folosește date generice"
+    format_b_label: "B = folosește propriile date"
+    format_c_label: "C = folosește atât date generice, cât și proprii"
+    format_help_a: "A — folosește date generice (nu sunt necesare date de la senzor). 12 runde folosind un set exemplu."
+    format_help_b: "B — folosește propriile date. Încarcă propriul fișier și prezice doar pe el."
+    format_help_c: "C — încearcă ambele. Vei încărca propriul fișier, dar fiecare rundă folosește fie date exemplu, fie datele tale."
+    data_usage_consent_label: "Sunt de acord cu utilizarea datelor mele CGM încărcate pentru acest studiu."
+    data_usage_consent_required: "Te rugăm să confirmi consimțământul pentru utilizarea datelor ca să continui."
+
+  header:
+    points_label: "Numărul de puncte afișate:"
+    time_window_label: "Poziția ferestrei de timp:"
+    upload_prompt_1: "Trage și plasează sau "
+    upload_prompt_2: "încarcă datele aici"
+    use_example_data: "Folosește date exemplu"
+    upload_required: "Este necesară încărcarea"
+    upload_success: "Datele din %{filename} au fost încărcate cu succes. Aceste date vor fi folosite pentru predicții."
+    example_data_now_using: "Acum se folosesc date exemplu. Încarcă un fișier CSV pentru o analiză personalizată."
+    example_data_warning: "În prezent se folosesc date exemplu. Încarcă propriul CSV Dexcom/Libre/Medtronic pentru o analiză personalizată."
+    current_data_source: "Sursa curentă de date:"
+    description_1: "Testează-ți abilitățile de predicție a glucozei!"
+    description_2: "Fă clic pe grafic sau desenează linii pentru a prezice valorile viitoare ale glucozei."
+    description_3: "Jocul îți va arăta cât de precise sunt predicțiile tale comparativ cu măsurătorile reale."
+    how_to_play: "Cum se joacă:"
+    how_to_play_1: "1. Fă clic și trage pe grafic pentru a adăuga predicții"
+    how_to_play_2: "2. Desenează linii una după alta pentru a crea curbe de predicție"
+    how_to_play_3: "3. Încearcă să prezici cel puțin 5 puncte pentru a vedea metricele de acuratețe"
+
+  prediction:
+    units_label: "Unități:"
+    upload_required_alert: "Acest format necesită propriile date CGM. Te rugăm să încarci un fișier CSV pentru a începe."
+    upload_consent_recorded: "Consimțământ înregistrat. Acum poți încărca și folosi datele CGM în această sesiune."
+
+  submit:
+    progress_no_data: "Fă predicții până la capătul zonei ascunse pentru a trimite"
+    progress_some: "Continuă predicțiile până la capăt (%{done}/%{total} puncte)"
+    progress_ready: "✓ Gata de trimitere!"
+    progress_hidden_area: "Fă predicții în zona ascunsă pentru a trimite"
+    submit: "Trimite"
+
+  mobile_warning:
+    text: "Notă: Sugar Sugar este optimizat pentru desktop momentan. Suportul pentru mobil va veni în curând!"
+
+  chart:
+    title: "Niveluri de glucoză (%{start} – %{end})"
+    source_suffix: " - Sursa: %{source}"
+    x_axis: "Timp"
+    y_axis: "Nivelul glucozei (%{unit})"
+    trace_glucose: "Nivelul glucozei"
+    trace_predictions: "Puncte de predicție"
+    known_label: "Cunoscut"
+    predicted_label: "Prezise"
+    hover_insulin: "Insulină: %{value}u<br>%{time}"
+    event_insulin: "Insulină"
+    event_exercise: "Exercițiu"
+    event_carbohydrates: "Carbohidrați"
+
+  metrics:
+    title: "Metrici"
+    prediction_accuracy: "Acuratețea predicției"
+    placeholder_need_5: "Adaugă cel puțin 5 puncte de predicție pentru a vedea metricele de acuratețe"
+    title_accuracy_metrics: "Metrici de acuratețe"
+    no_metrics_available: "Nu sunt disponibile metrici"
+    desc:
+      mae: "Diferența medie între valorile prezise și cele reale"
+      mse: "Pune accent pe erorile de predicție mai mari"
+      rmse: "Similar cu MAE, dar penalizează mai mult erorile mari"
+      mape: "Diferența procentuală medie față de valorile reale"
+
+  table:
+    metric_header: "Metrică"
+    actual_glucose: "Glucoză reală"
+    predicted: "Prezise"
+    absolute_error: "Eroare absolută"
+    relative_error_pct: "Eroare relativă (%{pct})"
+
+  session_expired:
+    title: "Sesiune expirată"
+    text: "Te rugăm să reîncepi de la început."
+
+  ending:
+    title: "Rezumatul predicției"
+    prediction_results: "Rezultatele predicției"
+    units_line: "Unități: %{unit}"
+    next_round: "Runda următoare"
+    view_complete_analysis: "Vezi analiza completă"
+    graph_explanation: "Graficul arată fereastra de glucoză pe care ai prezis-o. Linia portocalie punctată separă istoricul cunoscut (stânga) de ora pe care ai prezis-o (dreapta). Predicțiile tale sunt afișate cu roșu."
+
+  final:
+    title: "Analiză completă"
+    rounds_played: "Runde jucate: %{played} / %{total}"
+    played_formats: "Formate jucate până acum: %{formats}"
+    ranking_title: "Clasament"
+    ranking_format_line: "Clasament (%{format}): %{rank} / %{total}"
+    ranking_overall_line: "Clasament general: %{rank} / %{total}"
+    per_round_metrics: "Metrici pe rundă"
+    start_over: "Reîncepe"
+
+  switch_format:
+    title: "Încearcă o altă opțiune"
+    try_a: "Încearcă A = folosește date generice"
+    try_b: "Încearcă B = folosește propriile date"
+    try_c: "Încearcă C = folosește atât date generice, cât și proprii"
+    not_eligible_no_cgm: "B/C sunt disponibile doar dacă ai spus că ai date CGM."
+
+  results_disclaimer:
+    line1: "Aceste scoruri măsoară performanța predicției, nu starea de sănătate"
+    line2: "Nu le folosi pentru a ajusta insulina, dieta sau alte decizii medicale"
+    line3: "Continuă să urmezi recomandările furnizorului tău de servicii medicale"
+
