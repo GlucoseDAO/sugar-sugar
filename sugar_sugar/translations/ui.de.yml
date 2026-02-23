@@ -89,10 +89,10 @@ de:
     just_test_me: "Nur testen"
     start_prediction: "Vorhersage starten"
     format_label: "Format"
-    format_placeholder: "A, B oder C auswählen"
-    format_a_label: "A"
-    format_b_label: "B"
-    format_c_label: "C"
+    format_placeholder: "Option auswählen"
+    format_a_label: "A = generische Daten verwenden"
+    format_b_label: "B = eigene Daten verwenden"
+    format_c_label: "C = generische und eigene Daten verwenden"
     format_help_a: "A — generische Daten (keine Sensordaten nötig). 12 Runden mit einem Beispieldatensatz."
     format_help_b: "B — eigene Daten. Lade eine eigene Datei hoch und prognostiziere nur darauf."
     format_help_c: "C — beides ausprobieren. Du lädst eine eigene Datei hoch, aber pro Runde werden entweder Beispiel‑ oder eigene Daten genutzt."
@@ -121,6 +121,7 @@ de:
   prediction:
     units_label: "Einheiten:"
     upload_required_alert: "Dieses Format erfordert eigene CGM‑Daten. Bitte lade eine CSV‑Datei hoch, um zu starten."
+    upload_consent_recorded: "Einwilligung gespeichert. Du kannst deine CGM‑Daten jetzt in dieser Sitzung hochladen und verwenden."
 
   submit:
     progress_no_data: "Mache Vorhersagen bis zum Ende des ausgeblendeten Bereichs, um zu senden"
@@ -189,8 +190,13 @@ de:
 
   switch_format:
     title: "Andere Option ausprobieren"
-    try_a: "A ausprobieren"
-    try_b: "B ausprobieren"
-    try_c: "C ausprobieren"
+    try_a: "A ausprobieren = generische Daten verwenden"
+    try_b: "B ausprobieren = eigene Daten verwenden"
+    try_c: "C ausprobieren = generische und eigene Daten verwenden"
     not_eligible_no_cgm: "B/C sind nur verfügbar, wenn du angegeben hast, dass du CGM‑Daten hast."
+
+  results_disclaimer:
+    line1: "Diese Werte messen Vorhersageleistung, nicht Gesundheitszustand"
+    line2: "Nicht verwenden, um Insulin, Ernährung oder andere medizinische Entscheidungen anzupassen"
+    line3: "Folge weiterhin den Empfehlungen deines Behandlungsteams"
 

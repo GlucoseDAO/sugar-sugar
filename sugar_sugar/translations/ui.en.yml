@@ -89,10 +89,10 @@ en:
     just_test_me: "Just Test Me"
     start_prediction: "Start Prediction"
     format_label: "Format"
-    format_placeholder: "Choose A, B, or C"
-    format_a_label: "A"
-    format_b_label: "B"
-    format_c_label: "C"
+    format_placeholder: "Choose an option"
+    format_a_label: "A = use generic data"
+    format_b_label: "B = use own data"
+    format_c_label: "C = use both generic and own data"
     format_help_a: "A — use generic data (no sensor data required). 12 rounds using a sample set."
     format_help_b: "B — use your own data. Upload your own file and predict only on it."
     format_help_c: "C — try both. You will upload your own file, but each round uses either sample data or your own data."
@@ -121,6 +121,7 @@ en:
   prediction:
     units_label: "Units:"
     upload_required_alert: "This format requires your own CGM data. Please upload a CSV file to start."
+    upload_consent_recorded: "Consent recorded. You can now upload and use your CGM data in this session."
 
   submit:
     progress_no_data: "Make predictions to the end of the hidden area to submit"
@@ -189,8 +190,13 @@ en:
 
   switch_format:
     title: "Try another option"
-    try_a: "Try A"
-    try_b: "Try B"
-    try_c: "Try C"
+    try_a: "Try A = use generic data"
+    try_b: "Try B = use own data"
+    try_c: "Try C = use both generic and own data"
     not_eligible_no_cgm: "B/C are only available if you said you have CGM data."
+
+  results_disclaimer:
+    line1: "These scores measure prediction performance, not health status"
+    line2: "Do not use to adjust insulin, diet, or any medical decisions"
+    line3: "Continue following your healthcare provider's guidance"
 

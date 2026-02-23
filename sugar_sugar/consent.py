@@ -121,3 +121,64 @@ def ensure_consent_agreement_row(row: dict[str, Any]) -> None:
         return
     append_consent_agreement_row(row)
 
+
+def upsert_consent_agreement_fields(study_id: str, updates: dict[str, Any]) -> None:
+    """Update fields for an existing consent row, or append a new row if missing.
+
+    This is used for consents that can be given later in the session (e.g. uploaded CGM data usage).
+    """
+    sid = str(study_id or "").strip()
+    if not sid:
+        return
+
+    path = consent_csv_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    normalized_updates: dict[str, str] = {str(k): "" if v is None else str(v) for k, v in updates.items()}
+
+    with start_action(action_type=u"upsert_consent_agreement_fields", study_id=sid, path=str(path)):
+        if not path.exists():
+            append_consent_agreement_row({"study_id": sid, **normalized_updates})
+            return
+
+        with path.open("r", newline="", encoding="utf-8") as file_handle:
+            reader = csv.DictReader(file_handle)
+            fieldnames = list(reader.fieldnames or [])
+            rows = list(reader)
+
+        if "study_id" not in fieldnames:
+            fieldnames = ["study_id", *fieldnames]
+
+        updated = False
+        new_rows: list[dict[str, str]] = []
+        for row in rows:
+            if (row.get("study_id") or "") == sid:
+                merged = dict(row)
+                merged.update(normalized_updates)
+                # Keep timestamp fresh for late consents.
+                merged["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                new_rows.append(merged)
+                updated = True
+            else:
+                new_rows.append(dict(row))
+
+        if not updated:
+            append_consent_agreement_row({"study_id": sid, **normalized_updates})
+            return
+
+        # Upgrade schema if needed.
+        desired_fieldnames = list(fieldnames)
+        for k in normalized_updates.keys():
+            if k not in desired_fieldnames:
+                desired_fieldnames.append(k)
+        if "timestamp" not in desired_fieldnames:
+            desired_fieldnames.append("timestamp")
+
+        tmp_path = path.with_suffix(".tmp")
+        with tmp_path.open("w", newline="", encoding="utf-8") as file_handle:
+            writer = csv.DictWriter(file_handle, fieldnames=desired_fieldnames)
+            writer.writeheader()
+            for r in new_rows:
+                writer.writerow({k: r.get(k, "") for k in desired_fieldnames})
+        tmp_path.replace(path)
+

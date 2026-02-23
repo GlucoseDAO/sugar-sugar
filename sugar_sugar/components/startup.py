@@ -111,9 +111,9 @@ class StartupPage(html.Div):
                         dcc.Dropdown(
                             id='format-dropdown',
                             options=[
-                                {'label': t("ui.startup.format_a_label", locale=locale), 'value': 'A'},
-                                {'label': t("ui.startup.format_b_label", locale=locale), 'value': 'B', 'disabled': True},
                                 {'label': t("ui.startup.format_c_label", locale=locale), 'value': 'C', 'disabled': True},
+                                {'label': t("ui.startup.format_b_label", locale=locale), 'value': 'B', 'disabled': True},
+                                {'label': t("ui.startup.format_a_label", locale=locale), 'value': 'A'},
                             ],
                             placeholder=t("ui.startup.format_placeholder", locale=locale),
                             style={'fontSize': '20px', 'marginBottom': '10px'}
@@ -306,13 +306,16 @@ class StartupPage(html.Div):
         ) -> tuple[list[dict[str, Any]], Optional[str]]:
             allow_all = uses_cgm is True
             options: list[dict[str, Any]] = [
-                {'label': t("ui.startup.format_a_label", locale=interface_language), 'value': 'A'},
-                {'label': t("ui.startup.format_b_label", locale=interface_language), 'value': 'B', 'disabled': not allow_all},
                 {'label': t("ui.startup.format_c_label", locale=interface_language), 'value': 'C', 'disabled': not allow_all},
+                {'label': t("ui.startup.format_b_label", locale=interface_language), 'value': 'B', 'disabled': not allow_all},
+                {'label': t("ui.startup.format_a_label", locale=interface_language), 'value': 'A'},
             ]
 
             if not current_format:
-                return options, 'A'
+                return options, ('C' if allow_all else 'A')
+            if allow_all and current_format == 'A':
+                # Encourage option C once eligible.
+                return options, 'C'
             if not allow_all and current_format in ('B', 'C'):
                 return options, 'A'
             return options, current_format

@@ -92,7 +92,7 @@ class HeaderComponent(Div):
 
         return html.Div(controls_children)
 
-    def create_upload_section(self) -> html.Div:
+    def create_upload_section(self, *, visible: bool = True) -> html.Div:
         """Create the file upload section"""
         children: list[Any] = [
             dcc.Upload(
@@ -133,9 +133,10 @@ class HeaderComponent(Div):
             )
             children.append(html.Div(id='example-data-warning', style={'marginTop': '10px'}))
 
-        return html.Div([
-            *children
-        ])
+        return html.Div(
+            [*children],
+            style={'display': 'block' if visible else 'none'},
+        )
 
     def _create_header_content(self) -> Sequence[Any]:
         """Create the header section content with title and description"""
@@ -143,53 +144,11 @@ class HeaderComponent(Div):
             self.create_controls(),
         ]
 
-        if self.show_upload_section:
-            right_column_children.extend(
-                [
-                    self.create_upload_section(),
-                    # Add data source indicator with improved visibility
-                    html.Div(
-                        [
-                            html.Label(
-                                t("ui.header.current_data_source", locale=self._locale),
-                                style={
-                                    'fontWeight': 'bold',
-                                    'marginRight': '8px',
-                                    'color': '#4a5568',
-                                    'fontSize': '14px',
-                                },
-                            ),
-                            html.Div(
-                                id='data-source-display',
-                                children="example.csv",
-                                style={
-                                    'color': '#2c5282',
-                                    'fontStyle': 'italic',
-                                    'fontSize': '14px',
-                                    'fontWeight': '500',
-                                    'overflow': 'hidden',
-                                    'textOverflow': 'ellipsis',
-                                    'maxWidth': '300px',
-                                    'whiteSpace': 'nowrap',
-                                },
-                            ),
-                        ],
-                        style={
-                            'marginTop': '15px',
-                            'padding': '10px',
-                            'backgroundColor': '#f7fafc',
-                            'borderRadius': '5px',
-                            'display': 'flex',
-                            'alignItems': 'center',
-                            'width': '100%',
-                            'boxShadow': '0 1px 2px rgba(0,0,0,0.05)',
-                        },
-                    ),
-                ]
-            )
-        else:
-            # Keep the data source label visible even when uploads are disabled.
-            right_column_children.append(
+        right_column_children.extend(
+            [
+                # Keep component IDs stable across formats; hide when not needed.
+                self.create_upload_section(visible=self.show_upload_section),
+                # Data source indicator (always visible).
                 html.Div(
                     [
                         html.Label(
@@ -226,8 +185,9 @@ class HeaderComponent(Div):
                         'width': '100%',
                         'boxShadow': '0 1px 2px rgba(0,0,0,0.05)',
                     },
-                )
-            )
+                ),
+            ]
+        )
 
         return [
             html.H1(t("ui.common.app_title", locale=self._locale),
