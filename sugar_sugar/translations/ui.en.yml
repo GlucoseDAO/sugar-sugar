@@ -19,7 +19,7 @@ en:
     tagline: "A game to test your glucose-predicting superpowers."
     how_it_works: "How it works"
     how_it_works_steps:
-      - "Upload Dexcom/Libre CSV (or use the sample dataset)"
+      - "Upload Dexcom/Libre/Medtronic CSV (or use the sample dataset)"
       - "Draw your predicted glucose trend on the chart"
       - "Compare predictions to the real values"
       - "See accuracy metrics (MAE/RMSE/MAPE)"
@@ -108,7 +108,7 @@ en:
     upload_required: "Upload required"
     upload_success: "Successfully loaded data from %{filename}. This data will be used for predictions."
     example_data_now_using: "Now using example data. Upload a CSV file for personalized analysis."
-    example_data_warning: "Currently using example data. Upload your own Dexcom/Libre CSV file for personalized analysis."
+    example_data_warning: "Currently using example data. Upload your own Dexcom/Libre/Medtronic CSV file for personalized analysis."
     current_data_source: "Current Data Source:"
     description_1: "Test your glucose prediction skills!"
     description_2: "Click on the graph or draw lines to predict future glucose values."

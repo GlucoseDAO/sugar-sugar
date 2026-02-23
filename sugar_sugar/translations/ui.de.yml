@@ -19,7 +19,7 @@ de:
     tagline: "Ein Spiel, um deine Fähigkeiten zur Glukose‑Vorhersage zu testen."
     how_it_works: "So funktioniert es"
     how_it_works_steps:
-      - "Dexcom/Libre‑CSV hochladen (oder Beispieldaten verwenden)"
+      - "Dexcom/Libre/Medtronic‑CSV hochladen (oder Beispieldaten verwenden)"
       - "Deinen erwarteten Glukose‑Verlauf im Chart einzeichnen"
       - "Vorhersagen mit den echten Werten vergleichen"
       - "Genauigkeitsmetriken ansehen (MAE/RMSE/MAPE)"
@@ -108,7 +108,7 @@ de:
     upload_required: "Upload erforderlich"
     upload_success: "Daten aus %{filename} wurden erfolgreich geladen. Diese Daten werden für Vorhersagen verwendet."
     example_data_now_using: "Jetzt werden Beispieldaten verwendet. Lade eine CSV‑Datei für eine personalisierte Analyse hoch."
-    example_data_warning: "Aktuell werden Beispieldaten verwendet. Lade deine eigene Dexcom/Libre‑CSV für eine personalisierte Analyse hoch."
+    example_data_warning: "Aktuell werden Beispieldaten verwendet. Lade deine eigene Dexcom/Libre/Medtronic‑CSV für eine personalisierte Analyse hoch."
     current_data_source: "Aktuelle Datenquelle:"
     description_1: "Teste deine Glukose‑Vorhersage!"
     description_2: "Klicke im Chart oder zeichne Linien, um zukünftige Glukosewerte vorherzusagen."
