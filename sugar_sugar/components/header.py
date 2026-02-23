@@ -1,8 +1,8 @@
 from typing import Sequence, Optional, Any
-from dash import dcc, html
 
+from dash import dcc, html
 from dash.html import Div
-from sugar_sugar.config import DEFAULT_POINTS, MIN_POINTS, MAX_POINTS
+
 from sugar_sugar.i18n import t
 
 
@@ -39,58 +39,37 @@ class HeaderComponent(Div):
         )
 
     def create_controls(self) -> html.Div:
-        """Create the points control and time slider section"""
-        controls_children = [
-            html.Div([
-                # Points control
-                html.Div([
-                    html.Label(t("ui.header.points_label", locale=self._locale), style={'marginRight': '10px'}),
-                    dcc.Input(
-                        id='points-control',
-                        type='number',
-                        value=DEFAULT_POINTS,
-                        min=MIN_POINTS,
-                        max=MAX_POINTS,
-                        style={'width': '80px'}
-                    ),
-                ], style={'flex': '0 0 auto', 'display': 'flex', 'alignItems': 'center'}),
-            ], style={
-                'display': 'flex',
-                'flexDirection': 'row',
-                'alignItems': 'center',
-                'gap': '10px',
-                'marginBottom': '10px'
-            })
-        ]
+        """Create the header controls section.
 
-        # Always include the time slider for functionality, but conditionally hide it
-        time_slider_div = html.Div([
-            html.Label(t("ui.header.time_window_label", locale=self._locale), style={'marginRight': '10px'}),
-            dcc.Slider(
-                id='time-slider',
-                min=0,
-                max=100,  # This will be updated by callback
-                value=self.initial_slider_value,
-                marks=None,
-                tooltip={"placement": "bottom", "always_visible": True},
-                updatemode='mouseup',
-                included=True,
-                step=1
-            ),
-        ], style={
-            'flex': '1',
-            'marginLeft': '20px',
-            'display': 'block' if self.show_time_slider else 'none'  # Hide when show_time_slider is False
-        })
+        Note: the prediction window size is fixed, so we no longer expose a
+        "number of points to show" control in the UI.
+        """
+        # Always include the time slider for callback wiring, but conditionally hide it.
+        time_slider_div = html.Div(
+            [
+                html.Label(
+                    t("ui.header.time_window_label", locale=self._locale),
+                    style={"marginRight": "10px"},
+                ),
+                dcc.Slider(
+                    id="time-slider",
+                    min=0,
+                    max=100,  # Updated by callback
+                    value=self.initial_slider_value,
+                    marks=None,
+                    tooltip={"placement": "bottom", "always_visible": True},
+                    updatemode="mouseup",
+                    included=True,
+                    step=1,
+                ),
+            ],
+            style={
+                "flex": "1",
+                "display": "block" if self.show_time_slider else "none",
+            },
+        )
 
-        # Add the time slider to the first child's style
-        if self.show_time_slider:
-            controls_children[0]['props']['children'].append(time_slider_div)
-        else:
-            # Still include the slider but hidden for callback functionality
-            controls_children.append(time_slider_div)
-
-        return html.Div(controls_children)
+        return html.Div([time_slider_div])
 
     def create_upload_section(self, *, visible: bool = True) -> html.Div:
         """Create the file upload section"""

@@ -2182,7 +2182,6 @@ def initialize_data_on_url_change(
     [Input('upload-data', 'contents'),
      Input('prediction-data-usage-consent', 'value')],
     [State('upload-data', 'filename'),
-     State('points-control', 'value'),
      State('user-info-store', 'data')],
     prevent_initial_call=True
 )
@@ -2190,7 +2189,6 @@ def handle_file_upload(
     upload_contents: Optional[str],
     consent_value: Optional[list[str]],
     filename: Optional[str],
-                      points_value: Optional[int],
     user_info: Optional[Dict[str, Any]],
 ) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int, Dict[str, Any], int]:
     """Handle file upload and data loading"""
@@ -2316,7 +2314,7 @@ def handle_file_upload(
         new_full_df, new_events_df = load_glucose_data(save_path)
         
         # Start at a random position for uploaded files too
-        points = max(MIN_POINTS, min(MAX_POINTS, points_value or DEFAULT_POINTS))
+        points = max(MIN_POINTS, min(MAX_POINTS, DEFAULT_POINTS))
         new_df, random_start = get_random_data_window(new_full_df, points)
         
         info: Dict[str, Any] = dict(info_pre)
@@ -2354,10 +2352,9 @@ def handle_file_upload(
      Output('time-slider', 'value', allow_duplicate=True),
      Output('initial-slider-value', 'data', allow_duplicate=True)],  # Add initial slider value update
     [Input('use-example-data-button', 'n_clicks')],
-    [State('points-control', 'value')],
     prevent_initial_call=True
 )
-def handle_example_data_button(example_button_clicks: Optional[int], points_value: Optional[int]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int, int]:
+def handle_example_data_button(example_button_clicks: Optional[int]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int, int]:
     """Handle use example data button click"""
     if not example_button_clicks:
         return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
@@ -2369,7 +2366,7 @@ def handle_example_data_button(example_button_clicks: Optional[int], points_valu
         new_full_df, new_events_df = load_glucose_data()
         
         # Start at a random position for example data too
-        points = max(MIN_POINTS, min(MAX_POINTS, points_value or DEFAULT_POINTS))
+        points = max(MIN_POINTS, min(MAX_POINTS, DEFAULT_POINTS))
         new_df, random_start = get_random_data_window(new_full_df, points)
         
         # Reset predictions
@@ -2389,45 +2386,18 @@ def handle_example_data_button(example_button_clicks: Optional[int], points_valu
                random_start)  # Update initial slider value
 
 
-# Separate callback for points control
-@app.callback(
-    [Output('last-click-time', 'data', allow_duplicate=True),
-     Output('current-window-df', 'data', allow_duplicate=True)],
-    [Input('points-control', 'value')],
-    [State('time-slider', 'value'),
-     State('full-df', 'data')],
-    prevent_initial_call=True
-)
-def handle_points_control(points_value: Optional[int], current_position: Optional[int], 
-                         full_df_data: Optional[Dict]) -> Tuple[int, Dict[str, List[Any]]]:
-    """Handle points control slider changes"""
-    if not points_value or not full_df_data:
-        return no_update, no_update
-    
-    with start_action(action_type=u"handle_points_control", points_value=points_value):
-        current_time = int(time.time() * 1000)
-        
-        full_df = reconstruct_dataframe_from_dict(full_df_data)
-        points = max(MIN_POINTS, min(MAX_POINTS, points_value))
-        new_max = len(full_df) - points
-        new_start = min(current_position or 0, new_max)
-        new_start = max(0, new_start)
-        new_df = full_df.slice(new_start, points)
-        
-        return current_time, convert_df_to_dict(new_df)
-
-
 # Separate callback for time slider
 @app.callback(
     [Output('last-click-time', 'data', allow_duplicate=True),
      Output('current-window-df', 'data', allow_duplicate=True)],
     [Input('time-slider', 'value')],
-    [State('points-control', 'value'),
-     State('full-df', 'data')],
+    [State('full-df', 'data')],
     prevent_initial_call=True
 )
-def handle_time_slider(slider_value: Optional[int], current_points: Optional[int], 
-                      full_df_data: Optional[Dict]) -> Tuple[int, Dict[str, List[Any]]]:
+def handle_time_slider(
+    slider_value: Optional[int],
+    full_df_data: Optional[Dict],
+) -> Tuple[int, Dict[str, List[Any]]]:
     """Handle time slider changes"""
     if slider_value is None or not full_df_data:
         return no_update, no_update
@@ -2438,7 +2408,7 @@ def handle_time_slider(slider_value: Optional[int], current_points: Optional[int
         full_df = reconstruct_dataframe_from_dict(full_df_data)
         
         # Ensure we don't go beyond the available data
-        points = max(MIN_POINTS, min(MAX_POINTS, current_points or DEFAULT_POINTS))
+        points = max(MIN_POINTS, min(MAX_POINTS, DEFAULT_POINTS))
         max_start = len(full_df) - points
         safe_slider_value = min(slider_value, max_start)
         safe_slider_value = max(0, safe_slider_value)
@@ -2670,13 +2640,12 @@ def update_data_source_display(
     [Input('time-slider', 'max')],  # Triggers when slider is created and max is set
     [State('url', 'pathname'),
      State('full-df', 'data'),
-     State('points-control', 'value'),
      State('randomization-initialized', 'data'),
      State('initial-slider-value', 'data')],
     prevent_initial_call=True
 )
 def randomize_slider_on_prediction_page(slider_max: int, pathname: str, full_df_data: Optional[Dict], 
-                                       points_value: int, randomization_initialized: bool, 
+                                       randomization_initialized: bool, 
                                        initial_slider_value: Optional[int]) -> Tuple[int, bool]:
     """Set slider to a random valid window start when slider mounts on prediction page. Returns slider value and updated randomization flag."""
     if pathname == '/prediction' and full_df_data and slider_max is not None and not randomization_initialized:
@@ -2685,7 +2654,7 @@ def randomize_slider_on_prediction_page(slider_max: int, pathname: str, full_df_
             return initial_slider_value, True
         # Otherwise generate a new random start
         full_df = reconstruct_dataframe_from_dict(full_df_data)
-        points = max(MIN_POINTS, min(MAX_POINTS, points_value or DEFAULT_POINTS))
+        points = max(MIN_POINTS, min(MAX_POINTS, DEFAULT_POINTS))
         _, random_start = get_random_data_window(full_df, points)
         return random_start, True  # Set randomization flag to True after randomizing
     return no_update, no_update
@@ -2748,21 +2717,22 @@ def update_upload_success_message(
      Output('upload-data', 'contents', allow_duplicate=True),  # Reset upload contents
      Output('upload-data', 'filename', allow_duplicate=True)],  # Reset filename
     [Input('use-example-data-button', 'n_clicks')],
-    [State('points-control', 'value'),
-     State('full-df', 'data'),
+    [State('full-df', 'data'),
      State('interface-language', 'data')],
     prevent_initial_call=True
 )
-def reset_upload_on_example_data(example_button_clicks: Optional[int], points_value: Optional[int], 
-                                full_df_data: Optional[Dict],
-                                interface_language: Optional[str]) -> Tuple[Optional[html.Div], int, None, None]:
+def reset_upload_on_example_data(
+    example_button_clicks: Optional[int],
+    full_df_data: Optional[Dict],
+    interface_language: Optional[str],
+) -> Tuple[Optional[html.Div], int, None, None]:
     """Reset upload component and show message when example data button is clicked"""
     if not example_button_clicks or not full_df_data:
         return no_update, no_update, no_update, no_update
     
     with start_action(action_type=u"reset_upload_on_example_data"):
         full_df = reconstruct_dataframe_from_dict(full_df_data)
-        points = max(MIN_POINTS, min(MAX_POINTS, points_value))
+        points = max(MIN_POINTS, min(MAX_POINTS, DEFAULT_POINTS))
         new_max = len(full_df) - points
         
         print("DEBUG: Resetting upload component to allow re-upload of same file")
@@ -2782,45 +2752,6 @@ def reset_upload_on_example_data(example_button_clicks: Optional[int], points_va
         # Reset upload component by clearing contents and filename
         # This allows the same file to be uploaded again after switching to example data
         return example_msg, new_max, None, None
-
-
-# Separate UI callback for points control
-@app.callback(
-    [Output('example-data-warning', 'children', allow_duplicate=True),
-     Output('time-slider', 'max', allow_duplicate=True),
-     Output('time-slider', 'value', allow_duplicate=True)],
-    [Input('points-control', 'value')],
-    [State('time-slider', 'value'),
-     State('full-df', 'data'),
-     State('is-example-data', 'data'),
-     State('interface-language', 'data')],
-    prevent_initial_call=True
-)
-def update_points_control_ui(points_value: Optional[int], current_position: Optional[int], 
-                            full_df_data: Optional[Dict], is_example_data: Optional[bool], interface_language: Optional[str]) -> Tuple[Optional[html.Div], int, int]:
-    """Update UI when points control changes"""
-    if not points_value or not full_df_data:
-        return no_update, no_update, no_update
-    
-    full_df = reconstruct_dataframe_from_dict(full_df_data)
-    points = max(MIN_POINTS, min(MAX_POINTS, points_value))
-    new_max = len(full_df) - points
-    new_start = min(current_position, new_max)
-    
-    # Show warning if using example data.
-    # If *not* using example data, don't overwrite other messages (e.g. upload consent warnings).
-    warning = html.Div([
-        html.I(className="fas fa-exclamation-triangle", style={'marginRight': '8px'}),
-        t("ui.header.example_data_warning", locale=normalize_locale(interface_language))
-    ], style={
-        'color': '#b7791f',
-        'backgroundColor': '#fefcbf',
-        'padding': '10px',
-        'borderRadius': '5px',
-        'textAlign': 'center'
-    }) if is_example_data else no_update
-    
-    return warning, new_max, max(0, new_start)
 
 def convert_df_to_dict(df: pl.DataFrame) -> Dict[str, List[Any]]:
     """Convert a Polars DataFrame to a session-store dictionary."""
