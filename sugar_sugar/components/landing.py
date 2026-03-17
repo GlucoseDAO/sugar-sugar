@@ -11,7 +11,7 @@ import dash_bootstrap_components as dbc
 from dash import dcc, html, no_update
 from dash.dependencies import Input, Output, State
 
-from sugar_sugar.consent_notice_text import consent_notice_children
+from sugar_sugar.components.consent_info import get_consent_info_components
 from sugar_sugar.consent import ensure_consent_agreement_row, get_next_study_number
 from sugar_sugar.i18n import t, t_list
 
@@ -195,8 +195,47 @@ class LandingPage(html.Div):
             dbc.CardBody(
                 [
                     html.H3(
-                        t("ui.landing.patient_consent_form_title", locale=locale),
-                        style={"fontSize": "22px", "fontWeight": "800", "color": "#1565c0", "marginBottom": "10px"},
+                        t("ui.consent_form.title", locale=locale),
+                        style={"fontSize": "22px", "fontWeight": "800", "color": "#1565c0"},
+                    ),
+                    html.Div(
+                        t("ui.consent_form.subtitle", locale=locale),
+                        style={"color": "#334155", "lineHeight": "1.6", "marginBottom": "12px"},
+                    ),
+                    dbc.Alert(
+                        t("ui.consent_form.adults_only", locale=locale),
+                        color="warning",
+                        style={"marginBottom": "14px"},
+                    ),
+                    html.Div(get_consent_info_components(locale)),
+                ],
+                style={
+                    "maxHeight": "calc(100vh - 320px)",
+                    "overflowY": "auto",
+                    "paddingRight": "10px",
+                    "minHeight": "0",
+                },
+            ),
+            style={
+                "borderRadius": "14px",
+                "border": "1px solid rgba(15, 23, 42, 0.10)",
+                "flex": "1",
+                "display": "flex",
+                "flexDirection": "column",
+                "minHeight": "0",
+            },
+        )
+
+        consent_card = dbc.Card(
+            dbc.CardBody(
+                [
+                    html.H3(
+                        t("ui.landing.your_choices_title", locale=locale),
+                        style={"fontSize": "22px", "fontWeight": "800", "color": "#1565c0"},
+                    ),
+                    html.Div(
+                        t("ui.landing.your_choices_text", locale=locale),
+                        style={"color": "#334155", "lineHeight": "1.6", "marginBottom": "10px"},
                     ),
                     html.Div(
                         [
@@ -217,6 +256,8 @@ class LandingPage(html.Div):
                                 options=[{"label": f" {t('ui.landing.consent_gdpr_label', locale=locale)}", "value": "gdpr"}],
                                 value=[],
                                 style={"fontSize": "16px"},
+                                persistence=True,
+                                persistence_type="session",
                             ),
                             html.Hr(style={"margin": "14px 0"}),
                             html.H4(
@@ -248,13 +289,53 @@ class LandingPage(html.Div):
                                 style={"fontSize": "16px", "marginTop": "10px"},
                             ),
                         ],
-                        style={
-                            "maxHeight": "calc(100vh - 360px)",
-                            "overflowY": "auto",
-                            "paddingRight": "10px",
-                            "minHeight": "0",
-                        },
-                        id="consent-notice-scroll",
+                        style={"marginBottom": "10px"},
+                    ),
+                    dbc.Checklist(
+                        id="consent-gdpr",
+                        options=[
+                            {
+                                "label": f" {t('ui.landing.consent_gdpr_label', locale=locale)}",
+                                "value": "gdpr",
+                            }
+                        ],
+                        value=[],
+                        style={"fontSize": "16px", "marginBottom": "10px"},
+                        persistence=True,
+                        persistence_type="session",
+                    ),
+                    dbc.Checklist(
+                        id="consent-play-only",
+                        options=[
+                            {
+                                "label": f" {t('ui.landing.consent_play_only', locale=locale)}",
+                                "value": "play_only",
+                            }
+                        ],
+                        value=[],
+                        style={"fontSize": "16px"},
+                        persistence=True,
+                        persistence_type="session",
+                    ),
+                    dbc.Checklist(
+                        id="consent-receive-results",
+                        options=[{"label": f" {t('ui.landing.consent_receive_results', locale=locale)}", "value": "receive_results"}],
+                        value=[],
+                        style={"fontSize": "16px", "marginTop": "10px"},
+                        persistence=True,
+                        persistence_type="session",
+                    ),
+                    dbc.Checklist(
+                        id="consent-keep-updated",
+                        options=[{"label": f" {t('ui.landing.consent_keep_updated', locale=locale)}", "value": "keep_updated"}],
+                        value=[],
+                        style={"fontSize": "16px", "marginTop": "10px"},
+                        persistence=True,
+                        persistence_type="session",
+                    ),
+                    html.Div(
+                        id="landing-error",
+                        style={"marginTop": "12px"},
                     ),
                     html.Div(id="landing-error", style={"marginTop": "12px"}),
                     html.Button(

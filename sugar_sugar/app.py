@@ -200,21 +200,21 @@ ending_page = EndingPage()
 # Set initial layout to startup page
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
-    dcc.Store(id='user-info-store', data=None),
-    dcc.Store(id='last-click-time', data=0),
+    dcc.Store(id='user-info-store', data=None, storage_type='session'),
+    dcc.Store(id='last-click-time', data=0, storage_type='session'),
     # Used to request a scroll-to-top after consent actions (prevents "header disappeared" UX).
-    dcc.Store(id='consent-scroll-request', data=0),
-    dcc.Store(id='current-window-df', data=example_initial_df_store),
-    dcc.Store(id='full-df', data=example_full_df_store),
-    dcc.Store(id='events-df', data=example_events_df_store),
-    dcc.Store(id='is-example-data', data=True),
-    dcc.Store(id='data-source-name', data="example.csv"),  # Store source filename
-    dcc.Store(id='randomization-initialized', data=False),  # Track if randomization has been done
-    dcc.Store(id='glucose-chart-mode', data={'hide_last_hour': True}),
+    dcc.Store(id='consent-scroll-request', data=0, storage_type='session'),
+    dcc.Store(id='current-window-df', data=example_initial_df_store, storage_type='session'),
+    dcc.Store(id='full-df', data=example_full_df_store, storage_type='session'),
+    dcc.Store(id='events-df', data=example_events_df_store, storage_type='session'),
+    dcc.Store(id='is-example-data', data=True, storage_type='session'),
+    dcc.Store(id='data-source-name', data="example.csv", storage_type='session'),  # Store source filename
+    dcc.Store(id='randomization-initialized', data=False, storage_type='session'),  # Track if randomization has been done
+    dcc.Store(id='glucose-chart-mode', data={'hide_last_hour': True}, storage_type='session'),
     dcc.Store(id='glucose-unit', data='mg/dL', storage_type='session'),
     dcc.Store(id='interface-language', data='en', storage_type='session'),
     dcc.Store(id='user-agent', data=None, storage_type='session'),
-    dcc.Store(id='initial-slider-value', data=example_initial_slider_value),  # Store initial random start
+    dcc.Store(id='initial-slider-value', data=example_initial_slider_value, storage_type='session'),  # Store initial random start
 
     html.Div(id='mobile-warning', style={'margin': '12px 0'}),
     # Present on every page so scroll callback always has a target.

@@ -10,7 +10,7 @@ class MetricsComponent(html.Div):
         # Create the layout with session storage
         super().__init__(
             children=[
-                dcc.Store(id='metrics-store', data=None),  # Session storage for metrics
+                dcc.Store(id='metrics-store', data=None, storage_type='session'),  # Session storage for metrics
                 html.Div(
                     id='metrics-container',
                     children=[

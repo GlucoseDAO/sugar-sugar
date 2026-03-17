@@ -3,8 +3,8 @@ from __future__ import annotations
 import dash_bootstrap_components as dbc
 from dash import html
 
-from sugar_sugar.consent_notice_text import consent_notice_children
-from sugar_sugar.i18n import t
+from sugar_sugar.i18n import t, t_list
+from sugar_sugar.components.consent_info import get_consent_info_components
 
 
 class ConsentFormPage(html.Div):
@@ -30,14 +30,15 @@ class ConsentFormPage(html.Div):
                                 children=dbc.CardBody(
                                     [
                                         html.Div(
-                                            consent_notice_children(locale),
-                                            style={
-                                                "maxHeight": "calc(100vh - 240px)",
-                                                "overflowY": "auto",
-                                                "paddingRight": "10px",
-                                            },
-                                            id="consent-form-scroll",
+                                            t("ui.consent_form.subtitle", locale=locale),
+                                            style={"color": "#334155", "lineHeight": "1.6", "marginBottom": "12px"},
                                         ),
+                                        dbc.Alert(
+                                            t("ui.consent_form.adults_only", locale=locale),
+                                            color="warning",
+                                            style={"marginBottom": "14px"},
+                                        ),
+                                        html.Div(get_consent_info_components(locale)),
                                         html.Hr(style={"margin": "18px 0"}),
                                         html.A(
                                             t("ui.common.back", locale=locale),

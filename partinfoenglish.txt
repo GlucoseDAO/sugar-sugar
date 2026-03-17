@@ -1,0 +1,144 @@
+Participant Information
+Predicting Glucose Trends Based on Prior Value Patterns: An Online Benchmarking Study
+Short title: Sugar-Sugar Glucose Forecasting Study
+Please read the following text carefully before making a decision. If you have any questions, please contact the study team.
+Dear Participant,
+We would like to ask whether you'd be willing to take part in a scientific study. This study aims to be the first systematic investigation into how accurately people can predict short-term glucose trends from CGM data (data from a continuous glucose monitor). No such reference standard currently exists. Your participation will help establish a benchmark for human prediction accuracy — one that can also serve, in the long run, as a point of comparison for computer-based forecasting models. Such models are increasingly used in diabetes research and care, and can be validated and compared against each other using the data collected here.
+The study is conducted at IBIMA (Institute for Biostatistics and Informatics in Medicine and Ageing Research) at Rostock University Medical Center, in collaboration with HEALES (Healthy Life Extension Society, Brussels), which acts as the study funder. The study is led by Anton Kulaga (Rostock University Medical Center) and Livia Zaharia (HEALES). A minimum of 200 participants is planned.
+Participation in the study has no effect on any medical treatment you may be receiving. This is a purely online study with no in-person appointments or medical procedures.
+
+How does the study work?
+
+Participation is entirely online via the Sugar-Sugar web application and takes approximately 15–20 minutes.
+You'll start by completing a short registration questionnaire (age, sex, country of residence, diabetes status, CGM usage history; optionally: weight and height). You then complete 6 to 12 prediction tasks. Each task shows three hours of historical CGM data from a publicly known, anonymized dataset. You are shown the early portion of time series collected in other studies; your job is to guess what comes next. You draw the expected glucose trend for the following 60 minutes by placing 12 points on a chart. Before the scored tasks, two optional practice rounds are offered.
+After each task, the actual glucose values are shown and accuracy metrics are calculated. At the end you receive a summary of your prediction accuracy (based on the historical data) and a percentile ranking.
+
+Prediction accuracy is compared across four groups: people with diabetes who use CGM, people with diabetes who don't use CGM, people without diabetes who use CGM, and people without diabetes and no CGM experience. You'll be assigned to one of these groups based on the information you provide at the start.
+
+Optional upload of your own CGM data
+
+If you use a CGM device yourself, you can optionally upload an export file (CSV or JSON). Short segments will be extracted from it and used for additional prediction tasks — allowing a comparison of whether you predict your own data more accurately than the historical data. Date and time are not displayed in the user interface. The uploaded raw file will be deleted within 30 days; only the extracted segments are retained in pseudonymized form.
+
+Voluntary participation
+
+Participation in this study is voluntary. You will only be included if you give your consent. If you choose not to participate or wish to withdraw later, you will face no disadvantages as a result. You can stop participating at any time, without giving any reason. Partial data from completed rounds will only be included if at least 6 valid rounds have been completed.
+
+Who can participate?
+
+Adults aged 18 and over with internet access are eligible to participate. Both people with and without diabetes are welcome.
+
+What possible risks, discomforts, or side effects are associated with participation?
+
+Since this study only collects data, there are no medical risks involved. Accuracy scores are solely for research purposes and have no diagnostic or clinical significance whatsoever.
+
+What potential benefits does participation offer?
+
+There is no direct personal health benefit from participating. Your contribution helps build a systematic benchmark of human glucose prediction ability. You'll receive a personal accuracy summary and a results card. There is no financial compensation.
+
+What rights and conditions are associated with participation?
+
+You can end your participation at any time, without giving reasons, and without any disadvantage to yourself.
+Please note that no separate insurance has been taken out for this project and the accompanying study, since it is a purely online study involving no medical procedures and therefore carries minimal risk.
+The study has been submitted to the relevant ethics committee, which raised no objections.
+
+
+Data Protection
+
+The following section explains what happens to your personal data in the context of this study and how we handle it.
+
+1. Who is responsible for data processing and storage?
+
+Rostock University Medical Center is responsible for data processing and storage within the study. HEALES operates the Sugar-Sugar application as a data processor under a Data Processing Agreement (DPA) with Rostock University Medical Center. You can reach the responsible institution at:
+
+Responsible Institution
+
+Rostock University Medical Center — legally independent constituent body of the University of Rostock
+Schillingallee 35
+18057 Rostock
+www.med.uni-rostock.de
+
+2. Who can you contact with questions about the study or data protection?
+
+To ensure your interests are best protected, you can contact the following people at any time with any questions about your care within the study or about the study in general:
+Study contacts
+Anton Kulaga: anton.kulaga@uni-rostock.de
+Livia Zaharia: livia.zaharia@uni-rostock.de
+For data protection questions, the Data Protection Officer of Rostock University Medical Center is also available:
+Data Protection Officer, Rostock University Medical Center
+Der Datenschutzbeauftragte
+Doberaner Str. 142
+18057 Rostock
+0381 494 5155 | datenschutz@med.uni-rostock.de
+If you wish to exercise your right to lodge a complaint about unlawful data processing, please contact the competent supervisory authority:
+Competent data protection supervisory authority
+Der Landesbeauftragte für Datenschutz und Informationsfreiheit M-V
+Schloss Schwerin, Lennéstr. 1
+19053 Schwerin
+info@datenschutz-mv.de
+
+3. What data do we need from you for the study?
+
+The following data will be collected in the course of the study:
+Contact data: Email address (for registration, processing of withdrawal requests, and optional result notifications).
+Demographic data: Age, sex, country of residence; optionally: weight and height.
+Health-related data: Diabetes status (yes/no, type, duration), CGM usage history.
+Study data: Predicted and, where applicable, actual glucose values; accuracy metrics (MAE, MSE, RMSE, MAPE).
+Consent preferences: Documentation of your consent decisions.
+Optional — own CGM data: If uploaded, only extracted segments in pseudonymized form are retained.
+
+4. Where does this data come from?
+
+All data is collected exclusively directly from you as a participant, through your inputs in the Sugar-Sugar web application (registration questionnaire, prediction tasks, optional CGM upload). No data is obtained from other sources. The legal basis for data processing is your explicit consent under Art. 6(1)(a) GDPR and Art. 9(2)(a) GDPR.
+
+5. For what purposes is your data needed, and how is it protected?
+
+The data described above is used solely for the scientific investigation of human glucose prediction ability and for no other purpose.
+Each participant receives a random study ID upon registration. All research data is linked exclusively to this ID. A separate encrypted mapping file linking the study ID to the email address is stored separately and is accessible only to the study leadership (Anton Kulaga and Livia Zaharia). This file serves solely for processing withdrawal requests and optional results notifications. Other study staff cannot trace data back to you personally.
+Data is encrypted during transmission and at rest. Storage takes place on servers within the European Union (GDPR-compliant hosting). Access is regulated on a role-based basis.
+
+6. Where and for how long is data stored?
+
+Data collected in the study is first pseudonymized. The mapping file (email — study ID) will be destroyed approximately 12 months after the study concludes. After that point, the study data is anonymized, meaning it can no longer be traced back to you in any way.
+Pseudonymized research data is retained for 10 years in accordance with German research standards. Uploaded raw CGM files are deleted within 30 days.
+
+7. Who has access to your data? Will your data be shared or published?
+
+Pseudonymized research data is accessible only to the study team at IBIMA. The mapping file is accessible only to the study leadership (Anton Kulaga and Livia Zaharia). Study results are published exclusively in aggregated, anonymized form. No conclusions about individual persons can be drawn from any publications.
+
+8. What data protection rights do you have when participating in the study?
+
+Under the applicable data protection regulations (GDPR), you have the right to access data stored about you, to have inaccurate data corrected, to have data deleted, to restrict the processing of your data, to object to unreasonable data processing, and to data portability of data stored about you. You also have the right to withdraw your consent at any time. You can exercise these rights at any time against the responsible institution.
+
+Right to withdraw
+You can withdraw your consent at any time without giving reasons. To do so, contact the study leadership (anton.kulaga@uni-rostock.de). Your withdrawal takes effect from the moment you submit it. Processing of your data up to that point remains lawful. If you withdraw, deletion of your personal data will be initiated. Study data that has already been anonymized and can no longer be attributed to you will continue to be used within the study. The mapping file will be destroyed approximately 12 months after the study concludes; after that point, individual identification — and therefore individual deletion — is no longer possible.
+Legal basis: Art. 6(1)(a) GDPR and Art. 9(2)(a) GDPR.
+
+Declaration of Consent
+for participation in the Sugar-Sugar Glucose Forecasting Study
+and the associated data processing
+Study ID of the participating person: __________________________________ (assigned at registration)
+The following consents are recorded electronically at the time of registration by clicking the corresponding checkboxes.
+I am participating in this study voluntarily. I have read the participant information for the study and the information on data protection and associated rights contained therein.
+I have been informed that personal data will be collected, processed, and used in connection with this study, including in particular my health data (diabetes status, CGM usage history, prediction performance).
+As described in the participant information, processing is carried out in pseudonymized form by the study team at IBIMA, Rostock University Medical Center. HEALES acts as data processor under a DPA.
+I am aware that, in the event of my data being anonymized, deletion upon my request will no longer be possible.
+Right to withdraw
+I have been informed that I can end my participation at any time without giving reasons and without any disadvantage to myself. I am also aware that I can withdraw my consent to data processing at any time with effect for the future, without affecting the lawfulness of processing carried out on the basis of that consent prior to withdrawal. I have taken note of the withdrawal information in the accompanying participant information.
+I hereby declare my voluntary consent to participate in the Sugar-Sugar Glucose Forecasting Study. I am aware that I can end my participation at any time without giving reasons and without any disadvantage to myself.
+I hereby consent, with reference to the accompanying participant information, to the processing of my personal data and health data for the following purposes:
+☐ Collection, processing, and use of my data listed in the participant information, including in particular my health data (diabetes status, CGM usage history, prediction performance), in pseudonymized form for the conduct of the study by the study team at IBIMA, Rostock University Medical Center, and HEALES as data processor. Storage takes place on servers within the European Union. Research data will be retained for up to 10 years after anonymization of the mapping file. Withdrawal is possible up to 12 months after the study concludes; after that point, identification is no longer possible. Legal basis: Art. 6(1)(a) GDPR and Art. 9(2)(a) GDPR.
+☐ The participating person confirms that they are 18 years of age or older.
+Optional consents (declining these has no effect on study participation):
+☐ I consent to uploading my own CGM data for the optional prediction task using personal data. Raw data will be deleted within 30 days; only pseudonymized extracted segments will be retained.
+☐ I agree to be contacted by the study team via my registered email address to receive information about study results once published.
+Communications from HEALES or related projects will be presented on a separate page after the study concludes, and are entirely independent of study participation and consent.
+This study has been submitted to the Ethics Committee of Rostock University Medical Center. Registration number: [not yet assigned at the time of this version].
+Questions or withdrawal requests: anton.kulaga@uni-rostock.de | livia.zaharia@uni-rostock.de
+
+
+
+
+
+
+
+

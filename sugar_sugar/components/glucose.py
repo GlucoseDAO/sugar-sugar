@@ -25,9 +25,9 @@ class GlucoseChart(html.Div):
 
     def __init__(self, id: str = 'glucose-chart', hide_last_hour: bool = False) -> None:
         super().__init__([
-            dcc.Store(id=f"{id}-df-store", data=None),
-            dcc.Store(id=f"{id}-events-store", data=None),
-            dcc.Store(id=f"{id}-source-store", data=None),
+            dcc.Store(id=f"{id}-df-store", data=None, storage_type='session'),
+            dcc.Store(id=f"{id}-events-store", data=None, storage_type='session'),
+            dcc.Store(id=f"{id}-source-store", data=None, storage_type='session'),
             dcc.Graph(
                 id=f"{id}-graph",
                 figure=self._create_empty_figure(),
