@@ -12,7 +12,7 @@ class PredictionTableComponent(html.Div):
         # Create the layout with session storage and initial empty table
         super().__init__(
             children=[
-                dcc.Store(id='current-df-store', data=None),  # Session storage for current DataFrame
+                dcc.Store(id='current-df-store', data=None, storage_type='session'),  # Session storage for current DataFrame
                 html.H4("Predictions Table", style={'fontSize': '20px', 'marginBottom': '10px'}),
                 dash_table.DataTable(
                     id='prediction-table-data',

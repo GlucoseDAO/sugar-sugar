@@ -70,7 +70,7 @@ class SubmitComponent(html.Div):
                     'height': '50px'
                 }
             ),
-            dcc.Store(id='prediction-stats-store', data=None)
+            dcc.Store(id='prediction-stats-store', data=None, storage_type='session')
         ], style={'display': 'flex', 'flexDirection': 'column', 'justifyContent': 'center', 'alignItems': 'center'})
 
     def _repair_misaligned_csv_rows(self) -> None:

@@ -256,6 +256,8 @@ class LandingPage(html.Div):
                                 options=[{"label": f" {t('ui.landing.consent_gdpr_label', locale=locale)}", "value": "gdpr"}],
                                 value=[],
                                 style={"fontSize": "16px"},
+                                persistence=True,
+                                persistence_type="session",
                             ),
                             html.Hr(style={"margin": "14px 0"}),
                             html.H4(
@@ -287,13 +289,53 @@ class LandingPage(html.Div):
                                 style={"fontSize": "16px", "marginTop": "10px"},
                             ),
                         ],
-                        style={
-                            "maxHeight": "calc(100vh - 360px)",
-                            "overflowY": "auto",
-                            "paddingRight": "10px",
-                            "minHeight": "0",
-                        },
-                        id="consent-notice-scroll",
+                        style={"marginBottom": "10px"},
+                    ),
+                    dbc.Checklist(
+                        id="consent-gdpr",
+                        options=[
+                            {
+                                "label": f" {t('ui.landing.consent_gdpr_label', locale=locale)}",
+                                "value": "gdpr",
+                            }
+                        ],
+                        value=[],
+                        style={"fontSize": "16px", "marginBottom": "10px"},
+                        persistence=True,
+                        persistence_type="session",
+                    ),
+                    dbc.Checklist(
+                        id="consent-play-only",
+                        options=[
+                            {
+                                "label": f" {t('ui.landing.consent_play_only', locale=locale)}",
+                                "value": "play_only",
+                            }
+                        ],
+                        value=[],
+                        style={"fontSize": "16px"},
+                        persistence=True,
+                        persistence_type="session",
+                    ),
+                    dbc.Checklist(
+                        id="consent-receive-results",
+                        options=[{"label": f" {t('ui.landing.consent_receive_results', locale=locale)}", "value": "receive_results"}],
+                        value=[],
+                        style={"fontSize": "16px", "marginTop": "10px"},
+                        persistence=True,
+                        persistence_type="session",
+                    ),
+                    dbc.Checklist(
+                        id="consent-keep-updated",
+                        options=[{"label": f" {t('ui.landing.consent_keep_updated', locale=locale)}", "value": "keep_updated"}],
+                        value=[],
+                        style={"fontSize": "16px", "marginTop": "10px"},
+                        persistence=True,
+                        persistence_type="session",
+                    ),
+                    html.Div(
+                        id="landing-error",
+                        style={"marginTop": "12px"},
                     ),
                     html.Div(id="landing-error", style={"marginTop": "12px"}),
                     html.Button(

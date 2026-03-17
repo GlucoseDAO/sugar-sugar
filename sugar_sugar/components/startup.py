@@ -78,7 +78,9 @@ class StartupPage(html.Div):
                         id='email-input',
                         type='email',
                         placeholder=t("ui.startup.email_placeholder", locale=locale),
-                        style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
+                        style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'},
+                        persistence=True,
+                        persistence_type='session'
                     ),
                     
                     html.Div([
@@ -91,7 +93,9 @@ class StartupPage(html.Div):
                         placeholder=t("ui.startup.age_placeholder", locale=locale),
                         min=0,
                         max=120,
-                        style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
+                        style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'},
+                        persistence=True,
+                        persistence_type='session'
                     ),
                     html.Div(
                         id='age-error',
@@ -111,7 +115,9 @@ class StartupPage(html.Div):
                             {'label': t("ui.startup.gender_na", locale=locale), 'value': 'N/A'}
                         ],
                         placeholder=t("ui.startup.gender_placeholder", locale=locale),
-                        style={'fontSize': '20px', 'marginBottom': '20px'}
+                        style={'fontSize': '20px', 'marginBottom': '20px'},
+                        persistence=True,
+                        persistence_type='session'
                     ),
 
                     html.Label(t("ui.startup.cgm_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a'}),
@@ -122,7 +128,9 @@ class StartupPage(html.Div):
                             {'label': t("ui.startup.no", locale=locale), 'value': False}
                         ],
                         placeholder=t("ui.startup.cgm_placeholder", locale=locale),
-                        style={'fontSize': '20px', 'marginBottom': '20px'}
+                        style={'fontSize': '20px', 'marginBottom': '20px'},
+                        persistence=True,
+                        persistence_type='session'
                     ),
 
                     html.Div(id='cgm-details', children=[
@@ -133,7 +141,9 @@ class StartupPage(html.Div):
                             placeholder=t("ui.startup.cgm_duration_placeholder", locale=locale),
                             min=0,
                             max=100,
-                            style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
+                            style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'},
+                            persistence=True,
+                            persistence_type='session'
                         )
                     ]),
 
@@ -150,7 +160,9 @@ class StartupPage(html.Div):
                                 {'label': t("ui.startup.format_c_label", locale=locale), 'value': 'C', 'disabled': True},
                             ],
                             placeholder=t("ui.startup.format_placeholder", locale=locale),
-                            style={'fontSize': '20px', 'marginBottom': '10px'}
+                            style={'fontSize': '20px', 'marginBottom': '10px'},
+                            persistence=True,
+                            persistence_type='session'
                         ),
                         html.Div(
                             [
@@ -169,7 +181,9 @@ class StartupPage(html.Div):
                                     id='data-usage-consent',
                                     options=[{'label': t("ui.startup.data_usage_consent_label", locale=locale), 'value': 'agree'}],
                                     value=[],
-                                    style={'fontSize': '16px'}
+                                    style={'fontSize': '16px'},
+                                    persistence=True,
+                                    persistence_type='session'
                                 ),
                                 html.Div(id='data-usage-error', style={'marginTop': '8px', 'color': '#d32f2f', 'fontSize': '16px'})
                             ],
@@ -188,7 +202,9 @@ class StartupPage(html.Div):
                             {'label': t("ui.startup.no", locale=locale), 'value': False}
                         ],
                         placeholder=t("ui.startup.diabetic_placeholder", locale=locale),
-                        style={'fontSize': '20px', 'marginBottom': '20px'}
+                        style={'fontSize': '20px', 'marginBottom': '20px'},
+                        persistence=True,
+                        persistence_type='session'
                     ),
                     
                     html.Div(id='diabetic-details', children=[
@@ -204,7 +220,9 @@ class StartupPage(html.Div):
                                 {'label': t("ui.startup.gender_na", locale=locale), 'value': 'N/A'}
                             ],
                             placeholder=t("ui.startup.diabetes_type_placeholder", locale=locale),
-                            style={'fontSize': '20px', 'marginBottom': '20px'}
+                            style={'fontSize': '20px', 'marginBottom': '20px'},
+                            persistence=True,
+                            persistence_type='session'
                         ),
                         
                         html.Div([
@@ -217,7 +235,9 @@ class StartupPage(html.Div):
                             placeholder=t("ui.startup.diabetes_duration_placeholder", locale=locale),
                             min=0,
                             max=100,
-                            style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
+                            style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'},
+                            persistence=True,
+                            persistence_type='session'
                         )
                     ]),
                     
@@ -229,7 +249,9 @@ class StartupPage(html.Div):
                         id='location-input',
                         type='text',
                         placeholder=t("ui.startup.location_placeholder", locale=locale),
-                        style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
+                        style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'},
+                        persistence=True,
+                        persistence_type='session'
                     ),
                     
                     html.Div(
