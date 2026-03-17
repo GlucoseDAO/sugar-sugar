@@ -11,7 +11,7 @@ import dash_bootstrap_components as dbc
 from dash import dcc, html, no_update
 from dash.dependencies import Input, Output, State
 
-from sugar_sugar.consent_notice_text import consent_notice_children
+from sugar_sugar.components.consent_info import get_consent_info_components
 from sugar_sugar.consent import ensure_consent_agreement_row, get_next_study_number
 from sugar_sugar.i18n import t, t_list
 
@@ -195,8 +195,47 @@ class LandingPage(html.Div):
             dbc.CardBody(
                 [
                     html.H3(
-                        t("ui.landing.patient_consent_form_title", locale=locale),
-                        style={"fontSize": "22px", "fontWeight": "800", "color": "#1565c0", "marginBottom": "10px"},
+                        t("ui.consent_form.title", locale=locale),
+                        style={"fontSize": "22px", "fontWeight": "800", "color": "#1565c0"},
+                    ),
+                    html.Div(
+                        t("ui.consent_form.subtitle", locale=locale),
+                        style={"color": "#334155", "lineHeight": "1.6", "marginBottom": "12px"},
+                    ),
+                    dbc.Alert(
+                        t("ui.consent_form.adults_only", locale=locale),
+                        color="warning",
+                        style={"marginBottom": "14px"},
+                    ),
+                    html.Div(get_consent_info_components(locale)),
+                ],
+                style={
+                    "maxHeight": "calc(100vh - 320px)",
+                    "overflowY": "auto",
+                    "paddingRight": "10px",
+                    "minHeight": "0",
+                },
+            ),
+            style={
+                "borderRadius": "14px",
+                "border": "1px solid rgba(15, 23, 42, 0.10)",
+                "flex": "1",
+                "display": "flex",
+                "flexDirection": "column",
+                "minHeight": "0",
+            },
+        )
+
+        consent_card = dbc.Card(
+            dbc.CardBody(
+                [
+                    html.H3(
+                        t("ui.landing.your_choices_title", locale=locale),
+                        style={"fontSize": "22px", "fontWeight": "800", "color": "#1565c0"},
+                    ),
+                    html.Div(
+                        t("ui.landing.your_choices_text", locale=locale),
+                        style={"color": "#334155", "lineHeight": "1.6", "marginBottom": "10px"},
                     ),
                     html.Div(
                         [

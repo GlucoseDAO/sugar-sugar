@@ -1,0 +1,143 @@
+Teilnehmerinformation
+
+Vorhersage des Glukoseverlaufs anhand vorheriger Wertemuster: Eine Online-Benchmarking-Studie
+Kurztitel: Sugar-Sugar Glukoseprognose-Studie
+Bitte lesen Sie den folgenden Text sorgfältig, bevor Sie eine Entscheidung treffen. Bei Fragen wenden Sie sich bitte an die Studienleitung.
+Sehr geehrte Teilnehmerin, sehr geehrter Teilnehmer,
+wir möchten Sie fragen, ob Sie an einer wissenschaftlichen Studie teilnehmen möchten. Durch diese Studie soll erstmals systematisch untersucht werden, wie genau Menschen kurzfristige Glukoseverläufe anhand von CGM-Daten (Daten eines kontinuierlichen Glukosemessgeräts) vorhersagen können. Bisher gibt es keinen solchen Vergleichsmaßstab. Ihre Teilnahme hilft, eine Referenzgröße für die menschliche Vorhersagegenauigkeit zu schaffen, die langfristig auch zur Bewertung computergestützter Vorhersagemodelle dienen kann. Solche Vorhersagemodelle werden immer öfter in der Diabetesforschung und Diabetikerversorgung eingesetzt und sie lassen sich anhand der hier erhobenen Daten validieren und untereinander vergleichen.
+Die Studie wird am IBIMA (Institut für Biostatistik und Informatik in Medizin und Alternsforschung) der Universitätsmedizin Rostock durchgeführt, in Zusammenarbeit mit HEALES (Healthy Life Extension Society, Brüssel), die als Förderin der Studie auftritt. Die Studienleitung liegt bei Anton Kulaga (Universitätsmedizin Rostock) und Livia Zaharia (HEALES). Geplant sind mindestens 200 Teilnehmende.
+Die Teilnahme an der Studie hat keinen Einfluss auf eine etwaige medizinische Behandlung. Es handelt sich um eine reine Online-Studie ohne persönliche Termine oder medizinische Maßnahmen.
+
+Wie läuft die Studie ab?
+
+Die Teilnahme erfolgt vollständig online über die Sugar-Sugar-Webanwendung und dauert ca. 15–20 Minuten.
+
+Zunächst füllen Sie einen kurzen Registrierungsfragebogen aus (Alter, Geschlecht, Wohnsitzland, Diabetesstatus, CGM-Nutzungshistorie; optional: Gewicht und Körpergröße). Danach bearbeiten Sie 6 bis 12 Vorhersageaufgaben. Jede Aufgabe zeigt drei Stunden historische CGM-Daten aus einem öffentlich bekannnten, anonymisierten Datensatz. Sie erhalten die frühen Zeitpunkte von Zeitserien, die im Rahmen anderer Studien erhoben wurden; die späten Zeitpunkte sollen Sie erraten. Sie zeichnen den erwarteten Glukoseverlauf der folgenden 60 Minuten ein, indem Sie 12 Punkte in einem Diagramm setzen. Vor den gewerteten Aufgaben werden Ihnenzwei optionale Übungsrunden angeboten.
+
+Nach jeder Aufgabe werden die tatsächlichen Glukosewerte angezeigt und Genauigkeitsmetriken berechnet. Am Ende erhalten Sie eine Zusammenfassung Ihrer Vorhersagegenauigkeit (ermittelt aus den historischen Daten) sowie einen Perzentilrang.
+
+Die Vorhersagegenauigkeit wird in vier Gruppen verglichen: Personen mit Diabetes und CGM-Nutzung, Personen mit Diabetes ohne CGM-Nutzung, Personen ohne Diabetes mit CGM-Nutzung sowie Personen ohne Diabetes ohne CGM-Erfahrung; Sie werden aufgund der eingangs erhobenen Daten einer dieser Gruppen zugeteilt.
+
+Optionaler Upload eigener CGM-Daten
+
+Wenn Sie selbst ein CGM-Gerät nutzen, können Sie optional eine Exportdatei (CSV oder JSON) hochladen. Daraus werden kurze Segmente extrahiert und für zusätzliche Vorhersageaufgaben verwendet. So lässt sich vergleichen, ob Sie bei eigenen Daten genauer vorhersagen als bei den historischenDaten. Datum und Uhrzeit werden in der Benutzeroberfläche nicht angezeigt. Die hochgeladene Rohdatei wird innerhalb von 30 Tagen gelöscht; es werden nur die extrahierten Segmente in pseudonymisierter Form aufbewahrt.
+
+Freiwilligkeit der Teilnahme
+
+Die Teilnahme an dieser Studie ist freiwillig. Sie werden nur dann einbezogen, wenn Sie dazu Ihre Einwilligung erklären. Sofern Sie nicht an der Studie teilnehmen oder später aus ihr ausscheiden möchten, entstehen Ihnen daraus keine Nachteile. Sie können die Teilnahme jederzeit ohne Angabe von Gründen beenden. Teildaten aus abgeschlossenen Runden werden nur einbezogen, wenn mindestens 6 gültige Runden abgeschlossen wurden.
+
+Wer kann teilnehmen?
+
+Teilnehmen können volljährige Personen ab 18 Jahren mit Internetzugang. Sowohl Personen mit als auch ohne Diabetes sind teilnahmeberechtigt.
+
+Welche möglichen Risiken, Beschwerden oder Begleiterscheinungen sind mit Ihrer Teilnahme verbunden?
+
+Da im Rahmen unserer Studie nur Daten erhoben werden, sind mit der Teilnahme keine medizinischen Risiken verbunden. Die Genauigkeitswerte sind ausschließlich fürv die Forschung relevant und haben keinerlei diagnostische oder klinische Bedeutung.
+
+Welcher mögliche Nutzen ergibt sich aus Ihrer Teilnahme an der Studie?
+
+Ein persönlicher gesundheitlicher Nutzen entsteht Ihnen durch die Teilnahme nicht. Die Teilnahme trägt zu einem systematischen Benchmark der menschlichen Glukosewerte- Vorhersagefähigkeit bei. Sie erhalten eine persönliche Genauigkeitszusammenfassung sowie eine Ergebniskarte. Eine monetäre Vergütung gibt es nicht.
+
+Welche Rechte und Bedingungen sind mit der Teilnahme verbunden?
+
+Sie können jederzeit, auch ohne Angabe von Gründen, Ihre Teilnahme an der Studie beenden. Falls Sie nicht teilnehmen möchten oder ausscheiden möchten, entstehen Ihnen dadurch keine Nachteile.
+
+Wir weisen Sie darauf hin, dass für dieses Projekt und für die begleitende Studie keine eigene Versicherung abgeschlossen wurde, da es sich um eine reine Online-Studie ohne medizinische Maßnahmen und somit mit minimalem Risiko handelt.
+
+Die Studie wurde der zuständigen Ethikkommission vorgelegt. Sie hat keine Einwände erhoben.
+
+Datenschutz
+
+Nachfolgend möchten wir Sie umfassend darüber informieren, was mit Ihren persönlichen Daten im Rahmen der Studie geschieht und wie wir mit ihnen umgehen.
+
+1. Wer ist verantwortlich für die Datenverarbeitung und -speicherung?
+
+Für die Datenverarbeitung und -speicherung im Rahmen der Studie ist die Universitätsmedizin Rostock verantwortlich. HEALES betreibt die Sugar-Sugar-Anwendung als Auftragsverarbeiter im Rahmen eines Auftragsverarbeitungsvertrags (AVV) mit der Universitätsmedizin Rostock. Die verantwortliche Einrichtung können Sie unter folgenden Kontaktdaten erreichen:
+Verantwortliche Einrichtung
+Universitätsmedizin Rostock – rechtsfähige Teilkörperschaft der Universität Rostock
+Schillingallee 35
+18057 Rostock
+www.med.uni-rostock.de
+
+2. An wen können Sie sich bei Fragen zur Studie oder zum Datenschutz wenden?
+
+Damit Ihre Interessen bestmöglich gewahrt werden, können Sie sich auch jederzeit für sämtliche Fragen zu Ihrer Betreuung im Rahmen der Studie oder generell zu deren Ablauf unter folgender Adresse an die folgenden Ansprechpartner wenden:
+
+Ansprechpartner zur Studie
+Anton Kulaga: anton.kulaga@uni-rostock.de
+Livia Zaharia: livia.zaharia@uni-rostock.de
+Bei Fragen zum Datenschutz steht Ihnen zusätzlich der Datenschutzbeauftragte der Universitätsmedizin Rostock gerne zur Verfügung:
+Datenschutzbeauftragter der Universitätsmedizin Rostock
+Der Datenschutzbeauftragte
+Doberaner Str. 142
+18057 Rostock
+0381 494 5155 | datenschutz@med.uni-rostock.de
+Möchten Sie von Ihrem Beschwerderecht über rechtswidrige Datenverarbeitungen Gebrauch machen, wenden Sie sich bitte an die zuständige Aufsichtsbehörde:
+Zuständige Datenschutzaufsichtsbehörde
+Der Landesbeauftragte für Datenschutz und Informationsfreiheit M-V
+Schloss Schwerin, Lennéstr. 1
+19053 Schwerin
+info@datenschutz-mv.de
+
+3. Welche Daten von Ihnen benötigen wir für die Durchführung der Studie?
+
+Im Rahmen der Studie werden folgende Daten erhoben:
+Kontaktdaten: E-Mail-Adresse (für Registrierung, Widerrufsbearbeitung und optionale Wiederbenachrichtigung).
+Demografische Daten: Alter, Geschlecht, Wohnsitzland; optional: Gewicht und Körpergröße.
+Gesundheitsbezogene Daten: Diabetesstatus (ja/nein, Typ, Dauer), CGM-Nutzungshistorie.
+Studiendaten: Vorhergesagte und ggfs. tatsächliche Glukosewerte, Genauigkeitsmetriken (MAE, MSE, RMSE, MAPE).
+Einwilligungspräferenzen: Dokumentation Ihrer Einwilligungsentscheidungen.
+Optional – eigene CGM-Daten: Bei Upload werden ausschließlich extrahierte Segmente in pseudonymisierter Form aufbewahrt.
+
+4. Woher erhalten wir diese Daten?
+
+Sämtliche Daten werden ausschließlich direkt bei Ihnen als Teilnehmer erhoben, und zwar durch Ihre Eingaben in der Sugar-Sugar-Webanwendung (Registrierungsfragebogen, Vorhersageaufgaben, optionaler CGM-Upload). Es werden keine Daten aus anderen Quellen bezogen. Die Rechtsgrundlage für die Datenverarbeitung ist Ihre ausdrückliche Einwilligung gemäß Art. 6 Abs. 1 lit. a DSGVO und Art. 9 Abs. 2 lit. a DSGVO.
+
+5. Zu welchen Zwecken werden Ihre Daten benötigt und wie werden sie geschützt?
+
+Die oben genannten Daten werden ausschließlich für die wissenschaftliche Untersuchung der menschlichen Glukosevorhersagefähigkeit benötigt und nur für diesen Zweck verwendet.
+Jede teilnehmende Person erhält bei der Registrierung eine zufällige Studien-ID. Sämtliche Forschungsdaten werden ausschließlich mit dieser ID verknüpft. Eine separate verschlüsselte Zuordnungsdatei, die die Studien-ID der E-Mail-Adresse zuordnet, wird gesondert gespeichert und ist ausschließlich der Studienleitung (Anton Kulaga und Livia Zaharia) zugänglich. Diese Datei dient ausschließlich der Bearbeitung von Widerrufsanfragen und der optionalen Ergebnisbenachrichtigung. Für andere Mitarbeitende der Studie ist ein Rückschluss auf Ihre Person somit ausgeschlossen.
+Daten werden bei der Übertragung und im Ruhezustand verschlüsselt. Die Speicherung erfolgt auf Servern innerhalb der Europäischen Union (DSGVO-konformes Hosting). Der Zugriff ist rollenbasiert geregelt.
+
+6. Wo und wie lange werden die Daten gespeichert?
+
+Die im Rahmen der Studie erhobenen Daten werden zunächst pseudonymisiert. Die Zuordnungsdatei (E-Mail – Studien-ID) wird voraussichtlich 12 Monate nach Studienabschluss vernichtet. Danach sind die Studiendaten anonymisiert, d. h. sie lassen keinerlei Rückschluss auf Ihre Person mehr zu.
+
+Pseudonymisierte Forschungsdaten werden gemäß deutschen Forschungsstandards 10 Jahre aufbewahrt. Hochgeladene CGM-Rohdateien werden innerhalb von 30 Tagen gelöscht.
+
+7. Wer erlangt Kenntnis von Ihren Daten? Werden Ihre Daten weitergegeben und veröffentlicht?
+
+Pseudonymisierte Forschungsdaten sind ausschließlich für das Studienteam am IBIMA zugänglich. Die Zuordnungsdatei ist nur der Studienleitung (Anton Kulaga und Livia Zaharia) zugänglich. Studienergebnisse werden ausschließlich in aggregierter, anonymisierter Form veröffentlicht. Rückschlüsse auf einzelne Personen sind aus den Veröffentlichungen nicht möglich.
+
+8. Welche Datenschutzrechte haben Sie bei einer Teilnahme an der Studie?
+
+Gemäß den geltenden Datenschutzbestimmungen (DSGVO) verfügen Sie über ein Recht auf Auskunft über gespeicherte Daten, Berichtigung unzutreffender Daten, Löschung von Daten, Einschränkung der Verarbeitung von Daten, Widerspruch gegen unzumutbare Datenverarbeitung und über ein Recht auf Datenübertragbarkeit der zu Ihrer Person gespeicherten Daten. Ebenso haben Sie das Recht, Ihre abgegebene Einwilligung zu widerrufen. Diese Rechte können Sie jederzeit gegenüber der verantwortlichen Einrichtung ausüben.
+
+Widerrufsrecht
+
+Grundsätzlich können Sie Ihre Einwilligung jederzeit ohne Angabe von Gründen widerrufen. Wenden Sie sich hierfür an die Studienleitung (anton.kulaga@uni-rostock.de). Ihr Widerruf gilt ab dem Zeitpunkt, zu dem Sie diesen abgeben. Die Verarbeitung Ihrer Daten bis zu diesem Zeitpunkt bleibt rechtmäßig. Im Falle eines Widerrufs wird die Löschung der personenbezogenen Daten veranlasst. Studiendaten, die bereits anonymisiert und somit nicht mehr Ihrer Person zugeordnet werden können, werden im Rahmen der Studie weiterverwendet. Die Zuordnungsdatei wird voraussichtlich 12 Monate nach Studienabschluss vernichtet; danach ist eine individuelle Zuordnung und damit auch eine Löschung nicht mehr möglich.
+Rechtsgrundlage: Art. 6 Abs. 1 lit. a DSGVO und Art. 9 Abs. 2 lit. a DSGVO. 
+
+Einwilligungserklärung
+
+zur Teilnahme an der Studie Sugar-Sugar Glukoseprognose-Studie
+und die damit verbundene Datenverarbeitung
+
+Studien-ID der teilnehmenden Person: _________________________________ (wird bei der Registrierung vergeben)
+Die nachfolgenden Einwilligungen werden zum Zeitpunkt der Registrierung durch Anklicken der entsprechenden Kontrollkästchen elektronisch erfasst.
+Ich nehme freiwillig an der Studie teil. Ich habe die Teilnehmerinformation zur Studie und die dort enthaltenen Hinweise zum Datenschutz und den damit verbundenen Rechten aufmerksam gelesen.
+Ich wurde darüber aufgeklärt, dass im Rahmen der Studie personenbezogene Daten von mir erhoben, verarbeitet und genutzt werden, insbesondere meine Gesundheitsdaten (Diabetesstatus, CGM-Nutzungshistorie, Vorhersageleistung). 
+Wie der Teilnehmerinformation zu entnehmen ist, erfolgt die Verarbeitung in pseudonymisierter Form durch das Studienteam am IBIMA der Universitätsmedizin Rostock. HEALES fungiert als Auftragsverarbeiter im Rahmen eines AVV.
+Ich bin mir bewusst, dass im Falle einer anonymisierten Speicherung meiner Daten deren Löschung auf meinen Wunsch nicht mehr möglich ist.
+Widerrufsrecht
+Ich wurde darüber aufgeklärt, dass ich meine Teilnahme jederzeit ohne Angabe von Gründen beenden kann, ohne dass mir dadurch Nachteile entstehen. Mir ist ebenfalls bekannt, dass ich meine Einwilligung in die Datenverarbeitung jederzeit mit Wirkung für die Zukunft widerrufen kann, ohne dass die Rechtmäßigkeit der aufgrund der Einwilligung bis zum Widerruf erfolgten Verarbeitung berührt wird. Die Informationen zum Widerruf der Einwilligung in der dazugehörigen Teilnehmerinformation habe ich zur Kenntnis genommen.
+Ich erkläre hiermit mein freiwilliges Einverständnis zur Teilnahme an der Studie Sugar-Sugar Glukoseprognose-Studie. Mir ist bewusst, dass ich meine Teilnahme jederzeit ohne Angabe von Gründen beenden kann, ohne dass mir dadurch Nachteile entstehen.
+Ich willige hiermit unter Einbezug der dazugehörigen Teilnehmerinformation in die Verarbeitung meiner personenbezogenen Daten und Gesundheitsdaten zu folgenden Zwecken ein:
+☐  Erhebung, Verarbeitung und Nutzung meiner in der Teilnehmerinformation aufgelisteten Daten, insbesondere meiner Gesundheitsdaten (Diabetesstatus, CGM-Nutzungshistorie, Vorhersageleistung), in pseudonymisierter Form für die Durchführung der Studie durch das Studienteam am IBIMA, Universitätsmedizin Rostock, sowie HEALES als Auftragsverarbeiter. Die Speicherung erfolgt auf Servern innerhalb der Europäischen Union. Forschungsdaten werden bis zu 10 Jahre nach Anonymisierung der Zuordnungsdatei aufbewahrt. Ein Widerruf ist bis 12 Monate nach Studienabschluss möglich; danach ist eine Identifizierung nicht mehr möglich. Rechtsgrundlage: Art. 6 Abs. 1 lit. a DSGVO und Art. 9 Abs. 2 lit. a DSGVO.
+☐  Die teilnehmende Person bestätigt, 18 Jahre oder älter zu sein.
+Optionale Einwilligungen (eine Ablehnung hat keinen Einfluss auf die Teilnahme an der Studie):
+☐  Ich willige ein, eigene CGM-Daten für die optionale Vorhersageaufgabe mit eigenen Daten hochzuladen. Rohdaten werden innerhalb von 30 Tagen gelöscht; nur pseudonymisierte extrahierte Segmente werden aufbewahrt.
+☐  Ich erkläre mich damit einverstanden, vom Studienteam über die registrierte E-Mail-Adresse über die Studienergebnisse nach deren Veröffentlichung informiert zu werden.
+itteilungen von HEALES oder verwandten Projekten werden nach Studienabschluss auf einer separaten Seite präsentiert und sind vollständig unabhängig von der Studienteilnahme und Einwilligung.
+Diese Studie wurde der Ethikkommission der Universitätsmedizin Rostock vorgelegt. Registrierungsnummer: [zum Zeitpunkt dieser Version noch nicht vergeben].
+Fragen oder Widerrufsanfragen: anton.kulaga@uni-rostock.de | livia.zaharia@uni-rostock.de
