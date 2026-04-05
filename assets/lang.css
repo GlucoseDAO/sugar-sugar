@@ -11,10 +11,24 @@ body {
   padding: 0 !important;
 }
 
+/* Remove margin from mobile-warning to eliminate top gap */
+#mobile-warning {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
 /* Remove top margin/padding from navbar container */
 #navbar-container {
   margin-top: 0 !important;
   padding-top: 0 !important;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+/* Ensure the navbar menu stays on top while scrolling */
+#navbar-container .ui.menu {
+  position: static;
 }
 
 /* Language flag images inside the Fomantic menu */
@@ -282,6 +296,50 @@ body .ui.large.menu {
   color: #0f172a;
   margin-bottom: 8px;
   margin-top: 18px;
+}
+
+/* Replace purple focus outline with navbar blue on input fields and dropdowns */
+input:focus,
+input:focus-visible,
+textarea:focus,
+textarea:focus-visible,
+select:focus,
+select:focus-visible,
+.Select-control:focus,
+.Select-control.is-focused,
+.dcc-dropdown.focus,
+._dash-rc-input:focus,
+.dash-input-field:focus {
+  outline: 2px solid #0066cc !important;
+  outline-offset: 0 !important;
+  border-color: #0066cc !important;
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1) !important;
+}
+
+/* Fomantic UI input focus override */
+.ui.input input:focus,
+.ui.input input:focus-visible,
+.ui.input:focus,
+.ui.input:focus-visible {
+  outline: 2px solid #0066cc !important;
+  outline-offset: 0 !important;
+  border-color: #0066cc !important;
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1) !important;
+}
+
+/* Kill any purple/violet focus box-shadow from Fomantic or browser */
+*:focus,
+*:focus-visible {
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1) !important;
+}
+
+/* Dash Dropdown (dcc.Dropdown) styling */
+.Select-menu-outer {
+  border-color: #0066cc !important;
+}
+
+.Select-option.is-focused {
+  background-color: rgba(0, 102, 204, 0.08) !important;
 }
 
 
