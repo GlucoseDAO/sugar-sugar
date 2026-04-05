@@ -31,7 +31,6 @@ class MetricsComponent(html.Div):
                     ],
                     style={
                         'padding': '20px',
-                        'backgroundColor': 'white',
                         'borderRadius': '10px',
                         'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
                         'marginBottom': '20px'
@@ -123,7 +122,6 @@ class MetricsComponent(html.Div):
                             'margin': '5px',
                             'border': '2px solid #e2e8f0',
                             'borderRadius': '8px',
-                            'backgroundColor': '#f8fafc',
                             'minWidth': '150px',
                             'flex': '1'
                         })
@@ -139,7 +137,6 @@ class MetricsComponent(html.Div):
                     'borderRadius': '12px',
                     'padding': '10px',
                     'margin': '10px',
-                    'backgroundColor': 'white',
                     'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
                 })
             ]
@@ -216,7 +213,6 @@ class MetricsComponent(html.Div):
                 'borderRadius': '12px',
                 'padding': 'clamp(10px, 2vw, 20px)',  # Responsive padding
                 'margin': 'clamp(10px, 2vw, 15px)',  # Responsive margin
-                'backgroundColor': 'white',
                 'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
                 'width': '100%',
                 'boxSizing': 'border-box'

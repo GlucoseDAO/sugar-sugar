@@ -60,6 +60,8 @@ class GlucoseChart(html.Div):
         fig.update_layout(
             title='Glucose Levels',
             autosize=True,
+            plot_bgcolor='#f5f5f5',
+            paper_bgcolor='#f5f5f5',
             xaxis=dict(title='Time'),
             yaxis=dict(title='Glucose Level (mg/dL)'),
             margin=dict(l=50, r=20, t=80, b=50),
@@ -70,9 +72,7 @@ class GlucoseChart(html.Div):
                 y=1.02,
                 xanchor='center',
                 x=0.5,
-            ),
-            plot_bgcolor='white',
-            paper_bgcolor='white'
+            )
         )
         return fig
 
@@ -535,6 +535,8 @@ class GlucoseChart(html.Div):
         figure.update_layout(
             title=title_text,
             autosize=True,
+            plot_bgcolor='#f5f5f5',
+            paper_bgcolor='#f5f5f5',
             xaxis=dict(
                 title=t("ui.chart.x_axis", locale=locale),
                 tickmode='array',
@@ -568,8 +570,6 @@ class GlucoseChart(html.Div):
                 x=0.5,
             ),
             dragmode='drawline',
-            hovermode='closest',
-            plot_bgcolor='white',
-            paper_bgcolor='white'
+            hovermode='closest'
         )
 

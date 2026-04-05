@@ -268,7 +268,7 @@ class StartupPage(html.Div):
                                 style={'fontSize': '18px', 'lineHeight': '1.6', 'marginBottom': '0', 'color': '#555'}
                             ),
                         ],
-                        style={'backgroundColor': '#f8f9fa', 'padding': '20px', 'borderRadius': '8px', 'marginBottom': '20px'}
+                        style={'padding': '20px', 'borderRadius': '8px', 'marginBottom': '20px'}
                     ),
                     
                     # <!-- START INSERTION: Just Test Me Button (Debug Mode Only) --> 
@@ -327,7 +327,7 @@ class StartupPage(html.Div):
                     
 
                 ], style={'maxWidth': '600px', 'margin': '0 auto', 'padding': '20px'})
-            ], style={'backgroundColor': 'white', 'borderRadius': '10px', 'boxShadow': '0 0 10px rgba(0,0,0,0.1)'})
+            ], style={'borderRadius': '10px', 'boxShadow': '0 0 10px rgba(0,0,0,0.1)'})
         ]
         
         # Initialize the parent html.Div with the layout and styling
@@ -336,7 +336,6 @@ class StartupPage(html.Div):
             id=self.component_id,
             style={
                 'padding': '20px', 
-                'backgroundColor': '#f5f5f5', 
                 'minHeight': '100vh',
                 'display': 'flex',
                 'flexDirection': 'column'

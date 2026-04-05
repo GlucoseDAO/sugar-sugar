@@ -32,7 +32,6 @@ class HeaderComponent(Div):
             style={
                 'padding': '15px',
                 'marginBottom': '15px',
-                'backgroundColor': 'white',
                 'borderRadius': '10px',
                 'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
             },
@@ -105,7 +104,6 @@ class HeaderComponent(Div):
                     style={
                         'width': '100%',
                         'height': '40px',
-                        'backgroundColor': '#f8f9fa',
                         'border': '1px solid #dee2e6',
                         'borderRadius': '5px',
                         'cursor': 'pointer',
@@ -185,7 +183,6 @@ class HeaderComponent(Div):
                     style={
                         'marginTop': '15px',
                         'padding': '10px',
-                        'backgroundColor': '#f7fafc',
                         'borderRadius': '5px',
                         'display': 'flex',
                         'flexDirection': 'column',
