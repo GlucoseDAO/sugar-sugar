@@ -359,7 +359,7 @@ app.layout = html.Div([
     # Holds the target page for the resume dialog; set by restore_page_on_load.
     dcc.Store(id='resume-dialog-target', data=None, storage_type='memory'),
 
-    html.Div(id='mobile-warning', style={'margin': '12px 0'}),
+    html.Div(id='mobile-warning', style={'margin': '0'}),
     html.Div(id='scroll-to-top-trigger', style={'display': 'none'}),
 
     html.Div(id='resume-dialog-container', children=[], disable_n_clicks=True),
