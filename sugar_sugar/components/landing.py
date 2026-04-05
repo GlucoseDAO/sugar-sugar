@@ -304,7 +304,7 @@ class LandingPage(html.Div):
             acknowledged = bool(acknowledge_value and "ack" in acknowledge_value)
             gdpr_consented = bool(gdpr_value and "gdpr" in gdpr_value)
 
-            base_style = {"marginTop": "14px", "width": "220px", "fontWeight": "700", "backgroundColor": "#1e88e5", "color": "white"}
+            base_style = {"marginTop": "14px", "width": "220px", "fontWeight": "700", "color": "white"}
             if scrolled_to_end and acknowledged and gdpr_consented:
                 # blue button when enabled
                 return False, base_style
@@ -312,7 +312,6 @@ class LandingPage(html.Div):
                 # darker grey when disabled
                 disabled_style = base_style.copy()
                 disabled_style.update({
-                    "backgroundColor": "#555555",
                     "color": "white",
                     "cursor": "not-allowed",
                 })

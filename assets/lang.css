@@ -9,12 +9,80 @@ html, body {
 body {
   margin: 0 !important;
   padding: 0 !important;
+  background-color: white !important; /* Ensure light background for Dark Reader */
+  color: #0f172a !important; /* Ensure dark text for Dark Reader */
+}
+
+/* Ensure main containers have light backgrounds for Dark Reader */
+#page-content {
+  background-color: white !important;
+  min-height: 100vh;
 }
 
 /* Remove margin from mobile-warning to eliminate top gap */
 #mobile-warning {
   margin: 0 !important;
   padding: 0 !important;
+  background-color: white !important;
+}
+
+/* Dark Reader optimization: Ensure light backgrounds and dark text */
+html, body, #page-content, .info-page {
+  background-color: white !important;
+  color: #0f172a !important;
+}
+
+/* Ensure form containers and cards have light backgrounds */
+.ui.card, .ui.segment, .ui.form {
+  background-color: white !important;
+}
+
+/* Ensure buttons have appropriate backgrounds for Dark Reader */
+.ui.button:not(.inverted) {
+  background-color: #e0e1e2 !important;
+  color: rgba(0,0,0,.6) !important;
+}
+
+.ui.button.primary {
+  background-color: #2185d0 !important;
+  color: white !important;
+}
+
+.ui.button.green {
+  background-color: #4CBB17 !important;
+  color: white !important;
+}
+
+.ui.button.blue-action {
+  background-color: #1976D2 !important;
+  color: white !important;
+}
+
+/* Ensure input fields have light backgrounds */
+.ui.input input, .ui.input textarea, input, textarea, select {
+  background-color: white !important;
+  color: #0f172a !important;
+  border-color: #d4d4d5 !important;
+}
+
+/* Ensure dropdown menus have light backgrounds */
+.ui.selection.dropdown .menu,
+.ui.dropdown .menu {
+  background-color: white !important;
+  color: #0f172a !important;
+}
+
+/* Ensure table headers and cells have appropriate backgrounds */
+.ui.table thead th,
+.ui.table tbody td {
+  background-color: white !important;
+  color: #0f172a !important;
+}
+
+/* Ensure modal dialogs have light backgrounds */
+.ui.modal {
+  background-color: white !important;
+  color: #0f172a !important;
 }
 
 /* Remove top margin/padding from navbar container */
@@ -144,16 +212,17 @@ body .ui.large.menu {
 /* Make checkboxes outlined in black and larger on the landing page */
 #landing-page .form-check-input {
   border-color: black;
-  width: 1.4em;
-  height: 1.4em;
-  margin-top: 0.15em;
-  cursor: pointer;
+  background-color: white !important;
 }
 
-#landing-page .form-check-label {
-  font-size: 15px;
-  padding-left: 0.4em;
-  cursor: pointer;
+/* Make checkbox ticks blue when checked */
+#landing-page .form-check-input:checked {
+  background-color: #0066cc !important;
+  border-color: #0066cc !important;
+}
+
+#landing-page .form-check-input:checked::after {
+  color: white !important;
 }
 
 /* Info page styling (About, Contact, Demo pages) */
@@ -340,6 +409,32 @@ select:focus-visible,
 
 .Select-option.is-focused {
   background-color: rgba(0, 102, 204, 0.08) !important;
+}
+
+/* Radio button styling - make selected option blue */
+.form-check-input[type="radio"]:checked {
+  background-color: #0066cc !important;
+  border-color: #0066cc !important;
+}
+
+.form-check-input[type="radio"]:checked + .form-check-label {
+  color: #0066cc !important;
+  font-weight: 600 !important;
+}
+
+/* Bootstrap radio button styling for dbc.RadioItems */
+.custom-radio .custom-control-input:checked ~ .custom-control-label::before {
+  background-color: #0066cc !important;
+  border-color: #0066cc !important;
+}
+
+.custom-radio .custom-control-input:checked ~ .custom-control-label::after {
+  background-color: white !important;
+}
+
+/* Ensure radio buttons have proper contrast and visibility */
+.custom-control-label {
+  color: #0f172a !important;
 }
 
 
