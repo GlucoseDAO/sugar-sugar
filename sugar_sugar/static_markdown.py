@@ -27,6 +27,7 @@ body {
   color: #334155;
   line-height: 1.6;
   font-size: 16px;
+  background-color: transparent;
 }
 h1, h2, h3 { color: #0f172a; margin: 1em 0 0.5em; font-weight: 800; }
 h1 { font-size: 1.35rem; }
@@ -40,6 +41,27 @@ th, td { border: 1px solid rgba(15,23,42,0.12); padding: 6px 8px; text-align: le
 code { font-size: 0.92em; background: rgba(15,23,42,0.06); padding: 0.1em 0.35em; border-radius: 4px; }
 pre { background: rgba(15,23,42,0.06); padding: 10px; overflow: auto; border-radius: 8px; font-size: 0.92em; }
 blockquote { margin: 0.5em 0; padding-left: 12px; border-left: 3px solid rgba(30,136,229,0.35); }
+
+/* Dark mode overrides */
+body.dark-mode {
+    color: #e2e8f0;
+}
+body.dark-mode h1, body.dark-mode h2, body.dark-mode h3 {
+    color: #ffffff;
+}
+body.dark-mode a {
+    color: #63b3ed;
+}
+body.dark-mode th, body.dark-mode td {
+    border-color: #333;
+}
+body.dark-mode code, body.dark-mode pre {
+    background: #1e1e1e;
+    color: #cbd5e0;
+}
+body.dark-mode blockquote {
+    border-left-color: rgba(99, 179, 237, 0.35);
+}
 """
 
 

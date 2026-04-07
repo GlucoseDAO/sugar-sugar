@@ -229,10 +229,64 @@ def _download_study_pdf():
     return "PDF not found", 404
 
 app.clientside_callback(
+    """
+    function(theme, _navbar, _page, _resume) {
+          const activeTheme = theme || 'light';
+          document.documentElement.setAttribute('data-bs-theme', activeTheme);
+          if (activeTheme === 'dark') {
+              document.body.classList.add('dark-mode');
+          } else {
+              document.body.classList.remove('dark-mode');
+          }
+          
+          // Sync theme to all local iframes (e.g. for markdown)
+          const frames = document.querySelectorAll('iframe');
+          frames.forEach(f => {
+              try {
+                  const doc = f.contentDocument || (f.contentWindow && f.contentWindow.document);
+                  if (doc && doc.body) {
+                      if (activeTheme === 'dark') {
+                          doc.body.classList.add('dark-mode');
+                      } else {
+                          doc.body.classList.remove('dark-mode');
+                      }
+                  }
+              } catch(e) {}
+          });
+          
+          // Update icon if it exists
+          const icon = document.getElementById('dark-mode-icon');
+          if (icon) {
+              icon.className = activeTheme === 'dark' ? 'sun icon' : 'moon icon';
+          }
+          return window.dash_clientside.no_update;
+      }
+    """,
+    Output('theme-apply-dummy', 'data-theme'),
+    [Input('theme-store', 'data'), Input('navbar-container', 'children'), Input('page-content', 'children'), Input('resume-dialog-container', 'children')],
+    prevent_initial_call=False
+)
+
+app.clientside_callback(
     "function() { return window.navigator.userAgent || ''; }",
     Output('user-agent', 'data'),
     Input('url', 'href'),
     prevent_initial_call=False
+)
+
+app.clientside_callback(
+    """
+    function(n_clicks, current_theme) {
+        if (!n_clicks) {
+            return window.dash_clientside.no_update;
+        }
+        return current_theme === 'dark' ? 'light' : 'dark';
+    }
+    """,
+    Output('theme-store', 'data'),
+    Input('dark-mode-toggle', 'n_clicks'),
+    State('theme-store', 'data'),
+    prevent_initial_call=True
 )
 
 app.clientside_callback(
@@ -345,6 +399,7 @@ app.layout = html.Div([
     dcc.Store(id='interface-language', data=_chart_locale if _is_chart_mode else 'en', storage_type=STORAGE_TYPE),
     dcc.Store(id='user-agent', data=None, storage_type=STORAGE_TYPE),
     dcc.Store(id='initial-slider-value', data=example_initial_slider_value, storage_type=STORAGE_TYPE),
+    dcc.Store(id='theme-store', data='light', storage_type=STORAGE_TYPE),
     # Tracks the last page the user reached so we can restore it on reload (local storage only).
     dcc.Store(id='last-visited-page', data=None, storage_type=STORAGE_TYPE),
     # One-shot flag: prevents the restore-redirect from firing more than once per session.
@@ -360,6 +415,7 @@ app.layout = html.Div([
     dcc.Store(id='resume-dialog-target', data=None, storage_type='memory'),
 
     html.Div(id='mobile-warning', style={'margin': '0'}),
+    html.Div(id='theme-apply-dummy', style={'display': 'none'}),
     html.Div(id='scroll-to-top-trigger', style={'display': 'none'}),
 
     html.Div(id='resume-dialog-container', children=[], disable_n_clicks=True),

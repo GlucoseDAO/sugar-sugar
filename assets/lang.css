@@ -438,3 +438,659 @@ select:focus-visible,
 }
 
 
+
+
+/* Basic Dark Mode for Fomantic UI and App */
+body.dark-mode, body.dark-mode #page-content, body.dark-mode .info-page {
+    background-color: #121212 !important;
+    color: #ffffff;
+}
+body.dark-mode .ui.segment {
+    background-color: #1e1e1e !important;
+    color: #ffffff;
+    border-color: #333333 !important;
+}
+body.dark-mode .ui.header {
+    color: #ffffff;
+}
+body.dark-mode .ui.table, body.dark-mode .ui.table thead th, body.dark-mode .ui.table tbody td {
+    background-color: #1e1e1e !important;
+    color: #ffffff;
+    border-color: #333333 !important;
+}
+body.dark-mode .dash-spreadsheet {
+    background-color: #1e1e1e !important;
+    color: #ffffff;
+}
+body.dark-mode .dash-spreadsheet-container .dash-spreadsheet-inner * {
+    background-color: #1e1e1e !important;
+    color: #ffffff;
+    border-color: #333333 !important;
+}
+body.dark-mode .ui.button:not(.primary):not(.secondary):not(.blue):not(.green):not(.red) {
+    background-color: #333333 !important;
+    color: #ffffff;
+}
+body.dark-mode .ui.button:not(.primary):not(.secondary):not(.blue):not(.green):not(.red):hover {
+    background-color: #444444 !important;
+}
+body.dark-mode .info-page h1, body.dark-mode .info-page h2, body.dark-mode .info-page h3, body.dark-mode .info-page p {
+    color: #ffffff;
+}
+body.dark-mode .study-design-content h1, body.dark-mode .study-design-content h2, body.dark-mode .study-design-content h3, body.dark-mode .study-design-content p {
+    color: #ffffff;
+}
+body.dark-mode #mobile-warning, body.dark-mode .ui.card, body.dark-mode .ui.form {
+    background-color: #1e1e1e !important;
+    color: #ffffff;
+}
+body.dark-mode .ui.input input, body.dark-mode .ui.input textarea, body.dark-mode input, body.dark-mode textarea, body.dark-mode select {
+    background-color: #2e2e2e !important;
+    color: #ffffff;
+    border-color: #444444 !important;
+}
+body.dark-mode .ui.selection.dropdown .menu, body.dark-mode .ui.dropdown .menu {
+    background-color: #2e2e2e !important;
+    color: #ffffff;
+}
+body.dark-mode .ui.modal {
+    background-color: #1e1e1e !important;
+    color: #ffffff;
+}
+body.dark-mode .lang-dropdown > .menu {
+    background: #2e2e2e !important;
+    border-color: #444444 !important;
+}
+body.dark-mode .lang-dropdown .menu > .lang-dropdown-item.item {
+    color: #ffffff;
+}
+body.dark-mode .lang-dropdown .menu > .lang-dropdown-item.item:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: #ffffff;
+}
+
+/* Force dark mode colors for landing page and info pages with inline styles */
+body.dark-mode #landing-page, 
+body.dark-mode #landing-page div, 
+body.dark-mode #landing-page span,
+body.dark-mode #landing-page h1,
+body.dark-mode #landing-page h2,
+body.dark-mode #landing-page h3,
+body.dark-mode #landing-page li {
+    color: #e2e8f0 !important;
+}
+
+body.dark-mode #landing-page h1, 
+body.dark-mode #landing-page h2, 
+body.dark-mode #landing-page h3 {
+    color: #ffffff !important;
+}
+
+/* Force backgrounds for transparent/white inline styles on the landing page */
+body.dark-mode #landing-page .card,
+body.dark-mode #landing-page > div > div > div > div, /* For the hero card */
+body.dark-mode #landing-page > div {
+    background-color: transparent !important;
+}
+
+/* For specific inline style cards like how it works and preview */
+body.dark-mode #landing-page div[style*="rgba(255,255,255,0.75)"] {
+    background: rgba(30,30,30,0.85) !important;
+    border-color: #333 !important;
+}
+
+/* For the landing page container */
+body.dark-mode #landing-page {
+    background: #121212 !important;
+}
+
+/* Ensure form controls look correct */
+body.dark-mode .form-control {
+    background-color: #2e2e2e !important;
+    color: #fff !important;
+    border-color: #444 !important;
+}
+
+/* Ending page inline styles */
+body.dark-mode #page-content > div[style*="background-color: white"] {
+    background-color: #121212 !important;
+}
+
+body.dark-mode .info-page {
+    background: #121212 !important;
+}
+body.dark-mode .info-page div.ui.segment, body.dark-mode .info-page > div[style*="background"] {
+    background: #1e1e1e !important;
+}
+body.dark-mode #consent-notice-scroll {
+    background-color: #1e1e1e !important;
+    border-color: #333 !important;
+}
+
+/* Dark mode for generic links */
+body.dark-mode a {
+    color: #63b3ed !important;
+}
+body.dark-mode a:hover {
+    color: #90cdf4 !important;
+}
+
+/* Re-add color !important for previous dark mode rules */
+body.dark-mode, body.dark-mode #page-content, body.dark-mode .info-page {
+    color: #e2e8f0 !important;
+}
+body.dark-mode .ui.segment {
+    color: #e2e8f0 !important;
+}
+body.dark-mode .ui.header {
+    color: #ffffff !important;
+}
+body.dark-mode .ui.table, body.dark-mode .ui.table thead th, body.dark-mode .ui.table tbody td {
+    color: #e2e8f0 !important;
+}
+body.dark-mode .dash-spreadsheet {
+    color: #e2e8f0 !important;
+}
+body.dark-mode .dash-spreadsheet-container .dash-spreadsheet-inner * {
+    color: #e2e8f0 !important;
+}
+body.dark-mode .ui.button:not(.primary):not(.secondary):not(.blue):not(.green):not(.red) {
+    color: #e2e8f0 !important;
+}
+body.dark-mode .info-page h1, body.dark-mode .info-page h2, body.dark-mode .info-page h3, body.dark-mode .info-page p {
+    color: #e2e8f0 !important;
+}
+body.dark-mode .study-design-content h1, body.dark-mode .study-design-content h2, body.dark-mode .study-design-content h3, body.dark-mode .study-design-content p {
+    color: #e2e8f0 !important;
+}
+body.dark-mode #mobile-warning, body.dark-mode .ui.card, body.dark-mode .ui.form {
+    color: #e2e8f0 !important;
+}
+body.dark-mode .ui.input input, body.dark-mode .ui.input textarea, body.dark-mode input, body.dark-mode textarea, body.dark-mode select {
+    color: #ffffff !important;
+}
+body.dark-mode .ui.selection.dropdown .menu, body.dark-mode .ui.dropdown .menu {
+    color: #e2e8f0 !important;
+}
+body.dark-mode .ui.modal {
+    color: #e2e8f0 !important;
+}
+body.dark-mode .lang-dropdown .menu > .lang-dropdown-item.item {
+    color: #e2e8f0 !important;
+}
+/* Ensure resume dialog fits */
+body.dark-mode #resume-dialog-container div[style*="background-color: white"] {
+    background-color: #1e1e1e !important;
+    color: #ffffff !important;
+}
+
+/* General dark mode fixes for inline styles */
+body.dark-mode div[style*="#fff7ed"],
+body.dark-mode div[style*="rgba(255,255,255,0.75)"] {
+    background-color: #1e1e1e !important;
+    background: #1e1e1e !important;
+    border-color: #444 !important;
+    color: #e2e8f0 !important;
+}
+body.dark-mode div[style*="#7c2d12"],
+body.dark-mode div[style*="#1565c0"],
+body.dark-mode div[style*="#1d4ed8"] {
+    color: #90cdf4 !important;
+}
+body.dark-mode div[style*="#2c5282"],
+body.dark-mode div[style*="#4a5568"] {
+    color: #cbd5e0 !important;
+}
+
+body.dark-mode .ui.card {
+    background-color: #1e1e1e !important;
+    box-shadow: 0 1px 3px 0 #000000, 0 0 0 1px #333333 !important;
+}
+body.dark-mode .ui.card > .content {
+    border-color: #333333 !important;
+}
+body.dark-mode .ui.segment {
+    background-color: #1e1e1e !important;
+    border-color: #333333 !important;
+}
+
+body.dark-mode #ending-round-info,
+body.dark-mode #ending-round-motivation,
+body.dark-mode #ending-units-line,
+body.dark-mode #ending-graph-explanation {
+    color: #e2e8f0 !important;
+}
+
+/* Fix navbar links */
+body.dark-mode #navbar-container .ui.inverted.menu .item,
+body.dark-mode .ui.menu .item {
+    color: #e2e8f0 !important;
+}
+body.dark-mode .ui.inverted.menu .item.active {
+    color: #ffffff !important;
+    background: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Buttons in final and ending pages that have inline backgrounds */
+body.dark-mode div[style*="#f8fafc"] {
+    background: #1e1e1e !important;
+    border-color: #333 !important;
+}
+
+/* More inline color overrides */
+body.dark-mode div[style*="#0f172a"],
+body.dark-mode label[style*="#0f172a"],
+body.dark-mode span[style*="#0f172a"],
+body.dark-mode h1[style*="#0f172a"],
+body.dark-mode h2[style*="#0f172a"],
+body.dark-mode h3[style*="#0f172a"],
+body.dark-mode p[style*="#0f172a"] {
+    color: #e2e8f0 !important;
+}
+
+body.dark-mode div[style*="#666"],
+body.dark-mode p[style*="#666"],
+body.dark-mode span[style*="#666"] {
+    color: #a0aec0 !important;
+}
+
+body.dark-mode div[style*="#2c5282"],
+body.dark-mode h1[style*="#2c5282"],
+body.dark-mode h2[style*="#2c5282"],
+body.dark-mode h3[style*="#2c5282"] {
+    color: #90cdf4 !important;
+}
+
+/* Ensure labels inside .ui.form get light color */
+body.dark-mode .ui.form label {
+    color: #e2e8f0 !important;
+}
+
+/* Ensure placeholder text in inputs has decent contrast */
+body.dark-mode input::placeholder,
+body.dark-mode textarea::placeholder {
+    color: #a0aec0 !important;
+    opacity: 1;
+}
+
+/* Override .Select-placeholder */
+body.dark-mode .Select-placeholder {
+    color: #a0aec0 !important;
+}
+
+/* Disclaimer blocks */
+body.dark-mode #ending-title + div,
+body.dark-mode #final-title + div {
+    background-color: #1e1e1e !important;
+    border-color: #444 !important;
+    color: #e2e8f0 !important;
+}
+
+body.dark-mode #ending-title + div p,
+body.dark-mode #final-title + div p {
+    color: #e2e8f0 !important;
+}
+
+/* Metrics styling */
+body.dark-mode #metrics-container {
+    background-color: #121212 !important;
+}
+
+body.dark-mode #metrics-container > div > div > div,
+body.dark-mode #metrics-container > div {
+    border-color: #444 !important;
+}
+
+body.dark-mode #metrics-container strong {
+    color: #fff !important;
+}
+
+/* Consent form full page override */
+body.dark-mode #consent-form-page > div {
+    background: #121212 !important;
+}
+
+/* Make sure text in consent forms is light */
+body.dark-mode #consent-form-scroll,
+body.dark-mode #consent-form-scroll h3,
+body.dark-mode #consent-form-scroll p,
+body.dark-mode #consent-notice-scroll,
+body.dark-mode #consent-notice-scroll h3,
+body.dark-mode #consent-notice-scroll p {
+    color: #e2e8f0 !important;
+}
+
+body.dark-mode #consent-form-scroll h3,
+body.dark-mode #consent-notice-scroll h3 {
+    color: #ffffff !important;
+}
+
+/* Protect specific colored buttons */
+body.dark-mode .ui.button:not(.primary):not(.secondary):not(.blue):not(.green):not(.red):not(.blue-action) {
+    background-color: #333333 !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .ui.button:not(.primary):not(.secondary):not(.blue):not(.green):not(.red):not(.blue-action):hover {
+    background-color: #444444 !important;
+}
+
+/* Ensure #555 becomes lighter */
+body.dark-mode p[style*="#555"] {
+    color: #cbd5e0 !important;
+}
+
+/* Startup form container has a background? */
+body.dark-mode #startup-page {
+    background-color: #121212 !important;
+}
+
+/* Status and alert boxes */
+body.dark-mode div[style*="#fee2e2"] {
+    background-color: #451a1a !important;
+    color: #fca5a5 !important;
+}
+body.dark-mode div[style*="#7f1d1d"] {
+    color: #fca5a5 !important;
+}
+
+body.dark-mode div[style*="#c6f6d5"] {
+    background-color: #1c4532 !important;
+    color: #9ae6b4 !important;
+}
+body.dark-mode div[style*="#2f855a"] {
+    color: #9ae6b4 !important;
+}
+
+body.dark-mode div[style*="#d1ecf1"] {
+    background-color: #1a365d !important;
+    color: #90cdf4 !important;
+}
+
+body.dark-mode div[style*="#fff3cd"] {
+    background-color: #744210 !important;
+    color: #fbd38d !important;
+}
+
+body.dark-mode div[style*="rgba(0,0,0,0.55)"] {
+    background-color: rgba(0,0,0,0.85) !important;
+}
+
+body.dark-mode div[style*="#fff8f0"] {
+    background-color: #2d3748 !important;
+    color: #e2e8f0 !important;
+}
+
+/* Fix button and borders in header component */
+body.dark-mode div[style*="border: 1px solid rgb(222, 226, 230)"],
+body.dark-mode button[style*="#dee2e6"],
+body.dark-mode button[style*="border: 1px solid #dee2e6"] {
+    border-color: #444 !important;
+}
+body.dark-mode button[style*="#6c757d"] {
+    color: #e2e8f0 !important;
+    background-color: #333 !important;
+}
+
+/* Header component shadow */
+body.dark-mode .ui.header,
+body.dark-mode div[style*="box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1)"] {
+    box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.85) !important;
+}
+
+/* Fix background gradient on landing page */
+body.dark-mode #landing-page > div,
+body.dark-mode #consent-form-page > div {
+    background: #121212 !important;
+}
+
+/* Fix download PDF button on About page */
+body.dark-mode a.ui.blue.basic.button {
+    color: #90cdf4 !important;
+    border-color: #90cdf4 !important;
+    box-shadow: 0 0 0 1px #90cdf4 inset !important;
+    background-color: transparent !important;
+}
+
+body.dark-mode a.ui.blue.basic.button:hover {
+    background-color: rgba(144, 205, 244, 0.1) !important;
+    color: #bee3f8 !important;
+    box-shadow: 0 0 0 1px #bee3f8 inset !important;
+}
+
+/* Fix span coloring next to button */
+body.dark-mode span[style*="#64748b"] {
+    color: #a0aec0 !important;
+}
+
+/* Fix download PDF button that stays white */
+body.dark-mode .info-page a.ui.blue.basic.button,
+body.dark-mode a.ui.blue.basic.button {
+    background-color: transparent !important;
+    background: transparent !important;
+    color: #90cdf4 !important;
+    box-shadow: 0 0 0 1px #90cdf4 inset !important;
+}
+body.dark-mode .info-page a.ui.blue.basic.button:hover,
+body.dark-mode a.ui.blue.basic.button:hover {
+    background-color: rgba(144, 205, 244, 0.1) !important;
+    background: rgba(144, 205, 244, 0.1) !important;
+    color: #bee3f8 !important;
+    box-shadow: 0 0 0 1px #bee3f8 inset !important;
+}
+
+/* Ensure #eff6ff etc backgrounds are handled nicely */
+body.dark-mode .info-page div[style*="#eff6ff"],
+body.dark-mode .info-page[style*="#eff6ff"] {
+    background: #121212 !important;
+    background-color: #121212 !important;
+}
+
+/* Ensure study design block background is dark */
+body.dark-mode .ui.segment {
+    background: #1e1e1e !important;
+    background-color: #1e1e1e !important;
+}
+
+/* Fix any remaining light backgrounds with inline colors on the landing page/info */
+body.dark-mode .info-page div[style*="background: rgba(255,255,255,0.75)"],
+body.dark-mode .info-page div[style*="background-color: rgba(255, 255, 255, 0.75)"] {
+    background: rgba(30, 30, 30, 0.85) !important;
+    background-color: rgba(30, 30, 30, 0.85) !important;
+}
+
+/* More robust fix for the linear gradient backgrounds on landing and consent form */
+body.dark-mode div[style*="linear-gradient(135deg, #eff6ff 0%, #f8fafc 35%, #fff7ed 100%)"],
+body.dark-mode div[style*="linear-gradient(135deg, rgb(239, 246, 255) 0%, rgb(248, 250, 252) 35%, rgb(255, 247, 237) 100%)"],
+body.dark-mode .info-page {
+    background: #121212 !important;
+}
+
+body.dark-mode div[style*="rgba(255,255,255,0.75)"],
+body.dark-mode div[style*="rgba(255, 255, 255, 0.75)"] {
+    background: rgba(30, 30, 30, 0.85) !important;
+    border-color: #333 !important;
+}
+
+/* Even more specific specificity for landing page background */
+body.dark-mode div#landing-page > div,
+body.dark-mode div#consent-form-page > div,
+body.dark-mode div.info-page {
+    background: #121212 !important;
+    background-image: none !important;
+}
+
+body.dark-mode #landing-page div,
+body.dark-mode #consent-form-page div {
+    color: #e2e8f0 !important;
+}
+
+body.dark-mode #landing-page h1,
+body.dark-mode #landing-page h2,
+body.dark-mode #landing-page h3,
+body.dark-mode #consent-form-page h1,
+body.dark-mode #consent-form-page h2,
+body.dark-mode #consent-form-page h3 {
+    color: #ffffff !important;
+}
+
+body.dark-mode #landing-page div[style*="background"],
+body.dark-mode #consent-form-page div[style*="background"] {
+    background-color: transparent !important;
+}
+
+body.dark-mode #landing-page div[style*="rgba(255,255,255,0.75)"] {
+    background: rgba(30, 30, 30, 0.85) !important;
+    border-color: #444 !important;
+}
+
+/* Fix download PDF button specifically */
+body.dark-mode .info-page a.ui.blue.basic.button,
+body.dark-mode a.ui.blue.basic.button {
+    background-color: transparent !important;
+    background: transparent !important;
+    color: #90cdf4 !important;
+    box-shadow: 0 0 0 1px #90cdf4 inset !important;
+}
+body.dark-mode .info-page a.ui.blue.basic.button:hover,
+body.dark-mode a.ui.blue.basic.button:hover {
+    background-color: rgba(144, 205, 244, 0.1) !important;
+    background: rgba(144, 205, 244, 0.1) !important;
+    color: #bee3f8 !important;
+    box-shadow: 0 0 0 1px #bee3f8 inset !important;
+}
+
+/* Ensure the outer info-page has proper dark background using robust selector */
+html body.dark-mode div.info-page {
+    background-color: #121212 !important;
+    background: #121212 !important;
+    background-image: none !important;
+}
+
+html body.dark-mode div.info-page > div {
+    background-color: transparent !important;
+    background: transparent !important;
+}
+
+html body.dark-mode div.info-page div.ui.segment {
+    background-color: #1e1e1e !important;
+    background: #1e1e1e !important;
+}
+
+/* Also target the landing page again with high specificity */
+html body.dark-mode #page-content > div[style*="background"] {
+    background-color: #121212 !important;
+    background: #121212 !important;
+    background-image: none !important;
+}
+
+html body.dark-mode #page-content #landing-page {
+    background-color: transparent !important;
+    background: transparent !important;
+}
+
+/* Make sure the download button is a button tag or an a tag */
+html body.dark-mode a.ui.button.basic.blue, 
+html body.dark-mode .ui.button.basic.blue,
+html body.dark-mode .info-page a.ui.blue.basic.button,
+html body.dark-mode a.ui.blue.basic.button {
+    background-color: transparent !important;
+    background: transparent !important;
+    color: #90cdf4 !important;
+    box-shadow: 0 0 0 1px #90cdf4 inset !important;
+}
+html body.dark-mode a.ui.button.basic.blue:hover, 
+html body.dark-mode .ui.button.basic.blue:hover,
+html body.dark-mode .info-page a.ui.blue.basic.button:hover,
+html body.dark-mode a.ui.blue.basic.button:hover {
+    background-color: rgba(144, 205, 244, 0.1) !important;
+    background: rgba(144, 205, 244, 0.1) !important;
+    color: #bee3f8 !important;
+    box-shadow: 0 0 0 1px #bee3f8 inset !important;
+}
+
+/* More aggressive catch-all for transparent/white rgba boxes on landing and consent forms */
+html body.dark-mode div[style*="rgba(255"],
+html body.dark-mode div[style*="rgba(255,"] {
+    background: rgba(30, 30, 30, 0.85) !important;
+    background-color: rgba(30, 30, 30, 0.85) !important;
+    border-color: #444 !important;
+}
+
+/* Let the blue navbar items keep their transparent background though */
+html body.dark-mode .ui.tabular.inverted.menu .active.item {
+    background: rgba(255, 255, 255, 0.12) !important;
+}
+
+html body.dark-mode .lang-dropdown .menu > .lang-dropdown-item.item:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Fix download PDF button on The Study page */
+html body.dark-mode a.ui.blue.basic.button, 
+html body.dark-mode .ui.blue.basic.button,
+html body.dark-mode a.ui.button.blue.basic {
+    background-color: transparent !important;
+    background: transparent !important;
+    background-image: none !important;
+    color: #90cdf4 !important;
+    box-shadow: 0 0 0 1px #90cdf4 inset !important;
+}
+
+html body.dark-mode a.ui.blue.basic.button:hover, 
+html body.dark-mode .ui.blue.basic.button:hover,
+html body.dark-mode a.ui.button.blue.basic:hover {
+    background-color: rgba(144, 205, 244, 0.1) !important;
+    background: rgba(144, 205, 244, 0.1) !important;
+    color: #bee3f8 !important;
+    box-shadow: 0 0 0 1px #bee3f8 inset !important;
+}
+
+/* Fix background tables on Contact page */
+html body.dark-mode .info-page table[style*="background"] {
+    background-color: transparent !important;
+    background: transparent !important;
+}
+
+html body.dark-mode .info-page th[style*="borderBottom"],
+html body.dark-mode .info-page td[style*="borderBottom"] {
+    border-color: #333 !important;
+    color: #e2e8f0 !important;
+}
+
+html body.dark-mode .info-page th {
+    color: #ffffff !important;
+}
+
+html body.dark-mode .info-page table {
+    border-color: #333 !important;
+}
+
+/* VERY AGGRESSIVE FIX FOR CARD BACKGROUNDS ON ALL PAGES */
+html body.dark-mode .card,
+html body.dark-mode .card > .card-body,
+html body.dark-mode .ui.card,
+html body.dark-mode .ui.card > .content {
+    background-color: #1e1e1e !important;
+    background: #1e1e1e !important;
+    color: #e2e8f0 !important;
+    border-color: #333 !important;
+}
+html body.dark-mode .card h1,
+html body.dark-mode .card h2,
+html body.dark-mode .card h3,
+html body.dark-mode .ui.card h1,
+html body.dark-mode .ui.card h2,
+html body.dark-mode .ui.card h3 {
+    color: #ffffff !important;
+}
+
+/* Force text colors in cards for dark mode */
+html body.dark-mode .card div[style*="color: #334155"],
+html body.dark-mode .card div[style*="color: rgb(51, 65, 85)"] {
+    color: #e2e8f0 !important;
+}
+html body.dark-mode .card h3[style*="color: #1565c0"],
+html body.dark-mode .card h3[style*="color: rgb(21, 101, 192)"] {
+    color: #90cdf4 !important;
+}

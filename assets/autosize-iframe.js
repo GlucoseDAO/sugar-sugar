@@ -12,6 +12,13 @@
                 if (doc && doc.body) {
                     var h = doc.documentElement.scrollHeight;
                     if (h > 0) f.style.height = h + "px";
+                    
+                    // Sync dark mode from parent
+                    if (document.body.classList.contains('dark-mode')) {
+                        doc.body.classList.add('dark-mode');
+                    } else {
+                        doc.body.classList.remove('dark-mode');
+                    }
                 }
             } catch (_) { /* cross-origin — skip */ }
         }

@@ -73,8 +73,22 @@ class NavBar(html.Div):
             ),
         ]
 
+        dark_mode_toggle = html.Div(
+            [
+                html.I(className="moon icon", id="dark-mode-icon", style={"cursor": "pointer", "marginRight": "8px"}, disable_n_clicks=True),
+                # A hidden input just to give dash something to hook on, or we can use the Div itself.
+                # Actually, dash doesn't trigger callbacks on html.I directly if we don't have n_clicks allowed.
+                # So we let this div track n_clicks.
+            ],
+            className="item",
+            id="dark-mode-toggle",
+            style={"cursor": "pointer", "padding": "0 10px", "display": "flex", "alignItems": "center"},
+            n_clicks=0,
+            disable_n_clicks=False,
+        )
+
         right_menu = html.Div(
-            [self._language_dropdown()],
+            [dark_mode_toggle, self._language_dropdown()],
             className="right menu",
             disable_n_clicks=True,
         )

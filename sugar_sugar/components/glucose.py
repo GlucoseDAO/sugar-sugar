@@ -54,14 +54,19 @@ class GlucoseChart(html.Div):
         self._display_unit: str = "mg/dL"
         self._display_factor: float = 1.0
 
-    def _create_empty_figure(self) -> go.Figure:
+    def _create_empty_figure(self, theme: str = 'light') -> go.Figure:
         """Create an empty figure with basic layout"""
         fig = go.Figure()
+        
+        bg_color = '#1e1e1e' if theme == 'dark' else '#f5f5f5'
+        template = 'plotly_dark' if theme == 'dark' else 'plotly_white'
+        
         fig.update_layout(
+            template=template,
             title='Glucose Levels',
             autosize=True,
-            plot_bgcolor='#f5f5f5',
-            paper_bgcolor='#f5f5f5',
+            plot_bgcolor=bg_color,
+            paper_bgcolor=bg_color,
             xaxis=dict(title='Time'),
             yaxis=dict(title='Glucose Level (mg/dL)'),
             margin=dict(l=50, r=20, t=80, b=50),
@@ -110,7 +115,8 @@ class GlucoseChart(html.Div):
              Input(f'{self.id}-source-store', 'data'),
              Input('glucose-chart-mode', 'data'),
              Input('glucose-unit', 'data'),
-             Input('interface-language', 'data')],
+             Input('interface-language', 'data'),
+             Input('theme-store', 'data')],
             [State('url', 'pathname')]
         )
         def update_chart_figure(
@@ -120,13 +126,17 @@ class GlucoseChart(html.Div):
             mode_data: Optional[dict[str, Any]],
             glucose_unit: Optional[str],
             interface_language: Optional[str],
+            theme_store: Optional[str],
             pathname: Optional[str],
         ) -> go.Figure:
             """Update the chart figure when data changes"""
             if pathname != '/prediction':
                 raise PreventUpdate
+            
+            theme = theme_store or 'light'
+            
             if not df_data:
-                return self._create_empty_figure()
+                return self._create_empty_figure(theme=theme)
             locale = normalize_locale(interface_language)
             
             # Reconstruct DataFrames from stored data
@@ -144,10 +154,11 @@ class GlucoseChart(html.Div):
                 gl_min=df.get_column('gl').min(),
                 gl_max=df.get_column('gl').max(),
                 source=source_name,
-                hide_last_hour=hide_last_hour_flag
+                hide_last_hour=hide_last_hour_flag,
+                theme=theme
             ):
                 # Create the figure with source information
-                return self._build_figure(df, events_df, source_name, locale=locale)
+                return self._build_figure(df, events_df, source_name, locale=locale, theme=theme)
 
     def _reconstruct_dataframe_from_dict(self, df_data: dict[str, list[Any]]) -> pl.DataFrame:
         """Reconstruct a Polars DataFrame from stored dictionary data"""
@@ -169,7 +180,7 @@ class GlucoseChart(html.Div):
             'insulin_value': pl.Series(events_data['insulin_value']).cast(pl.Float64, strict=False)
         })
 
-    def _build_figure(self, df: pl.DataFrame, events_df: pl.DataFrame, source_name: Optional[str] = None, *, locale: str = "en") -> go.Figure:
+    def _build_figure(self, df: pl.DataFrame, events_df: pl.DataFrame, source_name: Optional[str] = None, *, locale: str = "en", theme: str = 'light') -> go.Figure:
         """Build complete figure with all components"""
         figure = go.Figure()
         
@@ -183,7 +194,7 @@ class GlucoseChart(html.Div):
         self._add_glucose_trace(figure, locale=locale)
         self._add_prediction_traces(figure, locale=locale)
         self._add_event_markers(figure, locale=locale)
-        self._update_layout(figure, locale=locale)
+        self._update_layout(figure, locale=locale, theme=theme)
         
         return figure
 
@@ -519,7 +530,7 @@ class GlucoseChart(html.Div):
         figure.update_layout(dragmode=False)
         return figure
 
-    def _update_layout(self, figure: go.Figure, *, locale: str) -> None:
+    def _update_layout(self, figure: go.Figure, *, locale: str, theme: str = 'light') -> None:
         """Updates the figure layout with axes, margins, and interaction settings."""
         y_range = self._calculate_y_axis_range()
         
@@ -532,11 +543,16 @@ class GlucoseChart(html.Div):
         if self._current_source:
             title_text += t("ui.chart.source_suffix", locale=locale, source=self._current_source)
         
+        bg_color = '#1e1e1e' if theme == 'dark' else '#f5f5f5'
+        template = 'plotly_dark' if theme == 'dark' else 'plotly_white'
+        grid_color = 'rgba(255, 255, 255, 0.2)' if theme == 'dark' else 'rgba(128, 128, 128, 0.2)'
+        
         figure.update_layout(
+            template=template,
             title=title_text,
             autosize=True,
-            plot_bgcolor='#f5f5f5',
-            paper_bgcolor='#f5f5f5',
+            plot_bgcolor=bg_color,
+            paper_bgcolor=bg_color,
             xaxis=dict(
                 title=t("ui.chart.x_axis", locale=locale),
                 tickmode='array',
@@ -546,7 +562,7 @@ class GlucoseChart(html.Div):
                 showspikes=True,
                 spikemode='across',
                 spikesnap='cursor',
-                gridcolor='rgba(128, 128, 128, 0.2)',
+                gridcolor=grid_color,
                 showgrid=True,
                 range=[-0.5, len(self._current_df) - 0.5]
             ),
@@ -556,7 +572,7 @@ class GlucoseChart(html.Div):
                 showspikes=True,
                 spikemode='across',
                 spikesnap='cursor',
-                gridcolor='rgba(128, 128, 128, 0.2)',
+                gridcolor=grid_color,
                 showgrid=True,
                 range=y_range
             ),
