@@ -127,12 +127,13 @@ class NavBar(html.Div):
                 ),
                 html.Span(
                     f" {current[2]}",
-                    style={"marginLeft": "4px"},
+                    style={"marginLeft": "4px", "color": "inherit"},
                     disable_n_clicks=True,
                 ),
-                html.I(className="dropdown icon", disable_n_clicks=True),
+                html.I(className="dropdown icon", style={"color": "inherit"}, disable_n_clicks=True),
                 html.Div(dropdown_items, className="menu", disable_n_clicks=True),
             ],
             className="ui simple dropdown item lang-dropdown",
+            style={"color": "inherit"},
             disable_n_clicks=True,
         )

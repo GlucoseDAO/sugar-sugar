@@ -274,6 +274,34 @@ app.clientside_callback(
     prevent_initial_call=False
 )
 
+@app.callback(
+    [Output('consent-form-background', 'style'),
+     Output('consent-form-card', 'style')],
+    Input('theme-store', 'data'),
+    State('url', 'pathname'),
+    prevent_initial_call=True
+)
+def update_consent_form_background(theme: str, pathname: str):
+    if pathname != '/consent-form':
+        raise PreventUpdate
+    background = (
+        "linear-gradient(135deg, #1e1e1e 0%, #2a2a2a 35%, #3a3a3a 100%)"
+        if theme == "dark"
+        else "linear-gradient(135deg, #eff6ff 0%, #f8fafc 35%, #fff7ed 100%)"
+    )
+    border_color = "rgba(255, 255, 255, 0.2)" if theme == "dark" else "rgba(15, 23, 42, 0.10)"
+    card_bg = "transparent"
+    return {
+        "height": "100vh",
+        "overflow": "hidden",
+        "padding": "28px 18px",
+        "background": background,
+    }, {
+        "borderRadius": "14px",
+        "border": f"1px solid {border_color}",
+        "backgroundColor": card_bg,
+    }
+
 app.clientside_callback(
     """
     function(n_clicks, current_theme) {
@@ -543,7 +571,8 @@ _STATEFUL_PAGES = frozenset({'/prediction', '/ending'})
     [Output('page-content', 'children', allow_duplicate=True),
      Output('mobile-warning', 'children', allow_duplicate=True),
      Output('navbar-container', 'children', allow_duplicate=True)],
-    [Input('interface-language', 'data')],
+    [Input('interface-language', 'data'),
+     Input('theme-store', 'data')],
     [State('url', 'pathname'),
      State('user-info-store', 'data'),
      State('user-agent', 'data'),
@@ -558,6 +587,7 @@ def update_on_language_change(
     user_agent: Optional[str],
     full_df_data: Optional[Dict],
     glucose_unit: Optional[str],
+    theme: Optional[str],
 ) -> tuple:
     """Re-render page content and navbar when language changes.
 
@@ -565,6 +595,7 @@ def update_on_language_change(
     a navbar refresh -- page content is left untouched via per-element callbacks.
     """
     locale = normalize_locale(interface_language)
+    theme = theme or 'light'
     navbar = NavBar(locale=locale, current_page=pathname or "/")
 
     if pathname in _STATEFUL_PAGES:
@@ -576,9 +607,9 @@ def update_on_language_change(
             return create_final_layout(full_df_data, user_info, glucose_unit, locale=locale), warning_content, navbar
         return no_update, no_update, navbar
     if pathname == "/consent-form":
-        return ConsentFormPage(locale=locale), warning_content, navbar
+        return ConsentFormPage(locale=locale, theme=theme), warning_content, navbar
     if pathname == '/startup':
-        return StartupPage(locale=locale), warning_content, navbar
+        return StartupPage(locale=locale, theme=theme), warning_content, navbar
     if pathname == '/about':
         return create_about_page(locale=locale), warning_content, navbar
     if pathname == '/contact':
@@ -762,7 +793,8 @@ def update_ending_text_on_language_change(
      State('current-window-df', 'data'),
      State('events-df', 'data'),
      State('glucose-unit', 'data'),
-     State('user-agent', 'data')],
+     State('user-agent', 'data'),
+     State('theme-store', 'data')],
     prevent_initial_call=False
 )
 def display_page(
@@ -774,22 +806,24 @@ def display_page(
     events_df_data: Optional[Dict],
     glucose_unit: Optional[str],
     user_agent: Optional[str],
+    theme: Optional[str],
 ) -> tuple[html.Div, Optional[html.Div], html.Div]:
     has_ptd = bool(user_info and 'prediction_table_data' in user_info) if user_info else False
     has_full = bool(full_df_data)
     print(f"DEBUG display_page: pathname={pathname} has_user_info={user_info is not None} has_prediction_table_data={has_ptd} has_full_df={has_full}")
     locale = normalize_locale(interface_language)
+    theme = theme or 'light'
     navbar = NavBar(locale=locale, current_page=pathname or "/")
     
     with start_action(action_type=u"display_page", pathname=pathname, locale=locale):
         warning_content = render_mobile_warning(user_agent, locale=locale)
         if pathname == "/consent-form":
-            return ConsentFormPage(locale=locale), warning_content, navbar
+            return ConsentFormPage(locale=locale, theme=theme), warning_content, navbar
         if pathname == '/prediction' and user_info:
             format_value = str(user_info.get("format") or "A")
             return create_prediction_layout(locale=locale, format_value=format_value, user_info=user_info), warning_content, navbar
         if pathname == '/startup':
-            return (StartupPage(locale=locale), warning_content, navbar)
+            return (StartupPage(locale=locale, theme=theme), warning_content, navbar)
         if pathname == '/ending':
             # Check if we have the required data for ending page
             if not full_df_data or not user_info or 'prediction_table_data' not in user_info:

@@ -48,6 +48,37 @@ html, body, #page-content, .info-page {
   color: white !important;
 }
 
+/* Keep language dropdown icon blue in both light and dark modes */
+.ui.massive.blue.inverted.tabular.menu .lang-dropdown .world.icon {
+  color: #2185d0 !important;
+}
+
+/* Dark mode styles */
+[data-bs-theme="dark"] .ui.dropdown {
+  background-color: #2d3748 !important;
+  color: #e2e8f0 !important;
+  border: 1px solid #555555 !important;
+}
+
+[data-bs-theme="dark"] .ui.dropdown input {
+  background-color: #2d3748 !important;
+  color: #e2e8f0 !important;
+}
+
+[data-bs-theme="dark"] .ui.dropdown .menu {
+  background-color: #2d3748 !important;
+  color: #e2e8f0 !important;
+  border: 1px solid #555555 !important;
+}
+
+[data-bs-theme="dark"] .ui.dropdown .menu .item {
+  color: #e2e8f0 !important;
+}
+
+[data-bs-theme="dark"] .ui.dropdown .menu .item:hover {
+  background-color: #4a5568 !important;
+}
+
 .ui.button.green {
   background-color: #4CBB17 !important;
   color: white !important;
@@ -585,6 +616,11 @@ body.dark-mode .ui.segment {
 body.dark-mode .ui.header {
     color: #ffffff !important;
 }
+body.dark-mode #header-app-title,
+body.dark-mode #header-description,
+body.dark-mode #header-how-to-play {
+    color: #ffffff !important;
+}
 body.dark-mode .ui.table, body.dark-mode .ui.table thead th, body.dark-mode .ui.table tbody td {
     color: #e2e8f0 !important;
 }
@@ -665,6 +701,20 @@ body.dark-mode #ending-graph-explanation {
 body.dark-mode #navbar-container .ui.inverted.menu .item,
 body.dark-mode .ui.menu .item {
     color: #e2e8f0 !important;
+}
+body.dark-mode #navbar-container .ui.tabular.inverted.menu .lang-dropdown.item,
+body.dark-mode #navbar-container .ui.tabular.inverted.menu .lang-dropdown.item span,
+body.dark-mode #navbar-container .ui.tabular.inverted.menu .lang-dropdown.item .dropdown.icon,
+body.dark-mode #navbar-container .ui.tabular.inverted.menu .lang-dropdown.item .lang-flag {
+    color: #e2e8f0 !important;
+    filter: none !important;
+}
+[data-bs-theme="dark"] #navbar-container .ui.tabular.inverted.menu .lang-dropdown.item,
+[data-bs-theme="dark"] #navbar-container .ui.tabular.inverted.menu .lang-dropdown.item span,
+[data-bs-theme="dark"] #navbar-container .ui.tabular.inverted.menu .lang-dropdown.item .dropdown.icon,
+[data-bs-theme="dark"] #navbar-container .ui.tabular.inverted.menu .lang-dropdown.item .lang-flag {
+    color: #e2e8f0 !important;
+    filter: none !important;
 }
 body.dark-mode .ui.inverted.menu .item.active {
     color: #ffffff !important;

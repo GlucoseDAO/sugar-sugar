@@ -18,16 +18,16 @@ _MARKDOWN_EXTENSIONS: Final[tuple[str, ...]] = (
 
 # Styles aligned with prior dcc.Markdown + landing/about cards (readable body text).
 _SRCDOC_CSS: Final[str] = """
-html { box-sizing: border-box; }
+html { box-sizing: border-box; background: transparent !important; }
 *, *::before, *::after { box-sizing: inherit; }
 body {
   margin: 0;
-  padding: 0 2px 12px 0;
+  padding: 0;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   color: #334155;
   line-height: 1.6;
   font-size: 16px;
-  background-color: transparent;
+  background: transparent !important;
 }
 h1, h2, h3 { color: #0f172a; margin: 1em 0 0.5em; font-weight: 800; }
 h1 { font-size: 1.35rem; }
@@ -38,8 +38,8 @@ a { color: #1e88e5; }
 ul, ol { margin: 0 0 0.85em 1.1em; padding-left: 1.2em; }
 table { border-collapse: collapse; width: 100%; margin: 0.5em 0; }
 th, td { border: 1px solid rgba(15,23,42,0.12); padding: 6px 8px; text-align: left; }
-code { font-size: 0.92em; background: rgba(15,23,42,0.06); padding: 0.1em 0.35em; border-radius: 4px; }
-pre { background: rgba(15,23,42,0.06); padding: 10px; overflow: auto; border-radius: 8px; font-size: 0.92em; }
+code { font-size: 0.92em; background: transparent; padding: 0.1em 0.35em; border-radius: 4px; }
+pre { background: transparent; padding: 10px; overflow: auto; border-radius: 8px; font-size: 0.92em; }
 blockquote { margin: 0.5em 0; padding-left: 12px; border-left: 3px solid rgba(30,136,229,0.35); }
 
 /* Dark mode overrides */
@@ -56,7 +56,7 @@ body.dark-mode th, body.dark-mode td {
     border-color: #333;
 }
 body.dark-mode code, body.dark-mode pre {
-    background: #1e1e1e;
+    background: transparent;
     color: #cbd5e0;
 }
 body.dark-mode blockquote {
@@ -93,13 +93,14 @@ def markdown_to_html_fragment(md: str) -> str:
     return _ensure_link_targets(raw)
 
 
-def html_fragment_to_srcdoc(html_fragment: str) -> str:
+def html_fragment_to_srcdoc(html_fragment: str, *, theme: str = "light") -> str:
     safe = _sanitize_srcdoc_fragment(html_fragment)
+    body_class = ' class="dark-mode"' if theme == "dark" else ""
     return (
         "<!DOCTYPE html><html><head>"
         '<meta charset="utf-8">'
         f"<style>{_SRCDOC_CSS}</style>"
-        "</head><body>"
+        "</head><body" + body_class + ">"
         f"{safe}"
         "</body></html>"
     )
@@ -110,6 +111,7 @@ def static_markdown_iframe(
     *,
     title: str,
     iframe_style: dict[str, Any] | None = None,
+    theme: str = "light",
 ) -> html.Iframe:
     """
     Render Markdown on the server and display it via iframe srcDoc.
@@ -118,10 +120,12 @@ def static_markdown_iframe(
     warnings on first paint.
     """
     fragment = markdown_to_html_fragment(md)
-    src_doc = html_fragment_to_srcdoc(fragment)
+    src_doc = html_fragment_to_srcdoc(fragment, theme=theme)
     style: dict[str, Any] = {
         "width": "100%",
         "border": "none",
+        "background": "transparent !important",
+        "boxShadow": "none",
         "display": "block",
         "height": "min(58vh, 780px)",
     }
@@ -140,6 +144,7 @@ def static_markdown_autosize_iframe(
     *,
     title: str,
     iframe_id: str = "study-design-iframe",
+    theme: str = "light",
 ) -> html.Iframe:
     """Same as *static_markdown_iframe* but the iframe auto-expands to fit
     its content — no inner scrollbar.
@@ -148,7 +153,7 @@ def static_markdown_autosize_iframe(
     ``contentDocument.scrollHeight`` from any iframe with
     ``data-autosize="true"`` (same-origin access is allowed for srcdoc).
     """
-    src_doc = html_fragment_to_srcdoc(markdown_to_html_fragment(md))
+    src_doc = html_fragment_to_srcdoc(markdown_to_html_fragment(md), theme=theme)
     return html.Iframe(
         id=iframe_id,
         srcDoc=src_doc,
@@ -156,6 +161,8 @@ def static_markdown_autosize_iframe(
         style={
             "width": "100%",
             "border": "none",
+            "background": "transparent !important",
+            "boxShadow": "none",
             "display": "block",
             "overflow": "hidden",
             "height": "0",

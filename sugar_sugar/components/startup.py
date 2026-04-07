@@ -50,9 +50,20 @@ eligibility and previous selection.
 
 
 class StartupPage(html.Div):
-    def __init__(self, *, locale: str = "en") -> None:
+    def __init__(self, *, locale: str = "en", theme: str = "light") -> None:
         self.component_id: str = 'startup-page'
         self._locale: str = locale
+        self._theme: str = theme
+
+        # Theme-aware colors
+        self.input_bg = "#2d3748" if theme == "dark" else "#ffffff"
+        self.input_color = "#e2e8f0" if theme == "dark" else "#000000"
+        self.border_color = "#555555" if theme == "dark" else "#cccccc"
+        self.label_color = "#e2e8f0" if theme == "dark" else "#0f172a"
+        self.text_color = "#cbd5e0" if theme == "dark" else "#555555"
+        self.title_color = "#ffffff" if theme == "dark" else "#2c5282"
+        self.contact_bg = "#1a202c" if theme == "dark" else "#f9f9f9"
+        self.button_bg = "#1565c0" if theme == "dark" else "#1976D2"
         
         # Create the layout
         layout = [
@@ -62,17 +73,17 @@ class StartupPage(html.Div):
                     'marginBottom': '30px', 
                     'fontSize': '48px',
                     'fontWeight': 'bold',
-                    'color': '#2c5282'  # Match the prediction page color
+                    'color': self.title_color
                 }
             ),
             html.Div([
                 html.Div([
                     html.Div([
-                        html.P(t("ui.startup.required_fields_note", locale=locale), style={'color': '#666', 'fontSize': '16px', 'fontStyle': 'italic', 'marginBottom': '20px', 'textAlign': 'right'})
+                        html.P(t("ui.startup.required_fields_note", locale=locale), style={'color': self.text_color, 'fontSize': '16px', 'fontStyle': 'italic', 'marginBottom': '20px', 'textAlign': 'right'})
                     ]),
                     
                     html.Div([
-                        html.Label(t("ui.startup.email_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a', 'display': 'inline-block'}),
+                        html.Label(t("ui.startup.email_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': self.label_color, 'display': 'inline-block'}),
                         html.Span(id='email-required', children=' *', style={'color': '#d32f2f', 'fontSize': '22px', 'fontWeight': 'bold'})
                     ], style={'marginBottom': '10px'}),
                     dcc.Input(
@@ -81,11 +92,11 @@ class StartupPage(html.Div):
                         placeholder=t("ui.startup.email_placeholder", locale=locale),
                         persistence=True,
                         persistence_type=STORAGE_TYPE,
-                        style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
+                        style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px', 'backgroundColor': self.input_bg, 'color': self.input_color, 'border': f'1px solid {self.border_color}'}
                     ),
                     
                     html.Div([
-                        html.Label(t("ui.startup.age_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a', 'display': 'inline-block'}),
+                        html.Label(t("ui.startup.age_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': self.label_color, 'display': 'inline-block'}),
                         html.Span(id='age-required', children=' *', style={'color': '#d32f2f', 'fontSize': '22px', 'fontWeight': 'bold'})
                     ], style={'marginBottom': '10px'}),
                     dcc.Input(
@@ -96,7 +107,7 @@ class StartupPage(html.Div):
                         max=120,
                         persistence=True,
                         persistence_type=STORAGE_TYPE,
-                        style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
+                        style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px', 'backgroundColor': self.input_bg, 'color': self.input_color, 'border': f'1px solid {self.border_color}'}
                     ),
                     html.Div(
                         id='age-error',
@@ -105,7 +116,7 @@ class StartupPage(html.Div):
                     ),
                     
                     html.Div([
-                        html.Label(t("ui.startup.gender_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a', 'display': 'inline-block'}),
+                        html.Label(t("ui.startup.gender_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': self.label_color, 'display': 'inline-block'}),
                         html.Span(id='gender-required', children=' *', style={'color': '#d32f2f', 'fontSize': '22px', 'fontWeight': 'bold'})
                     ], style={'marginBottom': '10px'}),
                     dcc.Dropdown(
@@ -118,10 +129,11 @@ class StartupPage(html.Div):
                         placeholder=t("ui.startup.gender_placeholder", locale=locale),
                         persistence=True,
                         persistence_type=STORAGE_TYPE,
+                        className="ui dropdown",
                         style={'fontSize': '20px', 'marginBottom': '20px'}
                     ),
 
-                    html.Label(t("ui.startup.cgm_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a'}),
+                    html.Label(t("ui.startup.cgm_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': self.label_color}),
                     dcc.Dropdown(
                         id='cgm-dropdown',
                         options=[
@@ -131,11 +143,12 @@ class StartupPage(html.Div):
                         placeholder=t("ui.startup.cgm_placeholder", locale=locale),
                         persistence=True,
                         persistence_type=STORAGE_TYPE,
+                        className="ui dropdown",
                         style={'fontSize': '20px', 'marginBottom': '20px'}
                     ),
 
                     html.Div(id='cgm-details', children=[
-                        html.Label(t("ui.startup.cgm_duration_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a'}),
+                        html.Label(t("ui.startup.cgm_duration_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': self.label_color}),
                         dcc.Input(
                             id='cgm-duration-input',
                             type='number',
@@ -144,13 +157,13 @@ class StartupPage(html.Div):
                             max=100,
                             persistence=True,
                             persistence_type=STORAGE_TYPE,
-                            style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
+                            style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px', 'backgroundColor': self.input_bg, 'color': self.input_color, 'border': f'1px solid {self.border_color}'}
                         )
                     ]),
 
                     html.Div([
                         html.Div([
-                            html.Label(t("ui.startup.format_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a', 'display': 'inline-block'}),
+                            html.Label(t("ui.startup.format_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': self.label_color, 'display': 'inline-block'}),
                             html.Span(id='format-required', children=' *', style={'color': '#d32f2f', 'fontSize': '22px', 'fontWeight': 'bold'})
                         ], style={'marginBottom': '10px'}),
                         dcc.Dropdown(
@@ -163,6 +176,7 @@ class StartupPage(html.Div):
                             placeholder=t("ui.startup.format_placeholder", locale=locale),
                             persistence=True,
                             persistence_type=STORAGE_TYPE,
+                            className="ui dropdown",
                             style={'fontSize': '20px', 'marginBottom': '10px'}
                         ),
                         html.Div(
@@ -173,7 +187,7 @@ class StartupPage(html.Div):
                                 html.Br(),
                                 html.Small(t("ui.startup.format_help_c", locale=locale)),
                             ],
-                            style={'color': '#666', 'fontSize': '14px', 'marginBottom': '20px', 'lineHeight': '1.4'}
+                            style={'color': self.text_color, 'fontSize': '14px', 'marginBottom': '20px', 'lineHeight': '1.4'}
                         ),
                         html.Div(
                             id='data-usage-consent-container',
@@ -184,7 +198,7 @@ class StartupPage(html.Div):
                                     value=[],
                                     persistence=True,
                                     persistence_type=STORAGE_TYPE,
-                                    style={'fontSize': '16px'}
+                                    style={'fontSize': '16px', 'color': self.input_color}
                                 ),
                                 html.Div(id='data-usage-error', style={'marginTop': '8px', 'color': '#d32f2f', 'fontSize': '16px'})
                             ],
@@ -193,7 +207,7 @@ class StartupPage(html.Div):
                     ], style={'marginBottom': '10px'}),
                     
                     html.Div([
-                        html.Label(t("ui.startup.diabetic_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a', 'display': 'inline-block'}),
+                        html.Label(t("ui.startup.diabetic_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': self.label_color, 'display': 'inline-block'}),
                         html.Span(id='diabetic-required', children=' *', style={'color': '#d32f2f', 'fontSize': '22px', 'fontWeight': 'bold'})
                     ], style={'marginBottom': '10px'}),
                     dcc.Dropdown(
@@ -205,12 +219,13 @@ class StartupPage(html.Div):
                         placeholder=t("ui.startup.diabetic_placeholder", locale=locale),
                         persistence=True,
                         persistence_type=STORAGE_TYPE,
+                        className="ui dropdown",
                         style={'fontSize': '20px', 'marginBottom': '20px'}
                     ),
                     
                     html.Div(id='diabetic-details', children=[
                         html.Div([
-                            html.Label(t("ui.startup.diabetes_type_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a', 'display': 'inline-block'}),
+                            html.Label(t("ui.startup.diabetes_type_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': self.label_color, 'display': 'inline-block'}),
                             html.Span(id='diabetic-type-required', children=' *', style={'color': '#d32f2f', 'fontSize': '22px', 'fontWeight': 'bold'})
                         ], style={'marginBottom': '10px'}),
                         dcc.Dropdown(
@@ -225,11 +240,12 @@ class StartupPage(html.Div):
                             placeholder=t("ui.startup.diabetes_type_placeholder", locale=locale),
                             persistence=True,
                             persistence_type=STORAGE_TYPE,
+                            className="ui dropdown",
                             style={'fontSize': '20px', 'marginBottom': '20px'}
                         ),
                         
                         html.Div([
-                            html.Label(t("ui.startup.diabetes_duration_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a', 'display': 'inline-block'}),
+                            html.Label(t("ui.startup.diabetes_duration_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': self.label_color, 'display': 'inline-block'}),
                             html.Span(id='diabetes-duration-required', children=' *', style={'color': '#d32f2f', 'fontSize': '22px', 'fontWeight': 'bold'})
                         ], style={'marginBottom': '10px'}),
                         dcc.Input(
@@ -240,12 +256,12 @@ class StartupPage(html.Div):
                             max=100,
                             persistence=True,
                             persistence_type=STORAGE_TYPE,
-                            style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
+                            style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px', 'backgroundColor': self.input_bg, 'color': self.input_color, 'border': f'1px solid {self.border_color}'}
                         )
                     ]),
                     
                     html.Div([
-                        html.Label(t("ui.startup.location_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a', 'display': 'inline-block'}),
+                        html.Label(t("ui.startup.location_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': self.label_color, 'display': 'inline-block'}),
                         html.Span(id='location-required', children=' *', style={'color': '#d32f2f', 'fontSize': '22px', 'fontWeight': 'bold'})
                     ], style={'marginBottom': '10px'}),
                     dcc.Input(
@@ -254,21 +270,21 @@ class StartupPage(html.Div):
                         placeholder=t("ui.startup.location_placeholder", locale=locale),
                         persistence=True,
                         persistence_type=STORAGE_TYPE,
-                        style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
+                        style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px', 'backgroundColor': self.input_bg, 'color': self.input_color, 'border': f'1px solid {self.border_color}'}
                     ),
                     
                     html.Div(
                         [
                             html.H3(
                                 t("ui.startup.contact_prefs_title", locale=locale),
-                                style={'fontSize': '24px', 'marginBottom': '12px', 'color': '#2c5282'}
+                                style={'fontSize': '24px', 'marginBottom': '12px', 'color': self.title_color}
                             ),
                             html.P(
                                 t("ui.startup.contact_prefs_text", locale=locale),
-                                style={'fontSize': '18px', 'lineHeight': '1.6', 'marginBottom': '0', 'color': '#555'}
+                                style={'fontSize': '18px', 'lineHeight': '1.6', 'marginBottom': '0', 'color': self.text_color}
                             ),
                         ],
-                        style={'padding': '20px', 'borderRadius': '8px', 'marginBottom': '20px'}
+                        style={'padding': '20px', 'borderRadius': '8px', 'marginBottom': '20px', 'backgroundColor': self.contact_bg}
                     ),
                     
                     # <!-- START INSERTION: Just Test Me Button (Debug Mode Only) --> 
@@ -278,7 +294,7 @@ class StartupPage(html.Div):
                             id='test-me-button',
                             className="ui blue-action button",
                             style={
-                                'backgroundColor': '#1976D2',
+                                'backgroundColor': self.button_bg,
                                 'color': 'white',
                                 'padding': '15px 25px',
                                 'border': 'none',

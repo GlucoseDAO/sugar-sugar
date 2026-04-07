@@ -217,6 +217,7 @@ class LandingPage(html.Div):
                         ],
                         style={
                             "paddingRight": "10px",
+                            "background": "transparent",
                         },
                         id="consent-notice-scroll",
                     ),
@@ -240,10 +241,12 @@ class LandingPage(html.Div):
                         style={"color": "#64748b", "marginTop": "10px", "fontSize": "14px"},
                     ),
                 ],
+                className="bg-transparent",
                 style={
                     "minHeight": "0",
                 },
             ),
+            className="bg-transparent",
             style={
                 "borderRadius": "14px",
                 "border": "1px solid rgba(15, 23, 42, 0.10)",
