@@ -221,6 +221,34 @@ body .ui.large.menu {
   background: rgba(255, 255, 255, 0.12);
 }
 
+/* Keep Home nav text identical to sibling inverted-menu items in all states. */
+#navbar-container .ui.inverted.menu #home-button.item,
+#navbar-container .ui.inverted.menu #home-button.item:hover,
+#navbar-container .ui.inverted.menu #home-button.item:focus,
+#navbar-container .ui.inverted.menu #home-button.item:active {
+  color: rgba(255, 255, 255, 0.9) !important;
+  text-decoration: none !important;
+}
+
+#navbar-container .ui.inverted.menu #home-button.active.item {
+  color: #ffffff !important;
+  text-decoration: none !important;
+}
+
+body.dark-mode #navbar-container .ui.inverted.menu #home-button.item,
+body.dark-mode #navbar-container .ui.inverted.menu #home-button.item:hover,
+[data-bs-theme="dark"] #navbar-container .ui.inverted.menu #home-button.item,
+[data-bs-theme="dark"] #navbar-container .ui.inverted.menu #home-button.item:hover {
+  color: #e2e8f0 !important;
+  text-decoration: none !important;
+}
+
+body.dark-mode #navbar-container .ui.inverted.menu #home-button.active.item,
+[data-bs-theme="dark"] #navbar-container .ui.inverted.menu #home-button.active.item {
+  color: #ffffff !important;
+  text-decoration: none !important;
+}
+
 /* Custom green color for primary action buttons */
 .ui.button.green {
   background-color: #4CBB17 !important;

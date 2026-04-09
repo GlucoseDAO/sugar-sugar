@@ -441,6 +441,14 @@ app.layout = html.Div([
     dcc.Store(id='clean-storage-flag', data=_clean_storage, storage_type='memory'),
     # Holds the target page for the resume dialog; set by restore_page_on_load.
     dcc.Store(id='resume-dialog-target', data=None, storage_type='memory'),
+    dcc.ConfirmDialog(
+        id='confirm-home-clear-session',
+        message='Attention! This action will delete your current session data!',
+    ),
+    dcc.ConfirmDialog(
+        id='confirm-ending-finish-exit',
+        message='Attention! This action will delete your current session data!',
+    ),
 
     html.Div(id='mobile-warning', style={'margin': '0'}),
     html.Div(id='theme-apply-dummy', style={'display': 'none'}),
@@ -2850,11 +2858,23 @@ def handle_finish_study_from_prediction(
 
 
 @app.callback(
+    Output('confirm-ending-finish-exit', 'displayed'),
+    Input('finish-study-button-ending', 'n_clicks'),
+    prevent_initial_call=True
+)
+def confirm_finish_study_from_ending(n_clicks: Optional[int]) -> bool:
+    """Ask for confirmation before Finish/Exit clears storage from ending."""
+    if not n_clicks:
+        raise PreventUpdate
+    return True
+
+
+@app.callback(
     [Output('url', 'pathname', allow_duplicate=True),
      Output('user-info-store', 'data', allow_duplicate=True),
      Output('glucose-chart-mode', 'data', allow_duplicate=True),
      Output('clean-storage-flag', 'data', allow_duplicate=True)],
-    [Input('finish-study-button-ending', 'n_clicks')],
+    [Input('confirm-ending-finish-exit', 'submit_n_clicks')],
     [State('user-info-store', 'data'),
      State('full-df', 'data')],
     prevent_initial_call=True
@@ -3566,6 +3586,18 @@ def render_resume_dialog(
 
 
 @app.callback(
+    Output('confirm-home-clear-session', 'displayed'),
+    Input('home-button', 'n_clicks'),
+    prevent_initial_call=True,
+)
+def confirm_home_button_clear_session(n_clicks: Optional[int]) -> bool:
+    """Ask for confirmation before clearing session via navbar Home."""
+    if not n_clicks:
+        raise PreventUpdate
+    return True
+
+
+@app.callback(
     [Output('url', 'pathname', allow_duplicate=True),
      Output('resume-dialog-container', 'children', allow_duplicate=True),
      Output('resume-dialog-target', 'data', allow_duplicate=True),
@@ -3657,7 +3689,7 @@ def handle_resume_start_over(
      Output('initial-slider-value', 'data', allow_duplicate=True),
      Output('clean-storage-flag', 'data', allow_duplicate=True),
      Output('session-active', 'data', allow_duplicate=True)],
-    [Input('home-button', 'n_clicks')],
+    [Input('confirm-home-clear-session', 'submit_n_clicks')],
     prevent_initial_call=True,
 )
 def handle_home_button(
