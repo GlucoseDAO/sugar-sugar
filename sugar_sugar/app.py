@@ -2406,6 +2406,29 @@ def create_final_layout(full_df_data: Optional[Dict], user_info: Dict[str, Any],
                     'justifyContent': 'center',
                     'lineHeight': '1.2'
                 }
+            ),
+            html.Button(
+                t("ui.common.finish_exit", locale=locale),
+                id='final-exit-button',
+                className="ui red button",
+                style={
+                    'backgroundColor': '#dc3545',
+                    'color': 'white',
+                    'padding': 'clamp(15px, 2vw, 20px) clamp(20px, 3vw, 30px)',
+                    'border': 'none',
+                    'borderRadius': '5px',
+                    'fontSize': 'clamp(18px, 3vw, 24px)',
+                    'cursor': 'pointer',
+                    'minWidth': '200px',
+                    'maxWidth': '400px',
+                    'width': '100%',
+                    'height': 'clamp(60px, 8vh, 80px)',
+                    'display': 'flex',
+                    'alignItems': 'center',
+                    'justifyContent': 'center',
+                    'lineHeight': '1.2',
+                    'marginLeft': '15px'
+                }
             )
         ], disable_n_clicks=True, style={
             'display': 'flex',
@@ -2829,7 +2852,8 @@ def handle_finish_study_from_prediction(
 @app.callback(
     [Output('url', 'pathname', allow_duplicate=True),
      Output('user-info-store', 'data', allow_duplicate=True),
-     Output('glucose-chart-mode', 'data', allow_duplicate=True)],
+     Output('glucose-chart-mode', 'data', allow_duplicate=True),
+     Output('clean-storage-flag', 'data', allow_duplicate=True)],
     [Input('finish-study-button-ending', 'n_clicks')],
     [State('user-info-store', 'data'),
      State('full-df', 'data')],
@@ -2839,20 +2863,22 @@ def handle_finish_study_from_ending(
     n_clicks: Optional[int],
     user_info: Optional[Dict[str, Any]],
     full_df_data: Optional[Dict]
-) -> Tuple[str, Optional[Dict[str, Any]], Dict[str, bool]]:
+) -> Tuple[str, Optional[Dict[str, Any]], Dict[str, bool], bool]:
     print(f"DEBUG handle_finish_study_from_ending FIRED: n_clicks={n_clicks}")
     if not n_clicks:
-        return no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update
 
     with start_action(action_type=u"handle_finish_study_from_ending", n_clicks=int(n_clicks)):
         pass
 
     if not user_info:
-        return '/final', None, {'hide_last_hour': True}
+        return '/', None, {'hide_last_hour': True}, True
 
     rounds: list[dict[str, Any]] = user_info.get('rounds') or []
-    if not rounds:
-        return '/final', user_info, {'hide_last_hour': True}
+    rounds_played = len(rounds)
+    max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS)
+    current_round_number = int(user_info.get('current_round_number') or rounds_played)
+    is_last_round = current_round_number >= max_rounds
 
     play_only = bool(user_info.get('consent_play_only')) if user_info else False
     if full_df_data and (not play_only) and not bool(user_info.get('statistics_saved')):
@@ -2861,7 +2887,10 @@ def handle_finish_study_from_ending(
             submit_component.save_statistics(full_df, user_info)
             user_info['statistics_saved'] = True
 
-    return '/final', user_info, {'hide_last_hour': False}
+    if is_last_round:
+        return '/final', user_info, {'hide_last_hour': False}, False
+    else:
+        return '/', None, {'hide_last_hour': True}, True
 
 
 @app.callback(
@@ -2893,32 +2922,125 @@ def handle_back_to_final_from_upload(n_clicks: Optional[int]) -> Tuple[str, Dict
      Output('clean-storage-flag', 'data', allow_duplicate=True),
      Output('session-active', 'data', allow_duplicate=True)],
     [Input('restart-button', 'n_clicks')],
+    [State('user-info-store', 'data')],
     prevent_initial_call=True
 )
-def handle_restart_button(n_clicks: Optional[int]) -> tuple:
-    """Handle restart button — fully reset session state including data stores."""
+def handle_restart_button(n_clicks: Optional[int], user_info: Optional[Dict[str, Any]]) -> tuple:
+    """Handle restart button — keep consent but restart game from /prediction."""
     print(f"DEBUG handle_restart_button FIRED: n_clicks={n_clicks}")
     if not n_clicks:
         raise PreventUpdate
     with start_action(action_type=u"handle_restart_button") as action:
         action.log(message_type="restart_clicked")
-    return (
-        '/',                       # url pathname
-        None,                      # user-info-store
-        {'hide_last_hour': True},  # glucose-chart-mode
-        False,                     # randomization-initialized
-        'mg/dL',                   # glucose-unit
-        'en',                      # interface-language
-        None,                      # last-visited-page
-        None,                      # full-df
-        None,                      # current-window-df
-        None,                      # events-df
-        True,                      # is-example-data
-        'example.csv',             # data-source-name
-        None,                      # initial-slider-value
-        True,                      # clean-storage-flag
-        True,                      # session-active
-    )
+
+    if not user_info:
+        return (
+            '/',                       # url pathname
+            None,                      # user-info-store
+            {'hide_last_hour': True},  # glucose-chart-mode
+            False,                     # randomization-initialized
+            no_update,                 # glucose-unit
+            no_update,                 # interface-language
+            None,                      # last-visited-page
+            None,                      # full-df
+            None,                      # current-window-df
+            None,                      # events-df
+            True,                      # is-example-data
+            'example.csv',             # data-source-name
+            None,                      # initial-slider-value
+            True,                      # clean-storage-flag
+            True,                      # session-active
+        )
+
+    info = dict(user_info)
+    target_format = str(info.get("format") or "A")
+
+    # Archive the current run so it appears in the final screen rankings
+    current_fmt = target_format
+    rounds_now = info.get("rounds") or []
+    if current_fmt and rounds_now:
+        runs_by_format = dict(info.get("runs_by_format") or {})
+        runs_list = list(runs_by_format.get(current_fmt) or [])
+        runs_list.append({
+            "run_id": str(uuid.uuid4()),
+            "format": current_fmt,
+            "active_run_id": str(info.get("run_id") or ""),
+            "ended_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "rounds": rounds_now,
+            "rounds_played": int(len(rounds_now)),
+            "uses_cgm": bool(info.get("uses_cgm", False)),
+            "consent_use_uploaded_data": bool(info.get("consent_use_uploaded_data", False)),
+            "is_example_data": bool(info.get("is_example_data", True)),
+            "data_source_name": str(info.get("data_source_name") or ""),
+        })
+        runs_by_format[current_fmt] = runs_list
+        info["runs_by_format"] = runs_by_format
+
+    # Reset current run state
+    info["run_id"] = str(uuid.uuid4())
+    info["rounds"] = []
+    info["current_round_number"] = 1
+    info["last_submit_round_number"] = 0
+    info["last_submit_n_clicks"] = 0
+    info["prediction_table_data"] = None
+    info["prediction_window_start"] = None
+    info["prediction_window_size"] = None
+    info["statistics_saved"] = False
+
+    points = int(info.get("prediction_window_size") or DEFAULT_POINTS)
+    points = max(MIN_POINTS, min(MAX_POINTS, points))
+    uploaded_path = info.get("uploaded_data_path")
+    chart_mode = {'hide_last_hour': True}
+
+    if target_format == "A" or (target_format in ("B", "C") and not uploaded_path):
+        full_df, events_df = load_glucose_data()
+        full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
+        new_df, random_start = get_random_data_window(full_df, points)
+        new_df = new_df.with_columns(pl.lit(0.0).alias("prediction"))
+        info["is_example_data"] = True
+        info["data_source_name"] = "example.csv"
+        return (
+            '/prediction',             # url pathname
+            info,                      # user-info-store
+            chart_mode,                # glucose-chart-mode
+            False,                     # randomization-initialized
+            no_update,                 # glucose-unit
+            no_update,                 # interface-language
+            '/prediction',             # last-visited-page
+            convert_df_to_dict(full_df),      # full-df
+            convert_df_to_dict(new_df),       # current-window-df
+            convert_events_df_to_dict(events_df), # events-df
+            True,                      # is-example-data
+            'example.csv',             # data-source-name
+            random_start,              # initial-slider-value
+            False,                     # clean-storage-flag
+            True,                      # session-active
+        )
+    else:
+        full_df, events_df = load_glucose_data(Path(str(uploaded_path)))
+        full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
+        new_df, random_start = get_random_data_window(full_df, points)
+        new_df = new_df.with_columns(pl.lit(0.0).alias("prediction"))
+        source_name = str(info.get("uploaded_data_filename") or info.get("data_source_name") or "uploaded.csv")
+        info["is_example_data"] = False
+        info["data_source_name"] = source_name
+        return (
+            '/prediction',             # url pathname
+            info,                      # user-info-store
+            chart_mode,                # glucose-chart-mode
+            False,                     # randomization-initialized
+            no_update,                 # glucose-unit
+            no_update,                 # interface-language
+            '/prediction',             # last-visited-page
+            convert_df_to_dict(full_df),      # full-df
+            convert_df_to_dict(new_df),       # current-window-df
+            convert_events_df_to_dict(events_df), # events-df
+            False,                     # is-example-data
+            source_name,               # data-source-name
+            random_start,              # initial-slider-value
+            False,                     # clean-storage-flag
+            True,                      # session-active
+        )
 
 
 @app.callback(
@@ -3483,17 +3605,69 @@ def handle_resume_continue(
      Output('initial-slider-value', 'data', allow_duplicate=True),
      Output('clean-storage-flag', 'data', allow_duplicate=True),
      Output('session-active', 'data', allow_duplicate=True)],
-    [Input('resume-start-over-btn', 'n_clicks')],
+    [Input('resume-start-over-btn', 'n_clicks'),
+     Input('final-exit-button', 'n_clicks')],
     prevent_initial_call=True,
 )
 def handle_resume_start_over(
-    n_clicks: Optional[int],
+    n_resume: Optional[int],
+    n_final: Optional[int],
 ) -> tuple:
     """Reset all in-memory stores and trigger the clean-storage-flag to wipe localStorage."""
-    if not n_clicks:
+    if not n_resume and not n_final:
         raise PreventUpdate
     with start_action(action_type=u"resume_start_over") as action:
         action.log(message_type="user_chose_start_over")
+    return (
+        "/",                       # url pathname
+        [],                        # resume-dialog-container
+        None,                      # resume-dialog-target
+        None,                      # user-info-store
+        {'hide_last_hour': True},  # glucose-chart-mode
+        False,                     # randomization-initialized
+        'mg/dL',                   # glucose-unit
+        'en',                      # interface-language
+        None,                      # last-visited-page
+        None,                      # full-df
+        None,                      # current-window-df
+        None,                      # events-df
+        True,                      # is-example-data
+        'example.csv',             # data-source-name
+        None,                      # initial-slider-value
+        True,                      # clean-storage-flag (self-resets via clientside callback)
+        True,                      # session-active (user made a choice in this tab)
+    )
+
+
+@app.callback(
+    [Output('url', 'pathname', allow_duplicate=True),
+     Output('resume-dialog-container', 'children', allow_duplicate=True),
+     Output('resume-dialog-target', 'data', allow_duplicate=True),
+     Output('user-info-store', 'data', allow_duplicate=True),
+     Output('glucose-chart-mode', 'data', allow_duplicate=True),
+     Output('randomization-initialized', 'data', allow_duplicate=True),
+     Output('glucose-unit', 'data', allow_duplicate=True),
+     Output('interface-language', 'data', allow_duplicate=True),
+     Output('last-visited-page', 'data', allow_duplicate=True),
+     Output('full-df', 'data', allow_duplicate=True),
+     Output('current-window-df', 'data', allow_duplicate=True),
+     Output('events-df', 'data', allow_duplicate=True),
+     Output('is-example-data', 'data', allow_duplicate=True),
+     Output('data-source-name', 'data', allow_duplicate=True),
+     Output('initial-slider-value', 'data', allow_duplicate=True),
+     Output('clean-storage-flag', 'data', allow_duplicate=True),
+     Output('session-active', 'data', allow_duplicate=True)],
+    [Input('home-button', 'n_clicks')],
+    prevent_initial_call=True,
+)
+def handle_home_button(
+    n_clicks: Optional[int],
+) -> tuple:
+    """Reset all in-memory stores and trigger the clean-storage-flag to wipe localStorage when Home is clicked."""
+    if not n_clicks:
+        raise PreventUpdate
+    with start_action(action_type=u"home_button") as action:
+        action.log(message_type="user_clicked_home")
     return (
         "/",                       # url pathname
         [],                        # resume-dialog-container

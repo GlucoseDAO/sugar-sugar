@@ -46,10 +46,11 @@ class NavBar(html.Div):
 
     def _create_navbar(self) -> list:
         left_items: list = [
-            dcc.Link(
+            html.Button(
                 t("ui.common.game", locale=self._locale),
-                href="/",
+                id="home-button",
                 className=self._active_cls(*_GAME_PAGES),
+                style={"background": "none", "border": "none", "color": "inherit", "cursor": "pointer", "font": "inherit"},
             ),
             dcc.Link(
                 t("ui.common.the_study", locale=self._locale),
