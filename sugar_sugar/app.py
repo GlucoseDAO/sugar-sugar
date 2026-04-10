@@ -1706,7 +1706,7 @@ def create_ending_layout(
                 ),
                 disable_n_clicks=True,
             )
-        ], disable_n_clicks=True, style={
+        ], id='ending-chart-card', disable_n_clicks=True, style={
             'marginBottom': '20px',
             'padding': 'clamp(10px, 2vw, 20px)',
             'backgroundColor': 'white',
@@ -1764,7 +1764,7 @@ def create_ending_layout(
                     }
                 ]
             )
-        ], style={
+        ], id='ending-prediction-card', style={
             'marginBottom': '20px',
             'padding': 'clamp(10px, 2vw, 20px)',
             'backgroundColor': 'white',

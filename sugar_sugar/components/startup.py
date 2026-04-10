@@ -55,13 +55,13 @@ class StartupPage(html.Div):
         self._locale: str = locale
         self._theme: str = theme
 
-        # Theme-aware colors
+        # Theme-aware colors (dark: white body copy, light blue for titles)
         self.input_bg = "#2d3748" if theme == "dark" else "#ffffff"
-        self.input_color = "#e2e8f0" if theme == "dark" else "#000000"
+        self.input_color = "#ffffff" if theme == "dark" else "#000000"
         self.border_color = "#555555" if theme == "dark" else "#cccccc"
-        self.label_color = "#e2e8f0" if theme == "dark" else "#0f172a"
-        self.text_color = "#cbd5e0" if theme == "dark" else "#555555"
-        self.title_color = "#ffffff" if theme == "dark" else "#2c5282"
+        self.label_color = "#ffffff" if theme == "dark" else "#0f172a"
+        self.text_color = "#ffffff" if theme == "dark" else "#555555"
+        self.title_color = "#93c5fd" if theme == "dark" else "#2c5282"
         self.contact_bg = "#1a202c" if theme == "dark" else "#f9f9f9"
         self.button_bg = "#1565c0" if theme == "dark" else "#1976D2"
         
@@ -277,13 +277,16 @@ class StartupPage(html.Div):
                         [
                             html.H3(
                                 t("ui.startup.contact_prefs_title", locale=locale),
+                                id='startup-contact-prefs-title',
                                 style={'fontSize': '24px', 'marginBottom': '12px', 'color': self.title_color}
                             ),
                             html.P(
                                 t("ui.startup.contact_prefs_text", locale=locale),
+                                id='startup-contact-prefs-text',
                                 style={'fontSize': '18px', 'lineHeight': '1.6', 'marginBottom': '0', 'color': self.text_color}
                             ),
                         ],
+                        id='startup-contact-prefs-card',
                         style={'padding': '20px', 'borderRadius': '8px', 'marginBottom': '20px', 'backgroundColor': self.contact_bg}
                     ),
                     

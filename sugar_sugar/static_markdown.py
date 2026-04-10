@@ -44,20 +44,20 @@ blockquote { margin: 0.5em 0; padding-left: 12px; border-left: 3px solid rgba(30
 
 /* Dark mode overrides */
 body.dark-mode {
-    color: #e2e8f0;
+    color: #ffffff;
 }
 body.dark-mode h1, body.dark-mode h2, body.dark-mode h3 {
     color: #ffffff;
 }
 body.dark-mode a {
-    color: #63b3ed;
+    color: #7dd3fc;
 }
 body.dark-mode th, body.dark-mode td {
     border-color: #333;
 }
 body.dark-mode code, body.dark-mode pre {
     background: transparent;
-    color: #cbd5e0;
+    color: #ffffff;
 }
 body.dark-mode blockquote {
     border-left-color: rgba(99, 179, 237, 0.35);

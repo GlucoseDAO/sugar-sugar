@@ -48,19 +48,24 @@ html, body, #page-content, .info-page {
   color: white !important;
 }
 
+/* Language trigger (label + caret): accent blue on navbar in light and dark mode */
+#navbar-container .ui.massive.blue.inverted.tabular.menu .lang-dropdown.item > span,
+#navbar-container .ui.massive.blue.inverted.tabular.menu .lang-dropdown.item > .dropdown.icon {
+  color: #2185d0 !important;
+}
 /* Keep language dropdown icon blue in both light and dark modes */
 .ui.massive.blue.inverted.tabular.menu .lang-dropdown .world.icon {
   color: #2185d0 !important;
 }
 
-/* Dark mode styles */
-[data-bs-theme="dark"] .ui.dropdown {
+/* Dark mode styles (exclude navbar language trigger: it uses .ui.dropdown + .lang-dropdown) */
+[data-bs-theme="dark"] .ui.dropdown:not(.lang-dropdown) {
   background-color: #2d3748 !important;
   color: #e2e8f0 !important;
   border: 1px solid #555555 !important;
 }
 
-[data-bs-theme="dark"] .ui.dropdown input {
+[data-bs-theme="dark"] .ui.dropdown:not(.lang-dropdown) input {
   background-color: #2d3748 !important;
   color: #e2e8f0 !important;
 }
@@ -615,6 +620,99 @@ body.dark-mode #page-content > div[style*="background-color: white"] {
     background-color: #121212 !important;
 }
 
+/* Ending page "cards" are inline-styled white blocks; make them dark like prediction cards */
+html[data-bs-theme="dark"] #page-content [id^="ending-"][style*="background-color: white"],
+html[data-bs-theme="dark"] #page-content [id^="ending-"][style*="background-color:white"],
+html[data-bs-theme="dark"] #page-content [id^="ending-"] div[style*="background-color: white"],
+html[data-bs-theme="dark"] #page-content [id^="ending-"] div[style*="background-color:white"],
+body.dark-mode #page-content [id^="ending-"][style*="background-color: white"],
+body.dark-mode #page-content [id^="ending-"][style*="background-color:white"],
+body.dark-mode #page-content [id^="ending-"] div[style*="background-color: white"],
+body.dark-mode #page-content [id^="ending-"] div[style*="background-color:white"] {
+    background-color: #1e1e1e !important;
+    background: #1e1e1e !important;
+    color: #ffffff !important;
+    border-color: #333333 !important;
+}
+
+html[data-bs-theme="dark"] #page-content [id^="ending-"] h1,
+html[data-bs-theme="dark"] #page-content [id^="ending-"] h2,
+html[data-bs-theme="dark"] #page-content [id^="ending-"] h3,
+html[data-bs-theme="dark"] #page-content [id^="ending-"] p,
+html[data-bs-theme="dark"] #page-content [id^="ending-"] span,
+body.dark-mode #page-content [id^="ending-"] h1,
+body.dark-mode #page-content [id^="ending-"] h2,
+body.dark-mode #page-content [id^="ending-"] h3,
+body.dark-mode #page-content [id^="ending-"] p,
+body.dark-mode #page-content [id^="ending-"] span {
+    color: #ffffff !important;
+}
+
+/* Ending page main cards */
+html[data-bs-theme="dark"] #ending-chart-card,
+html[data-bs-theme="dark"] #ending-prediction-card,
+html[data-bs-theme="dark"] #ending-metrics-container,
+body.dark-mode #ending-chart-card,
+body.dark-mode #ending-prediction-card,
+body.dark-mode #ending-metrics-container {
+    background-color: #1e1e1e !important;
+    background: #1e1e1e !important;
+    border: 1px solid #333333 !important;
+    color: #ffffff !important;
+}
+
+/* Accuracy metrics outer block and mini-cards */
+html[data-bs-theme="dark"] #ending-metrics-container > div,
+body.dark-mode #ending-metrics-container > div {
+    border-color: #444444 !important;
+    background-color: transparent !important;
+}
+
+html[data-bs-theme="dark"] #ending-metrics-container div[style*="#f8fafc"],
+html[data-bs-theme="dark"] #ending-metrics-container div[style*="rgb(248, 250, 252)"],
+html[data-bs-theme="dark"] #ending-metrics-container div[style*="background-color: rgb(248, 250, 252)"],
+body.dark-mode #ending-metrics-container div[style*="#f8fafc"],
+body.dark-mode #ending-metrics-container div[style*="rgb(248, 250, 252)"],
+body.dark-mode #ending-metrics-container div[style*="background-color: rgb(248, 250, 252)"] {
+    background-color: #2d3748 !important;
+    background: #2d3748 !important;
+    border-color: #444444 !important;
+    box-shadow: none !important;
+    color: #ffffff !important;
+}
+
+html[data-bs-theme="dark"] #ending-metrics-container div[style*="#2c5282"],
+html[data-bs-theme="dark"] #ending-metrics-container div[style*="rgb(44, 82, 130)"],
+body.dark-mode #ending-metrics-container div[style*="#2c5282"] {
+    color: #93c5fd !important;
+}
+
+html[data-bs-theme="dark"] #ending-metrics-container div[style*="#4a5568"],
+html[data-bs-theme="dark"] #ending-metrics-container div[style*="rgb(74, 85, 104)"],
+html[data-bs-theme="dark"] #ending-metrics-container strong,
+body.dark-mode #ending-metrics-container div[style*="#4a5568"],
+body.dark-mode #ending-metrics-container div[style*="rgb(74, 85, 104)"],
+body.dark-mode #ending-metrics-container strong {
+    color: #ffffff !important;
+}
+
+/* Force all text inside the 4 metric mini-cards to the intended dark-theme palette */
+html[data-bs-theme="dark"] #ending-metrics-container div[style*="#f8fafc"] *,
+html[data-bs-theme="dark"] #ending-metrics-container div[style*="rgb(248, 250, 252)"] *,
+body.dark-mode #ending-metrics-container div[style*="#f8fafc"] *,
+body.dark-mode #ending-metrics-container div[style*="rgb(248, 250, 252)"] * {
+    color: #ffffff !important;
+}
+
+html[data-bs-theme="dark"] #ending-metrics-container div[style*="#f8fafc"] div[style*="#2c5282"],
+html[data-bs-theme="dark"] #ending-metrics-container div[style*="rgb(248, 250, 252)"] div[style*="#2c5282"],
+html[data-bs-theme="dark"] #ending-metrics-container div[style*="rgb(248, 250, 252)"] div[style*="rgb(44, 82, 130)"],
+body.dark-mode #ending-metrics-container div[style*="#f8fafc"] div[style*="#2c5282"],
+body.dark-mode #ending-metrics-container div[style*="rgb(248, 250, 252)"] div[style*="#2c5282"],
+body.dark-mode #ending-metrics-container div[style*="rgb(248, 250, 252)"] div[style*="rgb(44, 82, 130)"] {
+    color: #93c5fd !important;
+}
+
 body.dark-mode .info-page {
     background: #121212 !important;
 }
@@ -701,9 +799,11 @@ body.dark-mode div[style*="#1565c0"],
 body.dark-mode div[style*="#1d4ed8"] {
     color: #90cdf4 !important;
 }
-body.dark-mode div[style*="#2c5282"],
+body.dark-mode div[style*="#2c5282"] {
+    color: #93c5fd !important;
+}
 body.dark-mode div[style*="#4a5568"] {
-    color: #cbd5e0 !important;
+    color: #ffffff !important;
 }
 
 body.dark-mode .ui.card {
@@ -730,19 +830,25 @@ body.dark-mode #navbar-container .ui.inverted.menu .item,
 body.dark-mode .ui.menu .item {
     color: #e2e8f0 !important;
 }
-body.dark-mode #navbar-container .ui.tabular.inverted.menu .lang-dropdown.item,
-body.dark-mode #navbar-container .ui.tabular.inverted.menu .lang-dropdown.item span,
-body.dark-mode #navbar-container .ui.tabular.inverted.menu .lang-dropdown.item .dropdown.icon,
-body.dark-mode #navbar-container .ui.tabular.inverted.menu .lang-dropdown.item .lang-flag {
-    color: #e2e8f0 !important;
-    filter: none !important;
+/* Language trigger: do not use generic .item gray text / panel styling */
+body.dark-mode #navbar-container .ui.inverted.menu .item.lang-dropdown,
+[data-bs-theme="dark"] #navbar-container .ui.inverted.menu .item.lang-dropdown {
+    background-color: transparent !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #2185d0 !important;
 }
-[data-bs-theme="dark"] #navbar-container .ui.tabular.inverted.menu .lang-dropdown.item,
-[data-bs-theme="dark"] #navbar-container .ui.tabular.inverted.menu .lang-dropdown.item span,
-[data-bs-theme="dark"] #navbar-container .ui.tabular.inverted.menu .lang-dropdown.item .dropdown.icon,
-[data-bs-theme="dark"] #navbar-container .ui.tabular.inverted.menu .lang-dropdown.item .lang-flag {
-    color: #e2e8f0 !important;
+body.dark-mode #navbar-container .ui.tabular.inverted.menu .lang-dropdown.item > span,
+body.dark-mode #navbar-container .ui.tabular.inverted.menu .lang-dropdown.item > .dropdown.icon,
+[data-bs-theme="dark"] #navbar-container .ui.tabular.inverted.menu .lang-dropdown.item > span,
+[data-bs-theme="dark"] #navbar-container .ui.tabular.inverted.menu .lang-dropdown.item > .dropdown.icon {
+    color: #2185d0 !important;
+}
+body.dark-mode #navbar-container .ui.tabular.inverted.menu .lang-dropdown.item > .lang-flag,
+[data-bs-theme="dark"] #navbar-container .ui.tabular.inverted.menu .lang-dropdown.item > .lang-flag {
     filter: none !important;
+    opacity: 1 !important;
 }
 body.dark-mode .ui.inverted.menu .item.active {
     color: #ffffff !important;
@@ -858,9 +964,124 @@ body.dark-mode p[style*="#555"] {
     color: #cbd5e0 !important;
 }
 
-/* Startup form container has a background? */
+/* Startup page: dark mode — white text, light-blue headings, placeholders, dark number spinners */
+html[data-bs-theme="dark"] #startup-page,
 body.dark-mode #startup-page {
     background-color: #121212 !important;
+    color: #ffffff !important;
+    color-scheme: dark;
+}
+
+html[data-bs-theme="dark"] #startup-page input,
+html[data-bs-theme="dark"] #startup-page select,
+body.dark-mode #startup-page input,
+body.dark-mode #startup-page select {
+    color-scheme: dark;
+}
+
+html[data-bs-theme="dark"] #startup-page input::placeholder,
+body.dark-mode #startup-page input::placeholder {
+    color: #a0aec0 !important;
+    opacity: 1 !important;
+}
+
+/* Native steppers on number inputs (WebKit/Blink) — dark chrome; color-scheme is primary */
+html[data-bs-theme="dark"] #startup-page input[type="number"]::-webkit-inner-spin-button,
+html[data-bs-theme="dark"] #startup-page input[type="number"]::-webkit-outer-spin-button,
+body.dark-mode #startup-page input[type="number"]::-webkit-inner-spin-button,
+body.dark-mode #startup-page input[type="number"]::-webkit-outer-spin-button {
+    opacity: 1;
+    filter: brightness(0.65);
+}
+
+/* Dash dcc.Dropdown (react-select) on startup */
+html[data-bs-theme="dark"] #startup-page .Select-control,
+body.dark-mode #startup-page .Select-control {
+    background-color: #2d3748 !important;
+    border-color: #555555 !important;
+    color: #ffffff !important;
+}
+
+html[data-bs-theme="dark"] #startup-page .Select-placeholder,
+body.dark-mode #startup-page .Select-placeholder {
+    color: #a0aec0 !important;
+}
+
+html[data-bs-theme="dark"] #startup-page .Select-input input,
+body.dark-mode #startup-page .Select-input input {
+    color: #ffffff !important;
+}
+
+html[data-bs-theme="dark"] #startup-page .Select-value-label,
+html[data-bs-theme="dark"] #startup-page .Select-single-value,
+body.dark-mode #startup-page .Select-value-label,
+body.dark-mode #startup-page .Select-single-value {
+    color: #ffffff !important;
+}
+
+html[data-bs-theme="dark"] #startup-page .Select-menu-outer,
+body.dark-mode #startup-page .Select-menu-outer {
+    background-color: #2d3748 !important;
+    border-color: #555555 !important;
+}
+
+html[data-bs-theme="dark"] #startup-page .Select-option,
+body.dark-mode #startup-page .Select-option {
+    color: #e2e8f0 !important;
+    background-color: #2d3748 !important;
+}
+
+html[data-bs-theme="dark"] #startup-page .Select-option.is-focused,
+body.dark-mode #startup-page .Select-option.is-focused {
+    background-color: #4a5568 !important;
+    color: #ffffff !important;
+}
+
+/* React-Select v5+ (Dash 4): combobox / listbox when .Select-* classes are absent */
+html[data-bs-theme="dark"] #startup-page div[role="combobox"],
+body.dark-mode #startup-page div[role="combobox"] {
+    background-color: #2d3748 !important;
+    border-color: #555555 !important;
+    color: #ffffff !important;
+}
+
+html[data-bs-theme="dark"] #startup-page [id$="-placeholder"],
+body.dark-mode #startup-page [id$="-placeholder"] {
+    color: #a0aec0 !important;
+}
+
+html[data-bs-theme="dark"] #startup-page div[role="listbox"],
+body.dark-mode #startup-page div[role="listbox"] {
+    background-color: #2d3748 !important;
+    border-color: #555555 !important;
+}
+
+html[data-bs-theme="dark"] #startup-page [role="option"],
+body.dark-mode #startup-page [role="option"] {
+    color: #e2e8f0 !important;
+    background-color: #2d3748 !important;
+}
+
+html[data-bs-theme="dark"] #startup-page input[type="checkbox"],
+body.dark-mode #startup-page input[type="checkbox"] {
+    accent-color: #2185d0;
+}
+
+/* Startup contact preferences card: force dark card + light copy in dark mode */
+html[data-bs-theme="dark"] #startup-contact-prefs-card,
+body.dark-mode #startup-contact-prefs-card {
+    background-color: #1a202c !important;
+    border: 1px solid #2d3748 !important;
+}
+
+html[data-bs-theme="dark"] #startup-contact-prefs-title,
+body.dark-mode #startup-contact-prefs-title {
+    color: #93c5fd !important;
+}
+
+html[data-bs-theme="dark"] #startup-contact-prefs-text,
+body.dark-mode #startup-contact-prefs-text {
+    color: #ffffff !important;
 }
 
 /* Status and alert boxes */
@@ -1151,7 +1372,7 @@ html body.dark-mode .ui.card,
 html body.dark-mode .ui.card > .content {
     background-color: #1e1e1e !important;
     background: #1e1e1e !important;
-    color: #e2e8f0 !important;
+    color: #ffffff !important;
     border-color: #333 !important;
 }
 html body.dark-mode .card h1,
@@ -1166,9 +1387,199 @@ html body.dark-mode .ui.card h3 {
 /* Force text colors in cards for dark mode */
 html body.dark-mode .card div[style*="color: #334155"],
 html body.dark-mode .card div[style*="color: rgb(51, 65, 85)"] {
-    color: #e2e8f0 !important;
+    color: #ffffff !important;
 }
 html body.dark-mode .card h3[style*="color: #1565c0"],
 html body.dark-mode .card h3[style*="color: rgb(21, 101, 192)"] {
-    color: #90cdf4 !important;
+    color: #93c5fd !important;
+}
+
+/*
+ * Dark mode: readable white copy, light blue for accents that are dark blue in light theme.
+ * Mirrors html[data-bs-theme="dark"] (set on documentElement) alongside body.dark-mode.
+ */
+html[data-bs-theme="dark"] body,
+html[data-bs-theme="dark"] #page-content,
+html[data-bs-theme="dark"] .info-page,
+body.dark-mode,
+body.dark-mode #page-content,
+body.dark-mode .info-page {
+    color: #ffffff !important;
+}
+
+html[data-bs-theme="dark"] #page-content a,
+html[data-bs-theme="dark"] .info-page a,
+html[data-bs-theme="dark"] #landing-page a,
+html[data-bs-theme="dark"] #consent-form-page a,
+body.dark-mode #page-content a,
+body.dark-mode .info-page a,
+body.dark-mode #landing-page a,
+body.dark-mode #consent-form-page a {
+    color: #7dd3fc !important;
+}
+html[data-bs-theme="dark"] #page-content a:hover,
+html[data-bs-theme="dark"] .info-page a:hover,
+body.dark-mode #page-content a:hover,
+body.dark-mode .info-page a:hover {
+    color: #bae6fd !important;
+}
+
+/* Section titles that are blue on info / study pages */
+html[data-bs-theme="dark"] .info-page h2,
+html[data-bs-theme="dark"] .study-design-content h2,
+html[data-bs-theme="dark"] #consent-notice-scroll h3,
+body.dark-mode .info-page h2,
+body.dark-mode .study-design-content h2,
+body.dark-mode #consent-notice-scroll h3 {
+    color: #93c5fd !important;
+}
+
+html[data-bs-theme="dark"] .study-design-content h3,
+html[data-bs-theme="dark"] .study-design-content li,
+body.dark-mode .study-design-content h3,
+body.dark-mode .study-design-content li {
+    color: #ffffff !important;
+}
+
+html[data-bs-theme="dark"] .custom-control-label,
+body.dark-mode .custom-control-label {
+    color: #ffffff !important;
+}
+
+html[data-bs-theme="dark"] .form-check-input[type="radio"]:checked + .form-check-label,
+body.dark-mode .form-check-input[type="radio"]:checked + .form-check-label {
+    color: #93c5fd !important;
+}
+
+/* Prediction header: labels and values */
+html[data-bs-theme="dark"] #header-data-source-label,
+body.dark-mode #header-data-source-label {
+    color: #ffffff !important;
+}
+html[data-bs-theme="dark"] #data-source-display,
+html[data-bs-theme="dark"] #generic-source-metadata-display,
+body.dark-mode #data-source-display,
+body.dark-mode #generic-source-metadata-display {
+    color: #93c5fd !important;
+}
+
+/* Metrics / placeholders using gray or blue inline colors */
+html[data-bs-theme="dark"] #metrics-container,
+html[data-bs-theme="dark"] #metrics-container strong,
+html[data-bs-theme="dark"] #metrics-container div[style*="color: gray"],
+html[data-bs-theme="dark"] #metrics-container div[style*="color:gray"],
+html[data-bs-theme="dark"] #metrics-container div[style*="#2c5282"],
+html[data-bs-theme="dark"] #metrics-container div[style*="#4a5568"],
+body.dark-mode #metrics-container,
+body.dark-mode #metrics-container strong,
+body.dark-mode #metrics-container div[style*="color: gray"],
+body.dark-mode #metrics-container div[style*="color:gray"],
+body.dark-mode #metrics-container div[style*="#2c5282"],
+body.dark-mode #metrics-container div[style*="#4a5568"] {
+    color: #ffffff !important;
+}
+html[data-bs-theme="dark"] #metrics-container div[style*="#2c5282"],
+body.dark-mode #metrics-container div[style*="#2c5282"] {
+    color: #93c5fd !important;
+}
+
+/* Ending / final metric cards: large values were dark blue */
+html[data-bs-theme="dark"] #page-content div[style*="#2c5282"],
+body.dark-mode #page-content div[style*="#2c5282"] {
+    color: #93c5fd !important;
+}
+html[data-bs-theme="dark"] #page-content div[style*="#4a5568"],
+body.dark-mode #page-content div[style*="#4a5568"] {
+    color: #ffffff !important;
+}
+html[data-bs-theme="dark"] #page-content div[style*="color: gray"],
+html[data-bs-theme="dark"] #page-content div[style*="color:gray"],
+body.dark-mode #page-content div[style*="color: gray"],
+body.dark-mode #page-content div[style*="color:gray"] {
+    color: #ffffff !important;
+}
+
+/* Dash Markdown (FAQ etc.): root inherits; links stay blue above */
+html[data-bs-theme="dark"] #page-content .dash-markdown,
+html[data-bs-theme="dark"] #page-content .dash-markdown p,
+html[data-bs-theme="dark"] #page-content .dash-markdown li,
+body.dark-mode #page-content .dash-markdown,
+body.dark-mode #page-content .dash-markdown p,
+body.dark-mode #page-content .dash-markdown li {
+    color: #ffffff !important;
+}
+
+/* dcc.Slider tooltips */
+html[data-bs-theme="dark"] #page-content .rc-tooltip,
+html[data-bs-theme="dark"] #page-content .rc-slider-handle,
+body.dark-mode #page-content .rc-tooltip,
+body.dark-mode #page-content .rc-slider-handle {
+    color: #ffffff !important;
+}
+
+/* Submit / control labels that use Bootstrap grays */
+html[data-bs-theme="dark"] #page-content label[style*="#6c757d"],
+body.dark-mode #page-content label[style*="#6c757d"] {
+    color: #ffffff !important;
+}
+
+/* Inline hex/rgb: slate body text → white; dark blues → light blue */
+html[data-bs-theme="dark"] #page-content [style*="#334155"],
+html[data-bs-theme="dark"] #page-content [style*="#374151"],
+html[data-bs-theme="dark"] #page-content [style*="#1e293b"],
+html[data-bs-theme="dark"] #page-content [style*="rgb(51, 65, 85)"],
+html[data-bs-theme="dark"] #page-content [style*="rgb(30, 41, 59)"],
+body.dark-mode #page-content [style*="#334155"],
+body.dark-mode #page-content [style*="#374151"],
+body.dark-mode #page-content [style*="#1e293b"],
+body.dark-mode #page-content [style*="rgb(51, 65, 85)"],
+body.dark-mode #page-content [style*="rgb(30, 41, 59)"] {
+    color: #ffffff !important;
+}
+
+html[data-bs-theme="dark"] #page-content [style*="#1565c0"],
+html[data-bs-theme="dark"] #page-content [style*="#1976D2"],
+html[data-bs-theme="dark"] #page-content [style*="#1976d2"],
+html[data-bs-theme="dark"] #page-content [style*="#1d4ed8"],
+html[data-bs-theme="dark"] #page-content [style*="#0d47a1"],
+html[data-bs-theme="dark"] #page-content [style*="#0066cc"],
+html[data-bs-theme="dark"] #page-content [style*="#2c5282"],
+html[data-bs-theme="dark"] #page-content [style*="#1e88e5"],
+html[data-bs-theme="dark"] #page-content [style*="rgb(21, 101, 192)"],
+html[data-bs-theme="dark"] #page-content [style*="rgb(25, 118, 210)"],
+html[data-bs-theme="dark"] #page-content [style*="rgb(44, 82, 130)"],
+body.dark-mode #page-content [style*="#1565c0"],
+body.dark-mode #page-content [style*="#1976D2"],
+body.dark-mode #page-content [style*="#1976d2"],
+body.dark-mode #page-content [style*="#1d4ed8"],
+body.dark-mode #page-content [style*="#0d47a1"],
+body.dark-mode #page-content [style*="#0066cc"],
+body.dark-mode #page-content [style*="#2c5282"],
+body.dark-mode #page-content [style*="#1e88e5"],
+body.dark-mode #page-content [style*="rgb(21, 101, 192)"],
+body.dark-mode #page-content [style*="rgb(25, 118, 210)"],
+body.dark-mode #page-content [style*="rgb(44, 82, 130)"] {
+    color: #93c5fd !important;
+}
+
+/* Primary slate heading color in light mode → white in dark */
+html[data-bs-theme="dark"] #page-content [style*="#0f172a"],
+html[data-bs-theme="dark"] #page-content [style*="rgb(15, 23, 42)"],
+body.dark-mode #page-content [style*="#0f172a"],
+body.dark-mode #page-content [style*="rgb(15, 23, 42)"] {
+    color: #ffffff !important;
+}
+
+/* Fomantic segments set their own color — keep copy white inside game/info flow */
+html[data-bs-theme="dark"] #page-content .ui.segment,
+html[data-bs-theme="dark"] .info-page .ui.segment,
+body.dark-mode #page-content .ui.segment,
+body.dark-mode .info-page .ui.segment {
+    color: #ffffff !important;
+}
+
+/* Main chart header title: stay white (not light-blue accent) */
+html[data-bs-theme="dark"] #header-app-title,
+body.dark-mode #header-app-title {
+    color: #ffffff !important;
 }
