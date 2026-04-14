@@ -11,6 +11,7 @@ from datetime import datetime
 import time
 from pathlib import Path
 import base64
+import html as py_html
 import dash_bootstrap_components as dbc
 import os
 import sys
@@ -449,6 +450,7 @@ app.layout = html.Div([
         id='confirm-ending-finish-exit',
         message='Attention! This action will delete your current session data!',
     ),
+    dcc.Download(id='share-results-download'),
 
     html.Div(id='mobile-warning', style={'margin': '0'}),
     html.Div(id='theme-apply-dummy', style={'display': 'none'}),
@@ -2416,6 +2418,29 @@ def create_final_layout(full_df_data: Optional[Dict], user_info: Dict[str, Any],
                 }
             ),
             html.Button(
+                "Share results",
+                id='share-results-button',
+                className="ui blue button",
+                style={
+                    'backgroundColor': '#007bff',
+                    'color': 'white',
+                    'padding': 'clamp(15px, 2vw, 20px) clamp(20px, 3vw, 30px)',
+                    'border': 'none',
+                    'borderRadius': '5px',
+                    'fontSize': 'clamp(18px, 3vw, 24px)',
+                    'cursor': 'pointer',
+                    'minWidth': '200px',
+                    'maxWidth': '400px',
+                    'width': '100%',
+                    'height': 'clamp(60px, 8vh, 80px)',
+                    'display': 'flex',
+                    'alignItems': 'center',
+                    'justifyContent': 'center',
+                    'lineHeight': '1.2',
+                    'marginLeft': '15px'
+                }
+            ),
+            html.Button(
                 t("ui.common.finish_exit", locale=locale),
                 id='final-exit-button',
                 className="ui red button",
@@ -2858,23 +2883,10 @@ def handle_finish_study_from_prediction(
 
 
 @app.callback(
-    Output('confirm-ending-finish-exit', 'displayed'),
-    Input('finish-study-button-ending', 'n_clicks'),
-    prevent_initial_call=True
-)
-def confirm_finish_study_from_ending(n_clicks: Optional[int]) -> bool:
-    """Ask for confirmation before Finish/Exit clears storage from ending."""
-    if not n_clicks:
-        raise PreventUpdate
-    return True
-
-
-@app.callback(
     [Output('url', 'pathname', allow_duplicate=True),
      Output('user-info-store', 'data', allow_duplicate=True),
-     Output('glucose-chart-mode', 'data', allow_duplicate=True),
-     Output('clean-storage-flag', 'data', allow_duplicate=True)],
-    [Input('confirm-ending-finish-exit', 'submit_n_clicks')],
+     Output('glucose-chart-mode', 'data', allow_duplicate=True)],
+    [Input('finish-study-button-ending', 'n_clicks')],
     [State('user-info-store', 'data'),
      State('full-df', 'data')],
     prevent_initial_call=True
@@ -2883,22 +2895,16 @@ def handle_finish_study_from_ending(
     n_clicks: Optional[int],
     user_info: Optional[Dict[str, Any]],
     full_df_data: Optional[Dict]
-) -> Tuple[str, Optional[Dict[str, Any]], Dict[str, bool], bool]:
+) -> Tuple[str, Optional[Dict[str, Any]], Dict[str, bool]]:
     print(f"DEBUG handle_finish_study_from_ending FIRED: n_clicks={n_clicks}")
     if not n_clicks:
-        return no_update, no_update, no_update, no_update
+        raise PreventUpdate
 
     with start_action(action_type=u"handle_finish_study_from_ending", n_clicks=int(n_clicks)):
         pass
 
     if not user_info:
-        return '/', None, {'hide_last_hour': True}, True
-
-    rounds: list[dict[str, Any]] = user_info.get('rounds') or []
-    rounds_played = len(rounds)
-    max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS)
-    current_round_number = int(user_info.get('current_round_number') or rounds_played)
-    is_last_round = current_round_number >= max_rounds
+        return '/final', None, {'hide_last_hour': False}
 
     play_only = bool(user_info.get('consent_play_only')) if user_info else False
     if full_df_data and (not play_only) and not bool(user_info.get('statistics_saved')):
@@ -2907,10 +2913,7 @@ def handle_finish_study_from_ending(
             submit_component.save_statistics(full_df, user_info)
             user_info['statistics_saved'] = True
 
-    if is_last_round:
-        return '/final', user_info, {'hide_last_hour': False}, False
-    else:
-        return '/', None, {'hide_last_hour': True}, True
+    return '/final', user_info, {'hide_last_hour': False}
 
 
 @app.callback(
@@ -3587,12 +3590,16 @@ def render_resume_dialog(
 
 @app.callback(
     Output('confirm-home-clear-session', 'displayed'),
-    Input('home-button', 'n_clicks'),
+    [Input('home-button', 'n_clicks'),
+     Input('final-exit-button', 'n_clicks')],
     prevent_initial_call=True,
 )
-def confirm_home_button_clear_session(n_clicks: Optional[int]) -> bool:
-    """Ask for confirmation before clearing session via navbar Home."""
-    if not n_clicks:
+def confirm_home_button_clear_session(
+    n_home_clicks: Optional[int],
+    n_final_exit_clicks: Optional[int],
+) -> bool:
+    """Ask for confirmation before clearing session via Home or final Finish/Exit."""
+    if not n_home_clicks and not n_final_exit_clicks:
         raise PreventUpdate
     return True
 
@@ -3637,16 +3644,14 @@ def handle_resume_continue(
      Output('initial-slider-value', 'data', allow_duplicate=True),
      Output('clean-storage-flag', 'data', allow_duplicate=True),
      Output('session-active', 'data', allow_duplicate=True)],
-    [Input('resume-start-over-btn', 'n_clicks'),
-     Input('final-exit-button', 'n_clicks')],
+    [Input('resume-start-over-btn', 'n_clicks')],
     prevent_initial_call=True,
 )
 def handle_resume_start_over(
     n_resume: Optional[int],
-    n_final: Optional[int],
 ) -> tuple:
     """Reset all in-memory stores and trigger the clean-storage-flag to wipe localStorage."""
-    if not n_resume and not n_final:
+    if not n_resume:
         raise PreventUpdate
     with start_action(action_type=u"resume_start_over") as action:
         action.log(message_type="user_chose_start_over")
@@ -3719,6 +3724,113 @@ def handle_home_button(
         True,                      # clean-storage-flag (self-resets via clientside callback)
         True,                      # session-active (user made a choice in this tab)
     )
+
+
+@app.callback(
+    Output('share-results-download', 'data'),
+    Input('share-results-button', 'n_clicks'),
+    [State('user-info-store', 'data'),
+     State('glucose-unit', 'data'),
+     State('interface-language', 'data')],
+    prevent_initial_call=True,
+)
+def share_final_results_as_image(
+    n_clicks: Optional[int],
+    user_info: Optional[Dict[str, Any]],
+    glucose_unit: Optional[str],
+    interface_language: Optional[str],
+) -> Dict[str, str]:
+    if not n_clicks:
+        raise PreventUpdate
+
+    locale = normalize_locale(interface_language)
+    if not user_info:
+        raise PreventUpdate
+
+    rounds: list[dict[str, Any]] = user_info.get('rounds') or []
+    if not rounds:
+        runs_by_format: dict[str, list[dict[str, Any]]] = dict(user_info.get('runs_by_format') or {})
+        all_archived: list[dict[str, Any]] = [run for runs in runs_by_format.values() for run in runs]
+        if all_archived:
+            latest_run = max(all_archived, key=lambda r: r.get('ended_at') or '')
+            rounds = list(latest_run.get('rounds') or [])
+
+    unit = glucose_unit if glucose_unit in ('mg/dL', 'mmol/L') else 'mg/dL'
+    max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS)
+    current_format = str(user_info.get("format") or "A")
+    metrics_component_final = MetricsComponent()
+    aggregate_table_data = _convert_table_data_units(_build_aggregate_table_data(rounds), unit)
+    overall_metrics = metrics_component_final._calculate_metrics_from_table_data(aggregate_table_data)
+
+    title_text = t("ui.common.app_title", locale=locale)
+    subtitle_text = t("ui.final.title", locale=locale)
+    rounds_text = t("ui.final.rounds_played", locale=locale, played=len(rounds), total=max_rounds)
+    format_text = f"{t('ui.startup.format_label', locale=locale)}: {_format_label(current_format, locale=locale)}"
+    unit_text = t("ui.ending.units_line", locale=locale, unit=unit)
+    metrics_header = t("ui.metrics.title_accuracy_metrics", locale=locale)
+    metric_order = ["MAE", "MSE", "RMSE", "MAPE"]
+    metric_pairs: list[tuple[str, str]] = []
+    for metric_name in metric_order:
+        metric_data = overall_metrics.get(metric_name, {})
+        value = metric_data.get("value")
+        if value is None:
+            continue
+        suffix = "%" if metric_name == "MAPE" else ""
+        metric_pairs.append((metric_name, f"{float(value):.2f}{suffix}"))
+
+    width = 1200
+    height = 700
+    info_block_y = 150
+    metrics_start_y = 380
+
+    svg_parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
+        '<defs>',
+        '<linearGradient id="heroBg" x1="0" y1="0" x2="1" y2="1">',
+        '<stop offset="0%" stop-color="#2c5282" />',
+        '<stop offset="100%" stop-color="#007bff" />',
+        '</linearGradient>',
+        '</defs>',
+        '<rect x="0" y="0" width="100%" height="100%" fill="url(#heroBg)" />',
+        '<rect x="45" y="150" width="1110" height="505" rx="20" fill="#1e3a8a" stroke="#93c5fd" stroke-width="2" />',
+        f'<text x="70" y="78" font-family="Arial, sans-serif" font-size="42" font-weight="700" fill="#ffffff">{py_html.escape(title_text)}</text>',
+        f'<text x="70" y="118" font-family="Arial, sans-serif" font-size="28" font-weight="600" fill="#e6f0ff">{py_html.escape(subtitle_text)}</text>',
+        f'<text x="80" y="{info_block_y + 52}" font-family="Arial, sans-serif" font-size="24" fill="#e2e8f0">{py_html.escape(rounds_text)}</text>',
+        f'<text x="80" y="{info_block_y + 88}" font-family="Arial, sans-serif" font-size="24" fill="#e2e8f0">{py_html.escape(format_text)}</text>',
+        f'<text x="80" y="{info_block_y + 124}" font-family="Arial, sans-serif" font-size="24" fill="#e2e8f0">{py_html.escape(unit_text)}</text>',
+        f'<text x="80" y="{info_block_y + 180}" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#ffffff">{py_html.escape(metrics_header)}</text>',
+    ]
+
+    if metric_pairs:
+        card_w = 240
+        card_h = 190
+        gap = 24
+        left_x = 80
+        for idx, (name, value_text) in enumerate(metric_pairs):
+            x = left_x + idx * (card_w + gap)
+            svg_parts.extend([
+                f'<rect x="{x}" y="{metrics_start_y}" width="{card_w}" height="{card_h}" rx="14" fill="#f8fafc" stroke="#cbd5e0" stroke-width="2" />',
+                f'<text x="{x + 20}" y="{metrics_start_y + 52}" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#2c5282">{py_html.escape(name)}</text>',
+                f'<text x="{x + 20}" y="{metrics_start_y + 115}" font-family="Arial, sans-serif" font-size="42" font-weight="700" fill="#007bff">{py_html.escape(value_text)}</text>',
+            ])
+    else:
+        no_metrics_text = t("ui.metrics.no_metrics_available", locale=locale)
+        svg_parts.append(
+            f'<text x="80" y="{metrics_start_y + 60}" font-family="Arial, sans-serif" font-size="30" fill="#64748b">{py_html.escape(no_metrics_text)}</text>'
+        )
+
+    timestamp_text = datetime.now().strftime("%Y-%m-%d %H:%M")
+    svg_parts.extend([
+        f'<text x="80" y="{height - 48}" font-family="Arial, sans-serif" font-size="18" fill="#64748b">{py_html.escape(timestamp_text)}</text>',
+        '</svg>',
+    ])
+    svg_content = "".join(svg_parts)
+
+    return {
+        "content": svg_content,
+        "filename": f"sugar-sugar-results-{datetime.now().strftime('%Y%m%d-%H%M%S')}.svg",
+        "type": "image/svg+xml",
+    }
 
 
 ## Removed URL-based data writer callback to enforce single-writer for data stores

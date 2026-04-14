@@ -861,6 +861,21 @@ body.dark-mode div[style*="#f8fafc"] {
     border-color: #333 !important;
 }
 
+/* Final page action button colors (force brand colors in all themes) */
+#share-results-button,
+body.dark-mode #share-results-button,
+html[data-bs-theme="dark"] #share-results-button {
+    background-color: #007bff !important;
+    color: #ffffff !important;
+}
+
+#final-exit-button,
+body.dark-mode #final-exit-button,
+html[data-bs-theme="dark"] #final-exit-button {
+    background-color: #dc3545 !important;
+    color: #ffffff !important;
+}
+
 /* More inline color overrides */
 body.dark-mode div[style*="#0f172a"],
 body.dark-mode label[style*="#0f172a"],
@@ -1004,7 +1019,8 @@ body.dark-mode #startup-page .Select-control {
 
 html[data-bs-theme="dark"] #startup-page .Select-placeholder,
 body.dark-mode #startup-page .Select-placeholder {
-    color: #a0aec0 !important;
+    color: #ffffff !important;
+    opacity: 1 !important;
 }
 
 html[data-bs-theme="dark"] #startup-page .Select-input input,
@@ -1047,7 +1063,17 @@ body.dark-mode #startup-page div[role="combobox"] {
 
 html[data-bs-theme="dark"] #startup-page [id$="-placeholder"],
 body.dark-mode #startup-page [id$="-placeholder"] {
-    color: #a0aec0 !important;
+    color: #ffffff !important;
+    opacity: 1 !important;
+}
+
+/* React-Select variants used by different Dash versions */
+html[data-bs-theme="dark"] #startup-page [class*="placeholder"],
+body.dark-mode #startup-page [class*="placeholder"],
+html[data-bs-theme="dark"] #startup-page [class*="-placeholder"],
+body.dark-mode #startup-page [class*="-placeholder"] {
+    color: #ffffff !important;
+    opacity: 1 !important;
 }
 
 html[data-bs-theme="dark"] #startup-page div[role="listbox"],
