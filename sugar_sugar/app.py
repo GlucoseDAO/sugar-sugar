@@ -3588,20 +3588,147 @@ def render_resume_dialog(
     ], style=overlay_style, disable_n_clicks=True)]
 
 
+def _has_saved_session_data(
+    user_info: Optional[Dict[str, Any]],
+    full_df_data: Optional[Dict[str, Any]],
+    current_window_df_data: Optional[Dict[str, Any]],
+    events_df_data: Optional[Dict[str, Any]],
+    last_visited_page: Optional[str],
+) -> bool:
+    return any([
+        bool(user_info),
+        bool(full_df_data),
+        bool(current_window_df_data),
+        bool(events_df_data),
+        bool(last_visited_page),
+    ])
+
+
 @app.callback(
     Output('confirm-home-clear-session', 'displayed'),
-    [Input('home-button', 'n_clicks'),
-     Input('final-exit-button', 'n_clicks')],
+    Input('home-button', 'n_clicks'),
+    [State('user-info-store', 'data'),
+     State('full-df', 'data'),
+     State('current-window-df', 'data'),
+     State('events-df', 'data'),
+     State('last-visited-page', 'data')],
     prevent_initial_call=True,
 )
 def confirm_home_button_clear_session(
     n_home_clicks: Optional[int],
-    n_final_exit_clicks: Optional[int],
+    user_info: Optional[Dict[str, Any]],
+    full_df_data: Optional[Dict[str, Any]],
+    current_window_df_data: Optional[Dict[str, Any]],
+    events_df_data: Optional[Dict[str, Any]],
+    last_visited_page: Optional[str],
 ) -> bool:
-    """Ask for confirmation before clearing session via Home or final Finish/Exit."""
-    if not n_home_clicks and not n_final_exit_clicks:
+    """Ask for confirmation before clearing session via navbar Home."""
+    if not n_home_clicks:
         raise PreventUpdate
-    return True
+
+    return _has_saved_session_data(
+        user_info,
+        full_df_data,
+        current_window_df_data,
+        events_df_data,
+        last_visited_page,
+    )
+
+
+@app.callback(
+    Output('confirm-home-clear-session', 'displayed', allow_duplicate=True),
+    Input('final-exit-button', 'n_clicks'),
+    [State('user-info-store', 'data'),
+     State('full-df', 'data'),
+     State('current-window-df', 'data'),
+     State('events-df', 'data'),
+     State('last-visited-page', 'data')],
+    prevent_initial_call=True,
+)
+def confirm_final_exit_clear_session(
+    n_final_exit_clicks: Optional[int],
+    user_info: Optional[Dict[str, Any]],
+    full_df_data: Optional[Dict[str, Any]],
+    current_window_df_data: Optional[Dict[str, Any]],
+    events_df_data: Optional[Dict[str, Any]],
+    last_visited_page: Optional[str],
+) -> bool:
+    """Ask for confirmation before clearing session via final Finish/Exit."""
+    if not n_final_exit_clicks:
+        raise PreventUpdate
+    return _has_saved_session_data(
+        user_info,
+        full_df_data,
+        current_window_df_data,
+        events_df_data,
+        last_visited_page,
+    )
+
+
+@app.callback(
+    Output('url', 'pathname', allow_duplicate=True),
+    Input('home-button', 'n_clicks'),
+    [State('user-info-store', 'data'),
+     State('full-df', 'data'),
+     State('current-window-df', 'data'),
+     State('events-df', 'data'),
+     State('last-visited-page', 'data')],
+    prevent_initial_call=True,
+)
+def route_home_to_landing_without_confirm_when_no_session(
+    n_home_clicks: Optional[int],
+    user_info: Optional[Dict[str, Any]],
+    full_df_data: Optional[Dict[str, Any]],
+    current_window_df_data: Optional[Dict[str, Any]],
+    events_df_data: Optional[Dict[str, Any]],
+    last_visited_page: Optional[str],
+) -> str:
+    """Skip reset confirmation for Home when there is no saved session data."""
+    if not n_home_clicks:
+        raise PreventUpdate
+    has_saved_data = _has_saved_session_data(
+        user_info,
+        full_df_data,
+        current_window_df_data,
+        events_df_data,
+        last_visited_page,
+    )
+    if has_saved_data:
+        raise PreventUpdate
+    return "/"
+
+
+@app.callback(
+    Output('url', 'pathname', allow_duplicate=True),
+    Input('final-exit-button', 'n_clicks'),
+    [State('user-info-store', 'data'),
+     State('full-df', 'data'),
+     State('current-window-df', 'data'),
+     State('events-df', 'data'),
+     State('last-visited-page', 'data')],
+    prevent_initial_call=True,
+)
+def route_final_exit_to_landing_without_confirm_when_no_session(
+    n_final_exit_clicks: Optional[int],
+    user_info: Optional[Dict[str, Any]],
+    full_df_data: Optional[Dict[str, Any]],
+    current_window_df_data: Optional[Dict[str, Any]],
+    events_df_data: Optional[Dict[str, Any]],
+    last_visited_page: Optional[str],
+) -> str:
+    """Skip reset confirmation for final Finish/Exit when there is no saved session data."""
+    if not n_final_exit_clicks:
+        raise PreventUpdate
+    has_saved_data = _has_saved_session_data(
+        user_info,
+        full_df_data,
+        current_window_df_data,
+        events_df_data,
+        last_visited_page,
+    )
+    if has_saved_data:
+        raise PreventUpdate
+    return "/"
 
 
 @app.callback(
