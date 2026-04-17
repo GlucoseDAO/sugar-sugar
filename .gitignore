@@ -54,6 +54,9 @@ cover/
 #user data
 data/input/users/
 
+# Share page records (persistent share state for /share/<id>)
+data/shares/
+
 # Translations
 *.mo
 *.pot
