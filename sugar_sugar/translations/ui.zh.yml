@@ -175,6 +175,10 @@ zh:
   mobile_warning:
     text: "注意：Sugar Sugar 目前针对桌面端进行了优化。移动端支持即将推出！"
 
+  orientation:
+    title: "请旋转设备"
+    subtitle: "Sugar Sugar 在横屏下效果最佳。请将手机或平板旋转至横屏以继续。"
+
   chart:
     title: "血糖水平（%{start} 到 %{end}）"
     source_suffix: " - 来源：%{source}"

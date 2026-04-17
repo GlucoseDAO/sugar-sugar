@@ -359,15 +359,93 @@ app.layout = html.Div([
     # Holds the target page for the resume dialog; set by restore_page_on_load.
     dcc.Store(id='resume-dialog-target', data=None, storage_type='memory'),
 
-    html.Div(id='mobile-warning', style={'margin': '12px 0'}),
+    html.Div(id='mobile-warning', style={'display': 'none'}),
     html.Div(id='scroll-to-top-trigger', style={'display': 'none'}),
 
     html.Div(id='resume-dialog-container', children=[], disable_n_clicks=True),
 
     html.Div(id='navbar-container', children=[], disable_n_clicks=True),
-    
-    html.Div(id='page-content', children=[], disable_n_clicks=True)
+
+    html.Div(id='page-content', children=[], disable_n_clicks=True),
+
+    # Portrait-orientation prompt for phones/tablets.  Pure CSS controls
+    # visibility (see assets/orientation.css); callbacks only refresh the
+    # translated text when the interface language changes.
+    html.Div(
+        [
+            html.Div("\u21BB", className="rotate-icon", id="orientation-overlay-icon"),
+            html.H2(
+                t("ui.orientation.title", locale="en"),
+                className="rotate-title",
+                id="orientation-overlay-title",
+            ),
+            html.P(
+                t("ui.orientation.subtitle", locale="en"),
+                className="rotate-subtitle",
+                id="orientation-overlay-subtitle",
+            ),
+        ],
+        id="orientation-overlay",
+        disable_n_clicks=True,
+    ),
 ])
+
+
+# Add a global `mobile-device` class to <html> based on the browser
+# user-agent.  This lets the CSS in assets/mobile.css scope all mobile
+# overrides without touching the desktop path.  The class is also removed
+# on non-mobile user agents, so CSS selectors are stable across hot-reload.
+app.clientside_callback(
+    """
+    function(ua) {
+        if (!document || !document.documentElement) {
+            return window.dash_clientside.no_update;
+        }
+        var root = document.documentElement;
+        var isMobile = false;
+        if (ua && typeof ua === 'string') {
+            var lc = ua.toLowerCase();
+            var keywords = ['iphone', 'android', 'ipad', 'mobile', 'opera mini', 'mobi'];
+            for (var i = 0; i < keywords.length; i++) {
+                if (lc.indexOf(keywords[i]) !== -1) { isMobile = true; break; }
+            }
+        }
+        // Touch-capable + coarse pointer is a reliable tablet fallback.
+        if (!isMobile && window.matchMedia) {
+            try {
+                if (window.matchMedia('(pointer: coarse)').matches &&
+                    window.matchMedia('(max-device-width: 1024px)').matches) {
+                    isMobile = true;
+                }
+            } catch (e) { /* ignore */ }
+        }
+        if (isMobile) {
+            root.classList.add('mobile-device');
+        } else {
+            root.classList.remove('mobile-device');
+        }
+        return {'display': 'none'};
+    }
+    """,
+    Output('mobile-warning', 'style'),
+    Input('user-agent', 'data'),
+    prevent_initial_call=False,
+)
+
+
+@app.callback(
+    [Output('orientation-overlay-title', 'children'),
+     Output('orientation-overlay-subtitle', 'children')],
+    [Input('interface-language', 'data')],
+    prevent_initial_call=False,
+)
+def update_orientation_overlay_text(interface_language: Optional[str]) -> tuple[str, str]:
+    """Keep the portrait-prompt overlay translated as the language changes."""
+    locale = normalize_locale(interface_language)
+    return (
+        t("ui.orientation.title", locale=locale),
+        t("ui.orientation.subtitle", locale=locale),
+    )
 
 
 @app.callback(
@@ -2334,24 +2412,14 @@ def create_final_layout(full_df_data: Optional[Dict], user_info: Dict[str, Any],
     })
 
 def render_mobile_warning(user_agent: Optional[str], *, locale: str) -> Optional[html.Div]:
-    if not user_agent:
-        return None
-    ua = user_agent.lower()
-    mobile_keywords = ("iphone", "android", "ipad", "mobile", "opera mini", "mobi")
-    if any(keyword in ua for keyword in mobile_keywords):
-        return html.Div(
-            t("ui.mobile_warning.text", locale=locale),
-            style={
-                'backgroundColor': '#fff3cd',
-                'border': '1px solid #ffeeba',
-                'color': '#856404',
-                'padding': '10px 14px',
-                'borderRadius': '6px',
-                'textAlign': 'center',
-                'marginBottom': '12px',
-                'fontWeight': '600'
-            }
-        )
+    """Deprecated: the yellow mobile banner has been replaced by the
+    orientation-prompt overlay (see `assets/orientation.css` and the
+    `orientation-overlay` div in `app.layout`).  We keep the function and
+    its call sites returning ``None`` to avoid churn in every page-render
+    callback; the `mobile-warning` div stays in the DOM purely as a
+    throwaway Output for the clientside `mobile-device` class setter.
+    """
+    _ = user_agent, locale
     return None
 
 def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) -> pl.DataFrame:

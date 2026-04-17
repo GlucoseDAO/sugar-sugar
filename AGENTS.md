@@ -30,6 +30,14 @@ In Dash 4 (also reproduced in Dash 3), every `html.*` component tracks `n_clicks
 
 **What did NOT work:** CSS `pointer-events: none` on containers, global JS click interceptors in `assets/` (broke the prediction chart), pathname guards on callbacks, making DataTables non-interactive.
 
+### `ending-*` IDs must always be in the DOM on `/ending`
+
+`create_ending_layout` must unconditionally render the full skeleton with every `ending-*` ID (`ending-title`, `ending-disclaimer-*`, `ending-round-info`, etc.). Never early-return a plain "session expired" fallback div — any callback targeting those IDs (e.g. `update_ending_text_on_language_change`, metrics updates) immediately crashes with `A nonexistent object was used in an Output`. If the user has no data, render the skeleton with placeholder/empty content; put the "session expired" handling at the `display_page` level for pathname `/ending` only when you also skip every `ending-*`-targeted callback via a `pathname != '/ending' or not user_info or 'prediction_table_data' not in user_info` guard.
+
+### Consent notice: single scrollbar rule
+
+`consent_notice_children()` is shared between the landing page (`/`) and the `/consent-form` page. It renders the long consent markdown via `static_markdown_iframe` with a fixed height (e.g. `min(55vh, 480px)`) so the iframe owns the scrollbar. **Never wrap it in an outer `overflowY: auto` container** — that creates the infamous double scrollbar bug the user has reported repeatedly. Do not use `static_markdown_autosize_iframe` here either; autosize makes the iframe so tall it forces a second page-level scrollbar. Also do not try to flex-collapse the landing page to `height: 100vh` + `overflow: hidden` to avoid the page scrollbar; that collapses the consent section entirely. Let the landing page scroll normally; the iframe scrolls its own content.
+
 ## Code style guidelines
 
 Always use type-hints. 
@@ -66,6 +74,8 @@ Interactive Dash components (sliders, dropdowns, inputs) that are destroyed and 
 
 The app forces a desktop-width layout viewport (`_DESKTOP_LAYOUT_VIEWPORT_CSS_PX = 1280`) via a `meta_tags` viewport entry on the `Dash()` constructor. This makes mobile browsers scale the page like "Request desktop site" instead of using `width=device-width`. Do not revert to `device-width`; the chart/drawing UI is unusable at phone-width layouts.
 
+Mobile responsive CSS lives in `assets/mobile.css` and is scoped under `html.mobile-device`. A clientside callback in `app.py` adds the `mobile-device` class to `<html>` based on `navigator.userAgent` plus a `(pointer: coarse) and (max-device-width: 1024px)` fallback. `assets/orientation.css` shows a full-screen portrait overlay (`#orientation-overlay`) on small devices via `@media (orientation: portrait) and (max-device-width: 1024px) and (pointer: coarse)`. **Do not CSS-rotate the page** (`transform: rotate(90deg)`) — it breaks Plotly's touch coordinate mapping for `drawline`. **Do not use `screen.orientation.lock()`** — it needs fullscreen and is unsupported on iOS Safari. The old yellow mobile-warning banner has been replaced by this overlay; `render_mobile_warning()` now always returns `None` and the `mobile-warning` div is only kept as a throwaway Output for the clientside class-setter callback.
+
 ## Session persistence & navigation contract
 
 These are the expected behaviours that every change must preserve. Treat regressions here as bugs.
@@ -99,6 +109,9 @@ These are the expected behaviours that every change must preserve. Treat regress
 - Use `fuser -k PORT/tcp` to kill stray Dash processes on a busy port
 - Keep `logs/*` with `!logs/.gitkeep` in `.gitignore` to preserve the directory in git while ignoring log files; `.cursor/` must be fully gitignored
 - The UI uses Fomantic UI (Semantic UI fork) classes alongside Dash — prefix interactive classes with `ui` (e.g. `ui green button`)
+- Do **not** rewrite the landing page into a flex-only `height: 100vh; overflow: hidden` shell to eliminate the double scrollbar — past attempts collapsed the consent section entirely. Fix double-scrollbar issues by choosing a single owner of the scroll (usually the iframe) and removing `overflowY: auto` from the others
+- When a fix regresses or layout breaks, check `git stash list` / `git stash show -p stash@{N}` for a prior working version before re-designing from scratch; the user has stashed working fixes in the past
+- "Start Over" must reset the app to a truly fresh state: clear `user-info-store`, consent selections, `last-visited-page`, and any other localStorage-backed stores. A partial clear that leaves consent checkboxes ticked is a bug
 
 ## Browser automation tips (cursor-ide-browser MCP)
 
@@ -113,7 +126,7 @@ These are the expected behaviours that every change must preserve. Treat regress
 - The app uses Fomantic UI CSS/JS loaded via `external_stylesheets` and `external_scripts` (jQuery is loaded first as a dependency)
 - GitHub repo is GlucoseDAO/sugar-sugar; issues are tracked there
 - `suppress_callback_exceptions=True` is set on the Dash app to allow callbacks referencing components not yet in the layout
-- The navbar is a Fomantic UI `massive blue inverted tabular menu` (`NavBar` class in `sugar_sugar/components/navbar.py`). Left items: Game, The Study, Video instructions, Contact us. Right items: language flags. The active tab is highlighted via a CSS bottom-border rule. Navbar uses `dcc.Link` for navigation (client-side routing, no full page reload) — this preserves all `dcc.Store` values and avoids hydration races. Language flags still use `html.A` (they trigger callbacks, not navigation). A `redirect_landing_to_game` callback redirects `/` → last game page when the user clicks "Game" mid-session.
+- The navbar is a Fomantic UI `massive blue inverted tabular menu` (`NavBar` class in `sugar_sugar/components/navbar.py`). Left items: Game, The Study, FAQ, Video instructions, Contact us. Right side: a Fomantic `ui simple dropdown item` (`lang-dropdown`) — the trigger shows the active language's flag+label and a dropdown caret; the menu lists all 8 languages from the module-level `LANGUAGES` constant. Use the **`simple` dropdown class** (CSS-only hover) because Fomantic's JS dropdown requires jQuery init which doesn't play well with Dash. Each dropdown item is an `html.A` with `id="lang-{code}"`, so the existing `set_interface_language` callback works unchanged. Wrapper divs inside the dropdown have `disable_n_clicks=True`; the `lang-*` links do not. Navbar uses `dcc.Link` for navigation (client-side routing, no full page reload) — this preserves all `dcc.Store` values and avoids hydration races. A `redirect_landing_to_game` callback redirects `/` → last game page when the user clicks "Game" mid-session.
 - `STORAGE_TYPE` env var controls `dcc.Store` `storage_type` and input `persistence_type` across the app; defaults to `local` (localStorage persists across sessions)
 - When using `dcc.Store` with `storage_type='local'`, the store hydrates from localStorage client-side **asynchronously** after initial render; use it as callback `Input` (not `State`) to react to hydration — see "localStorage hydration race condition" pitfall above
 - A `last-visited-page` store + `restore_page_on_load` callback restores the user's last page when `STORAGE_TYPE=local`; a resume dialog (continue / start over) appears for returning users. Page flow: `/` → `/startup` → `/prediction` → `/ending` → `/final`. The callback uses `user-info-store` and `full-df` as Inputs (not State) to avoid the hydration race
@@ -127,3 +140,5 @@ These are the expected behaviours that every change must preserve. Treat regress
 - Large static markdown documents (study design, consent-style content) should keep using the server-rendered `static_markdown.py` iframe path; `dcc.Markdown` can misrender or fail on the 100KB+ study document because it loads asynchronously via `react-markdown`.
 - The prediction area is 12 points (1 hour at 5-min intervals); the game requires predictions drawn to the end of the hidden area before submit. `MAX_ROUNDS` is configurable via `.env` (defaults to 12).
 - CGM file uploads are parsed by custom loaders in `sugar_sugar/data.py` using Polars (`pl.read_csv`). `detect_cgm_type` auto-detects Libre/Dexcom/Medtronic format via string checks on the file header. No `cgm-format` package is used.
+- Plotly charts on `/prediction` (`GlucoseChart` in `sugar_sugar/components/glucose.py`) and `/ending` (`ending-static-graph` in `app.py`) use `config={'displayModeBar': False, ...}` — the Plotly toolbar (camera/zoom/pan icons) is hidden on purpose. The chart's outer div and inner `dcc.Graph` both set `style={'touchAction': 'none'}` so browser pinch/pan gestures don't fight Plotly's `drawline` handler on mobile.
+- The clientside persist callback never writes `/` to `last-visited-page` — only `/startup`, `/prediction`, `/ending`, `/final`. Writing `/` would clobber a deeper stored page and break the resume dialog. Exit from `/prediction` always goes to `/ending` (never directly `/final`); exit from `/ending` with no completed rounds goes to `/` (landing), otherwise to `/final`.

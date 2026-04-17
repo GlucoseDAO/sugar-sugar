@@ -177,6 +177,10 @@ fr:
   mobile_warning:
     text: "Note : Sugar Sugar est actuellement optimisé pour le bureau. Le support mobile arrive bientôt !"
 
+  orientation:
+    title: "Tournez votre appareil"
+    subtitle: "Sugar Sugar fonctionne mieux en mode paysage. Veuillez tourner votre téléphone ou tablette pour continuer."
+
   chart:
     title: "Niveaux de glucose (%{start} à %{end})"
     source_suffix: " - Source : %{source}"

@@ -178,6 +178,10 @@ de:
   mobile_warning:
     text: "Hinweis: Sugar Sugar ist derzeit für Desktop optimiert. Mobile Unterstützung folgt bald!"
 
+  orientation:
+    title: "Gerät drehen"
+    subtitle: "Sugar Sugar funktioniert am besten im Querformat. Bitte drehe dein Handy oder Tablet, um fortzufahren."
+
   chart:
     title: "Glukosewerte (%{start} bis %{end})"
     source_suffix: " - Quelle: %{source}"

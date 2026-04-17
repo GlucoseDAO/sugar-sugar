@@ -178,6 +178,10 @@ ro:
   mobile_warning:
     text: "Notă: Sugar Sugar este optimizat pentru desktop momentan. Suportul pentru mobil va veni în curând!"
 
+  orientation:
+    title: "Rotește dispozitivul"
+    subtitle: "Sugar Sugar funcționează cel mai bine în format peisaj. Te rugăm să rotești telefonul sau tableta pentru a continua."
+
   chart:
     title: "Niveluri de glucoză (%{start} – %{end})"
     source_suffix: " - Sursa: %{source}"
