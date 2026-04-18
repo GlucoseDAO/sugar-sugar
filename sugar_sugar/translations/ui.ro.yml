@@ -137,6 +137,9 @@ ro:
     format_a_label: "Date generice"
     format_b_label: "Datele mele"
     format_c_label: "Date generice + datele mele"
+    format_a_label_short: "Generice"
+    format_b_label_short: "Ale mele"
+    format_c_label_short: "Combinate"
     format_help_a: "Date generice — folosește date generice (nu sunt necesare date de la senzor). 12 runde folosind un set exemplu."
     format_help_b: "Datele mele — folosește propriile date. Încarcă propriul fișier și prezice doar pe el."
     format_help_c: "Date generice + datele mele — încearcă ambele. Vei încărca propriul fișier, dar fiecare rundă folosește fie date generice, fie datele tale."
@@ -167,6 +170,7 @@ ro:
     units_label: "Unități:"
     upload_required_alert: "Acest format necesită propriile date CGM. Te rugăm să încarci un fișier CSV pentru a începe."
     upload_consent_recorded: "Consimțământ înregistrat. Acum poți încărca și folosi datele CGM în această sesiune."
+    no_upload_back_to_final: "Nu ai date CGM de încărcat? Vezi rezultatele din rundele anterioare"
 
   submit:
     progress_no_data: "Fă predicții până la capătul zonei ascunse pentru a trimite"
@@ -204,20 +208,43 @@ ro:
     stat_accuracy: "Acuratețe"
     stat_ranking: "Cel mai bun loc"
     stat_no_ranking: "neclasat"
+    best_rank_scope_overall: "General"
     expired_title: "Acest link de distribuire a expirat"
     expired_body: "Nu am găsit un card pentru această adresă. Joacă o rundă și poți distribui propriile tale rezultate."
     expired_cta: "Joacă Sugar Sugar"
     encouragement:
-      excellent: "Intuiție excelentă în %{rounds} runde. Simțul tău pentru glicemie e rar - distribuie-l și invită-ți prietenii!"
-      good: "Predicții precise în %{rounds} runde. Continuă să joci și urci rapid în clasament."
-      average: "Efort bun în %{rounds} runde. Fiecare rundă îți arată un tipar nou - continuă!"
-      keep_practicing: "Fiecare rundă îți ascute intuiția. Revino mâine, compară scorul și vezi-te cum progresezi."
+      excellent:
+        lines:
+          - "Citești zahărul ca un pro. %{rounds} runde, MAE sub 10 mg/dL. Crezi că mă bați?"
+          - "Prinzi fiecare curbă în %{rounds} runde. Feed-ul tău urmează - dă play și încearcă să mă depășești."
+          - "Instinct de pattern, deblocat. %{rounds} runde și încă nu ratez. E rândul tău."
+          - "Așa arată %{rounds} runde cu citiri curate. Pun pariu că nu ții pasul."
+      good:
+        lines:
+          - "Rundă solidă. %{rounds} runde și predicțiile au căzut aproape. Tu cazi mai aproape?"
+          - "Destul de ager ca să țin linia %{rounds} runde. E rândul tău - arată-mi contrariul."
+          - "%{rounds} runde, mână sigură. Crezi că ești mai iute cu creionul? Arată-mi."
+          - "Am nimerit curba mai des decât greșit în %{rounds} runde. Cine mă depășește primul?"
+      average:
+        lines:
+          - "%{rounds} runde și curba tot se mișcă. Pun pariu că nu-mi depășești scorul din prima."
+          - "Alerg după glicemie de %{rounds} runde. Ușor, nu? Arată."
+          - "%{rounds} runde adâncime. Numerele sunt șireți - vezi dacă-i întreci."
+          - "Am început să urc în clasament în %{rounds} runde. Vii cu mine în vârf?"
+      keep_practicing:
+        lines:
+          - "Glicemia te învață modestia. %{rounds} runde făcute - vezi dacă o citești mai bine ca mine."
+          - "%{rounds} runde, încă învăț curba. E rândul tău."
+          - "Mai greu decât pare, nu? %{rounds} încercări cinstite. Bate-mă. Te provoc."
+          - "%{rounds} runde și linia tot câștigă. Crezi că o citești mai bine? Arată-mi."
     synthesis:
       title: "Sinteza ta pe toate rundele"
       x_axis: "Pas de 5 min"
       y_axis: "Glicemie (mg/dL)"
-      legend_actual: "Glicemie reală"
-      legend_prediction: "Predicția ta"
+      legend_actual: "Glicemie reală (medie)"
+      legend_prediction: "Predicția ta (medie)"
+      legend_actual_shade: "Glicemie reală"
+      legend_predicted_shade: "Predicția ta"
       prediction_region: "Zona de predicție"
       caption_close: "Linia ta albastră a urmat îndeaproape glicemia reală - intuiție excelentă!"
       caption_far: "Cu cât liniile albastră și neagră sunt mai apropiate, cu atât predicția e mai exactă."

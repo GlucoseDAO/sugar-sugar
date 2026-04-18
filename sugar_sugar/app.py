@@ -367,8 +367,10 @@ def _share_card_png(share_id: str):
     if cached is None:
         locale: str = str(record.get("locale") or "en")
         share_url: str = _build_share_url(share_id)
-        fig = build_share_card_figure(record, share_url=share_url, locale=locale)
-        cached = fig.to_image(format="png", width=1200, height=630, scale=1, engine="kaleido")
+        fig = build_share_card_figure(
+            record, share_url=share_url, locale=locale, seed=share_id,
+        )
+        cached = fig.to_image(format="png", width=1080, height=1080, scale=1, engine="kaleido")
         _SHARE_PNG_CACHE[share_id] = cached
     return Response(cached, mimetype="image/png", headers={
         "Cache-Control": "public, max-age=86400",
@@ -399,8 +401,8 @@ def _share_card_og(share_id: str):
 <meta property="og:title" content="{title}">
 <meta property="og:description" content="{description}">
 <meta property="og:image" content="{image_url}">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
+<meta property="og:image:width" content="1080">
+<meta property="og:image:height" content="1080">
 <meta property="og:url" content="{share_url}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{title}">
@@ -1615,7 +1617,7 @@ def show_upload_required_alert(
         children += [
             html.Br(),
             html.Button(
-                t("ui.common.game", locale=locale) + " → " + t("ui.final.title", locale=locale),
+                t("ui.prediction.no_upload_back_to_final", locale=locale),
                 id="back-to-final-from-upload",
                 className="ui small button",
                 style={"paddingLeft": "0", "marginTop": "6px"},
