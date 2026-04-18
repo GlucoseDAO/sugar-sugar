@@ -25,30 +25,36 @@ class GlucoseChart(html.Div):
     }
 
     def __init__(self, id: str = 'glucose-chart', hide_last_hour: bool = False) -> None:
-        super().__init__([
-            dcc.Store(id=f"{id}-df-store", data=None, storage_type=STORAGE_TYPE),
-            dcc.Store(id=f"{id}-events-store", data=None, storage_type=STORAGE_TYPE),
-            dcc.Store(id=f"{id}-source-store", data=None, storage_type=STORAGE_TYPE),
-            dcc.Graph(
-                id=f"{id}-graph",
-                figure=self._create_empty_figure(),
-                config={
-                    'displayModeBar': False,
-                    'scrollZoom': False,
-                    'doubleClick': 'reset',
-                    'showAxisDragHandles': False,
-                    'showAxisRangeEntryBoxes': False,
-                    'displaylogo': False,
-                    'modeBarButtonsToAdd': ['drawopenpath', 'eraseshape'],
-                    'editable': False,
-                    'edits': {
-                        'shapePosition': False,
-                        'annotationPosition': False
-                    }
-                },
-                style={'height': '100%'}
-            )
-        ])
+        super().__init__(
+            [
+                dcc.Store(id=f"{id}-df-store", data=None, storage_type=STORAGE_TYPE),
+                dcc.Store(id=f"{id}-events-store", data=None, storage_type=STORAGE_TYPE),
+                dcc.Store(id=f"{id}-source-store", data=None, storage_type=STORAGE_TYPE),
+                dcc.Graph(
+                    id=f"{id}-graph",
+                    figure=self._create_empty_figure(),
+                    config={
+                        'displayModeBar': False,
+                        'scrollZoom': False,
+                        'doubleClick': 'reset',
+                        'showAxisDragHandles': False,
+                        'showAxisRangeEntryBoxes': False,
+                        'displaylogo': False,
+                        'modeBarButtonsToAdd': ['drawopenpath', 'eraseshape'],
+                        'editable': False,
+                        'edits': {
+                            'shapePosition': False,
+                            'annotationPosition': False
+                        }
+                    },
+                    # `touchAction: none` prevents the browser from intercepting
+                    # touch gestures (pinch-zoom, pan) on the chart, which
+                    # otherwise fights with Plotly's drawline handler on mobile.
+                    style={'height': '100%', 'touchAction': 'none'}
+                )
+            ],
+            style={'height': '100%', 'touchAction': 'none'}
+        )
         self.id = id
         self.hide_last_hour = hide_last_hour
         self._display_unit: str = "mg/dL"

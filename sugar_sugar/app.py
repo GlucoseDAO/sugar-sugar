@@ -68,6 +68,12 @@ from sugar_sugar.components.submit import SubmitComponent
 from sugar_sugar.components.header import HeaderComponent
 from sugar_sugar.components.ending import EndingPage
 from sugar_sugar.components.navbar import NavBar
+from sugar_sugar.components.share import (
+    build_share_card_figure,
+    create_expired_layout,
+    create_share_layout,
+)
+from sugar_sugar import share_store
 from sugar_sugar.generic_sources_metadata import load_generic_sources_metadata
 from sugar_sugar.contact_info import load_contact_info
 from sugar_sugar.static_markdown import static_markdown_autosize_iframe
@@ -91,6 +97,103 @@ def _format_label(format_code: str, *, locale: str) -> str:
     if code == "C":
         return t("ui.startup.format_c_label", locale=locale)
     return code
+
+
+def _rank_from_ranking_csv(
+    ranking_path: Path,
+    *,
+    study_id: str,
+    format_filter: Optional[str],
+    mode: str,
+) -> Optional[tuple[int, int]]:
+    """Return ``(rank, total)`` for ``study_id`` against the ranking CSV.
+
+    Extracted from ``create_final_layout`` so the share page can compute and
+    freeze rankings into a share record at save time.  ``mode`` is either
+    ``"best"`` (keep lowest MAE per study_id) or ``"latest"`` (keep most
+    recent MAE by timestamp).  Ranks on ``overall_mae_mgdl`` ascending.
+    """
+    if not study_id or not ranking_path.exists():
+        return None
+    try:
+        ranking_df = pl.read_csv(ranking_path)
+    except Exception:
+        return None
+    if 'study_id' not in ranking_df.columns or 'overall_mae_mgdl' not in ranking_df.columns:
+        return None
+
+    cols: list[str] = ['study_id', 'overall_mae_mgdl']
+    if 'format' in ranking_df.columns:
+        cols.append('format')
+    if 'timestamp' in ranking_df.columns:
+        cols.append('timestamp')
+    df2 = ranking_df.select([c for c in cols if c in ranking_df.columns])
+    df2 = df2.with_columns(pl.col('overall_mae_mgdl').cast(pl.Float64, strict=False)).filter(
+        pl.col('overall_mae_mgdl').is_not_null()
+    )
+    if format_filter and 'format' in df2.columns:
+        df2 = df2.filter(pl.col('format') == format_filter)
+
+    if mode == "latest" and 'timestamp' in df2.columns:
+        df2 = df2.with_columns(
+            pl.col('timestamp').str.strptime(pl.Datetime, format='%Y-%m-%d %H:%M:%S', strict=False).alias('_ts')
+        )
+        df_pick = (
+            df2.sort(['study_id', '_ts'])
+            .group_by('study_id')
+            .agg(pl.last('overall_mae_mgdl').alias('overall_mae_mgdl'))
+        )
+    else:
+        df_pick = df2.group_by('study_id').agg(pl.col('overall_mae_mgdl').min().alias('overall_mae_mgdl'))
+
+    total = df_pick.height
+    if total == 0:
+        return None
+    df_sorted = df_pick.sort(['overall_mae_mgdl', 'study_id'])
+    matches = df_sorted.with_row_index('rank_idx').filter(pl.col('study_id') == study_id)
+    if matches.height == 0:
+        return None
+    return int(matches.get_column('rank_idx')[0]) + 1, total
+
+
+def compute_share_rankings(study_id: str, played_formats: list[str]) -> dict[str, Any]:
+    """Freeze the per-format and overall rankings for a study_id.
+
+    Returns a dict with:
+      - ``per_format``: ``[{format, rank, total}, ...]`` in FORMAT_ORDER order
+      - ``overall``: ``{rank, total}`` or ``None``
+    Used by the share callback so the share URL always shows the ranks that
+    existed at share time, even if the CSVs are appended to later.
+    """
+    per_format: list[dict[str, Any]] = []
+    ordered: list[str] = sorted(
+        {f for f in played_formats if f in ("A", "B", "C")},
+        key=lambda x: FORMAT_ORDER.get(str(x), 999),
+    )
+    for fmt in ordered:
+        info = _rank_from_ranking_csv(
+            project_root / 'data' / 'input' / f'prediction_ranking_{fmt}.csv',
+            study_id=study_id,
+            format_filter=fmt,
+            mode="best",
+        )
+        if info is not None:
+            rank, total = info
+            per_format.append({"format": fmt, "rank": rank, "total": total})
+
+    overall: Optional[dict[str, int]] = None
+    overall_info = _rank_from_ranking_csv(
+        project_root / 'data' / 'input' / 'prediction_ranking.csv',
+        study_id=study_id,
+        format_filter="ALL",
+        mode="latest",
+    )
+    if overall_info is not None:
+        rank, total = overall_info
+        overall = {"rank": rank, "total": total}
+
+    return {"per_format": per_format, "overall": overall}
+
 
 def dataframe_to_store_dict(df_in: pl.DataFrame) -> Dict[str, List[Any]]:
     """Convert a Polars DataFrame into a session-store friendly dictionary."""
@@ -228,6 +331,92 @@ def _download_study_pdf():
         return flask_send_file(str(pdf_path), mimetype="application/pdf", as_attachment=True, download_name=pdf_path.name)
     return "PDF not found", 404
 
+
+# ---------------------------------------------------------------------------
+# Share routes
+#
+# Two routes complement the Dash page at /share/<id>:
+#  * /share/<id>/image.png  -- PNG render of the share card, served by kaleido.
+#    Cached in-process by share_id so repeated loads (crawler + human) don't
+#    spin kaleido up twice.
+#  * /share/<id>/og         -- tiny HTML shell with Open Graph meta tags for
+#    crawlers that don't execute JavaScript (Facebook, X, LinkedIn, WhatsApp).
+#    Humans who hit this URL get redirected to the real Dash page.
+# ---------------------------------------------------------------------------
+
+_SHARE_PNG_CACHE: dict[str, bytes] = {}
+
+
+def _build_share_url(share_id: str) -> str:
+    """Compose an absolute https URL for a share id based on the current request."""
+    try:
+        base: str = flask_request.host_url.rstrip("/")
+    except RuntimeError:
+        # Not inside a Flask request context -- fall back to a relative path.
+        return f"/share/{share_id}"
+    return f"{base}/share/{share_id}"
+
+
+@server.route("/share/<share_id>/image.png")
+def _share_card_png(share_id: str):
+    from flask import Response, abort
+    record = share_store.load_share(share_id)
+    if record is None:
+        abort(404)
+    cached: Optional[bytes] = _SHARE_PNG_CACHE.get(share_id)
+    if cached is None:
+        locale: str = str(record.get("locale") or "en")
+        share_url: str = _build_share_url(share_id)
+        fig = build_share_card_figure(
+            record, share_url=share_url, locale=locale, seed=share_id,
+        )
+        cached = fig.to_image(format="png", width=1080, height=1080, scale=1, engine="kaleido")
+        _SHARE_PNG_CACHE[share_id] = cached
+    return Response(cached, mimetype="image/png", headers={
+        "Cache-Control": "public, max-age=86400",
+    })
+
+
+@server.route("/share/<share_id>/og")
+def _share_card_og(share_id: str):
+    """HTML page with OG tags only, for social-platform crawlers."""
+    from flask import Response, abort
+    record = share_store.load_share(share_id)
+    if record is None:
+        abort(404)
+    locale: str = str(record.get("locale") or "en")
+    loc: str = normalize_locale(locale)
+    share_url: str = _build_share_url(share_id)
+    image_url: str = f"{share_url}/image.png"
+    title: str = t("ui.share.title", locale=loc)
+    description: str = t("ui.share.subtitle", locale=loc)
+
+    html_page: str = f"""<!doctype html>
+<html lang="{loc}">
+<head>
+<meta charset="utf-8">
+<title>{title}</title>
+<meta name="description" content="{description}">
+<meta property="og:type" content="website">
+<meta property="og:title" content="{title}">
+<meta property="og:description" content="{description}">
+<meta property="og:image" content="{image_url}">
+<meta property="og:image:width" content="1080">
+<meta property="og:image:height" content="1080">
+<meta property="og:url" content="{share_url}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{title}">
+<meta name="twitter:description" content="{description}">
+<meta name="twitter:image" content="{image_url}">
+<meta http-equiv="refresh" content="0; url={share_url}">
+</head>
+<body>
+<p>Loading... <a href="{share_url}">open {title}</a>.</p>
+</body>
+</html>
+"""
+    return Response(html_page, mimetype="text/html; charset=utf-8")
+
 app.clientside_callback(
     "function() { return window.navigator.userAgent || ''; }",
     Output('user-agent', 'data'),
@@ -359,15 +548,93 @@ app.layout = html.Div([
     # Holds the target page for the resume dialog; set by restore_page_on_load.
     dcc.Store(id='resume-dialog-target', data=None, storage_type='memory'),
 
-    html.Div(id='mobile-warning', style={'margin': '12px 0'}),
+    html.Div(id='mobile-warning', style={'display': 'none'}),
     html.Div(id='scroll-to-top-trigger', style={'display': 'none'}),
 
     html.Div(id='resume-dialog-container', children=[], disable_n_clicks=True),
 
     html.Div(id='navbar-container', children=[], disable_n_clicks=True),
-    
-    html.Div(id='page-content', children=[], disable_n_clicks=True)
+
+    html.Div(id='page-content', children=[], disable_n_clicks=True),
+
+    # Portrait-orientation prompt for phones/tablets.  Pure CSS controls
+    # visibility (see assets/orientation.css); callbacks only refresh the
+    # translated text when the interface language changes.
+    html.Div(
+        [
+            html.Div("\u21BB", className="rotate-icon", id="orientation-overlay-icon"),
+            html.H2(
+                t("ui.orientation.title", locale="en"),
+                className="rotate-title",
+                id="orientation-overlay-title",
+            ),
+            html.P(
+                t("ui.orientation.subtitle", locale="en"),
+                className="rotate-subtitle",
+                id="orientation-overlay-subtitle",
+            ),
+        ],
+        id="orientation-overlay",
+        disable_n_clicks=True,
+    ),
 ])
+
+
+# Add a global `mobile-device` class to <html> based on the browser
+# user-agent.  This lets the CSS in assets/mobile.css scope all mobile
+# overrides without touching the desktop path.  The class is also removed
+# on non-mobile user agents, so CSS selectors are stable across hot-reload.
+app.clientside_callback(
+    """
+    function(ua) {
+        if (!document || !document.documentElement) {
+            return window.dash_clientside.no_update;
+        }
+        var root = document.documentElement;
+        var isMobile = false;
+        if (ua && typeof ua === 'string') {
+            var lc = ua.toLowerCase();
+            var keywords = ['iphone', 'android', 'ipad', 'mobile', 'opera mini', 'mobi'];
+            for (var i = 0; i < keywords.length; i++) {
+                if (lc.indexOf(keywords[i]) !== -1) { isMobile = true; break; }
+            }
+        }
+        // Touch-capable + coarse pointer is a reliable tablet fallback.
+        if (!isMobile && window.matchMedia) {
+            try {
+                if (window.matchMedia('(pointer: coarse)').matches &&
+                    window.matchMedia('(max-device-width: 1024px)').matches) {
+                    isMobile = true;
+                }
+            } catch (e) { /* ignore */ }
+        }
+        if (isMobile) {
+            root.classList.add('mobile-device');
+        } else {
+            root.classList.remove('mobile-device');
+        }
+        return {'display': 'none'};
+    }
+    """,
+    Output('mobile-warning', 'style'),
+    Input('user-agent', 'data'),
+    prevent_initial_call=False,
+)
+
+
+@app.callback(
+    [Output('orientation-overlay-title', 'children'),
+     Output('orientation-overlay-subtitle', 'children')],
+    [Input('interface-language', 'data')],
+    prevent_initial_call=False,
+)
+def update_orientation_overlay_text(interface_language: Optional[str]) -> tuple[str, str]:
+    """Keep the portrait-prompt overlay translated as the language changes."""
+    locale = normalize_locale(interface_language)
+    return (
+        t("ui.orientation.title", locale=locale),
+        t("ui.orientation.subtitle", locale=locale),
+    )
 
 
 @app.callback(
@@ -519,6 +786,15 @@ def update_on_language_change(
         if user_info:
             return create_final_layout(full_df_data, user_info, glucose_unit, locale=locale), warning_content, navbar
         return no_update, no_update, navbar
+    if pathname and pathname.startswith('/share/'):
+        share_id = pathname.split('/share/', 1)[1].strip('/').split('/', 1)[0]
+        record = share_store.load_share(share_id) if share_id else None
+        if record is None:
+            return create_expired_layout(locale=locale), warning_content, navbar
+        share_url = _build_share_url(share_id)
+        return create_share_layout(
+            record, share_id=share_id, share_url=share_url, locale=locale,
+        ), warning_content, navbar
     if pathname == "/consent-form":
         return ConsentFormPage(locale=locale), warning_content, navbar
     if pathname == '/startup':
@@ -777,6 +1053,15 @@ def display_page(
                     ], style={'textAlign': 'center'})
                 ]), warning_content, navbar
             return create_final_layout(full_df_data, user_info, glucose_unit, locale=locale), warning_content, navbar
+        if pathname and pathname.startswith('/share/'):
+            share_id = pathname.split('/share/', 1)[1].strip('/').split('/', 1)[0]
+            record = share_store.load_share(share_id) if share_id else None
+            if record is None:
+                return create_expired_layout(locale=locale), warning_content, navbar
+            share_url = _build_share_url(share_id)
+            return create_share_layout(
+                record, share_id=share_id, share_url=share_url, locale=locale,
+            ), warning_content, navbar
         if pathname == '/about':
             return create_about_page(locale=locale), warning_content, navbar
         if pathname == '/contact':
@@ -1332,7 +1617,7 @@ def show_upload_required_alert(
         children += [
             html.Br(),
             html.Button(
-                t("ui.common.game", locale=locale) + " → " + t("ui.final.title", locale=locale),
+                t("ui.prediction.no_upload_back_to_final", locale=locale),
                 id="back-to-final-from-upload",
                 className="ui small button",
                 style={"paddingLeft": "0", "marginTop": "6px"},
@@ -2296,6 +2581,31 @@ def create_final_layout(full_df_data: Optional[Dict], user_info: Dict[str, Any],
         ),
         html.Div([
             html.Button(
+                t("ui.share.button_share", locale=locale),
+                id='share-results-button',
+                n_clicks=0,
+                className="ui green button",
+                style={
+                    'backgroundColor': '#4CBB17',
+                    'color': 'white',
+                    'padding': 'clamp(15px, 2vw, 20px) clamp(20px, 3vw, 30px)',
+                    'border': 'none',
+                    'borderRadius': '5px',
+                    'fontSize': 'clamp(18px, 3vw, 24px)',
+                    'fontWeight': '700',
+                    'cursor': 'pointer',
+                    'minWidth': '200px',
+                    'maxWidth': '400px',
+                    'width': '100%',
+                    'height': 'clamp(60px, 8vh, 80px)',
+                    'display': 'flex',
+                    'alignItems': 'center',
+                    'justifyContent': 'center',
+                    'lineHeight': '1.2',
+                    'marginBottom': '14px',
+                },
+            ),
+            html.Button(
                 t("ui.final.start_over", locale=locale),
                 id='restart-button',
                 className="ui green button",
@@ -2319,6 +2629,7 @@ def create_final_layout(full_df_data: Optional[Dict], user_info: Dict[str, Any],
             )
         ], disable_n_clicks=True, style={
             'display': 'flex',
+            'flexDirection': 'column',
             'justifyContent': 'center',
             'alignItems': 'center',
             'marginTop': '20px',
@@ -2334,24 +2645,14 @@ def create_final_layout(full_df_data: Optional[Dict], user_info: Dict[str, Any],
     })
 
 def render_mobile_warning(user_agent: Optional[str], *, locale: str) -> Optional[html.Div]:
-    if not user_agent:
-        return None
-    ua = user_agent.lower()
-    mobile_keywords = ("iphone", "android", "ipad", "mobile", "opera mini", "mobi")
-    if any(keyword in ua for keyword in mobile_keywords):
-        return html.Div(
-            t("ui.mobile_warning.text", locale=locale),
-            style={
-                'backgroundColor': '#fff3cd',
-                'border': '1px solid #ffeeba',
-                'color': '#856404',
-                'padding': '10px 14px',
-                'borderRadius': '6px',
-                'textAlign': 'center',
-                'marginBottom': '12px',
-                'fontWeight': '600'
-            }
-        )
+    """Deprecated: the yellow mobile banner has been replaced by the
+    orientation-prompt overlay (see `assets/orientation.css` and the
+    `orientation-overlay` div in `app.layout`).  We keep the function and
+    its call sites returning ``None`` to avoid churn in every page-render
+    callback; the `mobile-warning` div stays in the DOM purely as a
+    throwaway Output for the clientside `mobile-device` class setter.
+    """
+    _ = user_agent, locale
     return None
 
 def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) -> pl.DataFrame:
@@ -2806,12 +3107,21 @@ def handle_back_to_final_from_upload(n_clicks: Optional[int]) -> Tuple[str, Dict
     prevent_initial_call=True
 )
 def handle_restart_button(n_clicks: Optional[int]) -> tuple:
-    """Handle restart button — fully reset session state including data stores."""
-    print(f"DEBUG handle_restart_button FIRED: n_clicks={n_clicks}")
+    """Reset session state for the "Exit" button on ``/final``."""
     if not n_clicks:
         raise PreventUpdate
     with start_action(action_type=u"handle_restart_button") as action:
         action.log(message_type="restart_clicked")
+    return _full_session_reset()
+
+
+def _full_session_reset() -> tuple:
+    """Return the tuple consumed by the restart / play-again callbacks.
+
+    Mirrors every ``Output`` in the decorators below: navigates to ``/``,
+    nulls persisted session stores, and raises ``clean-storage-flag=True``
+    so the clientside hook wipes ``localStorage`` too.
+    """
     return (
         '/',                       # url pathname
         None,                      # user-info-store
@@ -2829,6 +3139,166 @@ def handle_restart_button(n_clicks: Optional[int]) -> tuple:
         True,                      # clean-storage-flag
         True,                      # session-active
     )
+
+
+@app.callback(
+    [Output('url', 'pathname', allow_duplicate=True),
+     Output('user-info-store', 'data', allow_duplicate=True),
+     Output('glucose-chart-mode', 'data', allow_duplicate=True),
+     Output('randomization-initialized', 'data', allow_duplicate=True),
+     Output('glucose-unit', 'data', allow_duplicate=True),
+     Output('interface-language', 'data', allow_duplicate=True),
+     Output('last-visited-page', 'data', allow_duplicate=True),
+     Output('full-df', 'data', allow_duplicate=True),
+     Output('current-window-df', 'data', allow_duplicate=True),
+     Output('events-df', 'data', allow_duplicate=True),
+     Output('is-example-data', 'data', allow_duplicate=True),
+     Output('data-source-name', 'data', allow_duplicate=True),
+     Output('initial-slider-value', 'data', allow_duplicate=True),
+     Output('clean-storage-flag', 'data', allow_duplicate=True),
+     Output('session-active', 'data', allow_duplicate=True)],
+    [Input('share-play-again-button', 'n_clicks')],
+    prevent_initial_call=True,
+)
+def handle_share_play_again(n_clicks: Optional[int]) -> tuple:
+    """Reset session state for "Play again" on ``/share/<id>``.
+
+    The share page is dynamic -- it only mounts when a user is on
+    ``/share/<id>``. `suppress_callback_exceptions=True` on the Dash app lets
+    us register this callback anyway; it fires only when the button actually
+    exists in the DOM.  Using a dedicated callback (rather than adding this
+    input to ``handle_restart_button``) keeps each handler's input list
+    stable for Dash's initial-layout validation.
+    """
+    if not n_clicks:
+        raise PreventUpdate
+    with start_action(action_type=u"handle_share_play_again") as action:
+        action.log(message_type="share_play_again_clicked")
+    return _full_session_reset()
+
+
+@app.callback(
+    Output('url', 'pathname', allow_duplicate=True),
+    [Input('share-results-button', 'n_clicks')],
+    [State('user-info-store', 'data'),
+     State('interface-language', 'data')],
+    prevent_initial_call=True,
+)
+def handle_share_results_button(
+    n_clicks: Optional[int],
+    user_info: Optional[Dict[str, Any]],
+    interface_language: Optional[str],
+) -> str:
+    """Persist a share record and navigate the user to the public share page.
+
+    The share record MUST capture every round the user has played across
+    every format they've tried, not just the currently-active run.  The
+    final page shows both; the share page must do the same or it'd hide
+    prior achievements.
+    """
+    if not n_clicks or not user_info:
+        raise PreventUpdate
+    with start_action(action_type=u"handle_share_results_button") as action:
+        current_rounds: list[dict[str, Any]] = list(user_info.get("rounds") or [])
+        current_format: str = str(user_info.get("format") or "")
+
+        # Tag currently-playing rounds with their format if missing, so the
+        # share page can split them by format even after we merge archives.
+        tagged_current: list[dict[str, Any]] = []
+        for rnd in current_rounds:
+            r = dict(rnd)
+            if not r.get("format"):
+                r["format"] = current_format
+            tagged_current.append(r)
+
+        # Merge archived runs (one key per previously-completed format run).
+        # Each archived run is already a list of round dicts with its own format.
+        archived_rounds: list[dict[str, Any]] = []
+        runs_by_format: dict[str, list[dict[str, Any]]] = dict(user_info.get("runs_by_format") or {})
+        for fmt_key, runs in runs_by_format.items():
+            for run in (runs or []):
+                for rnd in (run.get("rounds") or []):
+                    r = dict(rnd)
+                    if not r.get("format"):
+                        r["format"] = fmt_key
+                    archived_rounds.append(r)
+
+        all_rounds: list[dict[str, Any]] = archived_rounds + tagged_current
+        if not all_rounds:
+            action.log(message_type=u"no_rounds_to_share")
+            raise PreventUpdate
+
+        # Figure out which formats the user has actually played (for the
+        # ranking block).  Include the current format if it has rounds.
+        played_formats: set[str] = {str(r.get("format") or "") for r in all_rounds}
+        played_formats.discard("")
+
+        study_id: str = str(user_info.get("study_id") or "")
+        rankings: dict[str, Any] = compute_share_rankings(study_id, sorted(played_formats))
+
+        # Strip the share record to JSON-safe primitives so it survives a
+        # round-trip through JSON on disk.  `prediction_table_data` is already
+        # a list of {str: str}; round_info is shallow dicts of primitives.
+        share_record: dict[str, Any] = {
+            "schema_version": 2,
+            "created_at": datetime.now().isoformat(timespec="seconds"),
+            "locale": normalize_locale(interface_language),
+            "rounds": all_rounds,
+            "played_formats": sorted(played_formats, key=lambda x: FORMAT_ORDER.get(str(x), 999)),
+            "rankings": rankings,
+            "user_info": {
+                "name": str(user_info.get("name") or ""),
+                "study_id": study_id,
+                "format": current_format,
+                "uses_cgm": bool(user_info.get("uses_cgm", False)),
+                "max_rounds": int(user_info.get("max_rounds") or MAX_ROUNDS),
+            },
+        }
+        share_id: str = share_store.save_share(share_record)
+        action.log(
+            message_type=u"share_saved",
+            share_id=share_id,
+            total_rounds=len(all_rounds),
+            archived_rounds=len(archived_rounds),
+            current_rounds=len(tagged_current),
+            played_formats=sorted(played_formats),
+        )
+    return f"/share/{share_id}"
+
+
+# Clientside: clipboard copy for the "Copy link" button on the share page.
+app.clientside_callback(
+    """
+    function(n_clicks, url) {
+        if (!n_clicks) { return window.dash_clientside.no_update; }
+        if (!url) { return window.dash_clientside.no_update; }
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(url);
+            } else {
+                var ta = document.createElement('textarea');
+                ta.value = url;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }
+        } catch (e) { /* ignore */ }
+        var feedback = document.getElementById('share-copy-link-feedback');
+        if (feedback) {
+            feedback.style.opacity = '1';
+            setTimeout(function() { feedback.style.opacity = '0'; }, 1800);
+        }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output('share-copy-link-feedback', 'children'),
+    Input('share-copy-link-button', 'n_clicks'),
+    State('share-url-value', 'children'),
+    prevent_initial_call=True,
+)
 
 
 @app.callback(

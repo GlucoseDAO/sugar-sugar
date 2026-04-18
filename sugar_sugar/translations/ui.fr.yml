@@ -136,6 +136,9 @@ fr:
     format_a_label: "Données génériques"
     format_b_label: "Mes données"
     format_c_label: "Génériques + Mes données"
+    format_a_label_short: "Génériques"
+    format_b_label_short: "Miennes"
+    format_c_label_short: "Combinées"
     format_help_a: "Données génériques — utilisez des données génériques (aucune donnée de capteur requise). 12 manches à l'aide d'un ensemble d'échantillons."
     format_help_b: "Mes données — utilisez vos propres données. Téléchargez votre propre fichier et prévoyez uniquement sur celui-ci."
     format_help_c: "Génériques + Mes données — essayez les deux. Vous téléchargerez votre propre fichier, mais chaque manche utilisera soit des données d'échantillon, soit vos propres données."
@@ -166,6 +169,7 @@ fr:
     units_label: "Unités :"
     upload_required_alert: "Ce format nécessite vos propres données CGM. Veuillez télécharger un fichier CSV pour commencer."
     upload_consent_recorded: "Consentement enregistré. Vous pouvez maintenant télécharger et utiliser vos données CGM dans cette session."
+    no_upload_back_to_final: "Pas de données CGM à téléverser ? Voir les résultats de tes manches précédentes"
 
   submit:
     progress_no_data: "Faites des prédictions jusqu'à la fin de la zone cachée pour soumettre"
@@ -176,6 +180,73 @@ fr:
 
   mobile_warning:
     text: "Note : Sugar Sugar est actuellement optimisé pour le bureau. Le support mobile arrive bientôt !"
+
+  orientation:
+    title: "Tournez votre appareil"
+    subtitle: "Sugar Sugar fonctionne mieux en mode paysage. Veuillez tourner votre téléphone ou tablette pour continuer."
+
+  share:
+    button_share: "Partager mes résultats"
+    title: "Mes résultats Sugar Sugar"
+    subtitle: "Sauras-tu lire la glycémie mieux que moi ? Essaie !"
+    download_png: "Télécharger l'image"
+    download_png_hint: "Enregistre la carte en PNG, parfait pour les stories Instagram."
+    play_again: "Rejouer"
+    copy_link: "Copier le lien"
+    copy_link_success: "Lien copié !"
+    share_on_x: "Partager sur X"
+    share_on_facebook: "Partager sur Facebook"
+    share_on_whatsapp: "Partager sur WhatsApp"
+    share_on_linkedin: "Partager sur LinkedIn"
+    invite_text: "J'ai joué à Sugar Sugar et prédit la glycémie avec un MAE de %{mae} mg/dL sur %{rounds} manches. Tu penses faire mieux ?"
+    card_footer: "Joue sur %{url}"
+    stats_heading: "Ta carte de score"
+    stat_mae: "MAE"
+    stat_rmse: "RMSE"
+    stat_rounds: "Manches"
+    stat_accuracy: "Précision"
+    stat_ranking: "Meilleur rang"
+    stat_no_ranking: "non classé"
+    best_rank_scope_overall: "Global"
+    expired_title: "Ce lien de partage a expiré"
+    expired_body: "Aucune carte trouvée pour cette URL. Joue une manche et partage la tienne."
+    expired_cta: "Jouer à Sugar Sugar"
+    encouragement:
+      excellent:
+        lines:
+          - "Tu lis le sucre comme un pro. %{rounds} manches, MAE sous 10 mg/dL. Tu crois pouvoir me battre ?"
+          - "Toutes les courbes attrapées sur %{rounds} manches. Ton fil est le prochain - lance-toi et essaie de me dépasser."
+          - "Instinct des motifs, débloqué. %{rounds} manches et je rate toujours pas. À toi."
+          - "Voilà %{rounds} manches de lectures propres. Je parie que tu ne suis pas."
+      good:
+        lines:
+          - "Belle partie. %{rounds} manches et mes prédictions sont tombées proche. Tu peux tomber plus près ?"
+          - "Assez fin pour tenir la ligne %{rounds} manches. À toi de jouer - prouve-moi le contraire."
+          - "%{rounds} manches, main stable. Plus rapide au stylo ? Montre-moi."
+          - "Plus souvent dans la courbe qu'à côté sur %{rounds} manches. Qui me bat en premier ?"
+      average:
+        lines:
+          - "%{rounds} manches et la courbe continue à bouger. Je parie que tu ne fais pas mieux au premier essai."
+          - "Je cours après la glycémie depuis %{rounds} manches. Facile, non ? Prouve-le."
+          - "%{rounds} manches au compteur. Les chiffres sont sournois - à toi de les deviner."
+          - "Je commence à grimper au classement en %{rounds} manches. Envie de me rejoindre en haut ?"
+      keep_practicing:
+        lines:
+          - "La glycémie rend humble. %{rounds} manches faites - à toi de la lire mieux que moi."
+          - "%{rounds} manches, j'apprends encore la courbe. À toi d'essayer."
+          - "Plus dur que ça en a l'air, hein ? %{rounds} tentatives honnêtes. Bats-moi. Chiche."
+          - "%{rounds} manches et la ligne continue à gagner. Tu crois mieux lire ? Montre-moi."
+    synthesis:
+      title: "Ta synthèse sur toutes les manches"
+      x_axis: "Pas de 5 min"
+      y_axis: "Glycémie (mg/dL)"
+      legend_actual: "Glycémie réelle (moyenne)"
+      legend_prediction: "Ta prédiction (moyenne)"
+      legend_actual_shade: "Glycémie réelle"
+      legend_predicted_shade: "Ta prédiction"
+      prediction_region: "Zone de prédiction"
+      caption_close: "Ta ligne bleue a suivi la glycémie réelle de près - belle intuition !"
+      caption_far: "Plus les lignes bleue et noire sont proches, plus ta prédiction est précise."
 
   chart:
     title: "Niveaux de glucose (%{start} à %{end})"
@@ -241,7 +312,7 @@ fr:
     ranking_format_line: "Classement (%{format}) : %{rank} / %{total}"
     ranking_overall_line: "Classement général : %{rank} / %{total}"
     per_round_metrics: "Métriques par manche"
-    start_over: "Recommencer"
+    start_over: "Quitter"
 
   switch_format:
     title: "Essayer une autre option"

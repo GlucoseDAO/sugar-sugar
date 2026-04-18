@@ -1,0 +1,129 @@
+/* =============================================================================
+   Mobile overrides.
+
+   The app forces a 1280px layout viewport on all devices (see app.py).  On a
+   typical phone in landscape (~900 CSS px physical) that means everything is
+   rendered at ~70% of its intended size and then scaled down by the browser.
+   The result: tiny text, cramped chart, oversized navbar.
+
+   This stylesheet is scoped under `.mobile-device` (added to <html> by a
+   clientside callback that inspects navigator.userAgent).  Desktop browsers
+   never match the selector and are untouched.
+
+   Strategy: keep the 1280px layout (Plotly drawing needs the horizontal
+   space) but compensate for scaling with larger relative sizes, tighter
+   spacing, and compacted chrome.
+   ========================================================================== */
+
+
+/* --- Navbar ---------------------------------------------------------------
+   The navbar ships as a Fomantic `massive` menu (~27px items).  At 1280px
+   scaled to a phone that is simply overwhelming and the right-side language
+   dropdown often wraps.  Drop it to "large" proportions on mobile. */
+
+html.mobile-device body .ui.massive.menu,
+html.mobile-device body .ui.massive.menu .item {
+  font-size: 1.14285714rem !important;  /* == .ui.large.menu */
+}
+
+html.mobile-device #navbar-container .ui.menu .item {
+  padding-left: 0.8em !important;
+  padding-right: 0.8em !important;
+}
+
+html.mobile-device #navbar-container .lang-flag {
+  height: 22px !important;  /* compensates for scaling */
+}
+
+
+/* --- Chart tick / axis labels --------------------------------------------
+   Plotly's default tick font is 12px.  After the mobile scale-down that
+   reads as ~8px which is unusable.  Bump the SVG text sizes so the axis
+   labels, legend and title stay legible. */
+
+html.mobile-device .js-plotly-plot .xtick text,
+html.mobile-device .js-plotly-plot .ytick text,
+html.mobile-device .js-plotly-plot .legendtext {
+  font-size: 16px !important;
+}
+
+html.mobile-device .js-plotly-plot .xtitle,
+html.mobile-device .js-plotly-plot .ytitle {
+  font-size: 18px !important;
+}
+
+html.mobile-device .js-plotly-plot .gtitle {
+  font-size: 20px !important;
+}
+
+
+/* --- Prediction page spacing ---------------------------------------------
+   Tighten the outer padding/gap so the chart gets as much vertical room as
+   possible.  On phone landscape the viewport is only ~500 CSS px tall
+   (scaled from 1280-wide); every 20px of chrome matters. */
+
+html.mobile-device #page-content > div {
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+  gap: 10px !important;
+}
+
+html.mobile-device #prediction-glucose-chart-container {
+  min-height: 380px;
+}
+
+
+/* --- Buttons: guarantee finger-friendly tap targets ----------------------
+   Apple HIG and Material both recommend 44 CSS px minimum for touch.
+   After mobile scaling, a 40px button becomes ~28 physical px -- too small.
+   Enlarge the common action buttons. */
+
+html.mobile-device .ui.button,
+html.mobile-device button.ui {
+  min-height: 56px !important;
+  padding-top: 14px !important;
+  padding-bottom: 14px !important;
+  font-size: 18px !important;
+}
+
+html.mobile-device #submit-button {
+  min-height: 64px !important;
+  font-size: 22px !important;
+}
+
+
+/* --- Blanket body text override ------------------------------------------
+   The existing `body :not(h1)...` rule in lang.css pins text at 16px which
+   reads as ~11px on phone-landscape.  Lift it to 18px on mobile so labels,
+   lists, and links remain readable.  Inline `fontSize` in Python still wins
+   for specific elements (that's fine). */
+
+html.mobile-device body :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(.js-plotly-plot *) {
+  font-size: 18px !important;
+}
+
+/* Restore menu sizing after the blanket rule */
+html.mobile-device body .ui.massive.menu,
+html.mobile-device body .ui.massive.menu .item,
+html.mobile-device body .ui.huge.menu,
+html.mobile-device body .ui.huge.menu .item {
+  font-size: 1.14285714rem !important;
+}
+
+
+/* --- Info pages ----------------------------------------------------------
+   Reduce outer padding -- the clamp-based padding is already responsive but
+   defaults to 40px vertical which wastes precious mobile screen. */
+
+html.mobile-device .info-page {
+  padding: 20px clamp(16px, 5vw, 40px) 40px !important;
+}
+
+
+/* --- Iframe (study design) -----------------------------------------------
+   Give the embedded study document a sensible min-height on mobile so it
+   renders before autosize-iframe.js kicks in. */
+
+html.mobile-device iframe[data-autosize="true"] {
+  min-height: 400px;
+}

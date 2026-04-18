@@ -134,6 +134,9 @@ zh:
     format_a_label: "通用数据"
     format_b_label: "我的数据"
     format_c_label: "通用 + 我的数据"
+    format_a_label_short: "通用"
+    format_b_label_short: "我的"
+    format_c_label_short: "组合"
     format_help_a: "通用数据 — 使用通用数据（不需要传感器数据）。使用示例集进行 12 轮。"
     format_help_b: "我的数据 — 使用您自己的数据。上传您自己的文件并仅针对其进行预测。"
     format_help_c: "通用 + 我的数据 — 两者都尝试。您将上传自己的文件，但每轮使用示例数据或您自己的数据。"
@@ -164,6 +167,7 @@ zh:
     units_label: "单位："
     upload_required_alert: "此格式需要您自己的 CGM 数据。请上传 CSV 文件以开始。"
     upload_consent_recorded: "同意已记录。您现在可以在此会话中上传和使用您的 CGM 数据。"
+    no_upload_back_to_final: "没有可上传的 CGM 数据？查看之前轮次的成绩"
 
   submit:
     progress_no_data: "画出预测直到隐藏区域末尾以提交"
@@ -174,6 +178,73 @@ zh:
 
   mobile_warning:
     text: "注意：Sugar Sugar 目前针对桌面端进行了优化。移动端支持即将推出！"
+
+  orientation:
+    title: "请旋转设备"
+    subtitle: "Sugar Sugar 在横屏下效果最佳。请将手机或平板旋转至横屏以继续。"
+
+  share:
+    button_share: "分享我的成绩"
+    title: "我的 Sugar Sugar 成绩"
+    subtitle: "你能比我更会读血糖吗？来试试！"
+    download_png: "下载图片"
+    download_png_hint: "将成绩卡保存为 PNG，非常适合 Instagram 故事。"
+    play_again: "再玩一次"
+    copy_link: "复制链接"
+    copy_link_success: "链接已复制！"
+    share_on_x: "分享到 X"
+    share_on_facebook: "分享到 Facebook"
+    share_on_whatsapp: "分享到 WhatsApp"
+    share_on_linkedin: "分享到 LinkedIn"
+    invite_text: "我玩了 Sugar Sugar，在 %{rounds} 轮里以 MAE %{mae} mg/dL 预测了血糖。你能做得更好吗？"
+    card_footer: "来 %{url} 一起玩"
+    stats_heading: "你的成绩卡"
+    stat_mae: "MAE"
+    stat_rmse: "RMSE"
+    stat_rounds: "轮数"
+    stat_accuracy: "准确度"
+    stat_ranking: "最佳排名"
+    stat_no_ranking: "未上榜"
+    best_rank_scope_overall: "总榜"
+    expired_title: "此分享链接已失效"
+    expired_body: "我们没找到对应的成绩卡。玩一轮游戏，就能分享你自己的成绩。"
+    expired_cta: "玩 Sugar Sugar"
+    encouragement:
+      excellent:
+        lines:
+          - "你读糖像个行家。%{rounds} 轮，MAE 低于 10 mg/dL。觉得能赢我？"
+          - "%{rounds} 轮里，每条曲线都被你抓住了。轮到你发帖——上吧，试试超过这个。"
+          - "模式识别本能已解锁。%{rounds} 轮我还没失手。该你了。"
+          - "这就是 %{rounds} 轮干净预测的样子。敢说你跟得上？"
+      good:
+        lines:
+          - "稳稳一局。%{rounds} 轮，我的预测贴得很近。你能更近吗？"
+          - "够敏锐，%{rounds} 轮都能守住线。该你了——反驳我。"
+          - "%{rounds} 轮，手稳。觉得画得比我快？来证明。"
+          - "%{rounds} 轮里，我蒙对曲线比蒙错多。谁先超过我？"
+      average:
+        lines:
+          - "%{rounds} 轮过去，曲线还在跑。打赌你第一次玩赢不了我。"
+          - "追着血糖跑了 %{rounds} 轮。很简单对吧？证明一下。"
+          - "%{rounds} 轮深度。数字很滑——看你能不能反过来猜中。"
+          - "%{rounds} 轮里我开始爬排行榜。一起到榜顶来？"
+      keep_practicing:
+        lines:
+          - "血糖让人谦虚。%{rounds} 轮打完——看你能不能读得比我好。"
+          - "%{rounds} 轮了，曲线我还在学。轮到你试试。"
+          - "比看起来难吧？%{rounds} 次诚实尝试。打败我。不服来。"
+          - "%{rounds} 轮，线还是赢。你读得更好？来给我看看。"
+    synthesis:
+      title: "你所有轮次的综合分析"
+      x_axis: "5 分钟步长"
+      y_axis: "血糖 (mg/dL)"
+      legend_actual: "真实血糖（均值）"
+      legend_prediction: "你的预测（均值）"
+      legend_actual_shade: "真实血糖"
+      legend_predicted_shade: "你的预测"
+      prediction_region: "预测区域"
+      caption_close: "你的蓝线紧贴真实血糖——直觉棒极了！"
+      caption_far: "蓝线和黑线越接近，预测就越准确。"
 
   chart:
     title: "血糖水平（%{start} 到 %{end}）"
@@ -239,7 +310,7 @@ zh:
     ranking_format_line: "排名 (%{format})：%{rank} / %{total}"
     ranking_overall_line: "总排名：%{rank} / %{total}"
     per_round_metrics: "每轮指标"
-    start_over: "重新开始"
+    start_over: "退出"
 
   switch_format:
     title: "尝试另一个选项"

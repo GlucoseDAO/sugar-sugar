@@ -137,6 +137,9 @@ de:
     format_a_label: "generische Daten"
     format_b_label: "Meine Daten"
     format_c_label: "Generische + meine Daten"
+    format_a_label_short: "Generisch"
+    format_b_label_short: "Meine"
+    format_c_label_short: "Kombiniert"
     format_help_a: "Beispieldaten — generische Daten (keine Sensordaten nötig). 12 Runden mit einem Beispieldatensatz."
     format_help_b: "Meine Daten — eigene Daten. Lade eine eigene Datei hoch und prognostiziere nur darauf."
     format_help_c: "Generische + meine Daten — beides ausprobieren. Du lädst eine eigene Datei hoch, aber pro Runde werden entweder generische oder deine eigenen Daten genutzt."
@@ -167,6 +170,7 @@ de:
     units_label: "Einheiten:"
     upload_required_alert: "Dieses Format erfordert eigene CGM‑Daten. Bitte lade eine CSV‑Datei hoch, um zu starten."
     upload_consent_recorded: "Einwilligung gespeichert. Du kannst deine CGM‑Daten jetzt in dieser Sitzung hochladen und verwenden."
+    no_upload_back_to_final: "Keine CGM‑Daten zum Hochladen? Ergebnisse aus vorherigen Runden anzeigen"
 
   submit:
     progress_no_data: "Mache Vorhersagen bis zum Ende des ausgeblendeten Bereichs, um zu senden"
@@ -177,6 +181,73 @@ de:
 
   mobile_warning:
     text: "Hinweis: Sugar Sugar ist derzeit für Desktop optimiert. Mobile Unterstützung folgt bald!"
+
+  orientation:
+    title: "Gerät drehen"
+    subtitle: "Sugar Sugar funktioniert am besten im Querformat. Bitte drehe dein Handy oder Tablet, um fortzufahren."
+
+  share:
+    button_share: "Ergebnisse teilen"
+    title: "Meine Sugar-Sugar-Ergebnisse"
+    subtitle: "Kannst du Glukose besser lesen als ich? Probier es aus!"
+    download_png: "Bild herunterladen"
+    download_png_hint: "Speichere die Karte als PNG - perfekt für Instagram-Stories."
+    play_again: "Noch einmal spielen"
+    copy_link: "Link kopieren"
+    copy_link_success: "Link kopiert!"
+    share_on_x: "Auf X teilen"
+    share_on_facebook: "Auf Facebook teilen"
+    share_on_whatsapp: "Über WhatsApp teilen"
+    share_on_linkedin: "Auf LinkedIn teilen"
+    invite_text: "Ich habe Sugar Sugar gespielt und Glukose mit %{mae} mg/dL MAE über %{rounds} Runden vorhergesagt. Schaffst du es besser?"
+    card_footer: "Jetzt spielen: %{url}"
+    stats_heading: "Deine Punktekarte"
+    stat_mae: "MAE"
+    stat_rmse: "RMSE"
+    stat_rounds: "Runden"
+    stat_accuracy: "Genauigkeit"
+    stat_ranking: "Bester Rang"
+    stat_no_ranking: "ohne Rang"
+    best_rank_scope_overall: "Gesamt"
+    expired_title: "Dieser Share-Link ist abgelaufen"
+    expired_body: "Wir konnten keine Ergebniskarte zu dieser URL finden. Spiele eine Runde und teile deine eigenen Ergebnisse."
+    expired_cta: "Sugar Sugar spielen"
+    encouragement:
+      excellent:
+        lines:
+          - "Du liest Zucker wie ein Profi. %{rounds} Runden, MAE unter 10 mg/dL. Glaubst du, du schlägst mich?"
+          - "Jede Kurve erwischt, über %{rounds} Runden. Dein Feed ist dran - drück Play und versuch das zu toppen."
+          - "Mustererkennung auf Pro-Niveau. %{rounds} Runden und ich treffe weiter. Du bist dran."
+          - "So sehen %{rounds} Runden saubere Reads aus. Wette, du kommst da nicht mit."
+      good:
+        lines:
+          - "Solider Lauf. %{rounds} Runden und meine Vorhersagen saßen nah dran. Kommst du näher ran?"
+          - "Scharf genug, um %{rounds} Runden die Linie zu halten. Du bist dran - widerleg mich."
+          - "%{rounds} Runden, ruhige Hand. Glaubst du, du zeichnest schneller? Zeig's mir."
+          - "In %{rounds} Runden öfter die Kurve getroffen als daneben. Wer toppt das zuerst?"
+      average:
+        lines:
+          - "%{rounds} Runden rum und die Kurve zieht weiter. Wette, du schlägst meinen Score nicht beim ersten Versuch."
+          - "Jage der Glukose seit %{rounds} Runden hinterher. Einfach, oder? Beweis es."
+          - "%{rounds} Runden tief. Die Zahlen sind hinterhältig - mal sehen, ob du sie überlistest."
+          - "In %{rounds} Runden im Ranking geklettert. Lust, oben mitzuspielen?"
+      keep_practicing:
+        lines:
+          - "Glukose ist demütigend. %{rounds} Runden geschafft - mal sehen, ob du sie besser liest."
+          - "%{rounds} Runden, ich lerne die Kurve noch. Jetzt du."
+          - "Schwerer als es aussieht, was? %{rounds} ehrliche Runden. Schlag mich. Ich fordere dich heraus."
+          - "%{rounds} Runden und die Linie gewinnt weiter. Meinst du, du liest sie besser? Zeig's mir."
+    synthesis:
+      title: "Deine Synthese über alle Runden"
+      x_axis: "5-Min-Schritt"
+      y_axis: "Glukose (mg/dL)"
+      legend_actual: "Tatsächliche Glukose (Mittel)"
+      legend_prediction: "Deine Vorhersage (Mittel)"
+      legend_actual_shade: "Tatsächliche Glukose"
+      legend_predicted_shade: "Deine Vorhersage"
+      prediction_region: "Vorhersagezone"
+      caption_close: "Deine blaue Linie hat die echte Glukose eng verfolgt - starkes Gespür!"
+      caption_far: "Je näher die blauen und schwarzen Linien liegen, desto genauer war deine Vorhersage."
 
   chart:
     title: "Glukosewerte (%{start} bis %{end})"
@@ -242,7 +313,7 @@ de:
     ranking_format_line: "Ranking (%{format}): %{rank} / %{total}"
     ranking_overall_line: "Gesamt‑Ranking: %{rank} / %{total}"
     per_round_metrics: "Metriken pro Runde"
-    start_over: "Neu starten"
+    start_over: "Beenden"
 
   switch_format:
     title: "Andere Option ausprobieren"

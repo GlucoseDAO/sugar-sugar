@@ -1,0 +1,51 @@
+/* =============================================================================
+   Share page styles.
+
+   Most of the visual polish lives inside the Python component via inline
+   styles so kaleido can reproduce it pixel-for-pixel in the exported PNG.
+   This stylesheet only handles things that JS/CSS must own: hover states,
+   transitions, and mobile-specific spacing tweaks.
+   ========================================================================== */
+
+.share-page {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  padding-bottom: 60px;
+}
+
+.share-btn {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+  box-shadow: 0 3px 12px rgba(15, 23, 42, 0.15);
+}
+.share-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.2);
+  text-decoration: none;
+  color: white !important;
+}
+.share-btn:active {
+  transform: translateY(0);
+  filter: brightness(0.95);
+}
+
+/* Copy-link feedback fades in via JS toggling opacity. */
+#share-copy-link-feedback.visible {
+  opacity: 1 !important;
+}
+
+/* Download button uses the Fomantic `green` theme -- tighten for share page. */
+.share-page .ui.button.green i {
+  margin-right: 8px;
+}
+
+/* Mobile tweaks: share buttons stack more gracefully, reduce outer padding. */
+html.mobile-device .share-page {
+  padding: 16px 12px 40px 12px !important;
+}
+html.mobile-device .share-page .share-btn {
+  flex: 1 1 45%;
+  justify-content: center;
+}
+html.mobile-device .share-page .ui.button {
+  margin-bottom: 8px;
+}

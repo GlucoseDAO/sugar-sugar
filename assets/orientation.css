@@ -1,0 +1,70 @@
+/* =============================================================================
+   Orientation overlay for phones and tablets.
+
+   Shows a full-screen "please rotate your device" prompt when a small screen is
+   in portrait orientation.  The prompt is advisory -- browsers cannot truly
+   force orientation without fullscreen + Screen Orientation API, which iOS
+   Safari does not support.
+
+   Desktop is never affected: the overlay is only rendered on devices whose
+   physical screen width is <= 1024 CSS pixels.  We additionally gate on
+   `(pointer: coarse)` so that a narrow desktop browser window does not trigger
+   the overlay.
+   ========================================================================== */
+
+#orientation-overlay {
+  display: none;
+}
+
+@media (orientation: portrait) and (max-device-width: 1024px) and (pointer: coarse) {
+  #orientation-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483647;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    padding: 24px;
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+    color: #f8fafc;
+    text-align: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    box-sizing: border-box;
+  }
+
+  #orientation-overlay .rotate-icon {
+    font-size: 96px;
+    line-height: 1;
+    animation: rotate-hint 2.2s ease-in-out infinite;
+    transform-origin: 50% 50%;
+  }
+
+  #orientation-overlay .rotate-title {
+    font-size: 28px;
+    font-weight: 800;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+
+  #orientation-overlay .rotate-subtitle {
+    font-size: 18px;
+    font-weight: 400;
+    line-height: 1.5;
+    margin: 0;
+    max-width: 420px;
+    opacity: 0.9;
+  }
+
+  html, body {
+    overflow: hidden !important;
+  }
+}
+
+@keyframes rotate-hint {
+  0%   { transform: rotate(0deg); }
+  40%  { transform: rotate(-90deg); }
+  60%  { transform: rotate(-90deg); }
+  100% { transform: rotate(0deg); }
+}

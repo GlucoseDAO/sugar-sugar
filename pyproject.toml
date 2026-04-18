@@ -20,6 +20,7 @@ dependencies = [
     "eliot>=1.15.0",
     "i18nice[yaml]>=0.16.0",
     "markdown>=3.10.2",
+    "kaleido>=1.2.0",
 ]
 
 [project.scripts]

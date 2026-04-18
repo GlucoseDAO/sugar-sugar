@@ -30,6 +30,14 @@ In Dash 4 (also reproduced in Dash 3), every `html.*` component tracks `n_clicks
 
 **What did NOT work:** CSS `pointer-events: none` on containers, global JS click interceptors in `assets/` (broke the prediction chart), pathname guards on callbacks, making DataTables non-interactive.
 
+### `ending-*` IDs must always be in the DOM on `/ending`
+
+`create_ending_layout` must unconditionally render the full skeleton with every `ending-*` ID (`ending-title`, `ending-disclaimer-*`, `ending-round-info`, etc.). Never early-return a plain "session expired" fallback div — any callback targeting those IDs (e.g. `update_ending_text_on_language_change`, metrics updates) immediately crashes with `A nonexistent object was used in an Output`. If the user has no data, render the skeleton with placeholder/empty content; put the "session expired" handling at the `display_page` level for pathname `/ending` only when you also skip every `ending-*`-targeted callback via a `pathname != '/ending' or not user_info or 'prediction_table_data' not in user_info` guard.
+
+### Consent notice: single scrollbar rule
+
+`consent_notice_children()` is shared between the landing page (`/`) and the `/consent-form` page. It renders the long consent markdown via `static_markdown_iframe` with a fixed height (e.g. `min(55vh, 480px)`) so the iframe owns the scrollbar. **Never wrap it in an outer `overflowY: auto` container** — that creates the infamous double scrollbar bug the user has reported repeatedly. Do not use `static_markdown_autosize_iframe` here either; autosize makes the iframe so tall it forces a second page-level scrollbar. Also do not try to flex-collapse the landing page to `height: 100vh` + `overflow: hidden` to avoid the page scrollbar; that collapses the consent section entirely. Let the landing page scroll normally; the iframe scrolls its own content.
+
 ## Code style guidelines
 
 Always use type-hints. 
@@ -66,6 +74,8 @@ Interactive Dash components (sliders, dropdowns, inputs) that are destroyed and 
 
 The app forces a desktop-width layout viewport (`_DESKTOP_LAYOUT_VIEWPORT_CSS_PX = 1280`) via a `meta_tags` viewport entry on the `Dash()` constructor. This makes mobile browsers scale the page like "Request desktop site" instead of using `width=device-width`. Do not revert to `device-width`; the chart/drawing UI is unusable at phone-width layouts.
 
+Mobile responsive CSS lives in `assets/mobile.css` and is scoped under `html.mobile-device`. A clientside callback in `app.py` adds the `mobile-device` class to `<html>` based on `navigator.userAgent` plus a `(pointer: coarse) and (max-device-width: 1024px)` fallback. `assets/orientation.css` shows a full-screen portrait overlay (`#orientation-overlay`) on small devices via `@media (orientation: portrait) and (max-device-width: 1024px) and (pointer: coarse)`. **Do not CSS-rotate the page** (`transform: rotate(90deg)`) — it breaks Plotly's touch coordinate mapping for `drawline`. **Do not use `screen.orientation.lock()`** — it needs fullscreen and is unsupported on iOS Safari. The old yellow mobile-warning banner has been replaced by this overlay; `render_mobile_warning()` now always returns `None` and the `mobile-warning` div is only kept as a throwaway Output for the clientside class-setter callback.
+
 ## Session persistence & navigation contract
 
 These are the expected behaviours that every change must preserve. Treat regressions here as bugs.
@@ -99,6 +109,11 @@ These are the expected behaviours that every change must preserve. Treat regress
 - Use `fuser -k PORT/tcp` to kill stray Dash processes on a busy port
 - Keep `logs/*` with `!logs/.gitkeep` in `.gitignore` to preserve the directory in git while ignoring log files; `.cursor/` must be fully gitignored
 - The UI uses Fomantic UI (Semantic UI fork) classes alongside Dash — prefix interactive classes with `ui` (e.g. `ui green button`)
+- Do **not** rewrite the landing page into a flex-only `height: 100vh; overflow: hidden` shell to eliminate the double scrollbar — past attempts collapsed the consent section entirely. Fix double-scrollbar issues by choosing a single owner of the scroll (usually the iframe) and removing `overflowY: auto` from the others
+- When a fix regresses or layout breaks, check `git stash list` / `git stash show -p stash@{N}` for a prior working version before re-designing from scratch; the user has stashed working fixes in the past
+- "Start Over" must reset the app to a truly fresh state: clear `user-info-store`, consent selections, `last-visited-page`, and any other localStorage-backed stores. A partial clear that leaves consent checkboxes ticked is a bug
+- Do not introduce image libraries like PIL/Pillow for chart/share rendering — the project already has Plotly + kaleido and must reuse them for any PNG/OG-card output
+- On `/final` the exit button is labelled "Exit" (not "Start Over") and routes to landing (`/`); the share page's "Play again" button uses the same landing-redirect contract as the final "Exit" button
 
 ## Browser automation tips (cursor-ide-browser MCP)
 
@@ -113,7 +128,7 @@ These are the expected behaviours that every change must preserve. Treat regress
 - The app uses Fomantic UI CSS/JS loaded via `external_stylesheets` and `external_scripts` (jQuery is loaded first as a dependency)
 - GitHub repo is GlucoseDAO/sugar-sugar; issues are tracked there
 - `suppress_callback_exceptions=True` is set on the Dash app to allow callbacks referencing components not yet in the layout
-- The navbar is a Fomantic UI `massive blue inverted tabular menu` (`NavBar` class in `sugar_sugar/components/navbar.py`). Left items: Game, The Study, Video instructions, Contact us. Right items: language flags. The active tab is highlighted via a CSS bottom-border rule. Navbar uses `dcc.Link` for navigation (client-side routing, no full page reload) — this preserves all `dcc.Store` values and avoids hydration races. Language flags still use `html.A` (they trigger callbacks, not navigation). A `redirect_landing_to_game` callback redirects `/` → last game page when the user clicks "Game" mid-session.
+- The navbar is a Fomantic UI `massive blue inverted tabular menu` (`NavBar` class in `sugar_sugar/components/navbar.py`). Left items: Game, The Study, FAQ, Video instructions, Contact us. Right side: a Fomantic `ui simple dropdown item` (`lang-dropdown`) — the trigger shows the active language's flag+label and a dropdown caret; the menu lists all 8 languages from the module-level `LANGUAGES` constant. Use the **`simple` dropdown class** (CSS-only hover) because Fomantic's JS dropdown requires jQuery init which doesn't play well with Dash. Each dropdown item is an `html.A` with `id="lang-{code}"`, so the existing `set_interface_language` callback works unchanged. Wrapper divs inside the dropdown have `disable_n_clicks=True`; the `lang-*` links do not. Navbar uses `dcc.Link` for navigation (client-side routing, no full page reload) — this preserves all `dcc.Store` values and avoids hydration races. A `redirect_landing_to_game` callback redirects `/` → last game page when the user clicks "Game" mid-session.
 - `STORAGE_TYPE` env var controls `dcc.Store` `storage_type` and input `persistence_type` across the app; defaults to `local` (localStorage persists across sessions)
 - When using `dcc.Store` with `storage_type='local'`, the store hydrates from localStorage client-side **asynchronously** after initial render; use it as callback `Input` (not `State`) to react to hydration — see "localStorage hydration race condition" pitfall above
 - A `last-visited-page` store + `restore_page_on_load` callback restores the user's last page when `STORAGE_TYPE=local`; a resume dialog (continue / start over) appears for returning users. Page flow: `/` → `/startup` → `/prediction` → `/ending` → `/final`. The callback uses `user-info-store` and `full-df` as Inputs (not State) to avoid the hydration race
@@ -127,3 +142,23 @@ These are the expected behaviours that every change must preserve. Treat regress
 - Large static markdown documents (study design, consent-style content) should keep using the server-rendered `static_markdown.py` iframe path; `dcc.Markdown` can misrender or fail on the 100KB+ study document because it loads asynchronously via `react-markdown`.
 - The prediction area is 12 points (1 hour at 5-min intervals); the game requires predictions drawn to the end of the hidden area before submit. `MAX_ROUNDS` is configurable via `.env` (defaults to 12).
 - CGM file uploads are parsed by custom loaders in `sugar_sugar/data.py` using Polars (`pl.read_csv`). `detect_cgm_type` auto-detects Libre/Dexcom/Medtronic format via string checks on the file header. No `cgm-format` package is used.
+- Plotly charts on `/prediction` (`GlucoseChart` in `sugar_sugar/components/glucose.py`) and `/ending` (`ending-static-graph` in `app.py`) use `config={'displayModeBar': False, ...}` — the Plotly toolbar (camera/zoom/pan icons) is hidden on purpose. The chart's outer div and inner `dcc.Graph` both set `style={'touchAction': 'none'}` so browser pinch/pan gestures don't fight Plotly's `drawline` handler on mobile.
+- The clientside persist callback never writes `/` to `last-visited-page` — only `/startup`, `/prediction`, `/ending`, `/final`. Writing `/` would clobber a deeper stored page and break the resume dialog. Exit from `/prediction` always goes to `/ending` (never directly `/final`); exit from `/ending` with no completed rounds goes to `/` (landing), otherwise to `/final`.
+
+## Share page (`/share/<share_id>`)
+
+A public, read-only page that lets a user broadcast their Sugar Sugar performance. Key invariants:
+
+- **Share records live on disk**, not in `dcc.Store`. The store at `data/shares/<share_id>.json` is written atomically by `sugar_sugar/share_store.py`. This is deliberate: the URL must work for anyone, across devices, after localStorage is wiped.
+- **`/share/<share_id>` must render without any `dcc.Store` data**. `display_page` and `update_on_language_change` both load the record from disk via `share_store.load_share` and pass it into `create_share_layout`. If the id is missing/corrupt they show `create_expired_layout`, never a crashed page.
+- **Two sibling Flask routes**, not Dash pages:
+  - `GET /share/<id>/image.png` — kaleido renders `build_share_card_figure` to a 1200x630 PNG. Results are cached in `_SHARE_PNG_CACHE` (a module-level dict) so repeated loads don't respawn Chromium.
+  - `GET /share/<id>/og` — minimal HTML with Open Graph + Twitter Card meta tags, plus a `<meta http-equiv="refresh">` to the real Dash page. Needed because FB/X/WhatsApp/LinkedIn crawlers don't execute JS and would otherwise see the Dash shell with no OG tags. Social share buttons always link to the regular `/share/<id>` URL — the crawler follows redirects and picks up the OG tags from the crawled path.
+- **`kaleido`** is a hard dependency (see `pyproject.toml`). First render takes ~1 s (spawns Chromium); subsequent are served from the cache. Do NOT hot-reload the server while kaleido is rendering — it can leave orphaned Chromium processes on Windows.
+- **Share button wiring**: `share-results-button` on `/final` fires `handle_share_results_button`, which builds a lean JSON-safe record (rounds, limited `user_info` keys, locale, timestamp), persists it, and returns the new `/share/<id>` URL as the `url.pathname`. The record intentionally drops heavyweight stores (`full-df`, `events-df`) — everything the share page needs already lives in `prediction_table_data`.
+- **Encouragement text** (`sugar_sugar/encouragement.py`) is template-based today, keyed by a score bracket derived from overall MAE. A module-level `LLM_BACKEND: Optional[Callable]` is the swap point if you want to plug in a real LLM later; do not sprinkle LLM calls elsewhere.
+- **`data/shares/` is gitignored** — share records are session data, not source code.
+- **Synthesis graph aggregates ALL rounds the user played**, not just the latest — averaging per-tick across every completed round produces the black (ground truth) and blue (user prediction) lines. Per-round overlays use gradient opacity keyed to round index (e.g. round 1 = 25%, round 2 = 50%, ...) so older rounds fade and newer ones pop; never render only the last round.
+- **Rankings are shown per data-source category (example/generic, mixed, own) AND overall** on the share page, derived from `is_example_data` / `data_source_name` on each round record. The overall ranking comes first in the layout, followed by per-category rankings. The redundant per-round metrics table below the synthesis graph was removed on purpose — do not reintroduce it.
+- **Clientside persist allowlist** in `app.py` only writes `/startup`, `/prediction`, `/ending`, `/final` to `last-visited-page`. `/share/*` is automatically excluded by the allowlist; do not add it.
+- **Mobile**: the share page reuses `.info-page` + scoped `.mobile-device .share-page` rules in `assets/share.css` so the download/copy buttons stay readable on narrow viewports. The orientation overlay from `mobile-support` still fires if the user loads `/share/<id>` on a phone in portrait.
