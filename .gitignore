@@ -190,3 +190,6 @@ logs/*
 
 # Cursor IDE
 .cursor/
+
+# Local backup archives (see backup/README.md)
+backup/archives/

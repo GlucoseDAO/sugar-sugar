@@ -37,3 +37,11 @@ MAX_ROUNDS: int = int(os.getenv("MAX_ROUNDS", "12"))
 DEBUG_MODE: bool = _env_bool("DEBUG_MODE", "false")
 DASH_DEBUG: bool = _env_bool("DASH_DEBUG", DEBUG_MODE)
 
+# Bump this integer on every deploy that changes clientside callback JS.
+# Dash computes its client-side fingerprint from the layout JSON, NOT from
+# clientside callback content, so browsers cache old JS and survive server
+# restarts without re-fetching /_dash-dependencies. Including this value in
+# the layout as a dcc.Store forces the fingerprint to change and triggers a
+# full client reload for every connected browser on the next server restart.
+DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "2"))
+

@@ -1,0 +1,32 @@
+[Unit]
+Description=Backup Sugar-Sugar data/input (tar.gz + rotation)
+# Only run when the project directory is reachable
+ConditionPathIsDirectory=/data/sources/glucosedao/sugar-sugar/data/input
+
+[Service]
+Type=oneshot
+
+# ── Paths & identity ──────────────────────────────────────────────
+# TODO: adjust ExecStart and User for your host
+ExecStart=/data/sources/glucosedao/sugar-sugar/backup/backup-input.sh
+WorkingDirectory=/data/sources/glucosedao/sugar-sugar
+User=root
+Group=root
+
+# ── Environment ───────────────────────────────────────────────────
+Environment=SUGAR_BACKUP_DEST=/var/backups/sugar-sugar
+Environment=SUGAR_BACKUP_RETENTION_DAYS=30
+
+# ── Resource limits ───────────────────────────────────────────────
+Nice=19
+IOSchedulingClass=idle
+MemoryMax=512M
+
+# ── Retry on transient failure ────────────────────────────────────
+Restart=on-failure
+RestartSec=300
+
+# ── Logging ───────────────────────────────────────────────────────
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sugar-backup

@@ -54,6 +54,7 @@ from sugar_sugar.config import (
     DASH_HOST,
     DASH_PORT,
     DEBUG_MODE,
+    DEPLOY_BUILD,
     MAX_ROUNDS,
     STORAGE_TYPE,
 )
@@ -522,6 +523,12 @@ app.layout = html.Div([
     dcc.Location(id='url', refresh=False, **({'pathname': '/prediction'} if _is_chart_mode else {})),
     dcc.Store(id='user-info-store', data=_chart_user_info, storage_type=STORAGE_TYPE),
     dcc.Store(id='last-click-time', data=0),
+    # Fingerprint sentinel: value must equal DEPLOY_BUILD in config.py.
+    # Dash fingerprints the layout JSON, not clientside callback JS, so a JS-only
+    # change survives a server restart and old browsers keep their cached
+    # /_dash-dependencies. Bumping DEPLOY_BUILD changes the layout hash, forcing
+    # every reconnecting browser to do a full reload and pick up the new JS.
+    dcc.Store(id='_build', data=DEPLOY_BUILD),
     dcc.Store(id='consent-scroll-request', data=0),
     dcc.Store(id='current-window-df', data=example_initial_df_store, storage_type=STORAGE_TYPE),
     dcc.Store(id='full-df', data=example_full_df_store, storage_type=STORAGE_TYPE),
