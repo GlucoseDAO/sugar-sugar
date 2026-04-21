@@ -4,6 +4,13 @@ import polars as pl
 from pathlib import Path
 from eliot import start_action
 
+# Matches display conversion elsewhere (mg/dL internal storage).
+_GLUCOSE_MGDL_PER_MMOLL: float = 18.0
+
+_DEXCOM_GL_MG_DL: str = "Glucose Value (mg/dL)"
+_DEXCOM_GL_MMOL: str = "Glucose Value (mmol/L)"
+
+
 class CGMType(Enum):
     LIBRE = "libre"
     DEXCOM = "dexcom"
@@ -299,12 +306,25 @@ def load_dexcom_data(file_path: Path) -> Tuple[pl.DataFrame, pl.DataFrame]:
             truncate_ragged_lines=True
         )
 
+        if _DEXCOM_GL_MG_DL in df.columns:
+            gl_expr = pl.col(_DEXCOM_GL_MG_DL).cast(pl.Float64).alias("gl")
+        elif _DEXCOM_GL_MMOL in df.columns:
+            gl_expr = (
+                pl.col(_DEXCOM_GL_MMOL).cast(pl.Float64) * _GLUCOSE_MGDL_PER_MMOLL
+            ).alias("gl")
+        else:
+            raise ValueError(
+                "Dexcom export must contain "
+                f"'{_DEXCOM_GL_MG_DL}' or '{_DEXCOM_GL_MMOL}'; "
+                f"columns: {df.columns}"
+            )
+
         # Filter glucose data (EGV rows)
         glucose_data = (df
             .filter(pl.col("Event Type") == "EGV")
             .select([
                 pl.col("Timestamp (YYYY-MM-DDThh:mm:ss)").alias("time"),
-                pl.col("Glucose Value (mg/dL)").cast(pl.Float64).alias("gl")
+                gl_expr,
             ])
             .with_columns([
                 pl.col("time").str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S"),
