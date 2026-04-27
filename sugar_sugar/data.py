@@ -4,11 +4,16 @@ import polars as pl
 from pathlib import Path
 from eliot import start_action
 
-# Matches display conversion elsewhere (mg/dL internal storage).
-_GLUCOSE_MGDL_PER_MMOLL: float = 18.0
+from sugar_sugar.cgm_csv_glucose_tokens import utf8_token_column_to_mgdl_float
 
 _DEXCOM_GL_MG_DL: str = "Glucose Value (mg/dL)"
 _DEXCOM_GL_MMOL: str = "Glucose Value (mmol/L)"
+
+# Utf8 so rows with 'Low'/'High' parse; Polars ignores keys for columns not in the file.
+_DEXCOM_READ_CSV_GLUCOSE_SCHEMA_UTF8: dict[str, pl.DataType] = {
+    _DEXCOM_GL_MG_DL: pl.Utf8,
+    _DEXCOM_GL_MMOL: pl.Utf8,
+}
 
 
 class CGMType(Enum):
@@ -161,9 +166,11 @@ def load_medtronic_data(file_path: Path) -> Tuple[pl.DataFrame, pl.DataFrame]:
             ]
         ).alias("time")
 
-        sensor_gl = _euro_number_to_float(pl.col("Sensor Glucose (mg/dL)")).alias("_sensor_gl")
+        sensor_gl = utf8_token_column_to_mgdl_float(
+            pl.col("Sensor Glucose (mg/dL)"), source_is_mmol=False
+        ).alias("_sensor_gl")
         bg_gl = (
-            _euro_number_to_float(pl.col("BG Reading (mg/dL)"))
+            utf8_token_column_to_mgdl_float(pl.col("BG Reading (mg/dL)"), source_is_mmol=False)
             if "BG Reading (mg/dL)" in df.columns
             else pl.lit(None, dtype=pl.Float64)
         ).alias("_bg_gl")
@@ -271,7 +278,9 @@ def load_libre_data(file_path: Path) -> Tuple[pl.DataFrame, pl.DataFrame]:
             .filter(pl.col("Record Type").cast(pl.Int64) == 0)
             .select([
                 pl.col("Device Timestamp").alias("time"),
-                pl.col("Historic Glucose mg/dL").cast(pl.Float64).alias("gl")
+                utf8_token_column_to_mgdl_float(
+                    pl.col("Historic Glucose mg/dL"), source_is_mmol=False
+                ).alias("gl"),
             ])
             .with_columns([
                 pl.col("time").str.strptime(pl.Datetime, "%d-%m-%Y %H:%M"),
@@ -300,17 +309,22 @@ def load_libre_data(file_path: Path) -> Tuple[pl.DataFrame, pl.DataFrame]:
 def load_dexcom_data(file_path: Path) -> Tuple[pl.DataFrame, pl.DataFrame]:
     """Load and process Dexcom CGM data."""
     with start_action(action_type=u"load_dexcom_data", file_path=str(file_path)):
+        # Without Utf8, Polars may infer `Glucose Value (mg/dL)` as i64 from early rows
+        # and then fail on `Low`/`High`. Map those tokens in `utf8_token_column_to_mgdl_float`
+        # (`cgm_csv_glucose_tokens.py`). Unknown keys in schema_overrides are ignored.
         df = pl.read_csv(
             file_path,
-            null_values=["Low", "High"],
-            truncate_ragged_lines=True
+            truncate_ragged_lines=True,
+            schema_overrides=_DEXCOM_READ_CSV_GLUCOSE_SCHEMA_UTF8,
         )
 
         if _DEXCOM_GL_MG_DL in df.columns:
-            gl_expr = pl.col(_DEXCOM_GL_MG_DL).cast(pl.Float64).alias("gl")
+            gl_expr = utf8_token_column_to_mgdl_float(
+                pl.col(_DEXCOM_GL_MG_DL), source_is_mmol=False
+            ).alias("gl")
         elif _DEXCOM_GL_MMOL in df.columns:
-            gl_expr = (
-                pl.col(_DEXCOM_GL_MMOL).cast(pl.Float64) * _GLUCOSE_MGDL_PER_MMOLL
+            gl_expr = utf8_token_column_to_mgdl_float(
+                pl.col(_DEXCOM_GL_MMOL), source_is_mmol=True
             ).alias("gl")
         else:
             raise ValueError(
