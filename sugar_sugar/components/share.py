@@ -9,63 +9,76 @@ Public API
     Returns a ``html.Div`` for the Dash page.  ``share_record`` is what
     ``share_store.load_share`` returned; it must contain at minimum a
     ``rounds`` list matching the shape used on ``/final``.
-- ``build_synthesis_figure(share_record, *, locale)``:
-    Builds the grey/blue synthesis ``go.Figure`` shown in the page and
-    embedded inside the square share card.  Grey (actual) and blue
-    (prediction) rectangles are drawn per ``(slot, format)`` with opacity
-    encoding the format bucket: A=0.25, B=0.50, C=0.75.
+- ``build_synthesis_figure(share_record, *, locale, show_title=False, figure_height=None, show_legend_in_figure=True)``:
+    One stacked chart per data source format the user played (Generic,
+    My data, or Mixed).  Each row is the **next prediction hour** only
+    (every 5-min step; **Y** = percent error from actual, **X** = time
+    in that hour).  Per round, translucent hatch appears **only** between the
+    0% baseline and the variability curve (not the full panel), with a
+    **gradient** (saturated near the baseline, greyer toward the curve).
+    A solid **black** 0% line is the reference (drawn above the variability
+    curves, under point markers).  If the first predicted point in that hour is
+    missing, **actual** at that time is used so the line still starts.
+    Colours desaturate as |error| grows.
 - ``build_share_card_figure(share_record, share_url, *, locale)``:
     Builds the 1080x1080 composite Plotly figure used for the downloadable
-    PNG and the Open Graph preview.  Three vertical bands:
-    header+stats / chart / ranking+footer.
+    PNG and the Open Graph preview.  Vertical stack: title, stats, quote,
+    legend, chart (per-panel format labels), ranking (left) and QR (right)
+    in the footer band, QR linking to the play URL.
 - ``compute_aggregate_stats(rounds)``:
     Returns a dict with ``mae_mgdl``, ``rmse_mgdl``, ``mape``,
     ``rounds_played``, ``pairs`` used by both the layout and the LLM hook.
 """
 from __future__ import annotations
 
+import base64
+import io
 import math
 import re
 import urllib.parse
 from typing import Any, Optional
 
 import plotly.graph_objects as go
+import segno
+from plotly.subplots import make_subplots
 from dash import dcc, html
 from sugar_sugar.config import PREDICTION_HOUR_OFFSET
 from sugar_sugar.encouragement import encouragement_text
 from sugar_sugar.i18n import normalize_locale, t
 
 
-# Opacity by format bucket.  A = Generic Data, B = My Data, C = Mixed.
-# Values chosen so ALL THREE are visible even on white, while the jump
-# from 25 to 65 still reads as a clear gradient.  Spacing (25/40/65) is
-# intentionally non-linear: C bars are the most prominent because "play
-# your own data in both categories" is the hardest / most interesting
-# round to have completed.
-_FORMAT_OPACITY: dict[str, float] = {"A": 0.25, "B": 0.40, "C": 0.65}
+# Draw order: Generic (A), My data (B), Mixed (C) — one subplot per format present.
 _FORMAT_DRAW_ORDER: list[str] = ["A", "B", "C"]
 
-# Colours used by the synthesis chart.  Actual glucose draws in blue so
-# it matches the brand colour used across the app; predicted draws in
-# a saturated pure orange -- the earlier ochre tone was too washed out
-# at low opacities (25% / 40%) to stay visible against the blue bars
-# when they overlapped.  The two hues stay accessible for users with
-# mild colour-vision differences.
-_COLOR_ACTUAL_BASE: tuple[int, int, int] = (21, 101, 192)    # material-blue 800
-_COLOR_PRED_BASE: tuple[int, int, int] = (255, 140, 0)       # pure orange
-_COLOR_ACTUAL_LINE: str = "rgba(13, 71, 161, 0.95)"          # darker blue
-_COLOR_PRED_LINE: str = "rgba(214, 100, 0, 0.95)"            # saturated dark orange
-
-# Prediction rectangles bump their opacity by +0.05 relative to actual
-# rectangles so that where the two overlap (same slot played in the
-# same format) the orange prediction bar still reads over the blue.
-# Kept as a single constant so the page-chart and the PNG-card share the
-# same rule.
-_PRED_OPACITY_BOOST: float = 0.05
+# Per-format line colour (fills use the same hue with alpha, only under the curve).
+_FORMAT_PANEL: dict[str, dict[str, str]] = {
+    "A": {"line": "rgba(21, 101, 192, 0.92)"},
+    "B": {"line": "rgba(234, 88, 12, 0.92)"},
+    "C": {"line": "rgba(91, 33, 182, 0.88)"},
+}
+# Solid black baseline (scatter so markers can stay on top; drawn after variability lines)
+_ZERO_LINE: dict[str, Any] = {"color": "black", "width": 3.5}
+# Percent-error curve segments (between markers)
+_VARIABILITY_LINE_WIDTH: float = 1.35
+_LEGEND_VARIABILITY_SAMPLE_WIDTH: float = 1.0
+_DEFAULT_FORMAT_STYLE: dict[str, str] = {"line": "rgba(255, 140, 0, 0.92)"}
 
 _UUID_RE: re.Pattern[str] = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 )
+_RG_RGBA: re.Pattern[str] = re.compile(
+    r"^rgba\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*([0-9.]+)\s*\)\s*$",
+    re.IGNORECASE,
+)
+# Hatch: horizontal slices from baseline toward chord; alpha + grey increase toward the curve
+_N_FILL_SLICES: int = 8
+_FILL_ALPHA_TOP: float = 0.11
+_FILL_ALPHA_BOTTOM: float = 0.22
+# |y|/ref < 1 → blend toward full grey; ref = row max |% error|;
+# Exp < 1: stronger greying so mid/outer range moves toward #808080, not just faint hue
+_DESAT_GAMMA: float = 0.38
+# Literal neutral used at t=1.0
+_GREY_RGB: tuple[int, int, int] = (128, 128, 128)
 
 
 # ---------------------------------------------------------------------------
@@ -89,70 +102,210 @@ def _parse_float(cell: Any) -> Optional[float]:
     return None
 
 
-def _collect_aligned_series_by_format(
-    rounds: list[dict[str, Any]],
-) -> tuple[
-    dict[str, list[list[float]]],
-    dict[str, list[list[float]]],
-    int,
-]:
-    """Group actual/predicted values by ``(format, slot)`` across rounds.
+def _window_size_for_round(r: dict[str, Any]) -> int:
+    ws: int = int(r.get("prediction_window_size") or 0)
+    if ws > 0:
+        return ws
+    table: list[Any] = list(r.get("prediction_table_data") or [])
+    if not table:
+        return 0
+    row0: dict[str, Any] = table[0] or {}
+    max_t: int = -1
+    for key in row0:
+        if isinstance(key, str) and key.startswith("t") and key[1:].isdigit():
+            max_t = max(max_t, int(key[1:]))
+    return max_t + 1 if max_t >= 0 else 0
 
-    Returns ``(actual_by_format, predicted_by_format, n_slots)`` where each
-    inner list has length ``n_slots`` and each cell is the list of
-    non-missing observations at that slot from rounds of that format.
-    Formats not present in the rounds simply don't appear as keys.
+
+def _prediction_next_hour_range(ws: int) -> Optional[tuple[int, int]]:
+    """Return ``[start, end)`` slot indices for the *next* prediction hour."""
+    if ws <= 0:
+        return None
+    n_visible: int = min(PREDICTION_HOUR_OFFSET, ws)
+    start: int = max(0, ws - n_visible)
+    return (start, ws)
+
+
+def _minutes_tickvals(n_points: int) -> list[int]:
+    """Wall-clock style offset within the next hour: 0, 5, 10, … (one per 5-min step)."""
+    return [5 * i for i in range(n_points)]
+
+
+def _format_figure_styling(format_code: str) -> dict[str, str]:
+    return _FORMAT_PANEL.get(
+        str(format_code or "").strip().upper(),
+        _DEFAULT_FORMAT_STYLE,
+    )
+
+
+def _round_sort_key(ri: dict[str, Any]) -> tuple[int, int]:
+    n: int = int(ri.get("round_number") or 0)
+    return (n, id(ri))
+
+
+def _t_blend_to_grey(
+    abs_mag: float, ref_max: float, *, gamma: float = _DESAT_GAMMA
+) -> float:
+    """0 = full line colour, 1 = exact neutral grey, scaled by *this* subplot's data range.
+
+    ``ref_max`` = max |percent error| in the row (or 0 if none).
     """
-    n_slots: int = 0
-    # Pre-compute n_slots so we can size per-format bucket lists once.
+    if ref_max < 1e-12:
+        return 0.0
+    t_lin: float = min(1.0, abs(float(abs_mag)) / ref_max)
+    return float(min(1.0, t_lin ** float(gamma)))
+
+
+def _blend_toward_grey(
+    line_rgba: str, t: float, alpha_override: Optional[float] = None
+) -> str:
+    """Linear blend of base RGB to ``_GREY_RGB``; *t* in [0,1]."""
+    t2: float = max(0.0, min(1.0, t))
+    m = _RG_RGBA.match(str(line_rgba).strip())
+    if not m:
+        return line_rgba
+    r, g, b = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    a = float(m.group(4)) if alpha_override is None else float(alpha_override)
+    gr, gg, gb = _GREY_RGB
+    r2 = int(r * (1.0 - t2) + gr * t2)
+    g2 = int(g * (1.0 - t2) + gg * t2)
+    b2 = int(b * (1.0 - t2) + gb * t2)
+    return f"rgba({r2},{g2},{b2},{a:.3f})"
+
+
+def _add_gradient_hatch_axis_to_chord(
+    fig: go.Figure,
+    *,
+    row_idx: int,
+    col: int,
+    x0: float,
+    x1: float,
+    p0: float,
+    p1: float,
+    line_c: str,
+    row_y_max: float,
+    legend_rn: int,
+) -> None:
+    """Stacked quads between y=0 and chord *(x0,p0)–(x1,p1)*: vivid near baseline, grey near chord.
+
+    If the chord crosses y=0, splits at the crossing and recurses so the hatch
+    never sits outside the axis–curve strip.
+    """
+    if math.isclose(p0, 0.0, abs_tol=1e-12) and math.isclose(p1, 0.0, abs_tol=1e-12):
+        return
+
+    if p0 * p1 < 0.0:
+        denom: float = p0 - p1
+        if abs(denom) < 1e-15:
+            return
+        tn: float = p0 / denom
+        if 0.0 < tn < 1.0:
+            xc: float = x0 + tn * (x1 - x0)
+            _add_gradient_hatch_axis_to_chord(
+                fig,
+                row_idx=row_idx,
+                col=col,
+                x0=x0,
+                x1=xc,
+                p0=p0,
+                p1=0.0,
+                line_c=line_c,
+                row_y_max=row_y_max,
+                legend_rn=legend_rn,
+            )
+            _add_gradient_hatch_axis_to_chord(
+                fig,
+                row_idx=row_idx,
+                col=col,
+                x0=xc,
+                x1=x1,
+                p0=0.0,
+                p1=p1,
+                line_c=line_c,
+                row_y_max=row_y_max,
+                legend_rn=legend_rn,
+            )
+            return
+
+    for k in range(_N_FILL_SLICES):
+        f0: float = k / _N_FILL_SLICES
+        f1: float = (k + 1) / _N_FILL_SLICES
+        yl0, yl1 = f0 * p0, f1 * p0
+        yr0, yr1 = f0 * p1, f1 * p1
+        m_band: float = max(abs(yl0), abs(yl1), abs(yr0), abs(yr1))
+        t_mid: float = 0.5 * (f0 + f1)
+        a_fill: float = (
+            _FILL_ALPHA_BOTTOM * (1.0 - t_mid) + _FILL_ALPHA_TOP * t_mid
+        )
+        fill_t: float = _t_blend_to_grey(m_band, row_y_max)
+        fill_rgba: str = _blend_toward_grey(line_c, fill_t, a_fill)
+        fig.add_trace(
+            go.Scatter(
+                x=[x0, x1, x1, x0, x0],
+                y=[yl0, yr0, yr1, yl1, yl0],
+                fill="toself",
+                fillcolor=fill_rgba,
+                line=dict(width=0),
+                mode="lines",
+                hoverinfo="skip",
+                showlegend=False,
+                legendgroup=f"fill{legend_rn}",
+            ),
+            row=row_idx,
+            col=col,
+        )
+
+
+def _formats_played_in_order(rounds: list[dict[str, Any]]) -> list[str]:
+    seen: set[str] = set()
     for r in rounds:
-        table = r.get("prediction_table_data") or []
-        if len(table) < 1:
-            continue
-        actual_row = table[0] or {}
-        window_size: int = int(r.get("prediction_window_size") or 0)
-        slots: int = window_size if window_size > 0 else max(
-            (int(k[1:]) for k in actual_row.keys() if isinstance(k, str) and k.startswith("t") and k[1:].isdigit()),
-            default=-1,
-        ) + 1
-        if slots > n_slots:
-            n_slots = slots
-
-    actual_by_format: dict[str, list[list[float]]] = {}
-    predicted_by_format: dict[str, list[list[float]]] = {}
-
-    for r in rounds:
-        table = r.get("prediction_table_data") or []
-        if len(table) < 2:
-            continue
-        actual_row = table[0] or {}
-        pred_row = table[1] or {}
-        fmt: str = str(r.get("format") or "").strip().upper() or "?"
-
-        if fmt not in actual_by_format:
-            actual_by_format[fmt] = [[] for _ in range(n_slots)]
-            predicted_by_format[fmt] = [[] for _ in range(n_slots)]
-
-        for i in range(n_slots):
-            key: str = f"t{i}"
-            a = _parse_float(actual_row.get(key))
-            if a is not None:
-                actual_by_format[fmt][i].append(a)
-            p = _parse_float(pred_row.get(key))
-            if p is not None:
-                predicted_by_format[fmt][i].append(p)
-
-    return actual_by_format, predicted_by_format, n_slots
+        f: str = str(r.get("format") or "").strip().upper()
+        if f in _FORMAT_DRAW_ORDER:
+            seen.add(f)
+    return [f for f in _FORMAT_DRAW_ORDER if f in seen]
 
 
-def _flatten_slots(by_format: dict[str, list[list[float]]], n_slots: int) -> list[list[float]]:
-    """Union per-format slot lists into one flat per-slot list."""
-    out: list[list[float]] = [[] for _ in range(n_slots)]
-    for slots in by_format.values():
-        for i, values in enumerate(slots):
-            if values:
-                out[i].extend(values)
+def _percent_error_series_for_round(
+    r: dict[str, Any], hour_range: tuple[int, int]
+) -> list[Optional[float]]:
+    """``(pred - actual) / actual * 100`` at each 5-min step; None when undefined.
+
+    If the **first** point of the next-hour window is missing a prediction, use
+    the actual at that time as the prediction (0% error) so the graph still runs.
+    """
+    start, end = hour_range
+    table: list[Any] = list(r.get("prediction_table_data") or [])
+    if len(table) < 2:
+        return []
+    actual_row: dict[str, Any] = table[0] or {}
+    pred_row: dict[str, Any] = table[1] or {}
+    out: list[Optional[float]] = []
+    for i in range(start, end):
+        key: str = f"t{i}"
+        a = _parse_float(actual_row.get(key))
+        p = _parse_float(pred_row.get(key))
+        if i == start and p is None and a is not None and a != 0.0:
+            p = a
+        if a is None or p is None or a == 0.0:
+            out.append(None)
+        else:
+            out.append((p - a) / a * 100.0)
     return out
+
+
+def _max_abs_percent_for_format(rounds_f: list[dict[str, Any]]) -> float:
+    """Largest |percent error| across all rounds in this format row (for colour scale)."""
+    m: float = 0.0
+    for r in rounds_f:
+        ws: int = _window_size_for_round(r)
+        h: Optional[tuple[int, int]] = _prediction_next_hour_range(ws)
+        if h is None:
+            continue
+        ys: list[Optional[float]] = _percent_error_series_for_round(r, h)
+        for v in ys:
+            if v is not None:
+                m = max(m, abs(float(v)))
+    return m
 
 
 def compute_aggregate_stats(rounds: list[dict[str, Any]]) -> dict[str, Any]:
@@ -244,278 +397,10 @@ def _resolve_format_label(code: str, *, locale: str) -> str:
     return code
 
 
-def _resolve_format_label_short(code: str, *, locale: str) -> str:
-    """Shorter label used on the crowded gradient-bar tick row.
-
-    Falls back to the long label when no short form is defined; this
-    keeps translations optional-friendly.  Short forms are critical on
-    the tick row where three labels share ~300 px horizontally and the
-    full "Generic + My Data" string collides with its neighbours.
-    """
-    code = str(code or "").strip().upper()
-    if code == "A":
-        key = "ui.startup.format_a_label_short"
-    elif code == "B":
-        key = "ui.startup.format_b_label_short"
-    elif code == "C":
-        key = "ui.startup.format_c_label_short"
-    else:
-        return code
-    short: str = t(key, locale=locale)
-    # i18nice returns the key itself when missing -- treat that as "no
-    # short form provided" and fall back to the long label.
-    if not short or short.startswith("ui.startup.format_"):
-        return _resolve_format_label(code, locale=locale)
-    return short
-
-
 def _format_number(value: float, digits: int = 1) -> str:
     if value is None or math.isnan(value):
         return "-"
     return f"{value:.{digits}f}"
-
-
-def _format_opacity_tick_positions() -> list[tuple[str, float]]:
-    """Return [(format_code, fractional_x), ...] for the gradient-bar ticks.
-
-    The x positions are literal percentages (0-1), matching each
-    format's opacity value in _FORMAT_OPACITY.  Using opacity-as-position
-    makes the bar read as "darker = higher percentage of this shade" --
-    the same mental model the actual chart uses.
-    """
-    return [(fmt, _FORMAT_OPACITY[fmt]) for fmt in _FORMAT_DRAW_ORDER]
-
-
-def _gradient_half(
-    *,
-    title: str,
-    title_color: str,
-    base: tuple[int, int, int],
-    locale: str,
-) -> html.Div:
-    """Render one coloured half of the gradient legend (title + bar + ticks).
-
-    The ticks live inside this container so ``left: 25%`` / ``left: 40%``
-    / ``left: 65%`` map exactly to that percentage **of this half's
-    width**, which is what makes the labels line up under the shading
-    intensity they describe.
-    """
-    loc: str = normalize_locale(locale)
-    tick_nodes: list[Any] = []
-    for fmt, pos in _format_opacity_tick_positions():
-        tick_nodes.append(
-            html.Div(
-                [
-                    html.Div(
-                        style={
-                            "width": "1px",
-                            "height": "8px",
-                            "background": "#475569",
-                            "margin": "0 auto 2px auto",
-                        },
-                        disable_n_clicks=True,
-                    ),
-                    html.Div(
-                        _resolve_format_label_short(fmt, locale=loc),
-                        style={
-                            "fontSize": "11px",
-                            "color": "#475569",
-                            "textAlign": "center",
-                            "fontWeight": "600",
-                            "whiteSpace": "nowrap",
-                        },
-                        disable_n_clicks=True,
-                    ),
-                ],
-                style={
-                    "position": "absolute",
-                    "left": f"{pos * 100:.2f}%",
-                    "transform": "translateX(-50%)",
-                    "top": "0",
-                    "paddingTop": "4px",
-                },
-                disable_n_clicks=True,
-            )
-        )
-
-    return html.Div(
-        [
-            html.Div(
-                title,
-                style={
-                    "fontSize": "12px",
-                    "fontWeight": "700",
-                    "color": title_color,
-                    "textAlign": "center",
-                    "marginBottom": "4px",
-                },
-                disable_n_clicks=True,
-            ),
-            html.Div(
-                style={
-                    "height": "14px",
-                    "borderRadius": "7px",
-                    "background": (
-                        "linear-gradient(to right, "
-                        f"{_rgba(base, 0.08)} 0%, "
-                        f"{_rgba(base, 1.0)} 100%)"
-                    ),
-                },
-                disable_n_clicks=True,
-            ),
-            # Tick anchor row: positioned relative container so child
-            # ticks can use absolute "left: %" within this half's width.
-            html.Div(
-                tick_nodes,
-                style={"position": "relative", "height": "34px"},
-                disable_n_clicks=True,
-            ),
-        ],
-        style={"flex": "1", "minWidth": "0"},
-        disable_n_clicks=True,
-    )
-
-
-def build_gradient_legend_bar(*, locale: str) -> html.Div:
-    """Build a horizontal gradient bar for the share page.
-
-    Layout:
-
-        +-------------------------+     +-------------------------+
-        |  Actual glucose         | gap |  Your prediction        |
-        |  (blue 8% -> 100%)      |     |  (orange 8% -> 100%)    |
-        +-------------------------+     +-------------------------+
-           |        |         |            |        |         |
-         25%      40%       65%          25%      40%       65%
-         Generic  My Data   G+M          Generic  My Data   G+M
-
-    Each half owns its own tick row so the labels line up under the
-    shading intensity they describe, rather than being spread across
-    a synthetic combined scale that would misrepresent the layout.
-    """
-    loc: str = normalize_locale(locale)
-    blue_base: str = _rgba(_COLOR_ACTUAL_BASE, 1.0)
-    orange_base: str = _rgba(_COLOR_PRED_BASE, 1.0)
-    actual_label: str = t("ui.share.synthesis.legend_actual_shade", locale=loc)
-    pred_label: str = t("ui.share.synthesis.legend_predicted_shade", locale=loc)
-
-    return html.Div(
-        [
-            _gradient_half(
-                title=actual_label,
-                title_color=blue_base,
-                base=_COLOR_ACTUAL_BASE,
-                locale=loc,
-            ),
-            html.Div(style={"width": "12px"}, disable_n_clicks=True),
-            _gradient_half(
-                title=pred_label,
-                title_color=orange_base,
-                base=_COLOR_PRED_BASE,
-                locale=loc,
-            ),
-        ],
-        style={
-            "display": "flex",
-            "alignItems": "stretch",
-            "maxWidth": "620px",
-            "margin": "18px auto 16px auto",
-        },
-        disable_n_clicks=True,
-    )
-
-
-def _add_card_gradient_bar(fig: go.Figure, *, locale: str) -> None:
-    """Render the gradient legend bar onto the square PNG card.
-
-    Draws two half-bars side by side between y=0.275 and y=0.305 in
-    paper coordinates -- blue gradient on the left (actual glucose),
-    ochre gradient on the right (predicted).  Each half is built as 20
-    stacked rectangles with steadily increasing opacity to fake a CSS
-    linear-gradient (kaleido cannot render SVG gradient fills
-    reliably).  Three tick labels (Generic / My Data / Combined) land
-    underneath at the x position corresponding to each format's
-    opacity.
-    """
-    loc: str = normalize_locale(locale)
-
-    bar_left: float = 0.12
-    bar_right: float = 0.88
-    bar_mid: float = (bar_left + bar_right) / 2
-    gap: float = 0.010  # small gap between the two halves
-    half_left_span: tuple[float, float] = (bar_left, bar_mid - gap)
-    half_right_span: tuple[float, float] = (bar_mid + gap, bar_right)
-    # Positioned in the dedicated gap between the chart-axis labels
-    # (~y 0.37) and the ranking heading (~y 0.25).  Bar itself is a
-    # thin strip; the "Actual glucose" / "Your prediction" titles sit
-    # just above it, tick labels sit just below.
-    bar_y0: float = 0.30
-    bar_y1: float = 0.325
-
-    def _draw_gradient_half(span: tuple[float, float], base: tuple[int, int, int]) -> None:
-        n_steps: int = 24
-        step_width = (span[1] - span[0]) / n_steps
-        for i in range(n_steps):
-            # Opacity climbs from 0.08 to 1.0 so both endpoints are visible.
-            alpha = 0.08 + (i / max(1, n_steps - 1)) * (1.0 - 0.08)
-            x0 = span[0] + i * step_width
-            x1 = span[0] + (i + 1) * step_width
-            fig.add_shape(
-                type="rect",
-                xref="paper", yref="paper",
-                x0=x0, x1=x1, y0=bar_y0, y1=bar_y1,
-                fillcolor=_rgba(base, alpha),
-                line=dict(width=0),
-                layer="above",
-            )
-
-    _draw_gradient_half(half_left_span, _COLOR_ACTUAL_BASE)
-    _draw_gradient_half(half_right_span, _COLOR_PRED_BASE)
-
-    # Title labels for each half.
-    blue_base = _rgba(_COLOR_ACTUAL_BASE, 1.0)
-    ochre_base = _rgba(_COLOR_PRED_BASE, 1.0)
-    fig.add_annotation(
-        xref="paper", yref="paper",
-        x=(half_left_span[0] + half_left_span[1]) / 2, y=bar_y1 + 0.012,
-        xanchor="center", yanchor="bottom",
-        text=f"<b>{t('ui.share.synthesis.legend_actual_shade', locale=loc)}</b>",
-        showarrow=False,
-        font=dict(size=13, color=blue_base),
-    )
-    fig.add_annotation(
-        xref="paper", yref="paper",
-        x=(half_right_span[0] + half_right_span[1]) / 2, y=bar_y1 + 0.012,
-        xanchor="center", yanchor="bottom",
-        text=f"<b>{t('ui.share.synthesis.legend_predicted_shade', locale=loc)}</b>",
-        showarrow=False,
-        font=dict(size=13, color=ochre_base),
-    )
-
-    # Three tick marks + labels UNDER EACH HALF.  Each half owns its
-    # own 0-100% gradient, so ticks belong to their half's local span:
-    # opacity 0.25 sits a quarter of the way into the blue half AND a
-    # quarter of the way into the orange half, matching the shading
-    # intensity the user actually sees at those positions.
-    for (half_start, half_end) in (half_left_span, half_right_span):
-        half_width_paper: float = half_end - half_start
-        for fmt, pos in _format_opacity_tick_positions():
-            tick_x = half_start + pos * half_width_paper
-            fig.add_shape(
-                type="line",
-                xref="paper", yref="paper",
-                x0=tick_x, x1=tick_x, y0=bar_y0 - 0.008, y1=bar_y0,
-                line=dict(color="rgba(71,85,105,0.8)", width=1),
-                layer="above",
-            )
-            fig.add_annotation(
-                xref="paper", yref="paper",
-                x=tick_x, y=bar_y0 - 0.012,
-                xanchor="center", yanchor="top",
-                text=_resolve_format_label_short(fmt, locale=loc),
-                showarrow=False,
-                font=dict(size=11, color="rgba(71,85,105,1)"),
-            )
 
 
 def _safe_display_name(user_info: dict[str, Any]) -> str:
@@ -531,183 +416,484 @@ def _safe_display_name(user_info: dict[str, Any]) -> str:
     return ""
 
 
-def _rgba(base: tuple[int, int, int], alpha: float) -> str:
-    return f"rgba({base[0]},{base[1]},{base[2]},{alpha:.3f})"
+def _play_url_from_share(share_url: str) -> str:
+    """Absolute site root for the same host as ``share_url`` (where the game is played)."""
+    s: str = (share_url or "").strip()
+    if s.startswith("http://") or s.startswith("https://"):
+        p = urllib.parse.urlsplit(s)
+        return urllib.parse.urlunsplit((p.scheme, p.netloc, "/", "", ""))
+    return "/"
+
+
+def _qrcode_png_data_uri(target_url: str) -> str:
+    """PNG QR as a data URI for Plotly ``layout.images`` (pure-Python writer, no Pillow)."""
+    buf: io.BytesIO = io.BytesIO()
+    q = segno.make(target_url, error="m")
+    q.save(buf, kind="png", scale=5, border=2)
+    b64: str = base64.standard_b64encode(buf.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{b64}"
+
+
+# Share card PNG: Plotly ``xref/ yref: paper`` is the *inner* plot, not the full figure,
+# so large margins do not reserve “safe” space — text must be placed in y-bands the
+# traces do not use, by shrinking ``yaxis.domain`` for every stacked subplot.
+_CARD_TRACE_Y0: float = 0.29
+_CARD_TRACE_Y1: float = 0.71
+
+
+def _constrain_synthesis_panels_to_vertical_band(
+    fig: go.Figure,
+    n_rows: int,
+    *,
+    y_lo: float,
+    y_hi: float,
+) -> None:
+    """Force stacked subplots to use only *y* in [y_lo, y_hi] (plot / paper fraction)."""
+    if n_rows < 1:
+        return
+    span: float = y_hi - y_lo
+    step: float = span / float(n_rows)
+    for row in range(1, n_rows + 1):
+        d_bottom: float = y_lo + (n_rows - row) * step
+        d_top: float = d_bottom + step
+        fig.update_yaxes(domain=(d_bottom, d_top), row=row, col=1)
+
+
+# ---------------------------------------------------------------------------
+# Synthesis: HTML (share page) — legend cannot overlap the plot
+# ---------------------------------------------------------------------------
+
+
+def _synthesis_legend_row_html(share_record: dict[str, Any], *, locale: str) -> html.Div:
+    """In-DOM legend for /share: matches stroke colours, never drawn on the canvas."""
+    loc: str = normalize_locale(locale)
+    rounds: list[dict[str, Any]] = list(share_record.get("rounds") or [])
+    formats: list[str] = _formats_played_in_order(rounds)
+    fmt0: str = str(formats[0] or "A").strip().upper() or "A"
+    line_c: str = _format_figure_styling(fmt0)["line"]
+    z_label: str = t("ui.share.synthesis.legend_zero", locale=loc)
+    v_label: str = t("ui.share.synthesis.legend_variability", locale=loc)
+    item_style: dict[str, str] = {
+        "display": "inline-flex",
+        "alignItems": "center",
+        "gap": "8px",
+    }
+    swatch: dict[str, str] = {
+        "display": "inline-block",
+        "width": "28px",
+        "verticalAlign": "middle",
+        "marginRight": "0",
+    }
+    return html.Div(
+        [
+            html.Div(
+                [
+                    html.Span(
+                        style={**swatch, "borderBottom": "2.5px solid #0f0f0f", "alignSelf": "center"},
+                    ),
+                    html.Span(
+                        z_label,
+                        style={"color": "#334155", "fontSize": "13px", "lineHeight": "1.2"},
+                    ),
+                ],
+                style=item_style,
+            ),
+            html.Div(
+                [
+                    html.Span(
+                        style={
+                            **swatch,
+                            "borderBottom": f"2px solid {line_c}",
+                            "alignSelf": "center",
+                        },
+                    ),
+                    html.Span(
+                        v_label,
+                        style={"color": "#334155", "fontSize": "13px", "lineHeight": "1.2"},
+                    ),
+                ],
+                style=item_style,
+            ),
+        ],
+        className="share-synthesis-legend",
+        style={
+            "display": "flex",
+            "flexWrap": "wrap",
+            "justifyContent": "center",
+            "columnGap": "28px",
+            "rowGap": "4px",
+            "padding": "0 4px 4px 4px",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
 # Figures
 # ---------------------------------------------------------------------------
 
-def _slot_rect_bounds(format_code: str, slot: int, *, half_width: float) -> tuple[float, float]:
-    """Compute the horizontal bounds of the per-format bar inside a slot.
+def build_synthesis_figure(
+    share_record: dict[str, Any],
+    *,
+    locale: str,
+    show_title: bool = False,
+    figure_height: Optional[int] = None,
+    show_legend_in_figure: bool = True,
+    show_format_row_annotations: bool = True,
+) -> go.Figure:
+    """Per-slot percent error in the next hour (one subplot per data source.
 
-    Each slot is conceptually a column of width ``2 * half_width``
-    centered on the slot index.  Within that column the three format
-    buckets are drawn side-by-side in FORMAT_DRAW_ORDER so darker bars
-    don't fully hide lighter ones.  When a format hasn't been played the
-    column simply shows fewer bars -- this is the right behaviour because
-    the legend only lists formats that actually appear in the record.
-    """
-    try:
-        idx = _FORMAT_DRAW_ORDER.index(format_code)
-    except ValueError:
-        idx = 0
-    n_bins = len(_FORMAT_DRAW_ORDER)
-    bin_width = (2 * half_width) / n_bins
-    x0 = slot - half_width + idx * bin_width
-    x1 = x0 + bin_width
-    return x0, x1
+    The share page passes ``show_legend_in_figure=False`` and renders the legend
+    in HTML (see ``_synthesis_legend_row_html``) so Plotly never places it on
+    the data. For PNG/OG, keep ``show_legend_in_figure=True`` unless the card
+    draws its own legend. Both the downloadable share card and the interactive
+    ``/share`` page use ``show_format_row_annotations=True`` by default so each
+    panel shows its data-source label (Generic / My data / Mixed).
 
+    ``figure_height`` should match the Dash ``dcc.Graph`` pixel height. The
+    share page uses ``show_title=False`` and renders the chart title in HTML;
+    Plotly ``layout.title`` is not used. ``autosize`` keeps the plot width in
+    the container.
 
-def build_synthesis_figure(share_record: dict[str, Any], *, locale: str) -> go.Figure:
-    """Build the grey/blue synthesis chart across all played rounds.
-
-    Layout:
-      - Per-slot grey rectangles (actual-glucose range), one per format
-        present in the record, opacity from _FORMAT_OPACITY.
-      - Per-slot blue rectangles (predicted range), narrower, same
-        opacity encoding.
-      - One black line+dots for the cross-format actual mean per slot.
-      - One blue line+dots for the cross-format predicted mean per slot.
-      - Dashed vertical separator at the start of the prediction zone.
-      - Legend includes invisible sentinel scatter traces that carry the
-        format-opacity keys so the reader can decode the shading.
+    Per format row, ``ref = max |%|`` in that row drives a blend to **#808080**
+    at the largest errors; the curve uses the same scale.  Fill is only the
+    region between y=0 and the curve, as stacked bands: **saturated near the
+    baseline**, **greyer toward the variability chord**.  A solid **black** 0%
+    line is drawn on top of the variability curves.
     """
     loc: str = normalize_locale(locale)
     rounds: list[dict[str, Any]] = list(share_record.get("rounds") or [])
-    actual_by_format, predicted_by_format, n_slots = _collect_aligned_series_by_format(rounds)
+    formats: list[str] = _formats_played_in_order(rounds)
+    n_fmt: int = len(formats)
 
-    # Cross-format flat aggregates for the central mean lines.
-    actual_flat: list[list[float]] = _flatten_slots(actual_by_format, n_slots)
-    pred_flat: list[list[float]] = _flatten_slots(predicted_by_format, n_slots)
-
-    xs: list[int] = list(range(n_slots))
-    actual_mean: list[Optional[float]] = [
-        sum(v) / len(v) if v else None for v in actual_flat
-    ]
-    pred_mean: list[Optional[float]] = [
-        sum(v) / len(v) if v else None for v in pred_flat
-    ]
-
-    fig: go.Figure = go.Figure()
-
-    # ---- Per-slot, per-format rectangles ----
-    for fmt in _FORMAT_DRAW_ORDER:
-        if fmt not in actual_by_format:
-            continue
-        opacity = _FORMAT_OPACITY.get(fmt, 0.4)
-        slots = actual_by_format[fmt]
-        for i, values in enumerate(slots):
-            if not values:
-                continue
-            lo, hi = min(values), max(values)
-            if hi == lo:
-                # Widen a flat slot slightly so it's visible.
-                hi = lo + 0.4
-            x0, x1 = _slot_rect_bounds(fmt, i, half_width=0.38)
-            fig.add_shape(
-                type="rect",
-                x0=x0, x1=x1, y0=lo, y1=hi,
-                fillcolor=_rgba(_COLOR_ACTUAL_BASE, opacity),
-                line=dict(width=0),
-                layer="below",
-            )
-
-    for fmt in _FORMAT_DRAW_ORDER:
-        if fmt not in predicted_by_format:
-            continue
-        # Boost prediction opacity slightly above actual's so orange stays
-        # visible when its rectangle overlaps a blue one at the same slot.
-        opacity = min(1.0, _FORMAT_OPACITY.get(fmt, 0.4) + _PRED_OPACITY_BOOST)
-        slots = predicted_by_format[fmt]
-        for i, values in enumerate(slots):
-            if not values:
-                continue
-            lo, hi = min(values), max(values)
-            if hi == lo:
-                hi = lo + 0.4
-            x0, x1 = _slot_rect_bounds(fmt, i, half_width=0.25)
-            fig.add_shape(
-                type="rect",
-                x0=x0, x1=x1, y0=lo, y1=hi,
-                fillcolor=_rgba(_COLOR_PRED_BASE, opacity),
-                line=dict(width=0),
-                layer="below",
-            )
-
-    # ---- Cross-format mean lines ----
-    fig.add_trace(
-        go.Scatter(
-            x=xs, y=actual_mean,
-            mode="lines+markers",
-            name=t("ui.share.synthesis.legend_actual", locale=loc),
-            line=dict(color=_COLOR_ACTUAL_LINE, width=2),
-            marker=dict(color=_COLOR_ACTUAL_LINE, size=7),
-            connectgaps=False,
+    if n_fmt < 1 or not rounds:
+        eff_empty: int = (
+            figure_height
+            if figure_height is not None
+            else 420
         )
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=xs, y=pred_mean,
-            mode="lines+markers",
-            name=t("ui.share.synthesis.legend_prediction", locale=loc),
-            line=dict(color=_COLOR_PRED_LINE, width=3),
-            marker=dict(color=_COLOR_PRED_LINE, size=7),
-            connectgaps=False,
+        fig = go.Figure()
+        fig.update_layout(
+            height=eff_empty,
+            margin=dict(l=48, r=8, t=32, b=40),
+            autosize=True,
+            annotations=[
+                dict(
+                    text=t("ui.share.synthesis.empty", locale=loc),
+                    x=0.5, y=0.5, xref="paper", yref="paper",
+                    showarrow=False, font=dict(size=15, color="#64748b"),
+                )
+            ],
         )
+        return fig
+
+    # Width of the x axis = length of the prediction window slice (all rounds aligned).
+    n_points: int = 0
+    for r in rounds:
+        ws = _window_size_for_round(r)
+        h = _prediction_next_hour_range(ws)
+        if h is None:
+            continue
+        n_points = max(n_points, h[1] - h[0])
+    if n_points < 1:
+        n_points = PREDICTION_HOUR_OFFSET
+    x_vals: list[int] = _minutes_tickvals(n_points)
+    x_ticktext: list[str] = [str(m) for m in x_vals]
+    y_zero: list[float] = [0.0] * n_points
+
+    # No subplot_titles: they sit in the panel and crowd the main title / legend into the data.
+    fig: go.Figure = make_subplots(
+        rows=n_fmt,
+        cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.055,
     )
 
-    # Per-format shading is explained by the gradient bar rendered below
-    # the chart on the page and above the chart on the PNG card -- we do
-    # NOT spam the Plotly legend with three more format entries.
+    leg_zero: str = t("ui.share.synthesis.legend_zero", locale=loc)
+    leg_variability: str = t("ui.share.synthesis.legend_variability", locale=loc)
 
-    # ---- Prediction-zone separator ----
-    if n_slots > PREDICTION_HOUR_OFFSET:
-        sep_x: float = n_slots - PREDICTION_HOUR_OFFSET - 0.5
-        fig.add_shape(
-            type="line",
-            x0=sep_x, x1=sep_x,
-            y0=0, y1=1,
-            yref="paper",
-            line=dict(color="rgba(21,101,192,0.55)", width=2, dash="dash"),
+    first_zero: bool = True
+
+    for row_idx, fmt in enumerate(formats, start=1):
+        sty: dict[str, str] = _format_figure_styling(fmt)
+        line_c: str = sty["line"]
+
+        rounds_f: list[dict[str, Any]] = [
+            r
+            for r in rounds
+            if str(r.get("format") or "").strip().upper() == fmt
+        ]
+        rounds_f.sort(key=_round_sort_key)
+        row_y_max: float = _max_abs_percent_for_format(rounds_f)
+
+        y_dom: str = "y domain" if row_idx == 1 else f"y{row_idx} domain"
+        if show_format_row_annotations:
+            # Upper-left **inside** the panel (x domain 0–1) so we keep margin.l=0; no left clip.
+            fig.add_annotation(
+                xref="x domain",
+                yref=y_dom,
+                x=0.01,
+                y=0.99,
+                xanchor="left",
+                yanchor="top",
+                text=f"<b>{_resolve_format_label(fmt, locale=loc)}</b>",
+                showarrow=False,
+                font=dict(size=12, color="#475569"),
+                bgcolor="rgba(255,255,255,0.88)",
+                borderpad=3,
+            )
+
+        # 1) Gradient hatch only between y=0 and the variability chord
+        for r in rounds_f:
+            ws: int = _window_size_for_round(r)
+            hrange: Optional[tuple[int, int]] = _prediction_next_hour_range(ws)
+            if hrange is None:
+                continue
+            y_pct: list[Optional[float]] = _percent_error_series_for_round(r, hrange)
+            if not y_pct or not any(x is not None for x in y_pct):
+                continue
+            n_r: int = len(y_pct)
+            x_r: list[int] = _minutes_tickvals(n_r)
+            rn: int = int(r.get("round_number") or 0)
+            for j in range(0, n_r - 1):
+                p0o, p1o = y_pct[j], y_pct[j + 1]
+                if p0o is None or p1o is None:
+                    continue
+                p0: float = float(p0o)
+                p1: float = float(p1o)
+                xa: float = float(x_r[j])
+                xb: float = float(x_r[j + 1])
+                _add_gradient_hatch_axis_to_chord(
+                    fig,
+                    row_idx=row_idx,
+                    col=1,
+                    x0=xa,
+                    x1=xb,
+                    p0=p0,
+                    p1=p1,
+                    line_c=line_c,
+                    row_y_max=row_y_max,
+                    legend_rn=rn,
+                )
+
+        # 2) Variability line segments (thin); black 0% line and markers stacked above
+        for r in rounds_f:
+            ws2: int = _window_size_for_round(r)
+            h2: Optional[tuple[int, int]] = _prediction_next_hour_range(ws2)
+            if h2 is None:
+                continue
+            y_pct2: list[Optional[float]] = _percent_error_series_for_round(r, h2)
+            if not y_pct2 or not any(x is not None for x in y_pct2):
+                continue
+            n2: int = len(y_pct2)
+            x2: list[int] = _minutes_tickvals(n2)
+            rn2: int = int(r.get("round_number") or 0)
+            for j in range(0, n2 - 1):
+                v0, v1 = y_pct2[j], y_pct2[j + 1]
+                if v0 is None or v1 is None:
+                    continue
+                x0, x1 = x2[j], x2[j + 1]
+                m_seg: float = max(abs(v0), abs(v1))
+                seg_c: str = _blend_toward_grey(
+                    line_c, _t_blend_to_grey(m_seg, row_y_max), None
+                )
+                fig.add_trace(
+                    go.Scatter(
+                        x=[x0, x1],
+                        y=[v0, v1],
+                        mode="lines",
+                        line=dict(color=seg_c, width=_VARIABILITY_LINE_WIDTH),
+                        hoverinfo="skip",
+                        showlegend=False,
+                        legendgroup=f"ln{rn2}",
+                    ),
+                    row=row_idx, col=1,
+                )
+
+        # 3) Black 0% line (above variability traces, below markers)
+        show_lz: bool = show_legend_in_figure and first_zero
+        fig.add_trace(
+            go.Scatter(
+                x=x_vals,
+                y=y_zero,
+                mode="lines",
+                name=leg_zero,
+                line=_ZERO_LINE,
+                connectgaps=True,
+                legendgroup="zero",
+                showlegend=show_lz,
+                hoverinfo="skip",
+            ),
+            row=row_idx,
+            col=1,
         )
-        fig.add_annotation(
-            x=sep_x, y=1.02,
-            xref="x", yref="paper",
-            text=t("ui.share.synthesis.prediction_region", locale=loc),
-            showarrow=False,
-            font=dict(color="rgba(21,101,192,0.85)", size=12),
+        first_zero = False
+
+        for r in rounds_f:
+            ws3: int = _window_size_for_round(r)
+            h3: Optional[tuple[int, int]] = _prediction_next_hour_range(ws3)
+            if h3 is None:
+                continue
+            y_pct3: list[Optional[float]] = _percent_error_series_for_round(r, h3)
+            if not y_pct3 or not any(x is not None for x in y_pct3):
+                continue
+            n3: int = len(y_pct3)
+            x3: list[int] = _minutes_tickvals(n3)
+            rn3: int = int(r.get("round_number") or 0)
+            m_x: list[int] = []
+            m_y: list[float] = []
+            m_col: list[str] = []
+            m_cd: list[list[int]] = []
+            for j in range(n3):
+                yy = y_pct3[j]
+                if yy is None:
+                    continue
+                m_x.append(x3[j])
+                m_y.append(yy)
+                m_col.append(
+                    _blend_toward_grey(
+                        line_c, _t_blend_to_grey(abs(yy), row_y_max), None
+                    )
+                )
+                m_cd.append([rn3])
+            if m_x:
+                fig.add_trace(
+                    go.Scatter(
+                        x=m_x,
+                        y=m_y,
+                        mode="markers",
+                        marker=dict(size=5, color=m_col, line=dict(width=0, color="rgba(0,0,0,0)")),
+                        legendgroup="err",
+                        showlegend=False,
+                        customdata=m_cd,
+                        hovertemplate=(
+                            f"{t('ui.share.synthesis.round_hover', locale=loc)} %{{customdata[0]}} · "
+                            f"{t('ui.share.synthesis.y_axis_short', locale=loc)} %{{y:.1f}}%"
+                            f"<extra></extra>"
+                        ),
+                    ),
+                    row=row_idx, col=1,
+                )
+
+    x_title: str = t("ui.share.synthesis.x_axis_time", locale=loc)
+    y_name: str = t("ui.share.synthesis.y_axis_short", locale=loc)
+    y_title_row: int = max(1, (n_fmt + 1) // 2)
+    for row in range(1, n_fmt + 1):
+        fig.update_yaxes(
+            title_text=y_name if row == y_title_row else "",
+            row=row, col=1,
+            automargin=True,
+            gridcolor="rgba(15,23,42,0.08)",
+            ticksuffix="%",
+        )
+    for row in range(1, n_fmt + 1):
+        x_kw: dict[str, Any] = {
+            "row": row,
+            "col": 1,
+            "tickmode": "array",
+            "tickvals": x_vals,
+            "ticktext": x_ticktext,
+            "zeroline": False,
+            "showgrid": True,
+            "gridcolor": "rgba(15,23,42,0.08)",
+        }
+        if row == n_fmt:
+            x_kw["title_text"] = x_title
+            x_kw["automargin"] = True
+        fig.update_xaxes(**x_kw)
+
+    if show_legend_in_figure and formats:
+        var_leg_color: str = _format_figure_styling(formats[0])["line"]
+        fig.add_trace(
+            go.Scatter(
+                x=[None],
+                y=[None],
+                mode="lines",
+                line=dict(color=var_leg_color, width=_LEGEND_VARIABILITY_SAMPLE_WIDTH),
+                name=leg_variability,
+                showlegend=True,
+                visible="legendonly",
+                hoverinfo="skip",
+            ),
+            row=1,
+            col=1,
+        )
+
+    eff_h: int = (
+        figure_height
+        if figure_height is not None
+        else max(620, 120 * n_fmt + 500)
+    )
+    # When show_legend_in_figure is False (web /share), no Plotly legend: it cannot
+    # be kept reliably out of the drawable without wasting huge top margins.
+    if show_title:
+        margin_top = 102
+    elif show_legend_in_figure:
+        margin_top = 56
+    else:
+        margin_top = 8
+
+    layout_extra: dict[str, Any] = {
+        "autosize": True,
+        "height": eff_h,
+        "width": None,
+        "margin": dict(
+            l=0,
+            r=4,
+            t=margin_top,
+            b=48,
+        ),
+        "showlegend": show_legend_in_figure,
+        "plot_bgcolor": "white",
+        "paper_bgcolor": "white",
+        "hovermode": "x unified",
+        "hoverlabel": dict(
+            namelength=-1,
             align="left",
-        )
-
-    fig.update_layout(
-        title=dict(
+            font=dict(size=13),
+        ),
+    }
+    if show_legend_in_figure:
+        legend_leg: dict[str, Any] = {
+            "orientation": "h",
+            "xref": "paper",
+            "yref": "paper",
+            "xanchor": "center",
+            "x": 0.5,
+            "yanchor": "top",
+            "y": 1.0,
+            "bgcolor": "rgba(0,0,0,0)",
+            "traceorder": "normal",
+            "itemsizing": "constant",
+            "itemwidth": 36,
+            "font": dict(size=12, color="#334155"),
+        }
+        if show_title:
+            fig.add_annotation(
+                x=0.5,
+                y=1.0,
+                xref="paper",
+                yref="paper",
+                xanchor="center",
+                yanchor="top",
+                text=t("ui.share.synthesis.title", locale=loc),
+                showarrow=False,
+                font=dict(size=20, color="#0f172a"),
+            )
+            legend_leg["y"] = 0.89
+        layout_extra["legend"] = legend_leg
+    elif show_title:
+        fig.add_annotation(
+            x=0.5,
+            y=1.0,
+            xref="paper",
+            yref="paper",
+            xanchor="center",
+            yanchor="top",
             text=t("ui.share.synthesis.title", locale=loc),
-            x=0.02, xanchor="left",
-            font=dict(size=18),
-        ),
-        xaxis=dict(
-            title=t("ui.share.synthesis.x_axis", locale=loc),
-            zeroline=False, showgrid=True,
-            gridcolor="rgba(15,23,42,0.08)",
-        ),
-        yaxis=dict(
-            title=t("ui.share.synthesis.y_axis", locale=loc),
-            zeroline=False, showgrid=True,
-            gridcolor="rgba(15,23,42,0.08)",
-        ),
-        plot_bgcolor="white",
-        paper_bgcolor="white",
-        margin=dict(l=60, r=20, t=60, b=50),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom", y=1.04,
-            xanchor="right", x=1.0,
-            bgcolor="rgba(0,0,0,0)",
-        ),
-        hovermode="x unified",
-    )
+            showarrow=False,
+            font=dict(size=20, color="#0f172a"),
+        )
+    fig.update_layout(**layout_extra)
     return fig
 
 
@@ -722,24 +908,11 @@ def build_share_card_figure(
     locale: str,
     seed: Optional[str] = None,
 ) -> go.Figure:
-    """Build the 1080x1080 composite share card.
+    """Build the 1080x1080 composite share card for kaleido/OG.
 
-    Simpler approach than subplots: a single ``go.Figure`` where the
-    synthesis chart occupies the middle ``[0.32, 0.74]`` vertical band
-    (via ``xaxis.domain`` / ``yaxis.domain``), and header / stats /
-    ranking / tagline / footer live as paper-coordinate annotations in
-    explicit bands above and below.  Nothing overlaps because every
-    annotation has a hand-tuned y fraction that doesn't collide with
-    the chart domain or with sibling annotations.
-
-    Band layout (top -> bottom):
-      0.90 .. 1.00  title + name
-      0.78 .. 0.88  stats line (MAE / RMSE / Accuracy / Rounds)
-      0.74 .. 0.76  legend (set by legend.y below)
-      0.32 .. 0.74  synthesis chart (yaxis.domain)
-      0.20 .. 0.30  ranking heading + lines
-      0.10 .. 0.18  tagline
-      0.03 .. 0.08  footer url
+    In Plotly, ``paper`` is the *inner* plot, so we shrink every subplot
+    ``yaxis.domain`` to a middle band and place title, metrics, quote, legend
+    entirely above, and ranking + QR entirely below, the traces.
     """
     loc: str = normalize_locale(locale)
     rounds: list[dict[str, Any]] = list(share_record.get("rounds") or [])
@@ -749,105 +922,127 @@ def build_share_card_figure(
 
     mae: float = stats.get("mae_mgdl") or float("nan")
     rmse: float = stats.get("rmse_mgdl") or float("nan")
-    accuracy: float = stats.get("accuracy") or float("nan")
     rounds_played: int = int(stats.get("rounds_played") or 0)
     encourage: str = encouragement_text(stats, loc, seed=seed)
+    play_url: str = _play_url_from_share(share_url)
+    qri: str = _qrcode_png_data_uri(play_url)
 
-    # Build the synthesis figure, then flatten it into this figure by
-    # copying traces and shapes.  The chart occupies a sub-rectangle of
-    # the paper via xaxis.domain / yaxis.domain.
-    syn: go.Figure = build_synthesis_figure(share_record, locale=loc)
-    fig: go.Figure = go.Figure()
-    for trace in syn.data:
-        fig.add_trace(trace)
-    # Shapes in the synthesis fig are a mix of x/y-ref rectangles and a
-    # paper-ref separator line + annotation.  Rectangles use plain x/y
-    # refs so they follow the chart domain we set below automatically.
-    # Paper-ref shapes (the vertical separator) have y0=0, y1=1 covering
-    # the whole paper; we clamp them to the chart band [0.32, 0.74] so
-    # they don't crash through the ranking block underneath the chart.
-    chart_band_bottom: float = 0.40
-    chart_band_top: float = 0.76
-    for shape in (syn.layout.shapes or []):
-        new_shape = shape.to_plotly_json()
-        if new_shape.get("yref") == "paper":
-            new_shape["y0"] = chart_band_bottom
-            new_shape["y1"] = chart_band_top
-        fig.add_shape(**new_shape)
-    # Copy the "Prediction zone" annotation.  Its yref=paper so we
-    # position it *inside* the chart band, near the top, so it doesn't
-    # collide with the Plotly legend that sits just above the chart.
-    for ann in (syn.layout.annotations or []):
-        ad = ann.to_plotly_json()
-        if ad.get("yref") == "paper":
-            ad["y"] = chart_band_top - 0.01
-            ad["yanchor"] = "top"
-        fig.add_annotation(**ad)
+    fig: go.Figure = build_synthesis_figure(
+        share_record,
+        locale=loc,
+        show_title=False,
+        show_legend_in_figure=False,
+        show_format_row_annotations=True,
+    )
+    fig.update_layout(
+        width=1080, height=1080,
+        margin=dict(l=56, r=28, t=20, b=20),
+        paper_bgcolor="#f8fafc",
+        plot_bgcolor="white",
+        showlegend=False,
+    )
+    n_fmt: int = len(_formats_played_in_order(rounds))
+    if n_fmt >= 1:
+        _constrain_synthesis_panels_to_vertical_band(
+            fig, n_fmt, y_lo=_CARD_TRACE_Y0, y_hi=_CARD_TRACE_Y1
+        )
+    mae_label: str = t("ui.share.stat_mae", locale=loc)
+    rmse_label: str = t("ui.share.stat_rmse", locale=loc)
+    rounds_label: str = t("ui.share.stat_rounds", locale=loc)
+    leg_zero: str = t("ui.share.synthesis.legend_zero", locale=loc)
+    leg_var: str = t("ui.share.synthesis.legend_variability", locale=loc)
+    # Paper y: 0=bottom, 1=top. Traces use [_CARD_TRACE_Y0, _CARD_TRACE_Y1] only.
+    y_legend: float = 0.755
+    y_stats: float
+    y_quote: float
+    if name:
+        y_stats = 0.888
+        y_quote = 0.828
+    else:
+        y_stats = 0.908
+        y_quote = 0.848
 
-    # ---- Header ----
     fig.add_annotation(
         xref="paper", yref="paper",
-        x=0.5, y=0.975,
+        x=0.5, y=0.987,
         xanchor="center", yanchor="top",
         text=f"<b>{t('ui.share.title', locale=loc)}</b>",
         showarrow=False,
-        font=dict(size=30, color="rgba(15,23,42,1)"),
+        font=dict(size=36, color="rgba(15,23,42,1)"),
     )
     if name:
         fig.add_annotation(
             xref="paper", yref="paper",
-            x=0.5, y=0.910,
+            x=0.5, y=0.928,
             xanchor="center", yanchor="top",
             text=name,
             showarrow=False,
             font=dict(size=18, color="rgba(71,85,105,1)"),
         )
-
-    # ---- Stats line ----
-    mae_label: str = t("ui.share.stat_mae", locale=loc)
-    rmse_label: str = t("ui.share.stat_rmse", locale=loc)
-    rounds_label: str = t("ui.share.stat_rounds", locale=loc)
-    acc_label: str = t("ui.share.stat_accuracy", locale=loc)
     stats_line: str = (
         f"<b>{_format_number(mae)}</b> mg/dL {mae_label}"
         f"   \u2022   "
         f"<b>{_format_number(rmse)}</b> mg/dL {rmse_label}"
         f"   \u2022   "
-        f"<b>{_format_number(accuracy)}%</b> {acc_label}"
-        f"   \u2022   "
         f"<b>{rounds_played}</b> {rounds_label}"
     )
     fig.add_annotation(
         xref="paper", yref="paper",
-        x=0.5, y=name and 0.855 or 0.895,
+        x=0.5, y=y_stats,
         xanchor="center", yanchor="top",
         text=stats_line,
         showarrow=False,
         font=dict(size=17, color="rgba(15,23,42,1)"),
     )
-
-    # ---- Gradient legend bar (between chart and ranking) ----
-    # The bar is drawn as two half-bars side by side (blue gradient on
-    # the left = actual, ochre gradient on the right = predicted), with
-    # three tick labels underneath that map shading intensity to the
-    # format the user played.  Rendered via Plotly shapes so kaleido can
-    # reproduce it in the PNG.
-    _add_card_gradient_bar(fig, locale=loc)
-
-    # ---- Ranking block (below the gradient bar) ----
-    rankings: dict[str, Any] = dict(share_record.get("rankings") or {})
-    per_format_entries: list[dict[str, Any]] = list(rankings.get("per_format") or [])
-    overall_entry = rankings.get("overall") if isinstance(rankings.get("overall"), dict) else None
-
     fig.add_annotation(
         xref="paper", yref="paper",
-        x=0.5, y=0.25,
+        x=0.5, y=y_quote,
         xanchor="center", yanchor="top",
-        text=f"<b>{t('ui.final.ranking_title', locale=loc)}</b>",
+        text=f"<i>{encourage}</i>",
         showarrow=False,
-        font=dict(size=18, color="rgba(21,101,192,1)"),
+        font=dict(size=16, color="rgba(30,58,138,1)"),
     )
 
+    formats_played: list[str] = _formats_played_in_order(rounds)
+    fmt0: str = str(formats_played[0]).strip().upper() if formats_played else "A"
+    if fmt0 not in ("A", "B", "C"):
+        fmt0 = "A"
+    var_color: str = _format_figure_styling(fmt0)["line"]
+    fig.add_shape(
+        type="line",
+        xref="paper", yref="paper",
+        x0=0.28, x1=0.35, y0=y_legend, y1=y_legend,
+        line={"color": "#0f0f0f", "width": 3.2},
+        layer="above",
+    )
+    fig.add_annotation(
+        xref="paper", yref="paper",
+        x=0.355, y=y_legend, xanchor="left", yanchor="middle",
+        text=leg_zero,
+        showarrow=False,
+        font=dict(size=13, color="rgba(51,65,85,1)"),
+    )
+    fig.add_shape(
+        type="line",
+        xref="paper", yref="paper",
+        x0=0.55, x1=0.62, y0=y_legend, y1=y_legend,
+        line={"color": var_color, "width": 2.0},
+        layer="above",
+    )
+    fig.add_annotation(
+        xref="paper", yref="paper",
+        x=0.625, y=y_legend, xanchor="left", yanchor="middle",
+        text=leg_var,
+        showarrow=False,
+        font=dict(size=13, color="rgba(51,65,85,1)"),
+    )
+
+    # ---- Ranking (large, bottom) ----
+    rankings: dict[str, Any] = dict(share_record.get("rankings") or {})
+    per_format_entries: list[dict[str, Any]] = list(rankings.get("per_format") or [])
+    overall_entry: Optional[dict[str, Any]] = (
+        rankings.get("overall") if isinstance(rankings.get("overall"), dict) else None
+    )
     ranking_lines: list[str] = []
     if overall_entry is not None:
         try:
@@ -871,75 +1066,85 @@ def build_share_card_figure(
         fmt = str(entry.get("format") or "")
         label = _resolve_format_label(fmt, locale=loc)
         ranking_lines.append(
-            t("ui.final.ranking_format_line", locale=loc,
-              format=label, rank=r, total=total)
+            t(
+                "ui.final.ranking_format_line",
+                locale=loc,
+                format=label, rank=r, total=total,
+            )
         )
+    # Footer band: left column = ranking; right = scan hint + QR. Same top/bottom on both columns.
+    rank_left_x: float = 0.04
+    _rank_title_y_top: float = 0.205
+    _rank_first_line_y_top: float = 0.176
+    _rank_step: float = 0.026
+    # One line of body text in paper fraction (~px/fig_height for 14–17px on 1080)
+    _rank_line_paper_h: float = 0.022
+    _scan_font_pt: int = 12
+    _scan_line_paper_h: float = 0.02
+    _scan_qr_gap: float = 0.003
+    qr_col_x: float = 0.86
 
-    # Render each ranking line at a fixed paper-y with tight spacing.
-    # Cap at 4 lines so we don't run into the tagline band.
-    rank_base_y: float = 0.215
-    rank_step: float = 0.028
-    for idx, line in enumerate(ranking_lines[:4]):
-        emphasis_open, emphasis_close = ("<b>", "</b>") if idx == 0 else ("", "")
+    footer_y_top: float
+    footer_y_bottom: float
+    if ranking_lines:
+        footer_y_top = _rank_title_y_top
+        n_body: int = len(ranking_lines[:4])
+        y_last_line_top: float = (
+            _rank_first_line_y_top - max(0, n_body - 1) * _rank_step
+        )
+        footer_y_bottom = y_last_line_top - _rank_line_paper_h
         fig.add_annotation(
             xref="paper", yref="paper",
-            x=0.5, y=rank_base_y - idx * rank_step,
-            xanchor="center", yanchor="top",
-            text=f"{emphasis_open}{line}{emphasis_close}",
+            x=rank_left_x, y=footer_y_top,
+            xanchor="left", yanchor="top",
+            text=f"<b>{t('ui.final.ranking_title', locale=loc)}</b>",
             showarrow=False,
-            font=dict(size=14, color="rgba(15,23,42,1)"),
+            font=dict(size=22, color="rgba(21,101,192,1)"),
         )
+        for idx, line in enumerate(ranking_lines[:4]):
+            em_o, em_c = ("<b>", "</b>") if idx == 0 else ("", "")
+            fig.add_annotation(
+                xref="paper", yref="paper",
+                x=rank_left_x, y=_rank_first_line_y_top - idx * _rank_step,
+                xanchor="left", yanchor="top",
+                text=f"{em_o}{line}{em_c}",
+                showarrow=False,
+                font=dict(
+                    size=17 if idx == 0 else 14,
+                    color="rgba(15,23,42,1)",
+                ),
+            )
+    else:
+        footer_y_top, footer_y_bottom = 0.18, 0.05
 
-    # ---- Tagline ----
+    col_h: float = footer_y_top - footer_y_bottom
+    qr_h: float = max(0.0, col_h - _scan_line_paper_h - _scan_qr_gap)
+    # Square QR: same paper span on x and y (1080 square figure)
+    qr_w: float = qr_h
+
     fig.add_annotation(
         xref="paper", yref="paper",
-        x=0.5, y=0.085,
+        x=qr_col_x, y=footer_y_top,
         xanchor="center", yanchor="top",
-        text=f"<i>{encourage}</i>",
+        text=t("ui.share.qr_scan_to_play", locale=loc),
         showarrow=False,
-        font=dict(size=15, color="rgba(30,58,138,1)"),
+        font=dict(size=_scan_font_pt, color="rgba(71,85,105,0.95)"),
+    )
+    fig.add_layout_image(
+        dict(
+            source=qri,
+            xref="paper",
+            yref="paper",
+            x=qr_col_x,
+            y=footer_y_bottom,
+            xanchor="center",
+            yanchor="bottom",
+            sizex=qr_w,
+            sizey=qr_h,
+            layer="above",
+        )
     )
 
-    # ---- Footer ----
-    footer: str = t("ui.share.card_footer", locale=loc, url=share_url)
-    fig.add_annotation(
-        xref="paper", yref="paper",
-        x=0.5, y=0.035,
-        xanchor="center", yanchor="top",
-        text=footer,
-        showarrow=False,
-        font=dict(size=13, color="rgba(71,85,105,0.9)"),
-    )
-
-    # ---- Chart axis config: constrain the synthesis to the middle band ----
-    fig.update_xaxes(
-        domain=[0.08, 0.96],
-        showgrid=True, gridcolor="rgba(15,23,42,0.08)",
-        zeroline=False,
-        title=None,
-    )
-    fig.update_yaxes(
-        domain=[0.40, 0.76],
-        showgrid=True, gridcolor="rgba(15,23,42,0.08)",
-        zeroline=False,
-        title=t("ui.share.synthesis.y_axis", locale=loc),
-    )
-
-    fig.update_layout(
-        width=1080, height=1080,
-        plot_bgcolor="white",
-        paper_bgcolor="#f8fafc",
-        showlegend=True,
-        legend=dict(
-            orientation="h",
-            yanchor="top", y=0.78,
-            xanchor="center", x=0.5,
-            bgcolor="rgba(0,0,0,0)",
-            font=dict(size=12),
-        ),
-        margin=dict(l=30, r=30, t=30, b=30),
-        title=None,
-    )
     return fig
 
 
@@ -1010,7 +1215,6 @@ def create_share_layout(
 
     mae: float = stats.get("mae_mgdl") or float("nan")
     rmse: float = stats.get("rmse_mgdl") or float("nan")
-    accuracy: float = stats.get("accuracy") or float("nan")
     rounds_played: int = int(stats.get("rounds_played") or 0)
     best_entry: Optional[dict[str, Any]] = _best_ranking_entry(share_record)
 
@@ -1053,7 +1257,6 @@ def create_share_layout(
                "justifyContent": "center", "marginTop": "16px"},
     )
 
-    # Stat tile with optional subline (used for Best rank -> category).
     def stat_tile(label: str, value: str, sub: str = "") -> html.Div:
         children: list[Any] = [
             html.Div(value, style={"fontSize": "32px", "fontWeight": "800",
@@ -1081,7 +1284,6 @@ def create_share_layout(
             disable_n_clicks=True,
         )
 
-    # Best-rank tile: value + category subline.
     if best_entry:
         best_value: str = f"#{best_entry['rank']}"
         scope: str = best_entry["scope"]
@@ -1097,12 +1299,11 @@ def create_share_layout(
         [
             stat_tile(t("ui.share.stat_mae", locale=loc), f"{_format_number(mae)} mg/dL"),
             stat_tile(t("ui.share.stat_rmse", locale=loc), f"{_format_number(rmse)} mg/dL"),
-            stat_tile(t("ui.share.stat_accuracy", locale=loc), f"{_format_number(accuracy)}%"),
             stat_tile(t("ui.share.stat_rounds", locale=loc), str(rounds_played)),
             stat_tile(t("ui.share.stat_ranking", locale=loc), best_value, sub=best_sub),
         ],
         style={"display": "flex", "flexWrap": "wrap", "gap": "14px",
-               "marginTop": "20px", "justifyContent": "center"},
+               "marginTop": "8px", "justifyContent": "center"},
         disable_n_clicks=True,
     )
 
@@ -1153,31 +1354,29 @@ def create_share_layout(
             [
                 html.H3(
                     t("ui.final.ranking_title", locale=loc),
-                    style={"margin": "0 0 10px 0", "color": "#1565c0",
-                           "fontSize": "20px", "fontWeight": "700"},
+                    className="share-ranking-hero-title",
                     disable_n_clicks=True,
                 ),
                 html.Ul(
                     ranking_lines,
-                    style={"listStyle": "none", "padding": "0", "margin": "0",
-                           "fontSize": "16px", "color": "#0f172a"},
+                    className="share-ranking-hero-list",
                     disable_n_clicks=True,
                 ),
             ],
+            className="share-ranking-hero",
             style={
                 "background": "white",
                 "borderRadius": "14px",
                 "padding": "18px 22px",
                 "boxShadow": "0 4px 14px rgba(15,23,42,0.08)",
-                "marginTop": "20px",
-                "maxWidth": "760px",
-                "marginLeft": "auto",
-                "marginRight": "auto",
+                "flex": "1 1 280px",
+                "minWidth": "0",
+                "maxWidth": "540px",
+                "textAlign": "left",
             },
             disable_n_clicks=True,
         )
 
-    # ---------- Played formats line ----------
     played_formats: list[str] = list(share_record.get("played_formats") or [])
     if not played_formats:
         derived: set[str] = {str(r.get("format") or "") for r in rounds}
@@ -1197,24 +1396,81 @@ def create_share_layout(
             disable_n_clicks=True,
         )
 
+    n_panels: int = len(_formats_played_in_order(rounds))
+    # Match dcc.Graph height to build_synthesis_figure(figure_height=...). Title and legend
+    # are in HTML; the figure has an ~8px top margin so nothing clips at the top edge.
+    graph_height: int = max(620, 130 * n_panels + 520)
+
+    play_url: str = _play_url_from_share(share_url)
+    quote_block: html.Div = html.Div(
+        encourage,
+        className="share-encouragement-quote",
+        style={
+            "padding": "4px 16px 2px 16px",
+            "fontSize": "clamp(18px, 2.2vw, 22px)",
+            "lineHeight": "1.38",
+            "color": "#1e3a8a",
+            "textAlign": "center",
+            "fontWeight": "600",
+        },
+        disable_n_clicks=True,
+    )
+    qr_block: html.Div = html.Div(
+        [
+            html.Div(
+                t("ui.share.qr_scan_to_play", locale=loc),
+                className="share-play-qr-hint",
+                disable_n_clicks=True,
+            ),
+            html.A(
+                html.Img(
+                    src=_qrcode_png_data_uri(play_url),
+                    className="share-play-qr-img",
+                    alt=t("ui.share.qr_scan_to_play", locale=loc),
+                ),
+                href=play_url,
+                className="share-play-qr-link",
+            ),
+        ],
+        className="share-play-qr",
+        disable_n_clicks=True,
+    )
+
     synthesis_card: html.Div = html.Div(
         [
-            dcc.Graph(
-                figure=build_synthesis_figure(share_record, locale=loc),
-                config={"displayModeBar": False, "scrollZoom": False, "staticPlot": False},
-                style={"height": "460px"},
-            ),
-            # Gradient bar replaces the old text hint.  It visually shows
-            # how blue vs ochre maps to actual vs predicted, and the
-            # three ticks underneath (Generic / My Data / Combined) map
-            # shading intensity back to the format that produced it.
-            build_gradient_legend_bar(locale=loc),
             html.Div(
-                t(
-                    "ui.share.synthesis.caption_close" if not math.isnan(mae) and mae < 10
-                    else "ui.share.synthesis.caption_far",
+                t("ui.share.synthesis.title", locale=loc),
+                className="share-synthesis-headline",
+                disable_n_clicks=True,
+            ),
+            *(
+                (_synthesis_legend_row_html(share_record, locale=loc),)
+                if n_panels > 0
+                else ()
+            ),
+            dcc.Graph(
+                figure=build_synthesis_figure(
+                    share_record,
                     locale=loc,
+                    show_title=False,
+                    show_legend_in_figure=False,
+                    figure_height=graph_height,
                 ),
+                className="share-synthesis-graph",
+                config={
+                    "displayModeBar": False,
+                    "scrollZoom": False,
+                    "staticPlot": False,
+                    "responsive": True,
+                },
+                style={
+                    "height": f"{graph_height}px",
+                    "minHeight": "400px",
+                    "width": "100%",
+                },
+            ),
+            html.Div(
+                t("ui.share.synthesis.caption", locale=loc),
                 style={"fontSize": "14px", "color": "#475569", "textAlign": "center",
                        "padding": "6px 16px 16px 16px", "fontStyle": "italic"},
                 disable_n_clicks=True,
@@ -1222,7 +1478,7 @@ def create_share_layout(
         ],
         style={"background": "white", "borderRadius": "18px",
                "boxShadow": "0 8px 24px rgba(15,23,42,0.08)",
-               "overflow": "hidden", "marginTop": "24px"},
+               "overflow": "hidden", "marginTop": "14px", "width": "100%"},
         disable_n_clicks=True,
     )
 
@@ -1275,14 +1531,15 @@ def create_share_layout(
     header_children: list[Any] = [
         html.H1(
             t("ui.share.title", locale=loc),
-            style={"fontSize": "clamp(28px,4vw,44px)", "margin": "0 0 4px 0",
+            style={"fontSize": "clamp(32px,4.5vw,52px)", "margin": "0 0 2px 0",
+                   "lineHeight": "1.12",
                    "color": "#0f172a", "textAlign": "center"},
         ),
         html.P(
             t("ui.share.subtitle", locale=loc),
             style={"fontSize": "clamp(16px,2.5vw,20px)",
                    "color": "#475569", "textAlign": "center",
-                   "margin": "0 0 4px 0"},
+                   "margin": "0 0 2px 0"},
             disable_n_clicks=True,
         ),
     ]
@@ -1297,40 +1554,44 @@ def create_share_layout(
             )
         )
 
-    return html.Div(
+    main_stack: list[Any] = [
+        url_store,
+        html.Div(
+            header_children,
+            style={"paddingTop": "8px"},
+            disable_n_clicks=True,
+        ),
+        stats_row,
+        quote_block,
+    ]
+    if played_line is not None:
+        main_stack.append(played_line)
+    main_stack.append(synthesis_card)
+    if ranking_card is not None:
+        main_stack.append(
+            html.Div(
+                [ranking_card, qr_block],
+                className="share-ranking-qr-row",
+                disable_n_clicks=True,
+            )
+        )
+    else:
+        main_stack.append(qr_block)
+    main_stack.extend(
         [
-            url_store,
-            html.Div(
-                header_children,
-                style={"paddingTop": "20px"},
-                disable_n_clicks=True,
-            ),
-
-            stats_row,
-            ranking_card,
-            played_line,
-            synthesis_card,
-
-            html.Div(
-                encourage,
-                style={"marginTop": "22px", "padding": "18px 22px",
-                       "background": "linear-gradient(135deg,#eff6ff,#ede9fe)",
-                       "borderRadius": "14px", "fontSize": "17px",
-                       "color": "#1e3a8a", "textAlign": "center",
-                       "boxShadow": "0 3px 10px rgba(30,64,175,0.08)"},
-                disable_n_clicks=True,
-            ),
-
             action_buttons,
             share_buttons,
-
             html.Div(
                 t("ui.share.download_png_hint", locale=loc),
                 style={"fontSize": "13px", "color": "#94a3b8",
                        "textAlign": "center", "marginTop": "14px"},
                 disable_n_clicks=True,
             ),
-        ],
+        ]
+    )
+
+    return html.Div(
+        main_stack,
         className="share-page info-page",
         id="share-page",
         disable_n_clicks=True,

@@ -12,6 +12,140 @@
   padding-bottom: 60px;
 }
 
+/* Synthesis: title lives in HTML (not Plotly layout.title). Graph fills the card width. */
+.share-page .share-synthesis-headline {
+  text-align: center;
+  color: #0f172a;
+  font-size: clamp(1.15rem, 2.5vw, 1.4rem);
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 0;
+  padding: 2px 8px 2px 8px;
+}
+.share-page .share-synthesis-legend {
+  /* Legend row: lives between headline and dcc.Graph; not part of the canvas */
+  line-height: 1;
+}
+
+.share-page .share-encouragement-quote {
+  max-width: 820px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.share-page .share-ranking-hero-title {
+  margin: 0 0 10px 0;
+  color: #1565c0;
+  font-size: clamp(1.35rem, 3vw, 1.75rem);
+  font-weight: 800;
+  text-align: left;
+}
+
+.share-page .share-ranking-hero-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  color: #0f172a;
+}
+
+.share-page .share-ranking-hero-list li {
+  font-size: clamp(1.05rem, 2.3vw, 1.3rem);
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.share-page .share-ranking-hero-list li:first-child {
+  font-size: clamp(1.2rem, 2.7vw, 1.5rem);
+  font-weight: 800;
+}
+
+.share-page .share-ranking-qr-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 20px 28px;
+  margin-top: 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.share-page .share-ranking-qr-row .share-play-qr {
+  margin-top: 0;
+  margin-left: auto;
+  margin-bottom: 0;
+  flex: 0 0 min(200px, 40vw);
+  min-height: 0;
+  min-width: 120px;
+  max-width: 220px;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.share-page .share-play-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 20px;
+  margin-bottom: 8px;
+}
+
+.share-page .share-ranking-qr-row .share-play-qr .share-play-qr-hint {
+  margin-top: 0;
+  margin-bottom: 4px;
+  line-height: 1.2;
+  flex: 0 0 auto;
+}
+
+.share-page .share-ranking-qr-row .share-play-qr .share-play-qr-link {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+}
+
+.share-page .share-play-qr-link {
+  line-height: 0;
+}
+
+.share-page .share-ranking-qr-row .share-play-qr-img {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+  border-radius: 6px;
+  object-fit: contain;
+}
+
+.share-page .share-play-qr-img {
+  width: min(200px, 52vw);
+  height: auto;
+  display: block;
+  border-radius: 6px;
+}
+
+.share-page .share-play-qr-hint {
+  font-size: 15px;
+  font-weight: 600;
+  color: #475569;
+}
+.share-page .share-synthesis-graph,
+.share-page .share-synthesis-graph .js-plotly-plot,
+.share-page .share-synthesis-graph .plotly,
+.share-page .share-synthesis-graph .plotly-container {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
 .share-btn {
   transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
   box-shadow: 0 3px 12px rgba(15, 23, 42, 0.15);
@@ -48,4 +182,12 @@ html.mobile-device .share-page .share-btn {
 }
 html.mobile-device .share-page .ui.button {
   margin-bottom: 8px;
+}
+html.mobile-device .share-page .share-ranking-qr-row {
+  flex-direction: column;
+  align-items: stretch;
+}
+html.mobile-device .share-page .share-ranking-qr-row .share-play-qr {
+  margin-left: 0;
+  align-self: center;
 }
