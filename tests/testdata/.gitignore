@@ -1,0 +1,10 @@
+!.gitignore
+
+# Fixtures and imports (see also: add new !<dir>/ + !<dir>/** when committing another top-level subtree).
+**/**
+!Clarity_Export_synthetic.csv
+!Clarity_Export_synthetic_unified.csv
+!FreeStyle_Libre_3_synthetic.csv
+!FreeStyle_Libre_3_synthetic_unified.csv
+!Unified_synthetic.csv
+!Unified_synthetic_unified.csv

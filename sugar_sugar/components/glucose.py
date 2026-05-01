@@ -168,7 +168,7 @@ class GlucoseChart(html.Div):
     def _reconstruct_events_dataframe_from_dict(self, events_data: dict[str, list[Any]]) -> pl.DataFrame:
         """Reconstruct the events DataFrame from stored data"""
         return pl.DataFrame({
-            'time': pl.Series(events_data['time']).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),
+            'time': pl.Series(events_data['time'], dtype=pl.String).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),
             'event_type': pl.Series(events_data['event_type'], dtype=pl.String),
             'event_subtype': pl.Series(events_data['event_subtype'], dtype=pl.String),
             # Coerce numeric strings and mixed types to Float64
