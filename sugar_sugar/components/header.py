@@ -17,6 +17,7 @@ class HeaderComponent(Div):
         show_example_button: bool = True,
         children: Optional[Sequence[Any]] = None,
         initial_slider_value: int = 0,
+        data_source_name: str = "example.csv",
         **kwargs: Any
     ) -> None:
         self._locale: str = locale
@@ -24,6 +25,7 @@ class HeaderComponent(Div):
         self.show_upload_section = show_upload_section
         self.show_example_button = show_example_button
         self.initial_slider_value = initial_slider_value
+        self.data_source_name = data_source_name
         if children is None:
             children = self._create_header_content()
 
@@ -148,7 +150,7 @@ class HeaderComponent(Div):
                                 ),
                                 html.Div(
                                     id='data-source-display',
-                                    children="example.csv",
+                                    children=self.data_source_name,
                                     style={
                                         'color': '#2c5282',
                                         'fontStyle': 'italic',

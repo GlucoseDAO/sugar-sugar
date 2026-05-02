@@ -116,6 +116,25 @@ def _assert_store_roundtrip(glucose_df: pl.DataFrame, events_df: pl.DataFrame) -
     assert reconstructed_events.columns == events_df.columns
 
 
+def test_chart_reconstructs_mixed_numeric_insulin_values() -> None:
+    events_store: dict[str, list[Any]] = {
+        "time": [
+            "2025-05-14T10:00:00",
+            "2025-05-14T10:05:00",
+            "2025-05-14T10:10:00",
+            "2025-05-14T10:15:00",
+        ],
+        "event_type": ["Insulin", "Insulin", "Insulin", "Insulin"],
+        "event_subtype": ["Fast Acting", "Fast Acting", "Fast Acting", "Fast Acting"],
+        "insulin_value": [1, 3.5, "2.25", ""],
+    }
+
+    reconstructed_events = GlucoseChart()._reconstruct_events_dataframe_from_dict(events_store)
+
+    assert reconstructed_events.get_column("insulin_value").dtype == pl.Float64
+    assert reconstructed_events.get_column("insulin_value").to_list() == [1.0, 3.5, 2.25, None]
+
+
 def _trace_y_values(trace: Any) -> list[float]:
     return [float(value) for value in trace.y]
 

@@ -32,7 +32,7 @@ class EndingPage:
             'time': pl.Series(events_data['time'], dtype=pl.String).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),
             'event_type': pl.Series(events_data['event_type'], dtype=pl.String),
             'event_subtype': pl.Series(events_data['event_subtype'], dtype=pl.String),
-            'insulin_value': pl.Series(events_data['insulin_value'], dtype=pl.Float64)
+            'insulin_value': pl.Series(events_data['insulin_value'], dtype=pl.Float64, strict=False)
         })
         
     def __call__(self) -> html.Div:
