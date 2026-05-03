@@ -43,7 +43,7 @@ to_nice_file(logs_dir / 'sugar_sugar.json', logs_dir / 'sugar_sugar.log')
 from sugar_sugar.i18n import setup_i18n, normalize_locale, t, t_raw
 setup_i18n()
 
-from sugar_sugar.data import load_glucose_data
+from sugar_sugar.data import load_glucose_data, load_glucose_data_from_nightscout
 from sugar_sugar.config import (
     DEFAULT_POINTS,
     MIN_POINTS,
@@ -847,7 +847,8 @@ def update_on_language_change(
      Output('prediction-units-label', 'children'),
      Output('prediction-consent-label', 'children'),
      Output('submit-button', 'children'),
-     Output('finish-study-button', 'children')],
+     Output('finish-study-button', 'children'),
+     Output('nightscout-load-button', 'children')],
     [Input('interface-language', 'data')],
     [State('url', 'pathname')],
     prevent_initial_call=True,
@@ -889,6 +890,7 @@ def update_prediction_text_on_language_change(
         t("ui.startup.data_usage_consent_label", locale=locale),
         t("ui.submit.submit", locale=locale),
         t("ui.common.finish_exit", locale=locale),
+        t("ui.header.nightscout_load_button", locale=locale),
     )
 
 
@@ -4176,6 +4178,117 @@ def handle_file_upload(
             random_start,  # Update initial slider value
             info,
             current_time if triggered == "prediction-data-usage-consent" else no_update,
+        )
+
+
+# Nightscout data load callback
+@app.callback(
+    [Output('last-click-time', 'data', allow_duplicate=True),
+     Output('full-df', 'data', allow_duplicate=True),
+     Output('current-window-df', 'data', allow_duplicate=True),
+     Output('events-df', 'data', allow_duplicate=True),
+     Output('is-example-data', 'data', allow_duplicate=True),
+     Output('data-source-name', 'data', allow_duplicate=True),
+     Output('randomization-initialized', 'data', allow_duplicate=True),
+     Output('initial-slider-value', 'data', allow_duplicate=True),
+     Output('user-info-store', 'data', allow_duplicate=True),
+     Output('nightscout-status', 'children')],
+    [Input('nightscout-load-button', 'n_clicks')],
+    [State('nightscout-url-input', 'value'),
+     State('nightscout-token-input', 'value'),
+     State('user-info-store', 'data'),
+     State('prediction-data-usage-consent', 'value')],
+    prevent_initial_call=True,
+)
+def handle_nightscout_load(
+    n_clicks: Optional[int],
+    nightscout_url: Optional[str],
+    nightscout_token: Optional[str],
+    user_info: Optional[Dict[str, Any]],
+    consent_value: Optional[list[str]],
+) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int, Dict[str, Any], Any]:
+    """Load CGM data from a Nightscout server URL."""
+    if not n_clicks:
+        raise PreventUpdate
+
+    _no = (no_update,) * 9
+
+    info_pre: Dict[str, Any] = dict(user_info or {})
+    fmt = str(info_pre.get("format") or "A")
+    locale = normalize_locale(info_pre.get("interface_language"))
+
+    def _error(msg: str) -> Any:
+        return html.Div(msg, style={
+            'color': '#7f1d1d',
+            'backgroundColor': '#fee2e2',
+            'padding': '8px 10px',
+            'borderRadius': '4px',
+            'marginTop': '6px',
+        })
+
+    if not nightscout_url or not nightscout_url.strip():
+        return _no + (_error(t("ui.header.nightscout_url_required", locale=locale)),)
+
+    consent_ok = bool(info_pre.get("consent_use_uploaded_data", False)) or bool(consent_value and "agree" in consent_value)
+    if fmt in ("B", "C") and not consent_ok:
+        return _no + (_error(t("ui.header.nightscout_consent_required", locale=locale)),)
+
+    with start_action(action_type=u"handle_nightscout_load", url=nightscout_url.strip()):
+        users_data_dir = project_root / 'data' / 'input' / 'users'
+        try:
+            new_full_df, new_events_df, save_path = load_glucose_data_from_nightscout(
+                nightscout_url.strip(),
+                token=nightscout_token or None,
+                save_dir=users_data_dir,
+            )
+        except Exception as exc:
+            return _no + (_error(t("ui.header.nightscout_error", locale=locale, error=str(exc))),)
+
+        points = max(MIN_POINTS, min(MAX_POINTS, DEFAULT_POINTS))
+        new_df, random_start = get_random_data_window(new_full_df, points)
+
+        ns_label = nightscout_url.strip().rstrip('/')
+        current_time = int(time.time() * 1000)
+
+        info: Dict[str, Any] = dict(info_pre)
+        info["uploaded_data_path"] = str(save_path)
+        info["uploaded_data_filename"] = ns_label
+        info["is_example_data"] = False
+        info["data_source_name"] = ns_label
+        info["nightscout_url"] = ns_label
+        if nightscout_token:
+            info["nightscout_token"] = nightscout_token
+        info["blocked_upload_requires_consent"] = False
+        info.pop("pending_upload_contents", None)
+        info.pop("pending_upload_filename", None)
+
+        count = len(new_full_df)
+        success_div = html.Div(
+            [
+                html.I(className="fas fa-check-circle", style={'marginRight': '8px'}),
+                t("ui.header.nightscout_success", locale=locale, count=count),
+            ],
+            style={
+                'color': '#2f855a',
+                'backgroundColor': '#c6f6d5',
+                'padding': '10px',
+                'borderRadius': '5px',
+                'textAlign': 'center',
+                'marginTop': '6px',
+            },
+        )
+
+        return (
+            current_time,
+            convert_df_to_dict(new_full_df),
+            convert_df_to_dict(new_df),
+            convert_events_df_to_dict(new_events_df),
+            False,
+            ns_label,
+            False,
+            random_start,
+            info,
+            success_div,
         )
 
 

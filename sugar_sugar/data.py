@@ -1,4 +1,6 @@
+from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 import polars as pl
 from cgm_format import FormatParser, FormatProcessor, UnifiedEventType
@@ -12,6 +14,36 @@ _RENDERED_EVENT_TYPES: tuple[str, ...] = (
     UnifiedEventType.EXERCISE_MEDIUM.value,
     UnifiedEventType.EXERCISE_HEAVY.value,
 )
+
+
+def load_glucose_data_from_nightscout(
+    base_url: str,
+    *,
+    token: Optional[str] = None,
+    api_secret: Optional[str] = None,
+    days: Optional[int] = None,
+    save_dir: Path = Path("data/input/users"),
+) -> tuple[pl.DataFrame, pl.DataFrame, Path]:
+    """Fetch CGM data from a Nightscout server and adapt to the app store schema.
+
+    Downloads entries and treatments via the Nightscout REST API, serialises the
+    unified DataFrame to a timestamped CSV under *save_dir* (so subsequent rounds
+    can reload it via ``load_glucose_data``), and returns the adapted frames.
+
+    Returns:
+        (glucose_df, events_df, save_path)
+    """
+    with start_action(action_type=u"load_glucose_data_from_nightscout", base_url=base_url):
+        unified_df = FormatParser.from_nightscout_url(
+            base_url, token=token, api_secret=api_secret, days=days
+        )
+        glucose_df, events_df = FormatProcessor.split_glucose_events(unified_df)
+        save_dir = Path(save_dir)
+        save_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        save_path = save_dir / f"{timestamp}_nightscout.csv"
+        FormatParser.to_csv_file(unified_df, str(save_path))
+        return _adapt_glucose_df(glucose_df), _adapt_events_df(events_df), save_path
 
 
 def load_glucose_data(file_path: Path = Path("data/example.csv")) -> tuple[pl.DataFrame, pl.DataFrame]:

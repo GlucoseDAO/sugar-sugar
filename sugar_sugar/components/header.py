@@ -78,24 +78,75 @@ class HeaderComponent(Div):
         return html.Div([time_slider_div])
 
     def create_upload_section(self, *, visible: bool = True) -> html.Div:
-        """Create the file upload section"""
+        """Create the file upload and Nightscout data source section."""
+        _input_style: dict[str, str] = {
+            'width': '100%',
+            'marginBottom': '8px',
+            'padding': '8px 10px',
+            'borderRadius': '4px',
+            'border': '1px solid #ccc',
+            'fontSize': '14px',
+            'boxSizing': 'border-box',
+        }
+
+        csv_tab = dcc.Tab(
+            label=t("ui.header.csv_tab_label", locale=self._locale),
+            value="csv",
+            children=html.Div([
+                dcc.Upload(
+                    id='upload-data',
+                    children=html.Div(id='header-upload-prompt', children=[
+                        t("ui.header.upload_prompt_1", locale=self._locale),
+                        html.A(t("ui.header.upload_prompt_2", locale=self._locale))
+                    ]),
+                    style={
+                        'width': '100%',
+                        'height': '60px',
+                        'lineHeight': '60px',
+                        'borderWidth': '1px',
+                        'borderStyle': 'dashed',
+                        'borderRadius': '5px',
+                        'textAlign': 'center',
+                        'marginBottom': '10px',
+                    }
+                ),
+            ], style={'paddingTop': '10px'}),
+        )
+
+        nightscout_tab = dcc.Tab(
+            label=t("ui.header.nightscout_tab_label", locale=self._locale),
+            value="nightscout",
+            children=html.Div([
+                dcc.Input(
+                    id="nightscout-url-input",
+                    type="url",
+                    placeholder=t("ui.header.nightscout_url_placeholder", locale=self._locale),
+                    debounce=False,
+                    style=_input_style,
+                ),
+                dcc.Input(
+                    id="nightscout-token-input",
+                    type="text",
+                    placeholder=t("ui.header.nightscout_token_placeholder", locale=self._locale),
+                    debounce=False,
+                    style=_input_style,
+                ),
+                html.Button(
+                    id="nightscout-load-button",
+                    children=t("ui.header.nightscout_load_button", locale=self._locale),
+                    className="ui blue button",
+                    style={'width': '100%', 'marginBottom': '8px'},
+                ),
+                html.Div(id="nightscout-status"),
+            ], style={'paddingTop': '10px'}),
+        )
+
         children: list[Any] = [
-            dcc.Upload(
-                id='upload-data',
-                children=html.Div(id='header-upload-prompt', children=[
-                    t("ui.header.upload_prompt_1", locale=self._locale),
-                    html.A(t("ui.header.upload_prompt_2", locale=self._locale))
-                ]),
-                style={
-                    'width': '100%',
-                    'height': '60px',
-                    'lineHeight': '60px',
-                    'borderWidth': '1px',
-                    'borderStyle': 'dashed',
-                    'borderRadius': '5px',
-                    'textAlign': 'center',
-                    'marginBottom': '10px'
-                }
+            dcc.Tabs(
+                id="data-input-tabs",
+                value="csv",
+                children=[csv_tab, nightscout_tab],
+                style={'marginBottom': '4px'},
             ),
         ]
 
@@ -112,14 +163,14 @@ class HeaderComponent(Div):
                         'borderRadius': '5px',
                         'cursor': 'pointer',
                         'fontSize': '14px',
-                        'color': '#6c757d'
+                        'color': '#6c757d',
                     }
                 )
             )
             children.append(html.Div(id='example-data-warning', style={'marginTop': '10px'}))
 
         return html.Div(
-            [*children],
+            children,
             style={'display': 'block' if visible else 'none'},
         )
 
