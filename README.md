@@ -129,7 +129,15 @@ DASH_HOST=127.0.0.1
 DASH_PORT=8050
 DASH_DEBUG=True
 DEBUG_MODE=False
+UMAMI_SCRIPT_URL=https://sugar-sugar.glucosedao.org/stats/script.js
+UMAMI_WEBSITE_ID=7c6fb178-d8ff-439e-a9f3-e289d9ec7e97
+UMAMI_DOMAINS=sugar-sugar.glucosedao.org
+UMAMI_HOST_URL=https://sugar-sugar.glucosedao.org/stats
 ```
+
+Umami tracking is disabled when either `UMAMI_SCRIPT_URL` or `UMAMI_WEBSITE_ID` is blank.
+`UMAMI_DOMAINS` limits counting to listed production hostnames, and `UMAMI_HOST_URL`
+points Umami pageview requests at the same-domain `/stats` proxy.
 
 ### Running the app
 

@@ -57,6 +57,10 @@ from sugar_sugar.config import (
     DEPLOY_BUILD,
     MAX_ROUNDS,
     STORAGE_TYPE,
+    UMAMI_DOMAINS,
+    UMAMI_HOST_URL,
+    UMAMI_SCRIPT_URL,
+    UMAMI_WEBSITE_ID,
 )
 import sugar_sugar.config as sugar_sugar_config
 from sugar_sugar.components.glucose import GlucoseChart
@@ -300,6 +304,19 @@ external_stylesheets = [
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css',
 ]
 
+external_scripts: list[dict[str, str]] = []
+if UMAMI_SCRIPT_URL and UMAMI_WEBSITE_ID:
+    _umami_script_attrs: dict[str, str] = {
+        "src": UMAMI_SCRIPT_URL,
+        "defer": "defer",
+        "data-website-id": UMAMI_WEBSITE_ID,
+    }
+    if UMAMI_DOMAINS:
+        _umami_script_attrs["data-domains"] = UMAMI_DOMAINS
+    if UMAMI_HOST_URL:
+        _umami_script_attrs["data-host-url"] = UMAMI_HOST_URL
+    external_scripts.append(_umami_script_attrs)
+
 # Dash defaults to width=device-width, which makes phones use a narrow layout viewport and
 # breaks chart/drawing. A fixed layout width matches what mobile browsers do for "Desktop
 # site": the page is laid out at desktop width and scaled to fit the screen.
@@ -308,6 +325,7 @@ _DESKTOP_LAYOUT_VIEWPORT_CSS_PX: int = 1280
 app = dash.Dash(
     __name__,
     external_stylesheets=external_stylesheets,
+    external_scripts=external_scripts,
     assets_folder=str(project_root / 'assets'),
     suppress_callback_exceptions=True,
     meta_tags=[

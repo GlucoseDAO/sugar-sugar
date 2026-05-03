@@ -33,6 +33,13 @@ STORAGE_TYPE: str = os.getenv("STORAGE_TYPE", "local")
 # Maximum number of prediction rounds per session
 MAX_ROUNDS: int = int(os.getenv("MAX_ROUNDS", "12"))
 
+# Umami analytics. Defaults use the same-domain Caddy proxy so common
+# cross-domain analytics blocklists do not match the tracker URL.
+UMAMI_SCRIPT_URL: str = os.getenv("UMAMI_SCRIPT_URL", "https://sugar-sugar.glucosedao.org/stats/script.js").strip()
+UMAMI_WEBSITE_ID: str = os.getenv("UMAMI_WEBSITE_ID", "7c6fb178-d8ff-439e-a9f3-e289d9ec7e97").strip()
+UMAMI_DOMAINS: str = os.getenv("UMAMI_DOMAINS", "sugar-sugar.glucosedao.org").strip()
+UMAMI_HOST_URL: str = os.getenv("UMAMI_HOST_URL", "https://sugar-sugar.glucosedao.org/stats").strip()
+
 # Application debug (e.g. test button); startup reads this dynamically after CLI may update it
 DEBUG_MODE: bool = _env_bool("DEBUG_MODE", "false")
 DASH_DEBUG: bool = _env_bool("DASH_DEBUG", DEBUG_MODE)
