@@ -1450,6 +1450,13 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
     show_upload = format_value in ("B", "C")
     consent_given = bool(user_info.get("consent_use_uploaded_data", False))
     consent_value = ['agree'] if consent_given else []
+    data_source_name = str(user_info.get("data_source_name") or "")
+    if data_source_name:
+        data_source_display = data_source_name
+    elif format_value in ("B", "C"):
+        data_source_display = t("ui.header.upload_required", locale=locale)
+    else:
+        data_source_display = "example.csv"
     return html.Div([
         HeaderComponent(
             show_time_slider=False,
@@ -1457,6 +1464,7 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
             show_example_button=(format_value == "A"),
             initial_slider_value=example_initial_slider_value,
             locale=locale,
+            data_source_name=data_source_display,
         ),
         html.Div(
             [
@@ -2677,7 +2685,7 @@ def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) ->
                 insulin_values.append(None)
     
     return pl.DataFrame({
-        'time': pl.Series(events_data['time']).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),
+        'time': pl.Series(events_data['time'], dtype=pl.String).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),
         'event_type': pl.Series(events_data['event_type'], dtype=pl.String),
         'event_subtype': pl.Series(events_data['event_subtype'], dtype=pl.String),
         # Use pre-processed float values
@@ -4428,7 +4436,7 @@ def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optiona
      Input('data-source-name', 'data'),
      Input('user-info-store', 'data'),
      Input('interface-language', 'data')],
-    prevent_initial_call=True
+    prevent_initial_call=False
 )
 def update_data_source_display(
     pathname: str,

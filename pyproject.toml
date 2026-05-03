@@ -1,9 +1,15 @@
 [project]
 name = "sugar-sugar"
-version = "0.1.1"
+version = "0.2.1"
 description = "A data access and visualization tool for glucose monitoring data"
 authors = [
-    {name = "Anton Kulaga", email = "Antonkulaga@gmail.com"}
+    {name = "Anton Kulaga", email = "Antonkulaga@gmail.com"},
+    {name = "Livia Zaharia", email = "liviazaharia2020@gmail.com"},   
+    {name = "Newton Winter", email = "isoutthere@gmail.com"},
+]
+maintainers = [
+    {name = "Anton Kulaga", email = "Antonkulaga@gmail.com"},
+    {name = "Newton Winter", email = "isoutthere@gmail.com"}
 ]
 license = {text = "Apache-2.0"}
 readme = "README.md"
@@ -22,6 +28,7 @@ dependencies = [
     "markdown>=3.10.2",
     "kaleido>=1.2.0",
     "segno>=1.6.0",
+    "cgm-format>=0.8.2",
 ]
 
 [project.scripts]

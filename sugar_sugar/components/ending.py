@@ -29,10 +29,10 @@ class EndingPage:
     def _reconstruct_events_dataframe(self, events_data: dict[str, list[Any]]) -> pl.DataFrame:
         """Reconstruct the events DataFrame from stored data.""" 
         return pl.DataFrame({
-            'time': pl.Series(events_data['time']).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),
+            'time': pl.Series(events_data['time'], dtype=pl.String).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),
             'event_type': pl.Series(events_data['event_type'], dtype=pl.String),
             'event_subtype': pl.Series(events_data['event_subtype'], dtype=pl.String),
-            'insulin_value': pl.Series(events_data['insulin_value'], dtype=pl.Float64)
+            'insulin_value': pl.Series(events_data['insulin_value'], dtype=pl.Float64, strict=False)
         })
         
     def __call__(self) -> html.Div:

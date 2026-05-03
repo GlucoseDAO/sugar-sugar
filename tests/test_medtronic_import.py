@@ -4,23 +4,34 @@ from pathlib import Path
 
 import polars as pl
 
-from sugar_sugar.data import CGMType, detect_cgm_type, load_glucose_data
+from sugar_sugar.data import load_glucose_data
 
 
-def test_detect_and_load_medtronic_csv(tmp_path: Path) -> None:
+def test_load_medtronic_csv_returns_app_schema(tmp_path: Path) -> None:
+    header = ";".join(
+        [
+            "Index",
+            "Date",
+            "Time",
+            "Sensor Glucose (mg/dL)",
+            "BG Reading (mg/dL)",
+            "Basal Rate (U/h)",
+            "Bolus Volume Delivered (U)",
+            "BWZ Carb Input (grams)",
+            "Event Marker",
+        ]
+    )
     csv_text = "\n".join(
         [
-            "Index;Date;Time;Sensor Glucose (mg/dL);BG Reading (mg/dL);Bolus Volume Delivered (U);BWZ Carb Input (grams);Event Marker",
-            "1;2025/01/01;09:00:00;120,0;;;;",
-            "2;2025/01/01;09:05:00;;------- ;;;",
-            "3;2025/01/01;09:10:00;140,0;;1,50;;",
-            "4;2025/01/01;09:15:00;150,0;;;;Meal: 60,00grams",
+            header,
+            "1;2025/01/01;09:00:00;120,0;;;;;",
+            "2;2025/01/01;09:05:00;;------- ;;;;",
+            "3;2025/01/01;09:10:00;140,0;;;1,50;;",
+            "4;2025/01/01;09:15:00;150,0;;;;;Meal: 60,00grams",
         ]
     )
     path = tmp_path / "medtronic.csv"
     path.write_text(csv_text, encoding="utf-8")
-
-    assert detect_cgm_type(path) == CGMType.MEDTRONIC
 
     glucose_df, events_df = load_glucose_data(path)
 
