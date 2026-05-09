@@ -190,8 +190,8 @@ en:
     text: "Note: Sugar Sugar is optimised for desktop at the moment. Mobile support is coming soon!"
 
   orientation:
-    title: "Rotate your device"
-    subtitle: "Sugar Sugar works best in landscape. Please rotate your phone or tablet to continue."
+    title: "FOR BEST RESULTS PLEASE USE LANDSCAPE MODE TO ACCESS THE SITE"
+    subtitle: ""
 
   share:
     button_share: "Share my results"

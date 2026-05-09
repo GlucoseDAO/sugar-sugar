@@ -192,8 +192,8 @@ es:
     text: "Nota: Sugar Sugar está optimizado para escritorio en este momento. ¡El soporte para móviles llegará pronto!"
 
   orientation:
-    title: "Gira tu dispositivo"
-    subtitle: "Sugar Sugar funciona mejor en horizontal. Gira tu teléfono o tableta para continuar."
+    title: "PARA OBTENER LOS MEJORES RESULTADOS, USA EL SITIO EN MODO HORIZONTAL"
+    subtitle: ""
 
   share:
     button_share: "Compartir mis resultados"

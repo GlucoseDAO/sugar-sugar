@@ -192,8 +192,8 @@ fr:
     text: "Note : Sugar Sugar est actuellement optimisé pour le bureau. Le support mobile arrive bientôt !"
 
   orientation:
-    title: "Tournez votre appareil"
-    subtitle: "Sugar Sugar fonctionne mieux en mode paysage. Veuillez tourner votre téléphone ou tablette pour continuer."
+    title: "POUR DE MEILLEURS RÉSULTATS, UTILISEZ LE SITE EN MODE PAYSAGE"
+    subtitle: ""
 
   share:
     button_share: "Partager mes résultats"

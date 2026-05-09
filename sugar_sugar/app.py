@@ -586,20 +586,9 @@ app.layout = html.Div([
     # visibility (see assets/orientation.css); callbacks only refresh the
     # translated text when the interface language changes.
     html.Div(
-        [
-            html.Div("\u21BB", className="rotate-icon", id="orientation-overlay-icon"),
-            html.H2(
-                t("ui.orientation.title", locale="en"),
-                className="rotate-title",
-                id="orientation-overlay-title",
-            ),
-            html.P(
-                t("ui.orientation.subtitle", locale="en"),
-                className="rotate-subtitle",
-                id="orientation-overlay-subtitle",
-            ),
-        ],
+        t("ui.orientation.title", locale="en"),
         id="orientation-overlay",
+        className="rotate-title",
         disable_n_clicks=True,
     ),
 ])
@@ -648,18 +637,14 @@ app.clientside_callback(
 
 
 @app.callback(
-    [Output('orientation-overlay-title', 'children'),
-     Output('orientation-overlay-subtitle', 'children')],
+    Output('orientation-overlay', 'children'),
     [Input('interface-language', 'data')],
     prevent_initial_call=False,
 )
-def update_orientation_overlay_text(interface_language: Optional[str]) -> tuple[str, str]:
+def update_orientation_overlay_text(interface_language: Optional[str]) -> str:
     """Keep the portrait-prompt overlay translated as the language changes."""
     locale = normalize_locale(interface_language)
-    return (
-        t("ui.orientation.title", locale=locale),
-        t("ui.orientation.subtitle", locale=locale),
-    )
+    return t("ui.orientation.title", locale=locale)
 
 
 @app.callback(

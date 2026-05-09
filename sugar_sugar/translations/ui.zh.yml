@@ -190,8 +190,8 @@ zh:
     text: "注意：Sugar Sugar 目前针对桌面端进行了优化。移动端支持即将推出！"
 
   orientation:
-    title: "请旋转设备"
-    subtitle: "Sugar Sugar 在横屏下效果最佳。请将手机或平板旋转至横屏以继续。"
+    title: "为获得最佳效果，请使用横屏模式访问本站"
+    subtitle: ""
 
   share:
     button_share: "分享我的成绩"
