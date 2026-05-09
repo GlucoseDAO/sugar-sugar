@@ -1460,7 +1460,7 @@ def create_share_layout(
                 config={
                     "displayModeBar": False,
                     "scrollZoom": False,
-                    "staticPlot": False,
+                    "staticPlot": True,
                     "responsive": True,
                 },
                 style={

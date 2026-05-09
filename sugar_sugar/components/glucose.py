@@ -493,31 +493,30 @@ class GlucoseChart(html.Div):
         figure = instance._build_figure(df, events_df, source_name, locale=locale)
 
         if prediction_boundary is not None and 0 <= prediction_boundary <= len(df):
-            f = instance._display_factor
-            y_min = float(df.get_column("gl").min()) * f * 0.85
-            y_max = max(float(df.get_column("gl").max()) * f * 1.15, 300 * f)
-            x_pos = float(prediction_boundary) - 0.5
+            x_pos = float(prediction_boundary)
             x_pos = max(-0.5, min(float(len(df)) - 0.5, x_pos))
 
             figure.add_shape(
                 type="line",
                 x0=x_pos,
                 x1=x_pos,
-                y0=y_min,
-                y1=y_max,
+                y0=0,
+                y1=1,
                 line=dict(color="orange", width=2, dash="dash"),
                 xref="x",
-                yref="y",
+                yref="paper",
             )
             figure.add_annotation(
                 x=x_pos,
-                y=y_max,
+                y=0.98,
                 text=f"← {t('ui.chart.known_label', locale=locale)} | {t('ui.chart.predicted_label', locale=locale)} →",
                 showarrow=False,
                 font=dict(size=11, color="orange"),
                 bgcolor="white",
                 bordercolor="orange",
                 borderwidth=1,
+                xref="x",
+                yref="paper",
                 xanchor="center",
                 yanchor="top",
             )
