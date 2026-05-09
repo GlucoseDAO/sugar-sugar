@@ -1458,10 +1458,46 @@ def create_contact_page(*, locale: str) -> html.Div:
 
 
 def create_demo_page(*, locale: str) -> html.Div:
-    return create_info_page(
-        locale=locale,
-        title=t('ui.demo.title', locale=locale),
-        body=t('ui.demo.body', locale=locale),
+    return html.Div(
+        [
+            html.H1(t("ui.common.video_instructions", locale=locale), disable_n_clicks=True),
+            html.Div(
+                t("ui.demo.body", locale=locale),
+                style={"marginBottom": "18px"},
+                disable_n_clicks=True,
+            ),
+            html.Div(
+                html.Iframe(
+                    src="https://www.youtube.com/embed/M9JDhLFfFbA",
+                    title=t("ui.common.video_instructions", locale=locale),
+                    allow=(
+                        "accelerometer; autoplay; clipboard-write; encrypted-media; "
+                        "gyroscope; picture-in-picture; web-share"
+                    ),
+                    style={
+                        "position": "absolute",
+                        "top": "0",
+                        "left": "0",
+                        "width": "100%",
+                        "height": "100%",
+                        "border": "0",
+                    },
+                ),
+                style={
+                    "position": "relative",
+                    "width": "100%",
+                    "maxWidth": "960px",
+                    "paddingBottom": "56.25%",
+                    "height": "0",
+                    "overflow": "hidden",
+                    "borderRadius": "8px",
+                    "backgroundColor": "#000",
+                },
+                disable_n_clicks=True,
+            ),
+        ],
+        className="info-page",
+        disable_n_clicks=True,
     )
 
 
