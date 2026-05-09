@@ -199,6 +199,7 @@ zh:
     subtitle: "你能比我更会读血糖吗？来试试！"
     download_png: "下载图片"
     download_png_hint: "将成绩卡保存为 PNG，非常适合 Instagram 故事。"
+    generated_at: "生成时间"
     play_again: "再玩一次"
     copy_link: "复制链接"
     copy_link_success: "链接已复制！"

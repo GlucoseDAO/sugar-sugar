@@ -202,6 +202,7 @@ de:
     subtitle: "Kannst du Glukose besser lesen als ich? Probier es aus!"
     download_png: "Bild herunterladen"
     download_png_hint: "Speichere die Karte als PNG - perfekt für Instagram-Stories."
+    generated_at: "Erstellt"
     play_again: "Noch einmal spielen"
     copy_link: "Link kopieren"
     copy_link_success: "Link kopiert!"

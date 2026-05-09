@@ -201,6 +201,7 @@ fr:
     subtitle: "Sauras-tu lire la glycémie mieux que moi ? Essaie !"
     download_png: "Télécharger l'image"
     download_png_hint: "Enregistre la carte en PNG, parfait pour les stories Instagram."
+    generated_at: "Généré"
     play_again: "Rejouer"
     copy_link: "Copier le lien"
     copy_link_success: "Lien copié !"

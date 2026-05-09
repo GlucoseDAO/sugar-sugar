@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional, Tuple, Union
 from functools import lru_cache
+from html import escape as html_escape
 import dash
 from dash import dcc, html, Output, Input, State, no_update, dash_table, ctx
 from dash.dash_table.Format import Format, Scheme
@@ -365,19 +366,131 @@ def _download_study_pdf():
 
 _SHARE_PNG_CACHE: dict[str, bytes] = {}
 
+_SOCIAL_CRAWLER_USER_AGENT_TOKENS: tuple[str, ...] = (
+    "facebookexternalhit",
+    "facebot",
+    "twitterbot",
+    "linkedinbot",
+    "whatsapp",
+    "slackbot",
+    "telegrambot",
+    "discordbot",
+    "pinterest",
+    "skypeuripreview",
+)
+
+
+def _first_forwarded_header_value(value: Optional[str]) -> Optional[str]:
+    """Return the first value from a comma-separated proxy header."""
+    if not value:
+        return None
+    first: str = value.split(",", 1)[0].strip()
+    return first or None
+
+
+def _public_request_base_url() -> str:
+    """Base URL as seen by users/crawlers, respecting reverse-proxy headers."""
+    configured: Optional[str] = _first_forwarded_header_value(
+        os.environ.get("SUGAR_SUGAR_PUBLIC_BASE_URL")
+    )
+    if configured:
+        return configured.rstrip("/")
+
+    forwarded_host: Optional[str] = _first_forwarded_header_value(
+        flask_request.headers.get("X-Forwarded-Host")
+    )
+    forwarded_proto: Optional[str] = _first_forwarded_header_value(
+        flask_request.headers.get("X-Forwarded-Proto")
+    )
+    if forwarded_host:
+        scheme: str = forwarded_proto or flask_request.scheme or "https"
+        return f"{scheme}://{forwarded_host}".rstrip("/")
+    return flask_request.host_url.rstrip("/")
+
 
 def _build_share_url(share_id: str) -> str:
-    """Compose an absolute https URL for a share id based on the current request."""
+    """Compose an absolute public URL for a share id based on the current request."""
     try:
-        base: str = flask_request.host_url.rstrip("/")
+        base: str = _public_request_base_url()
     except RuntimeError:
         # Not inside a Flask request context -- fall back to a relative path.
         return f"/share/{share_id}"
     return f"{base}/share/{share_id}"
 
 
+def _share_id_from_public_path(path: str) -> Optional[str]:
+    """Extract share id from the public Dash route, excluding image/OG assets."""
+    if not path.startswith("/share/"):
+        return None
+    suffix: str = path.removeprefix("/share/").strip("/")
+    if not suffix or "/" in suffix:
+        return None
+    return suffix
+
+
+def _is_social_crawler(user_agent: str) -> bool:
+    ua: str = str(user_agent or "").lower()
+    return any(token in ua for token in _SOCIAL_CRAWLER_USER_AGENT_TOKENS)
+
+
+def _share_card_og_response(share_id: str) -> Any:
+    """HTML page with OG tags only, for social-platform crawlers."""
+    from flask import Response, abort
+    record = share_store.load_share(share_id)
+    if record is None:
+        abort(404)
+    locale: str = str(record.get("locale") or "en")
+    loc: str = normalize_locale(locale)
+    share_url: str = _build_share_url(share_id)
+    image_url: str = f"{share_url}/image.png"
+    title: str = html_escape(t("ui.share.title", locale=loc), quote=True)
+    description: str = html_escape(t("ui.share.subtitle", locale=loc), quote=True)
+    escaped_share_url: str = html_escape(share_url, quote=True)
+    escaped_image_url: str = html_escape(image_url, quote=True)
+
+    html_page: str = f"""<!doctype html>
+<html lang="{html_escape(loc, quote=True)}">
+<head>
+<meta charset="utf-8">
+<title>{title}</title>
+<meta name="description" content="{description}">
+<meta property="og:type" content="website">
+<meta property="og:title" content="{title}">
+<meta property="og:description" content="{description}">
+<meta property="og:image" content="{escaped_image_url}">
+<meta property="og:image:secure_url" content="{escaped_image_url}">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1080">
+<meta property="og:image:height" content="1080">
+<meta property="og:url" content="{escaped_share_url}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{title}">
+<meta name="twitter:description" content="{description}">
+<meta name="twitter:image" content="{escaped_image_url}">
+<meta name="twitter:url" content="{escaped_share_url}">
+<meta http-equiv="refresh" content="0; url={escaped_share_url}">
+</head>
+<body>
+<p>Loading... <a href="{escaped_share_url}">open {title}</a>.</p>
+</body>
+</html>
+"""
+    return Response(html_page, mimetype="text/html; charset=utf-8")
+
+
+@server.before_request
+def _serve_share_og_to_social_crawlers() -> Optional[Any]:
+    """Serve card metadata at the share URL crawlers actually request."""
+    share_id: Optional[str] = _share_id_from_public_path(flask_request.path)
+    if share_id is None:
+        return None
+    if not _is_social_crawler(flask_request.headers.get("User-Agent", "")):
+        return None
+    return _share_card_og_response(share_id)
+
+
 @server.route("/share/<share_id>/image.png")
-def _share_card_png(share_id: str):
+def _share_card_png(share_id: str) -> Any:
     from flask import Response, abort
     record = share_store.load_share(share_id)
     if record is None:
@@ -397,44 +510,8 @@ def _share_card_png(share_id: str):
 
 
 @server.route("/share/<share_id>/og")
-def _share_card_og(share_id: str):
-    """HTML page with OG tags only, for social-platform crawlers."""
-    from flask import Response, abort
-    record = share_store.load_share(share_id)
-    if record is None:
-        abort(404)
-    locale: str = str(record.get("locale") or "en")
-    loc: str = normalize_locale(locale)
-    share_url: str = _build_share_url(share_id)
-    image_url: str = f"{share_url}/image.png"
-    title: str = t("ui.share.title", locale=loc)
-    description: str = t("ui.share.subtitle", locale=loc)
-
-    html_page: str = f"""<!doctype html>
-<html lang="{loc}">
-<head>
-<meta charset="utf-8">
-<title>{title}</title>
-<meta name="description" content="{description}">
-<meta property="og:type" content="website">
-<meta property="og:title" content="{title}">
-<meta property="og:description" content="{description}">
-<meta property="og:image" content="{image_url}">
-<meta property="og:image:width" content="1080">
-<meta property="og:image:height" content="1080">
-<meta property="og:url" content="{share_url}">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="{title}">
-<meta name="twitter:description" content="{description}">
-<meta name="twitter:image" content="{image_url}">
-<meta http-equiv="refresh" content="0; url={share_url}">
-</head>
-<body>
-<p>Loading... <a href="{share_url}">open {title}</a>.</p>
-</body>
-</html>
-"""
-    return Response(html_page, mimetype="text/html; charset=utf-8")
+def _share_card_og(share_id: str) -> Any:
+    return _share_card_og_response(share_id)
 
 app.clientside_callback(
     "function() { return window.navigator.userAgent || ''; }",
@@ -591,6 +668,13 @@ app.layout = html.Div([
         className="rotate-title",
         disable_n_clicks=True,
     ),
+    html.Button(
+        "X",
+        id="orientation-overlay-close",
+        className="orientation-overlay-close",
+        type="button",
+        **{"aria-label": "Close landscape mode notice"},
+    ),
 ])
 
 
@@ -645,6 +729,30 @@ def update_orientation_overlay_text(interface_language: Optional[str]) -> str:
     """Keep the portrait-prompt overlay translated as the language changes."""
     locale = normalize_locale(interface_language)
     return t("ui.orientation.title", locale=locale)
+
+
+@app.callback(
+    [Output('orientation-overlay', 'className'),
+     Output('orientation-overlay-close', 'className')],
+    [Input('orientation-overlay-close', 'n_clicks'),
+     Input('url', 'pathname')],
+    prevent_initial_call=False,
+)
+def update_orientation_overlay_visibility(
+    close_clicks: Optional[int],
+    pathname: Optional[str],
+) -> tuple[str, str]:
+    """Dismiss the portrait prompt, but reinstate it for a fresh landing page."""
+    if ctx.triggered_id == 'orientation-overlay-close' and close_clicks:
+        return (
+            'rotate-title orientation-overlay-dismissed',
+            'orientation-overlay-close orientation-overlay-dismissed',
+        )
+
+    if ctx.triggered_id in (None, 'url') and pathname == '/':
+        return 'rotate-title', 'orientation-overlay-close'
+
+    raise PreventUpdate
 
 
 @app.callback(
@@ -3297,7 +3405,7 @@ def handle_share_results_button(
         # a list of {str: str}; round_info is shallow dicts of primitives.
         share_record: dict[str, Any] = {
             "schema_version": 2,
-            "created_at": datetime.now().isoformat(timespec="seconds"),
+            "created_at": datetime.now().astimezone().isoformat(timespec="seconds"),
             "locale": normalize_locale(interface_language),
             "rounds": all_rounds,
             "played_formats": sorted(played_formats, key=lambda x: FORMAT_ORDER.get(str(x), 999)),

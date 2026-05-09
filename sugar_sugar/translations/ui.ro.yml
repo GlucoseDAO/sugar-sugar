@@ -202,6 +202,7 @@ ro:
     subtitle: "Poți citi glicemia mai bine decât mine? Încearcă!"
     download_png: "Descarcă imaginea"
     download_png_hint: "Salvează cardul ca PNG, perfect pentru Stories pe Instagram."
+    generated_at: "Generat"
     play_again: "Joacă din nou"
     copy_link: "Copiază linkul"
     copy_link_success: "Link copiat!"

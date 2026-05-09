@@ -201,6 +201,7 @@ es:
     subtitle: "¿Puedes leer la glucosa mejor que yo? ¡Inténtalo!"
     download_png: "Descargar imagen"
     download_png_hint: "Guarda la tarjeta como PNG, perfecta para las historias de Instagram."
+    generated_at: "Generado"
     play_again: "Jugar de nuevo"
     copy_link: "Copiar enlace"
     copy_link_success: "¡Enlace copiado!"

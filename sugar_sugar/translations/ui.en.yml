@@ -199,6 +199,7 @@ en:
     subtitle: "Can you read glucose better than me? Try it!"
     download_png: "Download image"
     download_png_hint: "Save the card as PNG, perfect for Instagram stories."
+    generated_at: "Generated"
     play_again: "Play again"
     copy_link: "Copy link"
     copy_link_success: "Link copied!"

@@ -202,6 +202,7 @@ uk:
     subtitle: "Читаєш глюкозу краще за мене? Спробуй!"
     download_png: "Завантажити зображення"
     download_png_hint: "Збережи картку у PNG - чудово для історій в Instagram."
+    generated_at: "Створено"
     play_again: "Грати ще раз"
     copy_link: "Скопіювати посилання"
     copy_link_success: "Посилання скопійовано!"

@@ -36,6 +36,7 @@ import io
 import math
 import re
 import urllib.parse
+from datetime import datetime
 from typing import Any, Optional
 
 import plotly.graph_objects as go
@@ -401,6 +402,18 @@ def _format_number(value: float, digits: int = 1) -> str:
     if value is None or math.isnan(value):
         return "-"
     return f"{value:.{digits}f}"
+
+
+def _format_generated_at(share_record: dict[str, Any], *, locale: str) -> Optional[str]:
+    raw_created_at: str = str(share_record.get("created_at") or "").strip()
+    if not raw_created_at:
+        return None
+    try:
+        created_at: datetime = datetime.fromisoformat(raw_created_at.replace("Z", "+00:00"))
+        display_value: str = created_at.isoformat(sep=" ", timespec="seconds")
+    except ValueError:
+        display_value = raw_created_at
+    return f"{t('ui.share.generated_at', locale=locale)}: {display_value}"
 
 
 def _safe_display_name(user_info: dict[str, Any]) -> str:
@@ -924,6 +937,7 @@ def build_share_card_figure(
     rmse: float = stats.get("rmse_mgdl") or float("nan")
     rounds_played: int = int(stats.get("rounds_played") or 0)
     encourage: str = encouragement_text(stats, loc, seed=seed)
+    generated_at: Optional[str] = _format_generated_at(share_record, locale=loc)
     play_url: str = _play_url_from_share(share_url)
     qri: str = _qrcode_png_data_uri(play_url)
 
@@ -1144,6 +1158,15 @@ def build_share_card_figure(
             layer="above",
         )
     )
+    if generated_at:
+        fig.add_annotation(
+            xref="paper", yref="paper",
+            x=0.04, y=0.022,
+            xanchor="left", yanchor="bottom",
+            text=generated_at,
+            showarrow=False,
+            font=dict(size=11, color="rgba(100,116,139,1)"),
+        )
 
     return fig
 
@@ -1225,15 +1248,17 @@ def create_share_layout(
         rounds=rounds_played,
     )
     encourage: str = encouragement_text(stats, loc, seed=share_id)
+    generated_at: Optional[str] = _format_generated_at(share_record, locale=loc)
 
     encoded_url: str = urllib.parse.quote(share_url, safe="")
     encoded_text: str = urllib.parse.quote(invite_text, safe="")
+    encoded_x_text: str = urllib.parse.quote(f"{invite_text} {share_url}", safe="")
 
     share_buttons: html.Div = html.Div(
         [
             _share_button(
                 t("ui.share.share_on_x", locale=loc),
-                f"https://twitter.com/intent/tweet?text={encoded_text}&url={encoded_url}",
+                f"https://x.com/intent/post?text={encoded_x_text}",
                 color="#000000", icon="fa-x-twitter",
             ),
             _share_button(
@@ -1550,6 +1575,20 @@ def create_share_layout(
                 style={"fontSize": "15px", "color": "#1e3a8a",
                        "textAlign": "center", "fontWeight": "600",
                        "margin": "0"},
+                disable_n_clicks=True,
+            )
+        )
+    if generated_at:
+        header_children.append(
+            html.P(
+                generated_at,
+                style={
+                    "fontSize": "13px",
+                    "color": "#64748b",
+                    "textAlign": "center",
+                    "fontWeight": "600",
+                    "margin": "6px 0 0 0",
+                },
                 disable_n_clicks=True,
             )
         )

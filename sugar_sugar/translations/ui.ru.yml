@@ -199,6 +199,7 @@ ru:
     subtitle: "Читаешь глюкозу лучше меня? Попробуй!"
     download_png: "Скачать изображение"
     download_png_hint: "Сохрани карточку в PNG - идеально для историй в Instagram."
+    generated_at: "Создано"
     play_again: "Играть снова"
     copy_link: "Скопировать ссылку"
     copy_link_success: "Ссылка скопирована!"

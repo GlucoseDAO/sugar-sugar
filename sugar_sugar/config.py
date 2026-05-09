@@ -50,5 +50,5 @@ DASH_DEBUG: bool = _env_bool("DASH_DEBUG", DEBUG_MODE)
 # restarts without re-fetching /_dash-dependencies. Including this value in
 # the layout as a dcc.Store forces the fingerprint to change and triggers a
 # full client reload for every connected browser on the next server restart.
-DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "2"))
+DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "4"))
 
