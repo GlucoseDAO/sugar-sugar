@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional, Tuple, Union
 from functools import lru_cache
 from html import escape as html_escape
+from io import BytesIO
 import dash
 from dash import dcc, html, Output, Input, State, no_update, dash_table, ctx
 from dash.dash_table.Format import Format, Scheme
@@ -491,7 +492,7 @@ def _serve_share_og_to_social_crawlers() -> Optional[Any]:
 
 @server.route("/share/<share_id>/image.png")
 def _share_card_png(share_id: str) -> Any:
-    from flask import Response, abort
+    from flask import abort
     record = share_store.load_share(share_id)
     if record is None:
         abort(404)
@@ -504,9 +505,15 @@ def _share_card_png(share_id: str) -> Any:
         )
         cached = fig.to_image(format="png", width=1080, height=1080, scale=1, engine="kaleido")
         _SHARE_PNG_CACHE[share_id] = cached
-    return Response(cached, mimetype="image/png", headers={
-        "Cache-Control": "public, max-age=86400",
-    })
+    response = flask_send_file(
+        BytesIO(cached),
+        mimetype="image/png",
+        as_attachment=True,
+        download_name=f"sugar-sugar-{share_id}.png",
+        max_age=86400,
+    )
+    response.headers["Cache-Control"] = "public, max-age=86400"
+    return response
 
 
 @server.route("/share/<share_id>/og")
