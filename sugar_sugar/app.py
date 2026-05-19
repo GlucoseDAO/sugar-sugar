@@ -4623,20 +4623,11 @@ def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optiona
                         ground_truth_y = df.get_column("gl")[start_idx]
                         actual_start_y = ground_truth_y
                 
-                # Calculate the intersection with the first vertical guideline after start
-                actual_end_x, actual_end_y = calculate_first_guideline_intersection(
-                    float(start_idx), float(actual_start_y), float(end_idx), to_mgdl(float(end_y)), df
-                )
-                snapped_end_idx = snap_index(actual_end_x)
-                if snapped_end_idx is None:
-                    return (
-                        last_click_time,
-                        convert_df_to_dict(full_df),
-                        convert_df_to_dict(df)
-                    )
-                end_time = df.get_column("time")[snapped_end_idx]
-                
-                # Get intermediate prediction points every 5 minutes
+                # Use the full extent of the drawn line (end_idx already snapped above)
+                actual_end_y = to_mgdl(float(end_y))
+                end_time = df.get_column("time")[end_idx]
+
+                # Get intermediate prediction points for every grid point along the line
                 intermediate_points = create_intermediate_predictions(start_time, end_time, float(actual_start_y), float(actual_end_y), df)
                 
                 # Collect all times that need prediction values
@@ -4906,75 +4897,24 @@ def reconstruct_dataframe_from_dict(df_data: Dict[str, List[Any]]) -> pl.DataFra
         'user_id': pl.Series([int(float(x)) for x in df_data['user_id']], dtype=pl.Int64)
     })
 
-def calculate_first_guideline_intersection(start_x: float, start_y: float, end_x: float, end_y: float, df: pl.DataFrame) -> Tuple[float, float]:
-    """
-    Calculate the intersection of the drawn line with the first vertical guideline after the start point.
-    Returns the (x, y) coordinates of the intersection with the next time marker.
-    """
-    # Find the next integer x position (vertical guideline) after start_x
-    next_x = int(start_x) + 1
-    
-    # If the line doesn't extend past the next guideline, use the original end point
-    if next_x >= end_x:
-        return end_x, end_y
-    
-    # Make sure the next_x is within the DataFrame bounds
-    if next_x >= len(df):
-        next_x = len(df) - 1
-    
-    # Calculate the y-value at the intersection using linear interpolation
-    if end_x != start_x:  # Avoid division by zero
-        slope = (end_y - start_y) / (end_x - start_x)
-        intersect_y = start_y + slope * (next_x - start_x)
-    else:
-        intersect_y = start_y
-    
-    return float(next_x), float(intersect_y)
-
 
 def create_intermediate_predictions(start_time: datetime, end_time: datetime, start_y: float, end_y: float, df: pl.DataFrame) -> List[Tuple[datetime, float]]:
     """
-    Create intermediate prediction points every 5 minutes between start and end points.
-    Returns a list of (time, glucose_value) tuples for intermediate points.
+    Create linearly-interpolated prediction points for every dataframe row
+    between start_time and end_time (exclusive of both endpoints).
     """
-    intermediate_points = []
-    time_diff = end_time - start_time
-    
-    # Only create intermediate points if the difference is more than 5 minutes
-    if time_diff.total_seconds() <= 5 * 60:  # 5 minutes in seconds
-        return intermediate_points
-    
-    # Get all available times in the DataFrame between start and end
     available_times = (df
         .filter((pl.col("time") > start_time) & (pl.col("time") < end_time))
         .get_column("time")
         .to_list()
     )
-    
-    if not available_times:
-        return intermediate_points
-    
-    # Calculate the total time range in minutes for interpolation
-    total_minutes = time_diff.total_seconds() / 60
-    
-    # Create prediction points for times that are approximately every 5 minutes
-    target_interval = 5  # minutes
-    for time_point in available_times:
-        # Calculate how far along we are in the time range (0 to 1)
-        time_from_start = time_point - start_time
-        progress = time_from_start.total_seconds() / time_diff.total_seconds()
-        
-        # Check if this time point is approximately at a 5-minute interval
-        minutes_from_start = time_from_start.total_seconds() / 60
-        
-        # Add point if it's close to a 5-minute interval (within 2.5 minutes)
-        nearest_interval = round(minutes_from_start / target_interval) * target_interval
-        if abs(minutes_from_start - nearest_interval) <= 2.5 and nearest_interval > 0 and nearest_interval < total_minutes:
-            # Interpolate the glucose value
-            interpolated_value = start_y + (end_y - start_y) * progress
-            intermediate_points.append((time_point, interpolated_value))
-    
-    return intermediate_points
+    total_seconds = (end_time - start_time).total_seconds()
+    if total_seconds == 0:
+        return []
+    return [
+        (t, start_y + (end_y - start_y) * ((t - start_time).total_seconds() / total_seconds))
+        for t in available_times
+    ]
 
 
 def find_nearest_time(x: Union[str, float, datetime], df: pl.DataFrame) -> datetime:
