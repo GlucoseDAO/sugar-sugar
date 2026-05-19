@@ -75,17 +75,10 @@ _RG_RGBA: re.Pattern[str] = re.compile(
 _N_FILL_SLICES: int = 8
 _FILL_ALPHA_TOP: float = 0.11
 _FILL_ALPHA_BOTTOM: float = 0.22
-# |y|/ref → blend from green (accurate) toward red-orange (high error);
-# Exp < 1: sharper colour transition so mid-range already shows warm tones
+# |y|/ref → blend from format colour toward neutral grey (high error);
+# Exp < 1: stronger greying so mid/outer range moves toward #808080, not just faint hue
 _DESAT_GAMMA: float = 0.38
-# Absolute percent-error thresholds for colour mapping.
-# Below _ABS_GREEN_PCT the colour is pure green; above _ABS_RED_PCT it is pure
-# red-orange.  CGM sensor MARD is ~10%, so predictions under ~15% are good.
-_ABS_GREEN_PCT: float = 15.0
-_ABS_RED_PCT: float = 50.0
-# Green (accurate, t=0) → red-orange (worst error, t=1)
-_GOOD_RGB: tuple[int, int, int] = (34, 139, 34)
-_BAD_RGB: tuple[int, int, int] = (220, 60, 20)
+_GREY_RGB: tuple[int, int, int] = (128, 128, 128)
 
 
 # ---------------------------------------------------------------------------
@@ -153,40 +146,27 @@ def _round_sort_key(ri: dict[str, Any]) -> tuple[int, int]:
 def _t_blend_to_grey(
     abs_mag: float, ref_max: float, *, gamma: float = _DESAT_GAMMA
 ) -> float:
-    """0 = green (accurate), 1 = red-orange (worst), on an absolute % error scale.
-
-    Errors below ``_ABS_GREEN_PCT`` (15%) are pure green.  Errors above
-    ``_ABS_RED_PCT`` (50%) are pure red-orange.  ``ref_max`` is accepted for
-    API compat but no longer drives the colour mapping.
-    """
-    pct: float = abs(float(abs_mag))
-    if pct <= _ABS_GREEN_PCT:
+    """0 = full line colour, 1 = exact neutral grey, scaled by *this* subplot's data range."""
+    if ref_max < 1e-12:
         return 0.0
-    t_lin: float = min(1.0, (pct - _ABS_GREEN_PCT) / max(_ABS_RED_PCT - _ABS_GREEN_PCT, 1e-12))
+    t_lin: float = min(1.0, abs(float(abs_mag)) / ref_max)
     return float(min(1.0, t_lin ** float(gamma)))
 
 
 def _blend_toward_grey(
     line_rgba: str, t: float, alpha_override: Optional[float] = None
 ) -> str:
-    """Blend from green (t=0, accurate) to red-orange (t=1, high error).
-
-    ``line_rgba`` is accepted for API compat but the actual colour is computed
-    from the ``_GOOD_RGB`` → ``_BAD_RGB`` gradient; only the alpha channel of
-    the original is preserved when ``alpha_override`` is None.
-    """
+    """Linear blend of base RGB to ``_GREY_RGB``; *t* in [0,1]."""
     t2: float = max(0.0, min(1.0, t))
     m = _RG_RGBA.match(str(line_rgba).strip())
-    a: float
-    if m:
-        a = float(m.group(4)) if alpha_override is None else float(alpha_override)
-    else:
-        a = 0.92 if alpha_override is None else float(alpha_override)
-    gr, gg, gb = _GOOD_RGB
-    br, bg, bb = _BAD_RGB
-    r2 = int(gr * (1.0 - t2) + br * t2)
-    g2 = int(gg * (1.0 - t2) + bg * t2)
-    b2 = int(gb * (1.0 - t2) + bb * t2)
+    if not m:
+        return line_rgba
+    r, g, b = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    a = float(m.group(4)) if alpha_override is None else float(alpha_override)
+    gr, gg, gb = _GREY_RGB
+    r2 = int(r * (1.0 - t2) + gr * t2)
+    g2 = int(g * (1.0 - t2) + gg * t2)
+    b2 = int(b * (1.0 - t2) + gb * t2)
     return f"rgba({r2},{g2},{b2},{a:.3f})"
 
 
@@ -547,8 +527,7 @@ def _synthesis_legend_row_html(share_record: dict[str, Any], *, locale: str) -> 
                     html.Span(
                         style={
                             **swatch,
-                            "height": "2px",
-                            "background": "linear-gradient(to right, rgba(34,139,34,1), rgba(220,60,20,1))",
+                            "borderBottom": f"2px solid {line_c}",
                             "alignSelf": "center",
                         },
                     ),
@@ -818,19 +797,17 @@ def build_synthesis_figure(
                     ),
                     row=row_idx, col=1,
                 )
-                label_text: str = f"r{rn3}"
-                for li in range(len(m_x)):
-                    lc: str = m_col[li] if m_col else "rgba(100,100,100,0.7)"
-                    fig.add_annotation(
-                        x=m_x[li], y=m_y[li],
-                        text=label_text,
-                        showarrow=False,
-                        font=dict(size=7, color=lc),
-                        xanchor="center", yanchor="bottom",
-                        yshift=3,
-                        opacity=0.6,
-                        row=row_idx, col=1,
-                    )
+                lc0: str = m_col[0] if m_col else "rgba(100,100,100,0.7)"
+                fig.add_annotation(
+                    x=m_x[0], y=m_y[0],
+                    text=f"r{rn3}",
+                    showarrow=False,
+                    font=dict(size=8, color=lc0),
+                    xanchor="right", yanchor="bottom",
+                    xshift=-4, yshift=3,
+                    opacity=0.7,
+                    row=row_idx, col=1,
+                )
 
     x_title: str = t("ui.share.synthesis.x_axis_time", locale=loc)
     y_name: str = t("ui.share.synthesis.y_axis_short", locale=loc)
@@ -978,10 +955,10 @@ def build_share_card_figure(
     user_info: dict[str, Any] = dict(share_record.get("user_info") or {})
     name: str = _safe_display_name(user_info)
 
-    mae: float = stats.get("mae_mgdl") or float("nan")
-    rmse: float = stats.get("rmse_mgdl") or float("nan")
-    mard: float = stats.get("mape") or float("nan")
-    accuracy: float = stats.get("accuracy") or float("nan")
+    mae: float = stats.get("mae_mgdl", float("nan"))
+    rmse: float = stats.get("rmse_mgdl", float("nan"))
+    mard: float = stats.get("mape", float("nan"))
+    accuracy: float = stats.get("accuracy", float("nan"))
     accuracy_str: str = f"{_format_number(accuracy)}%" if not math.isnan(accuracy) else "?"
     mard_str: str = f"{_format_number(mard)}%" if not math.isnan(mard) else "?"
     rounds_played: int = int(stats.get("rounds_played") or 0)
@@ -1299,10 +1276,10 @@ def create_share_layout(
     user_info: dict[str, Any] = dict(share_record.get("user_info") or {})
     name: str = _safe_display_name(user_info)
 
-    mae: float = stats.get("mae_mgdl") or float("nan")
-    rmse: float = stats.get("rmse_mgdl") or float("nan")
-    mard: float = stats.get("mape") or float("nan")
-    accuracy: float = stats.get("accuracy") or float("nan")
+    mae: float = stats.get("mae_mgdl", float("nan"))
+    rmse: float = stats.get("rmse_mgdl", float("nan"))
+    mard: float = stats.get("mape", float("nan"))
+    accuracy: float = stats.get("accuracy", float("nan"))
     accuracy_str: str = f"{_format_number(accuracy)}%" if not math.isnan(accuracy) else "?"
     mard_str: str = f"{_format_number(mard)}%" if not math.isnan(mard) else "?"
     rounds_played: int = int(stats.get("rounds_played") or 0)

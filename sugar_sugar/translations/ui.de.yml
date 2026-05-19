@@ -238,7 +238,7 @@ de:
     encouragement:
       excellent:
         lines:
-          - "Du liest Zucker wie ein Profi. %{rounds} Runden, MAE unter 10 mg/dL. Glaubst du, du schlägst mich?"
+          - "Du liest Zucker wie ein Profi. %{rounds} Runden und immer noch punktgenau. Glaubst du, du schlägst mich?"
           - "Jede Kurve erwischt, über %{rounds} Runden. Dein Feed ist dran - drück Play und versuch das zu toppen."
           - "Mustererkennung auf Pro-Niveau. %{rounds} Runden und ich treffe weiter. Du bist dran."
           - "So sehen %{rounds} Runden saubere Reads aus. Wette, du kommst da nicht mit."

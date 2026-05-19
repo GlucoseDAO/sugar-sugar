@@ -238,7 +238,7 @@ ro:
     encouragement:
       excellent:
         lines:
-          - "Citești zahărul ca un pro. %{rounds} runde, MAE sub 10 mg/dL. Crezi că mă bați?"
+          - "Citești zahărul ca un pro. %{rounds} runde și tot precis. Crezi că mă bați?"
           - "Prinzi fiecare curbă în %{rounds} runde. Feed-ul tău urmează - dă play și încearcă să mă depășești."
           - "Instinct de pattern, deblocat. %{rounds} runde și încă nu ratez. E rândul tău."
           - "Așa arată %{rounds} runde cu citiri curate. Pun pariu că nu ții pasul."

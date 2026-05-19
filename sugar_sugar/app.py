@@ -12,6 +12,7 @@ import polars as pl
 from datetime import datetime
 import time
 from pathlib import Path
+import math
 import base64
 import dash_bootstrap_components as dbc
 import os
@@ -409,18 +410,25 @@ if _is_share_mode:
                         all_actual.append(float(a_s))
                         all_pred.append(float(p_s))
                     except ValueError:
-                        pass
+                        continue
         n = len(all_actual)
         if n == 0:
             return {"mae": 0.0, "mse": 0.0, "rmse": 0.0, "mape": 0.0}
         mae = sum(abs(a - p) for a, p in zip(all_actual, all_pred)) / n
         mse = sum((a - p) ** 2 for a, p in zip(all_actual, all_pred)) / n
         rmse = mse ** 0.5
-        mape = sum(abs((a - p) / a) * 100 for a, p in zip(all_actual, all_pred) if a != 0) / n
+        nonzero = sum(1 for a in all_actual if a != 0)
+        mape = (sum(abs((a - p) / a) * 100 for a, p in zip(all_actual, all_pred) if a != 0) / nonzero) if nonzero else 0.0
         return {"mae": mae, "mse": mse, "rmse": rmse, "mape": mape}
+
+    import tempfile, shutil
+    _ranking_header = "study_id,run_id,number,timestamp,format,rounds_played,is_example_data,data_source_name,overall_mae_mgdl,overall_mse_mgdl,overall_rmse_mgdl,overall_mape\n"
 
     def _append_ranking_row(path: Path, fmt: str, rounds_for_fmt: list[dict[str, Any]]) -> None:
         m = _metrics_from_rounds(rounds_for_fmt)
+        if not path.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(_ranking_header, encoding="utf-8")
         row = (
             f"{_share_study_id},{_share_run_id},0,{_share_timestamp},{fmt},"
             f"{len(rounds_for_fmt)},{_share_is_example},{_share_source},"
@@ -429,23 +437,45 @@ if _is_share_mode:
         with open(path, "a", encoding="utf-8") as fh:
             fh.write(row)
 
+    _tmp_ranking_dir = Path(tempfile.mkdtemp(prefix="sugar_share_ranking_"))
+    _real_ranking_dir = project_root / "data" / "input"
+
     _rounds_by_fmt: dict[str, list[dict[str, Any]]] = {}
     for _r in _share_all_rounds:
         _rounds_by_fmt.setdefault(_r["format"], []).append(_r)
 
     for _fmt_key, _fmt_rounds in _rounds_by_fmt.items():
-        _append_ranking_row(
-            project_root / "data" / "input" / f"prediction_ranking_{_fmt_key}.csv",
-            _fmt_key,
-            _fmt_rounds,
-        )
-    _append_ranking_row(
-        project_root / "data" / "input" / "prediction_ranking.csv",
-        "ALL",
-        _share_all_rounds,
-    )
+        _real_fmt_csv = _real_ranking_dir / f"prediction_ranking_{_fmt_key}.csv"
+        _tmp_fmt_csv = _tmp_ranking_dir / f"prediction_ranking_{_fmt_key}.csv"
+        if _real_fmt_csv.exists():
+            shutil.copy2(_real_fmt_csv, _tmp_fmt_csv)
+        _append_ranking_row(_tmp_fmt_csv, _fmt_key, _fmt_rounds)
 
-    _share_rankings = compute_share_rankings(_share_study_id, list(_share_played_formats))
+    _real_overall_csv = _real_ranking_dir / "prediction_ranking.csv"
+    _tmp_overall_csv = _tmp_ranking_dir / "prediction_ranking.csv"
+    if _real_overall_csv.exists():
+        shutil.copy2(_real_overall_csv, _tmp_overall_csv)
+    _append_ranking_row(_tmp_overall_csv, "ALL", _share_all_rounds)
+
+    def _share_rank(fmt_filter: Optional[str], csv_name: str) -> Optional[tuple[int, int]]:
+        return _rank_from_ranking_csv(
+            _tmp_ranking_dir / csv_name,
+            study_id=_share_study_id,
+            format_filter=fmt_filter,
+            mode="best",
+        )
+
+    _share_per_format: list[dict[str, Any]] = []
+    for _fmt_key in sorted(_rounds_by_fmt, key=lambda x: FORMAT_ORDER.get(x, 999)):
+        _info = _share_rank(_fmt_key, f"prediction_ranking_{_fmt_key}.csv")
+        if _info:
+            _share_per_format.append({"format": _fmt_key, "rank": _info[0], "total": _info[1]})
+    _share_overall = _share_rank(None, "prediction_ranking.csv")
+    _share_rankings: dict[str, Any] = {
+        "per_format": _share_per_format,
+        "overall": {"rank": _share_overall[0], "total": _share_overall[1]} if _share_overall else None,
+    }
+    shutil.rmtree(_tmp_ranking_dir, ignore_errors=True)
 
     _share_record: dict[str, Any] = {
         "schema_version": 2,
@@ -463,8 +493,12 @@ if _is_share_mode:
         },
     }
     _share_mode_id = share_store.save_share(_share_record)
-    print(f"[share-mode] Saved {_share_rounds_n} fake rounds → /share/{_share_mode_id}")
-    print(f"[share-mode] Rankings: {_share_rankings}")
+    with start_action(action_type=u"share_mode_setup") as _share_action:
+        _share_action.add_success_fields(
+            share_id=_share_mode_id,
+            rounds=_share_rounds_n,
+            rankings=str(_share_rankings),
+        )
 
 external_stylesheets = [
     'https://codepen.io/chriddyp/pen/bWLwgP.css',
@@ -614,8 +648,8 @@ def _share_card_og_response(share_id: str) -> Any:
 
     from sugar_sugar.components.share import compute_aggregate_stats, _best_ranking_entry, _format_number
     og_stats = compute_aggregate_stats(list(record.get("rounds") or []))
-    og_accuracy = og_stats.get("accuracy") or float("nan")
-    og_accuracy_str = f"{_format_number(og_accuracy)}%" if og_accuracy == og_accuracy else "?"
+    og_accuracy = og_stats.get("accuracy", float("nan"))
+    og_accuracy_str = f"{_format_number(og_accuracy)}%" if not math.isnan(og_accuracy) else "?"
     og_best = _best_ranking_entry(record)
     og_percentile = og_best.get("percentile") if og_best else None
     if og_percentile is not None:

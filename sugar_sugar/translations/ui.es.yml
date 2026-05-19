@@ -237,7 +237,7 @@ es:
     encouragement:
       excellent:
         lines:
-          - "Lees la glucosa como un pro. %{rounds} rondas con MAE bajo 10 mg/dL. ¿Crees que me puedes ganar?"
+          - "Lees la glucosa como un pro. %{rounds} rondas y siempre preciso. ¿Crees que me puedes ganar?"
           - "Cada curva pillada en %{rounds} rondas. Tu muro es el próximo - dale a jugar y trata de superarlo."
           - "Instinto de patrones al máximo. %{rounds} rondas y sigo sin fallar. Te toca."
           - "Así se ven %{rounds} rondas leyendo limpio. Apuesto que no aguantas el ritmo."

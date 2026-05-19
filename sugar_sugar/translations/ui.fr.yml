@@ -237,7 +237,7 @@ fr:
     encouragement:
       excellent:
         lines:
-          - "Tu lis le sucre comme un pro. %{rounds} manches, MAE sous 10 mg/dL. Tu crois pouvoir me battre ?"
+          - "Tu lis le sucre comme un pro. %{rounds} manches et toujours aussi précis. Tu crois pouvoir me battre ?"
           - "Toutes les courbes attrapées sur %{rounds} manches. Ton fil est le prochain - lance-toi et essaie de me dépasser."
           - "Instinct des motifs, débloqué. %{rounds} manches et je rate toujours pas. À toi."
           - "Voilà %{rounds} manches de lectures propres. Je parie que tu ne suis pas."
