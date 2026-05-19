@@ -20,13 +20,10 @@ from eliot import start_action
 from sugar_sugar.i18n import normalize_locale, t, t_list
 
 
-# Score brackets (mean absolute error in mg/dL).  A MAE < 10 mg/dL is
-# genuinely excellent for a human forecaster; the upper band catches the
-# "still learning" case without shaming the player.
 BRACKET_THRESHOLDS_MGDL: list[tuple[float, str]] = [
-    (10.0, "excellent"),
-    (20.0, "good"),
-    (35.0, "average"),
+    (15.0, "excellent"),
+    (30.0, "good"),
+    (50.0, "average"),
     (float("inf"), "keep_practicing"),
 ]
 
