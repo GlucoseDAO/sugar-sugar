@@ -51,18 +51,45 @@ from sugar_sugar.i18n import normalize_locale, t
 # Draw order: Generic (A), My data (B), Mixed (C) — one subplot per format present.
 _FORMAT_DRAW_ORDER: list[str] = ["A", "B", "C"]
 
-# Per-format line colour (fills use the same hue with alpha, only under the curve).
-_FORMAT_PANEL: dict[str, dict[str, str]] = {
-    "A": {"line": "rgba(21, 101, 192, 0.92)"},
-    "B": {"line": "rgba(234, 88, 12, 0.92)"},
-    "C": {"line": "rgba(91, 33, 182, 0.88)"},
+# ---------------------------------------------------------------------------
+# Per-format colour palettes
+# ---------------------------------------------------------------------------
+# When only ONE format is displayed, every panel uses the classic green-to-red
+# scientific gradient.  When MULTIPLE formats share the page, each format gets
+# its own good-to-bad palette so the reader can tell panels apart at a glance.
+#
+#   A (Generic):           blue (good) -> cool grey (bad)
+#   B (My Data):           orange (good) -> warm grey (bad)
+#   C (Generic + My Data): green (good) -> red (bad)
+#
+# The zero-percent line always uses the "good" end of the panel's palette.
+
+_RGB3 = tuple[int, int, int]
+
+_PALETTE_SINGLE: tuple[_RGB3, _RGB3] = ((34, 139, 34), (220, 60, 20))
+_PALETTE_MULTI: dict[str, tuple[_RGB3, _RGB3]] = {
+    "A": ((21, 101, 192), (170, 175, 185)),
+    "B": ((234, 88, 12), (185, 170, 160)),
+    "C": ((34, 139, 34), (220, 60, 20)),
 }
-# Solid black baseline (scatter so markers can stay on top; drawn after variability lines)
-_ZERO_LINE: dict[str, Any] = {"color": "rgba(34,139,34,1)", "width": 3.5}
-# Percent-error curve segments (between markers)
+_DEFAULT_PALETTE: tuple[_RGB3, _RGB3] = _PALETTE_SINGLE
+
+
+def _palette_for(fmt: str, n_formats: int) -> tuple[_RGB3, _RGB3]:
+    """Return (good_rgb, bad_rgb) for a format, context-aware."""
+    if n_formats <= 1:
+        return _PALETTE_SINGLE
+    return _PALETTE_MULTI.get(fmt.strip().upper(), _DEFAULT_PALETTE)
+
+
+def _good_rgba(fmt: str, n_formats: int, alpha: float = 1.0) -> str:
+    r, g, b = _palette_for(fmt, n_formats)[0]
+    return f"rgba({r},{g},{b},{alpha})"
+
+
+_ZERO_LINE_WIDTH: float = 3.5
 _VARIABILITY_LINE_WIDTH: float = 1.35
 _LEGEND_VARIABILITY_SAMPLE_WIDTH: float = 1.0
-_DEFAULT_FORMAT_STYLE: dict[str, str] = {"line": "rgba(255, 140, 0, 0.92)"}
 
 _UUID_RE: re.Pattern[str] = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
@@ -71,14 +98,10 @@ _RG_RGBA: re.Pattern[str] = re.compile(
     r"^rgba\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*([0-9.]+)\s*\)\s*$",
     re.IGNORECASE,
 )
-# Hatch: horizontal slices from baseline toward chord; alpha + grey increase toward the curve
 _N_FILL_SLICES: int = 8
 _FILL_ALPHA_TOP: float = 0.11
 _FILL_ALPHA_BOTTOM: float = 0.22
-# |y|/ref → blend from format colour toward neutral grey (high error);
-# Exp < 1: stronger greying so mid/outer range moves toward #808080, not just faint hue
 _DESAT_GAMMA: float = 0.38
-_GREY_RGB: tuple[int, int, int] = (128, 128, 128)
 
 
 # ---------------------------------------------------------------------------
@@ -131,11 +154,9 @@ def _minutes_tickvals(n_points: int) -> list[int]:
     return [5 * i for i in range(n_points)]
 
 
-def _format_figure_styling(format_code: str) -> dict[str, str]:
-    return _FORMAT_PANEL.get(
-        str(format_code or "").strip().upper(),
-        _DEFAULT_FORMAT_STYLE,
-    )
+def _format_good_color(format_code: str, n_formats: int) -> str:
+    """Return the 'good' RGBA string for a format in the current layout context."""
+    return _good_rgba(format_code, n_formats)
 
 
 def _round_sort_key(ri: dict[str, Any]) -> tuple[int, int]:
@@ -143,31 +164,25 @@ def _round_sort_key(ri: dict[str, Any]) -> tuple[int, int]:
     return (n, id(ri))
 
 
-def _t_blend_to_grey(
+def _t_error(
     abs_mag: float, ref_max: float, *, gamma: float = _DESAT_GAMMA
 ) -> float:
-    """0 = full line colour, 1 = exact neutral grey, scaled by *this* subplot's data range."""
+    """0 = perfect (good colour), 1 = worst (bad colour), scaled by this subplot's range."""
     if ref_max < 1e-12:
         return 0.0
     t_lin: float = min(1.0, abs(float(abs_mag)) / ref_max)
     return float(min(1.0, t_lin ** float(gamma)))
 
 
-def _blend_toward_grey(
-    line_rgba: str, t: float, alpha_override: Optional[float] = None
+def _blend_color(
+    good: _RGB3, bad: _RGB3, t: float, alpha: float = 0.92
 ) -> str:
-    """Linear blend of base RGB to ``_GREY_RGB``; *t* in [0,1]."""
+    """Blend from good RGB (t=0) to bad RGB (t=1)."""
     t2: float = max(0.0, min(1.0, t))
-    m = _RG_RGBA.match(str(line_rgba).strip())
-    if not m:
-        return line_rgba
-    r, g, b = int(m.group(1)), int(m.group(2)), int(m.group(3))
-    a = float(m.group(4)) if alpha_override is None else float(alpha_override)
-    gr, gg, gb = _GREY_RGB
-    r2 = int(r * (1.0 - t2) + gr * t2)
-    g2 = int(g * (1.0 - t2) + gg * t2)
-    b2 = int(b * (1.0 - t2) + gb * t2)
-    return f"rgba({r2},{g2},{b2},{a:.3f})"
+    r = int(good[0] * (1.0 - t2) + bad[0] * t2)
+    g = int(good[1] * (1.0 - t2) + bad[1] * t2)
+    b = int(good[2] * (1.0 - t2) + bad[2] * t2)
+    return f"rgba({r},{g},{b},{alpha:.3f})"
 
 
 def _add_gradient_hatch_axis_to_chord(
@@ -179,7 +194,7 @@ def _add_gradient_hatch_axis_to_chord(
     x1: float,
     p0: float,
     p1: float,
-    line_c: str,
+    palette: tuple[_RGB3, _RGB3],
     row_y_max: float,
     legend_rn: int,
 ) -> None:
@@ -206,7 +221,7 @@ def _add_gradient_hatch_axis_to_chord(
                 x1=xc,
                 p0=p0,
                 p1=0.0,
-                line_c=line_c,
+                palette=palette,
                 row_y_max=row_y_max,
                 legend_rn=legend_rn,
             )
@@ -218,7 +233,7 @@ def _add_gradient_hatch_axis_to_chord(
                 x1=x1,
                 p0=0.0,
                 p1=p1,
-                line_c=line_c,
+                palette=palette,
                 row_y_max=row_y_max,
                 legend_rn=legend_rn,
             )
@@ -234,8 +249,8 @@ def _add_gradient_hatch_axis_to_chord(
         a_fill: float = (
             _FILL_ALPHA_BOTTOM * (1.0 - t_mid) + _FILL_ALPHA_TOP * t_mid
         )
-        fill_t: float = _t_blend_to_grey(m_band, row_y_max)
-        fill_rgba: str = _blend_toward_grey(line_c, fill_t, a_fill)
+        fill_t: float = _t_error(m_band, row_y_max)
+        fill_rgba: str = _blend_color(palette[0], palette[1], fill_t, alpha=a_fill)
         fig.add_trace(
             go.Scatter(
                 x=[x0, x1, x1, x0, x0],
@@ -493,8 +508,9 @@ def _synthesis_legend_row_html(share_record: dict[str, Any], *, locale: str) -> 
     loc: str = normalize_locale(locale)
     rounds: list[dict[str, Any]] = list(share_record.get("rounds") or [])
     formats: list[str] = _formats_played_in_order(rounds)
+    n_fmt: int = len(formats)
     fmt0: str = str(formats[0] or "A").strip().upper() or "A"
-    line_c: str = _format_figure_styling(fmt0)["line"]
+    line_c: str = _format_good_color(fmt0, n_fmt)
     z_label: str = t("ui.share.synthesis.legend_zero", locale=loc)
     v_label: str = t("ui.share.synthesis.legend_variability", locale=loc)
     item_style: dict[str, str] = {
@@ -513,7 +529,7 @@ def _synthesis_legend_row_html(share_record: dict[str, Any], *, locale: str) -> 
             html.Div(
                 [
                     html.Span(
-                        style={**swatch, "borderBottom": "2.5px solid rgba(34,139,34,1)", "alignSelf": "center"},
+                        style={**swatch, "borderBottom": f"2.5px solid {_good_rgba(fmt0, n_fmt)}", "alignSelf": "center"},
                     ),
                     html.Span(
                         z_label,
@@ -638,8 +654,8 @@ def build_synthesis_figure(
     first_zero: bool = True
 
     for row_idx, fmt in enumerate(formats, start=1):
-        sty: dict[str, str] = _format_figure_styling(fmt)
-        line_c: str = sty["line"]
+        palette: tuple[_RGB3, _RGB3] = _palette_for(fmt, n_fmt)
+        good_c: str = _good_rgba(fmt, n_fmt)
 
         rounds_f: list[dict[str, Any]] = [
             r
@@ -694,7 +710,7 @@ def build_synthesis_figure(
                     x1=xb,
                     p0=p0,
                     p1=p1,
-                    line_c=line_c,
+                    palette=palette,
                     row_y_max=row_y_max,
                     legend_rn=rn,
                 )
@@ -717,9 +733,7 @@ def build_synthesis_figure(
                     continue
                 x0, x1 = x2[j], x2[j + 1]
                 m_seg: float = max(abs(v0), abs(v1))
-                seg_c: str = _blend_toward_grey(
-                    line_c, _t_blend_to_grey(m_seg, row_y_max), None
-                )
+                seg_c: str = _blend_color(palette[0], palette[1], _t_error(m_seg, row_y_max))
                 fig.add_trace(
                     go.Scatter(
                         x=[x0, x1],
@@ -741,7 +755,7 @@ def build_synthesis_figure(
                 y=y_zero,
                 mode="lines",
                 name=leg_zero,
-                line=_ZERO_LINE,
+                line=dict(color=good_c, width=_ZERO_LINE_WIDTH),
                 connectgaps=True,
                 legendgroup="zero",
                 showlegend=show_lz,
@@ -774,9 +788,7 @@ def build_synthesis_figure(
                 m_x.append(x3[j])
                 m_y.append(yy)
                 m_col.append(
-                    _blend_toward_grey(
-                        line_c, _t_blend_to_grey(abs(yy), row_y_max), None
-                    )
+                    _blend_color(palette[0], palette[1], _t_error(abs(yy), row_y_max))
                 )
                 m_cd.append([rn3])
             if m_x:
@@ -837,7 +849,7 @@ def build_synthesis_figure(
         fig.update_xaxes(**x_kw)
 
     if show_legend_in_figure and formats:
-        var_leg_color: str = _format_figure_styling(formats[0])["line"]
+        var_leg_color: str = _format_good_color(formats[0], n_fmt)
         fig.add_trace(
             go.Scatter(
                 x=[None],
@@ -1061,12 +1073,13 @@ def build_share_card_figure(
     fmt0: str = str(formats_played[0]).strip().upper() if formats_played else "A"
     if fmt0 not in ("A", "B", "C"):
         fmt0 = "A"
-    var_color: str = _format_figure_styling(fmt0)["line"]
+    n_fmt_card: int = len(formats_played)
+    var_color: str = _format_good_color(fmt0, n_fmt_card)
     fig.add_shape(
         type="line",
         xref="paper", yref="paper",
         x0=0.28, x1=0.35, y0=y_legend, y1=y_legend,
-        line={"color": "rgba(34,139,34,1)", "width": 3.2},
+        line={"color": _good_rgba(fmt0, n_fmt_card), "width": 3.2},
         layer="above",
     )
     fig.add_annotation(

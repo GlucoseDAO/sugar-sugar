@@ -393,6 +393,36 @@ en:
             a: "Glucose is a core metabolic signal linked to energy, cognition, mood, exercise response, and long-term health. For non-diabetic people, prediction can reveal how food, sleep, stress, and activity shape metabolism in real time — useful for preventive health and lifestyle optimisation."
           - q: "Why is human accuracy so important for machine learning?"
             a: "There is currently no published human-baseline benchmark for CGM glucose prediction. Without knowing how well an informed human can predict glucose trends, we cannot assess whether any ML model is genuinely useful — it might be worse than a knowledgeable diabetic, or better only in specific scenarios. This study establishes that baseline so future ML work can be compared meaningfully."
+          - q: "A person knows way more than any chart shows — meals, sleep, stress, digestion, cycle. Without all that, isn't this just fortune-telling on graphs?"
+            a: >-
+              When you look at your CGM graph, you already have a sense of where glucose is heading.
+              You don't list every factor consciously. You look at the curve and read what's already happening.
+
+
+              That works because the things you didn't log still show up in the glucose.
+              A post-meal spike looks like a post-meal spike whether the carbs were entered or not.
+              Insulin on board pulls the curve down in a recognizable way.
+              The glucose line is the result of everything going on, even what wasn't tracked.
+
+
+              Also, if you upload your CGM data, the chart shows logged carbs, insulin, and exercise as markers. So it's not a bare glucose line.
+
+
+              Is this like "technical analysis" in stock trading? No.
+              Stock prices move on crowd psychology, and the prediction itself moves the market.
+              Glucose is biochemistry. Insulin has a known action curve. Carbs absorb at known rates.
+              The next hour mostly follows from what's already in motion right now.
+
+
+              Research confirms this: studies comparing glucose prediction models with and without meal and insulin inputs
+              found that adding those covariates did not improve short-term accuracy
+              ([Daniels et al., 2022](https://pmc.ncbi.nlm.nih.gov/articles/PMC8782424/);
+              [The Maastricht Study, 2021](https://pmc.ncbi.nlm.nih.gov/articles/PMC8224858/)).
+              The CGM signal alone carries enough information for the next hour.
+
+
+              We're not asking anyone to describe their whole day to a model.
+              The question is: looking at the screen, how well can you tell where glucose is going?
       - title: "How the study works"
         items:
           - q: "Who can participate?"
@@ -407,6 +437,19 @@ en:
             a: "Please do not restart just because you are unhappy with your accuracy. People naturally prefer to keep good scores and discard bad ones, but that would skew the study and make the results less scientifically valid. If you feel disappointed, the best thing is to continue with another round rather than resetting your progress."
           - q: "What are the accuracy metrics?"
             a: "We use standard forecasting metrics — MAE, RMSE, and MAPE — to quantify how close your predicted glucose curve was to the real one. MAE is the average absolute error: it tells you how far off you were on average. RMSE penalises larger mistakes more strongly, so it highlights cases where the prediction was badly wrong. MAPE expresses error as a percentage, which helps compare performance across different glucose ranges. Together these metrics give a more complete picture than a single score."
+          - q: "What are the limitations of this study?"
+            a: >-
+              We want to be upfront:
+
+              - **Short horizon only.** We ask you to predict the next hour. Longer-term prediction is a much harder problem where unmeasured factors dominate.
+
+              - **Logged events may be incomplete.** The chart shows whatever your CGM app recorded — if you didn't log a meal or dose, it won't appear, and both you and a model are working with the same incomplete picture.
+
+              - **No personal context.** In real life, you know things not in the data — that you're coming down with a cold, that you're about to go for a run, that this is your third coffee. This study isolates chart-reading ability from personal knowledge.
+
+              - **No real-time pressure.** Drawing a prediction line calmly is different from making a dosing decision at 2 AM while half asleep.
+
+              - **Example vs. own data.** If you play with the built-in example data, your accuracy may differ from predicting your own glucose. We encourage you to upload your own CGM export (Dexcom, Libre, Medtronic, or Nightscout) — your personal intuition about your own patterns is part of what makes the comparison with ML interesting.
       - title: "Data and privacy"
         items:
           - q: "Is any of my data stored?"
