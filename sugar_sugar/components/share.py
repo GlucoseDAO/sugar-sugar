@@ -58,7 +58,7 @@ _FORMAT_PANEL: dict[str, dict[str, str]] = {
     "C": {"line": "rgba(91, 33, 182, 0.88)"},
 }
 # Solid black baseline (scatter so markers can stay on top; drawn after variability lines)
-_ZERO_LINE: dict[str, Any] = {"color": "black", "width": 3.5}
+_ZERO_LINE: dict[str, Any] = {"color": "rgba(34,139,34,1)", "width": 3.5}
 # Percent-error curve segments (between markers)
 _VARIABILITY_LINE_WIDTH: float = 1.35
 _LEGEND_VARIABILITY_SAMPLE_WIDTH: float = 1.0
@@ -75,11 +75,17 @@ _RG_RGBA: re.Pattern[str] = re.compile(
 _N_FILL_SLICES: int = 8
 _FILL_ALPHA_TOP: float = 0.11
 _FILL_ALPHA_BOTTOM: float = 0.22
-# |y|/ref < 1 → blend toward full grey; ref = row max |% error|;
-# Exp < 1: stronger greying so mid/outer range moves toward #808080, not just faint hue
+# |y|/ref → blend from green (accurate) toward red-orange (high error);
+# Exp < 1: sharper colour transition so mid-range already shows warm tones
 _DESAT_GAMMA: float = 0.38
-# Literal neutral used at t=1.0
-_GREY_RGB: tuple[int, int, int] = (128, 128, 128)
+# Absolute percent-error thresholds for colour mapping.
+# Below _ABS_GREEN_PCT the colour is pure green; above _ABS_RED_PCT it is pure
+# red-orange.  CGM sensor MARD is ~10%, so predictions under ~15% are good.
+_ABS_GREEN_PCT: float = 15.0
+_ABS_RED_PCT: float = 50.0
+# Green (accurate, t=0) → red-orange (worst error, t=1)
+_GOOD_RGB: tuple[int, int, int] = (34, 139, 34)
+_BAD_RGB: tuple[int, int, int] = (220, 60, 20)
 
 
 # ---------------------------------------------------------------------------
@@ -147,30 +153,40 @@ def _round_sort_key(ri: dict[str, Any]) -> tuple[int, int]:
 def _t_blend_to_grey(
     abs_mag: float, ref_max: float, *, gamma: float = _DESAT_GAMMA
 ) -> float:
-    """0 = full line colour, 1 = exact neutral grey, scaled by *this* subplot's data range.
+    """0 = green (accurate), 1 = red-orange (worst), on an absolute % error scale.
 
-    ``ref_max`` = max |percent error| in the row (or 0 if none).
+    Errors below ``_ABS_GREEN_PCT`` (15%) are pure green.  Errors above
+    ``_ABS_RED_PCT`` (50%) are pure red-orange.  ``ref_max`` is accepted for
+    API compat but no longer drives the colour mapping.
     """
-    if ref_max < 1e-12:
+    pct: float = abs(float(abs_mag))
+    if pct <= _ABS_GREEN_PCT:
         return 0.0
-    t_lin: float = min(1.0, abs(float(abs_mag)) / ref_max)
+    t_lin: float = min(1.0, (pct - _ABS_GREEN_PCT) / max(_ABS_RED_PCT - _ABS_GREEN_PCT, 1e-12))
     return float(min(1.0, t_lin ** float(gamma)))
 
 
 def _blend_toward_grey(
     line_rgba: str, t: float, alpha_override: Optional[float] = None
 ) -> str:
-    """Linear blend of base RGB to ``_GREY_RGB``; *t* in [0,1]."""
+    """Blend from green (t=0, accurate) to red-orange (t=1, high error).
+
+    ``line_rgba`` is accepted for API compat but the actual colour is computed
+    from the ``_GOOD_RGB`` → ``_BAD_RGB`` gradient; only the alpha channel of
+    the original is preserved when ``alpha_override`` is None.
+    """
     t2: float = max(0.0, min(1.0, t))
     m = _RG_RGBA.match(str(line_rgba).strip())
-    if not m:
-        return line_rgba
-    r, g, b = int(m.group(1)), int(m.group(2)), int(m.group(3))
-    a = float(m.group(4)) if alpha_override is None else float(alpha_override)
-    gr, gg, gb = _GREY_RGB
-    r2 = int(r * (1.0 - t2) + gr * t2)
-    g2 = int(g * (1.0 - t2) + gg * t2)
-    b2 = int(b * (1.0 - t2) + gb * t2)
+    a: float
+    if m:
+        a = float(m.group(4)) if alpha_override is None else float(alpha_override)
+    else:
+        a = 0.92 if alpha_override is None else float(alpha_override)
+    gr, gg, gb = _GOOD_RGB
+    br, bg, bb = _BAD_RGB
+    r2 = int(gr * (1.0 - t2) + br * t2)
+    g2 = int(gg * (1.0 - t2) + bg * t2)
+    b2 = int(gb * (1.0 - t2) + bb * t2)
     return f"rgba({r2},{g2},{b2},{a:.3f})"
 
 
@@ -353,10 +369,18 @@ def compute_aggregate_stats(rounds: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def compute_percentile(rank: int, total: int) -> Optional[int]:
+    """Compute the percentile (top X%) from rank and total. Returns None if invalid."""
+    if total <= 0 or rank <= 0:
+        return None
+    pct: float = (rank / total) * 100.0
+    return max(1, math.ceil(pct))
+
+
 def _best_ranking_entry(share_record: dict[str, Any]) -> Optional[dict[str, Any]]:
     """Return the single best (lowest-rank) entry across per-format + overall.
 
-    Output shape: ``{"rank": int, "total": int, "scope": "overall"|fmt}``.
+    Output shape: ``{"rank": int, "total": int, "scope": "overall"|fmt, "percentile": int|None}``.
     Returns None when no ranks are available.
     """
     rankings: dict[str, Any] = dict(share_record.get("rankings") or {})
@@ -371,7 +395,11 @@ def _best_ranking_entry(share_record: dict[str, Any]) -> Optional[dict[str, Any]
         if rank <= 0:
             continue
         if best is None or rank < best["rank"]:
-            best = {"rank": rank, "total": total, "scope": str(entry.get("format") or "")}
+            best = {
+                "rank": rank, "total": total,
+                "scope": str(entry.get("format") or ""),
+                "percentile": compute_percentile(rank, total),
+            }
 
     overall = rankings.get("overall")
     if isinstance(overall, dict):
@@ -379,7 +407,10 @@ def _best_ranking_entry(share_record: dict[str, Any]) -> Optional[dict[str, Any]
             o_rank = int(overall.get("rank"))
             o_total = int(overall.get("total"))
             if o_rank > 0 and (best is None or o_rank < best["rank"]):
-                best = {"rank": o_rank, "total": o_total, "scope": "overall"}
+                best = {
+                    "rank": o_rank, "total": o_total, "scope": "overall",
+                    "percentile": compute_percentile(o_rank, o_total),
+                }
         except (TypeError, ValueError):
             pass
 
@@ -502,7 +533,7 @@ def _synthesis_legend_row_html(share_record: dict[str, Any], *, locale: str) -> 
             html.Div(
                 [
                     html.Span(
-                        style={**swatch, "borderBottom": "2.5px solid #0f0f0f", "alignSelf": "center"},
+                        style={**swatch, "borderBottom": "2.5px solid rgba(34,139,34,1)", "alignSelf": "center"},
                     ),
                     html.Span(
                         z_label,
@@ -516,7 +547,8 @@ def _synthesis_legend_row_html(share_record: dict[str, Any], *, locale: str) -> 
                     html.Span(
                         style={
                             **swatch,
-                            "borderBottom": f"2px solid {line_c}",
+                            "height": "2px",
+                            "background": "linear-gradient(to right, rgba(34,139,34,1), rgba(220,60,20,1))",
                             "alignSelf": "center",
                         },
                     ),
@@ -935,7 +967,13 @@ def build_share_card_figure(
 
     mae: float = stats.get("mae_mgdl") or float("nan")
     rmse: float = stats.get("rmse_mgdl") or float("nan")
+    mard: float = stats.get("mape") or float("nan")
+    accuracy: float = stats.get("accuracy") or float("nan")
+    accuracy_str: str = f"{_format_number(accuracy)}%" if not math.isnan(accuracy) else "?"
+    mard_str: str = f"{_format_number(mard)}%" if not math.isnan(mard) else "?"
     rounds_played: int = int(stats.get("rounds_played") or 0)
+    best_entry: Optional[dict[str, Any]] = _best_ranking_entry(share_record)
+    percentile: Optional[int] = best_entry.get("percentile") if best_entry else None
     encourage: str = encouragement_text(stats, loc, seed=seed)
     generated_at: Optional[str] = _format_generated_at(share_record, locale=loc)
     play_url: str = _play_url_from_share(share_url)
@@ -970,36 +1008,48 @@ def build_share_card_figure(
     y_stats: float
     y_quote: float
     if name:
-        y_stats = 0.888
-        y_quote = 0.828
+        y_stats = 0.878
+        y_quote = 0.812
     else:
-        y_stats = 0.908
-        y_quote = 0.848
+        y_stats = 0.898
+        y_quote = 0.832
 
     fig.add_annotation(
         xref="paper", yref="paper",
-        x=0.5, y=0.987,
+        x=0.5, y=0.993,
         xanchor="center", yanchor="top",
-        text=f"<b>{t('ui.share.title', locale=loc)}</b>",
+        text=f"<b>{t('ui.share.subtitle', locale=loc)}</b>",
         showarrow=False,
-        font=dict(size=36, color="rgba(15,23,42,1)"),
+        font=dict(size=40, color="rgba(15,23,42,1)"),
+    )
+    fig.add_annotation(
+        xref="paper", yref="paper",
+        x=0.5, y=0.938,
+        xanchor="center", yanchor="top",
+        text=t("ui.share.title", locale=loc),
+        showarrow=False,
+        font=dict(size=18, color="rgba(100,116,139,1)"),
     )
     if name:
         fig.add_annotation(
             xref="paper", yref="paper",
-            x=0.5, y=0.928,
+            x=0.5, y=0.918,
             xanchor="center", yanchor="top",
             text=name,
             showarrow=False,
-            font=dict(size=18, color="rgba(71,85,105,1)"),
+            font=dict(size=16, color="rgba(71,85,105,1)"),
         )
-    stats_line: str = (
-        f"<b>{_format_number(mae)}</b> mg/dL {mae_label}"
-        f"   \u2022   "
-        f"<b>{_format_number(rmse)}</b> mg/dL {rmse_label}"
-        f"   \u2022   "
-        f"<b>{rounds_played}</b> {rounds_label}"
-    )
+    mard_label: str = t("ui.share.stat_mard", locale=loc)
+    parts: list[str] = [f"<b>{accuracy_str}</b> {t('ui.share.stat_accuracy', locale=loc)}"]
+    if percentile is not None:
+        parts.append(f"<b>{t('ui.share.stat_percentile', locale=loc, percentile=f'{percentile}%')}</b>")
+    parts.extend([
+        f"<b>{mard_str}</b> {mard_label}",
+        f"<b>{_format_number(mae)}</b> mg/dL {mae_label}",
+        f"<b>{_format_number(rmse)}</b> mg/dL {rmse_label}",
+        f"<b>{rounds_played}</b> {rounds_label}",
+    ])
+    stats_line: str = "   \u2022   ".join(parts)
     fig.add_annotation(
         xref="paper", yref="paper",
         x=0.5, y=y_stats,
@@ -1014,7 +1064,7 @@ def build_share_card_figure(
         xanchor="center", yanchor="top",
         text=f"<i>{encourage}</i>",
         showarrow=False,
-        font=dict(size=16, color="rgba(30,58,138,1)"),
+        font=dict(size=20, color="rgba(30,58,138,1)"),
     )
 
     formats_played: list[str] = _formats_played_in_order(rounds)
@@ -1026,7 +1076,7 @@ def build_share_card_figure(
         type="line",
         xref="paper", yref="paper",
         x0=0.28, x1=0.35, y0=y_legend, y1=y_legend,
-        line={"color": "#0f0f0f", "width": 3.2},
+        line={"color": "rgba(34,139,34,1)", "width": 3.2},
         layer="above",
     )
     fig.add_annotation(
@@ -1238,15 +1288,29 @@ def create_share_layout(
 
     mae: float = stats.get("mae_mgdl") or float("nan")
     rmse: float = stats.get("rmse_mgdl") or float("nan")
+    mard: float = stats.get("mape") or float("nan")
+    accuracy: float = stats.get("accuracy") or float("nan")
+    accuracy_str: str = f"{_format_number(accuracy)}%" if not math.isnan(accuracy) else "?"
+    mard_str: str = f"{_format_number(mard)}%" if not math.isnan(mard) else "?"
     rounds_played: int = int(stats.get("rounds_played") or 0)
     best_entry: Optional[dict[str, Any]] = _best_ranking_entry(share_record)
+    percentile: Optional[int] = best_entry.get("percentile") if best_entry else None
 
-    invite_text: str = t(
-        "ui.share.invite_text",
-        locale=loc,
-        mae=_format_number(mae),
-        rounds=rounds_played,
-    )
+    if percentile is not None:
+        invite_text: str = t(
+            "ui.share.invite_text_ranked",
+            locale=loc,
+            accuracy=accuracy_str,
+            rounds=rounds_played,
+            percentile=f"{percentile}%",
+        )
+    else:
+        invite_text = t(
+            "ui.share.invite_text",
+            locale=loc,
+            accuracy=accuracy_str,
+            rounds=rounds_played,
+        )
     encourage: str = encouragement_text(stats, loc, seed=share_id)
     generated_at: Optional[str] = _format_generated_at(share_record, locale=loc)
 
@@ -1275,6 +1339,11 @@ def create_share_layout(
                 t("ui.share.share_on_linkedin", locale=loc),
                 f"https://www.linkedin.com/sharing/share-offsite/?url={encoded_url}",
                 color="#0A66C2", icon="fa-linkedin",
+            ),
+            _share_button(
+                t("ui.share.share_on_telegram", locale=loc),
+                f"https://t.me/share/url?url={encoded_url}&text={urllib.parse.quote(invite_text, safe='')}",
+                color="#26A5E4", icon="fa-telegram",
             ),
         ],
         className="share-buttons",
@@ -1316,17 +1385,28 @@ def create_share_layout(
             best_sub: str = t("ui.share.best_rank_scope_overall", locale=loc)
         else:
             best_sub = _resolve_format_label(scope, locale=loc)
+        if percentile is not None:
+            best_sub = t("ui.share.stat_percentile", locale=loc, percentile=f"{percentile}%")
     else:
         best_value = t("ui.share.stat_no_ranking", locale=loc)
         best_sub = ""
 
+    tile_list: list[html.Div] = [
+        stat_tile(t("ui.share.stat_accuracy", locale=loc), accuracy_str,
+                  sub=t("ui.share.stat_accuracy_hint", locale=loc)),
+        stat_tile(t("ui.share.stat_mard", locale=loc), mard_str,
+                  sub=t("ui.share.stat_mard_hint", locale=loc)),
+        stat_tile(t("ui.share.stat_mae", locale=loc), f"{_format_number(mae)} mg/dL",
+                  sub=t("ui.share.stat_mae_hint", locale=loc)),
+        stat_tile(t("ui.share.stat_rmse", locale=loc), f"{_format_number(rmse)} mg/dL",
+                  sub=t("ui.share.stat_rmse_hint", locale=loc)),
+        stat_tile(t("ui.share.stat_rounds", locale=loc), str(rounds_played),
+                  sub=t("ui.share.stat_rounds_hint", locale=loc)),
+        stat_tile(t("ui.share.stat_ranking", locale=loc), best_value, sub=best_sub),
+    ]
     stats_row: html.Div = html.Div(
-        [
-            stat_tile(t("ui.share.stat_mae", locale=loc), f"{_format_number(mae)} mg/dL"),
-            stat_tile(t("ui.share.stat_rmse", locale=loc), f"{_format_number(rmse)} mg/dL"),
-            stat_tile(t("ui.share.stat_rounds", locale=loc), str(rounds_played)),
-            stat_tile(t("ui.share.stat_ranking", locale=loc), best_value, sub=best_sub),
-        ],
+        tile_list,
+        className="share-stats-row",
         style={"display": "flex", "flexWrap": "wrap", "gap": "14px",
                "marginTop": "8px", "justifyContent": "center"},
         disable_n_clicks=True,
@@ -1555,13 +1635,13 @@ def create_share_layout(
 
     header_children: list[Any] = [
         html.H1(
-            t("ui.share.title", locale=loc),
-            style={"fontSize": "clamp(32px,4.5vw,52px)", "margin": "0 0 2px 0",
+            t("ui.share.subtitle", locale=loc),
+            style={"fontSize": "clamp(32px,4.5vw,52px)", "margin": "0 0 4px 0",
                    "lineHeight": "1.12",
                    "color": "#0f172a", "textAlign": "center"},
         ),
         html.P(
-            t("ui.share.subtitle", locale=loc),
+            t("ui.share.title", locale=loc),
             style={"fontSize": "clamp(16px,2.5vw,20px)",
                    "color": "#475569", "textAlign": "center",
                    "margin": "0 0 2px 0"},
@@ -1636,6 +1716,5 @@ def create_share_layout(
         disable_n_clicks=True,
         style={
             "background": "linear-gradient(135deg,#eff6ff 0%,#f8fafc 40%,#fdf2f8 100%)",
-            "maxWidth": "1100px",
         },
     )

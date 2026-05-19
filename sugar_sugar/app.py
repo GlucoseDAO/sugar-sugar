@@ -58,6 +58,10 @@ from sugar_sugar.config import (
     DEBUG_MODE,
     DEPLOY_BUILD,
     MAX_ROUNDS,
+    SHARE_FORMATS,
+    SHARE_NAME,
+    SHARE_NOISE,
+    SHARE_ROUNDS,
     STORAGE_TYPE,
     UMAMI_DOMAINS,
     UMAMI_HOST_URL,
@@ -299,6 +303,167 @@ example_initial_df_store = dataframe_to_store_dict(_init_window_df)
 example_events_df_store = events_dataframe_to_store_dict(_init_events_df)
 example_initial_slider_value = _init_start
 
+# ---------------------------------------------------------------------------
+# Share-mode: generate fake multi-round data, persist a share record, and
+# navigate directly to /share/<id> on startup.  Activated by _SHARE_MODE=1
+# (set by the ``share`` CLI command).
+# ---------------------------------------------------------------------------
+_is_share_mode = os.environ.get("_SHARE_MODE") == "1"
+_share_mode_id: Optional[str] = None
+
+if _is_share_mode:
+    import random as _share_rnd
+    _share_rounds_n = int(os.environ.get("_SHARE_ROUNDS", str(SHARE_ROUNDS)))
+    _share_noise = float(os.environ.get("_SHARE_NOISE", str(SHARE_NOISE)))
+    _share_locale = os.environ.get("_SHARE_LOCALE", "en")
+    _share_formats_env = os.environ.get("_SHARE_FORMATS", SHARE_FORMATS)
+    _share_formats = [f.strip().upper() for f in _share_formats_env.split(",") if f.strip()]
+    _share_source = os.environ.get("_SHARE_SOURCE", "example.csv")
+    _share_is_example = os.environ.get("_CHART_FILE") is None
+
+    _share_full_df = _init_full_df.clone()
+    _share_used_starts: set[int] = set()
+    _share_all_rounds: list[dict[str, Any]] = []
+
+    for _ri in range(_share_rounds_n):
+        _fmt = _share_formats[_ri % len(_share_formats)]
+        _win_df, _win_start = get_random_data_window(
+            _share_full_df, _chart_points, _share_used_starts,
+        )
+        _share_used_starts.add(_win_start)
+        _win_df = _win_df.with_columns(pl.lit(0.0).alias("prediction"))
+
+        _sn = len(_win_df)
+        _s_visible = _sn - PREDICTION_HOUR_OFFSET
+        _s_gl = _win_df.get_column("gl").to_list()
+        _s_preds = [0.0] * _sn
+        _s_pred_steps = _sn - _s_visible
+        for _si in range(_s_visible, _sn):
+            _sg = _s_gl[_si]
+            if _sg is not None:
+                _s_step_frac = ((_si - _s_visible) / max(_s_pred_steps - 1, 1)) ** 1.8
+                _s_step_noise = _share_noise * _s_step_frac
+                _s_preds[_si] = round(
+                    _sg * (1.0 + _share_rnd.uniform(-_s_step_noise, _s_step_noise)), 1
+                )
+        _win_df = _win_df.with_columns(
+            pl.Series("prediction", _s_preds, dtype=pl.Float64)
+        )
+
+        _s_actual_row: dict[str, str] = {"metric": "Actual Glucose"}
+        _s_pred_row: dict[str, str] = {"metric": "Predicted"}
+        _s_abs_err_row: dict[str, str] = {"metric": "Absolute Error"}
+        _s_rel_err_row: dict[str, str] = {"metric": "Relative Error (%)"}
+        for _ti in range(_sn):
+            _a = _s_gl[_ti]
+            _p = _s_preds[_ti]
+            _s_actual_row[f"t{_ti}"] = "-" if _a is None else f"{float(_a):.1f}"
+            if _p == 0.0 or _a is None:
+                _s_pred_row[f"t{_ti}"] = "-"
+                _s_abs_err_row[f"t{_ti}"] = "-"
+                _s_rel_err_row[f"t{_ti}"] = "-"
+            else:
+                _s_pred_row[f"t{_ti}"] = f"{_p:.1f}"
+                _s_err = abs(float(_a) - _p)
+                _s_abs_err_row[f"t{_ti}"] = f"{_s_err:.1f}"
+                _s_rel_err_row[f"t{_ti}"] = (
+                    f"{(_s_err / float(_a) * 100):.1f}%" if _a != 0 else "-"
+                )
+
+        _share_all_rounds.append({
+            "round_number": _ri + 1,
+            "prediction_window_start": _win_start,
+            "prediction_window_size": _sn,
+            "prediction_table_data": [
+                _s_actual_row, _s_pred_row, _s_abs_err_row, _s_rel_err_row,
+            ],
+            "format": _fmt,
+            "is_example_data": _share_is_example,
+            "data_source_name": _share_source,
+        })
+
+    _share_study_id = str(uuid.uuid4())
+    _share_run_id = str(uuid.uuid4())
+    _share_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    _share_played_formats = sorted(
+        {r["format"] for r in _share_all_rounds},
+        key=lambda x: FORMAT_ORDER.get(str(x), 999),
+    )
+
+    def _metrics_from_rounds(rounds: list[dict[str, Any]]) -> dict[str, float]:
+        all_actual: list[float] = []
+        all_pred: list[float] = []
+        for rnd in rounds:
+            ptd = rnd.get("prediction_table_data", [])
+            if len(ptd) < 2:
+                continue
+            actual_row, pred_row = ptd[0], ptd[1]
+            for k in actual_row:
+                if k == "metric":
+                    continue
+                a_s, p_s = actual_row[k], pred_row[k]
+                if a_s != "-" and p_s != "-":
+                    try:
+                        all_actual.append(float(a_s))
+                        all_pred.append(float(p_s))
+                    except ValueError:
+                        pass
+        n = len(all_actual)
+        if n == 0:
+            return {"mae": 0.0, "mse": 0.0, "rmse": 0.0, "mape": 0.0}
+        mae = sum(abs(a - p) for a, p in zip(all_actual, all_pred)) / n
+        mse = sum((a - p) ** 2 for a, p in zip(all_actual, all_pred)) / n
+        rmse = mse ** 0.5
+        mape = sum(abs((a - p) / a) * 100 for a, p in zip(all_actual, all_pred) if a != 0) / n
+        return {"mae": mae, "mse": mse, "rmse": rmse, "mape": mape}
+
+    def _append_ranking_row(path: Path, fmt: str, rounds_for_fmt: list[dict[str, Any]]) -> None:
+        m = _metrics_from_rounds(rounds_for_fmt)
+        row = (
+            f"{_share_study_id},{_share_run_id},0,{_share_timestamp},{fmt},"
+            f"{len(rounds_for_fmt)},{_share_is_example},{_share_source},"
+            f"{m['mae']},{m['mse']},{m['rmse']},{m['mape']}\n"
+        )
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write(row)
+
+    _rounds_by_fmt: dict[str, list[dict[str, Any]]] = {}
+    for _r in _share_all_rounds:
+        _rounds_by_fmt.setdefault(_r["format"], []).append(_r)
+
+    for _fmt_key, _fmt_rounds in _rounds_by_fmt.items():
+        _append_ranking_row(
+            project_root / "data" / "input" / f"prediction_ranking_{_fmt_key}.csv",
+            _fmt_key,
+            _fmt_rounds,
+        )
+    _append_ranking_row(
+        project_root / "data" / "input" / "prediction_ranking.csv",
+        "ALL",
+        _share_all_rounds,
+    )
+
+    _share_rankings = compute_share_rankings(_share_study_id, list(_share_played_formats))
+
+    _share_record: dict[str, Any] = {
+        "schema_version": 2,
+        "created_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "locale": normalize_locale(_share_locale),
+        "rounds": _share_all_rounds,
+        "played_formats": _share_played_formats,
+        "rankings": _share_rankings,
+        "user_info": {
+            "name": os.environ.get("_SHARE_NAME", SHARE_NAME),
+            "study_id": _share_study_id,
+            "format": _share_formats[0],
+            "uses_cgm": True,
+            "max_rounds": MAX_ROUNDS,
+        },
+    }
+    _share_mode_id = share_store.save_share(_share_record)
+    print(f"[share-mode] Saved {_share_rounds_n} fake rounds → /share/{_share_mode_id}")
+    print(f"[share-mode] Rankings: {_share_rankings}")
+
 external_stylesheets = [
     'https://codepen.io/chriddyp/pen/bWLwgP.css',
     dbc.themes.BOOTSTRAP,
@@ -444,7 +609,23 @@ def _share_card_og_response(share_id: str) -> Any:
     loc: str = normalize_locale(locale)
     share_url: str = _build_share_url(share_id)
     image_url: str = f"{share_url}/image.png"
-    title: str = html_escape(t("ui.share.title", locale=loc), quote=True)
+
+    from sugar_sugar.components.share import compute_aggregate_stats, _best_ranking_entry, _format_number
+    og_stats = compute_aggregate_stats(list(record.get("rounds") or []))
+    og_accuracy = og_stats.get("accuracy") or float("nan")
+    og_accuracy_str = f"{_format_number(og_accuracy)}%" if og_accuracy == og_accuracy else "?"
+    og_best = _best_ranking_entry(record)
+    og_percentile = og_best.get("percentile") if og_best else None
+    if og_percentile is not None:
+        title = html_escape(
+            t("ui.share.og_title_ranked", locale=loc, percentile=f"{og_percentile}%", accuracy=og_accuracy_str),
+            quote=True,
+        )
+    else:
+        title = html_escape(
+            t("ui.share.og_title_unranked", locale=loc, accuracy=og_accuracy_str),
+            quote=True,
+        )
     description: str = html_escape(t("ui.share.subtitle", locale=loc), quote=True)
     escaped_share_url: str = html_escape(share_url, quote=True)
     escaped_image_url: str = html_escape(image_url, quote=True)
@@ -622,7 +803,11 @@ else:
     _chart_user_info = None
 
 app.layout = html.Div([
-    dcc.Location(id='url', refresh=False, **({'pathname': '/prediction'} if _is_chart_mode else {})),
+    dcc.Location(id='url', refresh=False, **(
+        {'pathname': f'/share/{_share_mode_id}'} if _is_share_mode and _share_mode_id
+        else {'pathname': '/prediction'} if _is_chart_mode
+        else {}
+    )),
     dcc.Store(id='user-info-store', data=_chart_user_info, storage_type=STORAGE_TYPE),
     dcc.Store(id='last-click-time', data=0),
     # Fingerprint sentinel: value must equal DEPLOY_BUILD in config.py.
@@ -5076,6 +5261,55 @@ def chart(
         app.run(host=dash_host, port=dash_port, debug=True)
 
 
+@cli.command()
+def share(
+    file: Optional[Path] = typer.Option(None, "--file", "-f", help="CSV file to load. Default: built-in example."),
+    rounds: int = typer.Option(SHARE_ROUNDS, "--rounds", "-r", help="Number of fake rounds to generate"),
+    formats: str = typer.Option(SHARE_FORMATS, "--formats", help="Comma-separated format letters to cycle through (e.g. 'A,B,C')"),
+    noise: float = typer.Option(SHARE_NOISE, "--noise", help="Max noise at last prediction step (fraction, e.g. 0.30 = +/-30%%)"),
+    points: int = typer.Option(DEFAULT_POINTS, "--points", "-p", help="Number of data points per window"),
+    locale: str = typer.Option("en", "--locale", "-l", help="UI locale (en, de, uk, ro)"),
+    name: str = typer.Option(SHARE_NAME, "--name", "-n", help="Player name shown on the share card"),
+    host: Optional[str] = typer.Option(None, "--host", help="Host to run the server on"),
+    port: Optional[int] = typer.Option(None, "--port", help="Port to run the server on"),
+) -> None:
+    """Dev shortcut: generate fake multi-round data and open the share page.
+
+    Bypasses the entire game flow.  Generates N rounds of noisy predictions
+    from the example data (or a custom CSV), saves a share record to disk,
+    and starts Dash at /share/<id> so you can iterate on the share page
+    layout, card rendering, and social-sharing flow.
+    """
+    os.environ["_SHARE_MODE"] = "1"
+    os.environ["_SHARE_ROUNDS"] = str(max(1, rounds))
+    os.environ["_SHARE_FORMATS"] = formats
+    os.environ["_SHARE_NOISE"] = str(noise)
+    os.environ["_SHARE_LOCALE"] = normalize_locale(locale)
+    os.environ["_SHARE_NAME"] = name
+    os.environ["_SHARE_SOURCE"] = file.name if file else "example.csv"
+    os.environ["_CHART_POINTS"] = str(points)
+    if file:
+        os.environ["_CHART_FILE"] = str(file)
+
+    sugar_sugar_config.DEBUG_MODE = True
+
+    _ensure_chrome()
+    _register_all_callbacks()
+
+    dash_host = DASH_HOST if host is None else (host or DASH_HOST)
+    dash_port = DASH_PORT if port is None else port
+
+    with start_action(
+        action_type=u"start_share_dev",
+        rounds=rounds,
+        formats=formats,
+        noise=noise,
+        host=dash_host,
+        port=dash_port,
+    ):
+        app.run(host=dash_host, port=dash_port, debug=True)
+
+
 def cli_main() -> None:
     """CLI entry point"""
     cli()
@@ -5084,6 +5318,11 @@ def cli_main() -> None:
 def chart_main() -> None:
     """CLI entry point that defaults to the ``chart`` command."""
     cli(["chart"] + sys.argv[1:])
+
+
+def share_main() -> None:
+    """CLI entry point that defaults to the ``share`` command."""
+    cli(["share"] + sys.argv[1:])
 
 
 def setup_chrome_main() -> None:

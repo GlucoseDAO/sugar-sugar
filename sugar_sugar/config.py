@@ -40,6 +40,12 @@ UMAMI_WEBSITE_ID: str = os.getenv("UMAMI_WEBSITE_ID", "7c6fb178-d8ff-439e-a9f3-e
 UMAMI_DOMAINS: str = os.getenv("UMAMI_DOMAINS", "sugar-sugar.glucosedao.org").strip()
 UMAMI_HOST_URL: str = os.getenv("UMAMI_HOST_URL", "https://sugar-sugar.glucosedao.org/stats").strip()
 
+# Share-mode defaults (used by `uv run share` dev shortcut)
+SHARE_ROUNDS: int = int(os.getenv("SHARE_ROUNDS", "4"))
+SHARE_NOISE: float = float(os.getenv("SHARE_NOISE", "0.30"))
+SHARE_FORMATS: str = os.getenv("SHARE_FORMATS", "A")
+SHARE_NAME: str = os.getenv("SHARE_NAME", "Dev Tester")
+
 # Application debug (e.g. test button); startup reads this dynamically after CLI may update it
 DEBUG_MODE: bool = _env_bool("DEBUG_MODE", "false")
 DASH_DEBUG: bool = _env_bool("DASH_DEBUG", DEBUG_MODE)
