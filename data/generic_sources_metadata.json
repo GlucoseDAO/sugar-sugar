@@ -2,6 +2,7 @@
   "example.csv": {
     "age": "28 years old",
     "gender": "female",
-    "weight": "67 kg"
+    "weight": "67 kg",
+    "sensor": "Dexcom G6"
   }
 }

@@ -199,7 +199,7 @@ ro:
   share:
     button_share: "Distribuie rezultatele"
     title: "Rezultatele mele Sugar Sugar"
-    subtitle: "Poți citi glicemia mai bine decât mine? Încearcă!"
+    subtitle: "Poți prezice glicemia mai bine decât mine? Încearcă!"
     download_png: "Descarcă imaginea"
     download_png_hint: "Salvează cardul ca PNG, perfect pentru Stories pe Instagram."
     generated_at: "Generat"
@@ -210,27 +210,38 @@ ro:
     share_on_facebook: "Distribuie pe Facebook"
     share_on_whatsapp: "Distribuie pe WhatsApp"
     share_on_linkedin: "Distribuie pe LinkedIn"
-    invite_text: "Am jucat Sugar Sugar și am prezis glicemia cu MAE %{mae} mg/dL în %{rounds} runde. Crezi că poți face mai bine?"
+    share_on_telegram: "Distribuie pe Telegram"
+    invite_text: "Am prezis glicemia pentru ora următoare cu %{accuracy} precizie în %{rounds} runde. Crezi că poți face mai bine?"
+    invite_text_ranked: "Sunt în top %{percentile} al predictorilor de glicemie — %{accuracy} precizie în %{rounds} runde. Poți să mă întreci?"
     card_footer: "Joacă la %{url}"
     qr_scan_to_play: "Scanează pentru a juca"
     stats_heading: "Fișa ta de scor"
+    stat_mard: "MARD"
+    stat_mard_hint: "Diferența relativă absolută medie"
     stat_mae: "MAE"
+    stat_mae_hint: "Eroarea absolută medie"
     stat_rmse: "RMSE"
+    stat_rmse_hint: "Eroarea medie pătratică"
     stat_rounds: "Runde"
+    stat_rounds_hint: "Runde de predicție jucate"
     stat_accuracy: "Acuratețe"
+    stat_accuracy_hint: "Cât de aproape de glicemia reală"
     stat_ranking: "Cel mai bun loc"
+    stat_percentile: "Top %{percentile}"
     stat_no_ranking: "neclasat"
     best_rank_scope_overall: "General"
+    og_title_ranked: "Top %{percentile} predictor de glicemie — %{accuracy} precizie"
+    og_title_unranked: "%{accuracy} precizie la predicția glicemiei — poți să mă întreci?"
     expired_title: "Acest link de distribuire a expirat"
     expired_body: "Nu am găsit un card pentru această adresă. Joacă o rundă și poți distribui propriile tale rezultate."
     expired_cta: "Joacă Sugar Sugar"
     encouragement:
       excellent:
         lines:
-          - "Citești zahărul ca un pro. %{rounds} runde, MAE sub 10 mg/dL. Crezi că mă bați?"
+          - "Prezici zahărul ca un pro. %{rounds} runde și tot precis. Crezi că mă bați?"
           - "Prinzi fiecare curbă în %{rounds} runde. Feed-ul tău urmează - dă play și încearcă să mă depășești."
           - "Instinct de pattern, deblocat. %{rounds} runde și încă nu ratez. E rândul tău."
-          - "Așa arată %{rounds} runde cu citiri curate. Pun pariu că nu ții pasul."
+          - "Așa arată %{rounds} runde cu predicții curate. Pun pariu că nu ții pasul."
       good:
         lines:
           - "Rundă solidă. %{rounds} runde și predicțiile au căzut aproape. Tu cazi mai aproape?"
@@ -245,10 +256,10 @@ ro:
           - "Am început să urc în clasament în %{rounds} runde. Vii cu mine în vârf?"
       keep_practicing:
         lines:
-          - "Glicemia te învață modestia. %{rounds} runde făcute - vezi dacă o citești mai bine ca mine."
+          - "Glicemia te învață modestia. %{rounds} runde făcute - vezi dacă o prezici mai bine ca mine."
           - "%{rounds} runde, încă învăț curba. E rândul tău."
           - "Mai greu decât pare, nu? %{rounds} încercări cinstite. Bate-mă. Te provoc."
-          - "%{rounds} runde și linia tot câștigă. Crezi că o citești mai bine? Arată-mi."
+          - "%{rounds} runde și linia tot câștigă. Crezi că o prezici mai bine? Arată-mi."
     synthesis:
       title: "Eroare de predicție în următoarea oră"
       x_axis: "Timp (minute de la startul următoarei ore ascunse; fiecare pas de 5 min)"
@@ -315,8 +326,39 @@ ro:
     view_complete_analysis: "Vezi analiza completă"
     graph_explanation: "Graficul arată fereastra de glucoză pe care ai prezis-o. Linia portocalie punctată separă istoricul cunoscut (stânga) de ora pe care ai prezis-o (dreapta). Predicțiile tale sunt afișate cu roșu."
     data_source_label: "Sursa datelor: %{source}"
+    sensor_label: "Senzor"
     round_motivation: "Poți opri oricând, dar completarea tuturor celor %{total} runde oferă cele mai bune date. Cel puțin %{min_useful} runde sunt necesare pentru rezultate utile — fiecare rundă suplimentară ajută!"
     local_storage_note: "Progresul tău este salvat local în acest browser. Poți lua o pauză și relua mai târziu folosind același browser."
+    reaction:
+      excellent:
+        - "Precizie la nivel de senzor — date ca acestea chiar avansează cercetarea!"
+        - "Ai prezis curba ca un profesionist. Precizie rară, contribuție valoroasă."
+        - "Aproape perfect! Această rundă este un punct de date puternic pentru studiu."
+        - "Exact pe țintă — exact ceea ce are nevoie cercetarea."
+      good:
+        - "Predicție bună — încă un punct de date solid pentru studiu!"
+        - "Ai prins tendința bine. Asta consolidează setul de date."
+        - "Predicție solidă! Instinctul tău contribuie cu semnal real."
+        - "Bună treabă. Runde constante ca aceasta fac analiza mai fiabilă."
+      average:
+        - "Nu e rău — curbă dificilă. Încercarea ta adaugă totuși semnal la studiu."
+        - "Încercare rezonabilă! Chiar și predicțiile imperfecte ajută la cartografierea intuiției umane."
+        - "Estimare corectă. Cercetarea beneficiază și de cazurile dificile."
+        - "Efort decent — studiul măsoară intuiția, nu perfecțiunea."
+      keep_practicing:
+        - "Fereastră dificilă. Cazurile dificile sunt deosebit de informative pentru cercetare."
+        - "Greu de anticipat — segmentele cu variabilitate mare ne învață cel mai mult."
+        - "Chiar și experții ratează acestea! Exact asta măsoară studiul."
+        - "Nu-ți face griji — acolo unde oamenii se chinuie, acolo învață știința."
+    milestone:
+      first_round: "Prima rundă completată — contribui la cercetare!"
+      minimum_reached: "Minimul atins! Datele tale sunt utile științific. Rundele suplimentare le fac mai puternice."
+      all_complete: "Toate rundele completate — mulțumim pentru un set complet de date!"
+    personal_best: "Cea mai bună rundă a ta până acum!"
+    progress:
+      minimum_goal: "Minim: %{min_useful}"
+      stretch_goal: "Extins: %{total}"
+      bonus_rounds: "Runde bonus"
 
   final:
     title: "Analiză completă"
@@ -338,7 +380,7 @@ ro:
   results_disclaimer:
     line1: "Aceste rezultate sunt exclusiv în scop de cercetare"
     line2: "Indiferent de rezultate, nu schimba nicio decizie medicală pe baza acestei aplicații"
-    line3: "Urmează întotdeauna recomandările furnizorului tău de servicii medicale"
+    line3: "Consultă întotdeauna medicul tău înainte de a lua decizii medicale"
 
   faq:
     title: "Întrebări frecvente"
@@ -355,6 +397,36 @@ ro:
             a: "Glucoza este un semnal metabolic central legat de energie, cogniție, dispoziție, răspuns la exerciții și sănătate pe termen lung. Pentru persoanele fără diabet, predicția poate arăta cum alimentele, somnul, stresul și activitatea modelează metabolismul în timp real — util pentru sănătatea preventivă și optimizarea stilului de viață."
           - q: "De ce este precizia umană atât de importantă pentru învățarea automată?"
             a: "În prezent nu există niciun benchmark publicat al preciziei umane pentru prognozarea glucozei CGM. Fără să știm cât de bine poate un om informat să prezică tendințele glucozei, nu putem evalua dacă vreun model AI este cu adevărat util — ar putea fi mai slab decât un diabetic experimentat, sau mai bun doar în scenarii specifice. Acest studiu stabilește acel benchmark pentru ca viitoarele modele AI să poată fi comparate cu sens."
+          - q: "O persoană știe mult mai mult decât arată orice grafic — mese, somn, stres, digestie, ciclu menstrual. Fără toate astea, nu este doar ghicit pe grafice?"
+            a: >-
+              Când te uiți la graficul CGM, ai deja o intuiție despre unde se îndreaptă glucoza.
+              Nu enumeri conștient fiecare factor. Te uiți la curbă și citești ce se întâmplă deja.
+
+
+              Asta funcționează pentru că lucrurile pe care nu le-ai înregistrat tot apar în glucoză.
+              Un vârf postprandial arată ca un vârf postprandial, indiferent dacă carbohidrații au fost notați sau nu.
+              Insulina activă trage curba în jos într-un mod recognoscibil.
+              Linia glucozei este rezultatul a tot ce se întâmplă, chiar și a ce nu a fost înregistrat.
+
+
+              De asemenea, dacă încarci datele CGM, graficul arată carbohidrații, insulina și exercițiile înregistrate ca marcaje. Deci nu este o linie goală de glucoză.
+
+
+              Este asta ca „analiza tehnică" din tranzacționarea acțiunilor? Nu.
+              Prețurile acțiunilor se mișcă pe baza psihologiei mulțimii, iar predicția însăși mișcă piața.
+              Glucoza este biochimie. Insulina are o curbă de acțiune cunoscută. Carbohidrații se absorb cu viteze cunoscute.
+              Următoarea oră decurge în mare parte din ce este deja în mișcare acum.
+
+
+              Cercetarea confirmă acest lucru: studiile care au comparat modele de predicție a glucozei cu și fără date despre mese și insulină
+              au constatat că adăugarea acestor covariabile nu a îmbunătățit precizia pe termen scurt
+              ([Daniels et al., 2022](https://pmc.ncbi.nlm.nih.gov/articles/PMC8782424/);
+              [The Maastricht Study, 2021](https://pmc.ncbi.nlm.nih.gov/articles/PMC8224858/)).
+              Semnalul CGM singur conține suficientă informație pentru următoarea oră.
+
+
+              Nu cerem nimănui să-și descrie întreaga zi unui model.
+              Întrebarea este: uitându-te la ecran, cât de bine poți spune unde se îndreaptă glucoza?
       - title: "Cum funcționează studiul"
         items:
           - q: "Cine poate participa?"
@@ -369,6 +441,19 @@ ro:
             a: "Te rugăm să nu reîncepi doar pentru că nu ești mulțumit de precizia ta. Oamenii tind natural să păstreze scorurile bune și să le respingă pe cele proaste — dar asta ar distorsiona studiul și ar face rezultatele mai puțin valide din punct de vedere științific. Dacă ești dezamăgit, cel mai bine este să continui cu o altă rundă, nu să îți resetezi progresul."
           - q: "Care sunt metricele de acuratețe?"
             a: "Folosim metrici standard de prognoză — MAE, RMSE și MAPE — pentru a cuantifica cât de apropiată a fost curba ta de glucoză față de cea reală. MAE este eroarea absolută medie: îți spune cu cât ai greșit în medie. RMSE penalizează mai mult greșelile mari, evidențiind cazurile în care predicția a fost serios greșită. MAPE exprimă eroarea ca procent, ceea ce ajută la compararea performanței în diferite intervale de glucoză. Împreună, aceste metrici oferă o imagine mai completă decât un singur scor."
+          - q: "Care sunt limitările acestui studiu?"
+            a: >-
+              Vrem să fim sinceri de la început:
+
+              - **Doar orizont scurt.** Îți cerem să prezici următoarea oră. Predicția pe termen lung este o problemă mult mai dificilă, în care factorii nemăsurați domină.
+
+              - **Evenimentele înregistrate pot fi incomplete.** Graficul arată ce a înregistrat aplicația ta CGM — dacă nu ai notat o masă sau o doză, aceasta nu va apărea, iar atât tu, cât și un model lucrați cu aceeași imagine incompletă.
+
+              - **Fără context personal.** În viața reală, știi lucruri care nu sunt în date — că te-ai îmbolnăvit, că ești pe cale să alergi, că aceasta este a treia cafea. Acest studiu izolează capacitatea de a citi graficul de cunoștințele personale.
+
+              - **Fără presiune în timp real.** A desena o linie de predicție în liniște este diferit de a lua o decizie de dozare la 2 dimineața pe jumătate adormit.
+
+              - **Date exemplu vs. date proprii.** Dacă joci cu datele exemplu incluse, precizia ta poate diferi față de prezicerea propriei glucoze. Te încurajăm să încarci propriul export CGM (Dexcom, Libre, Medtronic sau Nightscout) — intuiția ta personală despre propriile tipare este parte din ceea ce face comparația cu învățarea automată interesantă.
       - title: "Date și confidențialitate"
         items:
           - q: "Sunt stocate datele mele?"

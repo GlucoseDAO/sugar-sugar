@@ -199,7 +199,7 @@ de:
   share:
     button_share: "Ergebnisse teilen"
     title: "Meine Sugar-Sugar-Ergebnisse"
-    subtitle: "Kannst du Glukose besser lesen als ich? Probier es aus!"
+    subtitle: "Kannst du Glukose besser vorhersagen als ich? Probier es aus!"
     download_png: "Bild herunterladen"
     download_png_hint: "Speichere die Karte als PNG - perfekt für Instagram-Stories."
     generated_at: "Erstellt"
@@ -210,27 +210,38 @@ de:
     share_on_facebook: "Auf Facebook teilen"
     share_on_whatsapp: "Über WhatsApp teilen"
     share_on_linkedin: "Auf LinkedIn teilen"
-    invite_text: "Ich habe Sugar Sugar gespielt und Glukose mit %{mae} mg/dL MAE über %{rounds} Runden vorhergesagt. Schaffst du es besser?"
+    share_on_telegram: "Auf Telegram teilen"
+    invite_text: "Ich habe den Blutzucker für die nächste Stunde mit %{accuracy} Genauigkeit über %{rounds} Runden vorhergesagt. Schaffst du es besser?"
+    invite_text_ranked: "Ich bin unter den Top %{percentile} der Glukose-Vorhersager — %{accuracy} Genauigkeit über %{rounds} Runden. Kannst du mich schlagen?"
     card_footer: "Jetzt spielen: %{url}"
     qr_scan_to_play: "Zum Spielen scannen"
     stats_heading: "Deine Punktekarte"
+    stat_mard: "MARD"
+    stat_mard_hint: "Mittlere absolute relative Differenz"
     stat_mae: "MAE"
+    stat_mae_hint: "Mittlerer absoluter Fehler"
     stat_rmse: "RMSE"
+    stat_rmse_hint: "Mittlerer quadratischer Fehler"
     stat_rounds: "Runden"
+    stat_rounds_hint: "Gespielte Vorhersagerunden"
     stat_accuracy: "Genauigkeit"
+    stat_accuracy_hint: "Nähe zum tatsächlichen Glukosewert"
     stat_ranking: "Bester Rang"
+    stat_percentile: "Top %{percentile}"
     stat_no_ranking: "ohne Rang"
     best_rank_scope_overall: "Gesamt"
+    og_title_ranked: "Top %{percentile} Glukose-Vorhersager — %{accuracy} Genauigkeit"
+    og_title_unranked: "%{accuracy} Genauigkeit bei der Blutzuckervorhersage — kannst du mich schlagen?"
     expired_title: "Dieser Share-Link ist abgelaufen"
     expired_body: "Wir konnten keine Ergebniskarte zu dieser URL finden. Spiele eine Runde und teile deine eigenen Ergebnisse."
     expired_cta: "Sugar Sugar spielen"
     encouragement:
       excellent:
         lines:
-          - "Du liest Zucker wie ein Profi. %{rounds} Runden, MAE unter 10 mg/dL. Glaubst du, du schlägst mich?"
+          - "Du sagst Zucker vorher wie ein Profi. %{rounds} Runden und immer noch punktgenau. Glaubst du, du schlägst mich?"
           - "Jede Kurve erwischt, über %{rounds} Runden. Dein Feed ist dran - drück Play und versuch das zu toppen."
           - "Mustererkennung auf Pro-Niveau. %{rounds} Runden und ich treffe weiter. Du bist dran."
-          - "So sehen %{rounds} Runden saubere Reads aus. Wette, du kommst da nicht mit."
+          - "So sehen %{rounds} Runden saubere Vorhersagen aus. Wette, du kommst da nicht mit."
       good:
         lines:
           - "Solider Lauf. %{rounds} Runden und meine Vorhersagen saßen nah dran. Kommst du näher ran?"
@@ -245,10 +256,10 @@ de:
           - "In %{rounds} Runden im Ranking geklettert. Lust, oben mitzuspielen?"
       keep_practicing:
         lines:
-          - "Glukose ist demütigend. %{rounds} Runden geschafft - mal sehen, ob du sie besser liest."
+          - "Glukose ist demütigend. %{rounds} Runden geschafft - mal sehen, ob du sie besser vorhersagst."
           - "%{rounds} Runden, ich lerne die Kurve noch. Jetzt du."
           - "Schwerer als es aussieht, was? %{rounds} ehrliche Runden. Schlag mich. Ich fordere dich heraus."
-          - "%{rounds} Runden und die Linie gewinnt weiter. Meinst du, du liest sie besser? Zeig's mir."
+          - "%{rounds} Runden und die Linie gewinnt weiter. Meinst du, du sagst sie besser vorher? Zeig's mir."
     synthesis:
       title: "Vorhersagefehler in der nächsten Stunde"
       x_axis: "Zeit (Minuten ab Beginn der verborgenen nächsten Stunde, jeder 5-Min-Schritt)"
@@ -315,8 +326,39 @@ de:
     view_complete_analysis: "Komplette Analyse ansehen"
     graph_explanation: "Das Diagramm zeigt das Glukosfenster, das Sie vorhergesagt haben. Die orangefarbene gestrichelte Linie trennt die bekannte Vorgeschichte (links) von der vorhergesagten Stunde (rechts). Ihre Vorhersagen sind rot dargestellt."
     data_source_label: "Datenquelle: %{source}"
+    sensor_label: "Sensor"
     round_motivation: "Du kannst jederzeit aufhören, aber alle %{total} Runden liefern die besten Daten. Mindestens %{min_useful} Runden sind für brauchbare Ergebnisse nötig — jede weitere Runde hilft!"
     local_storage_note: "Dein Fortschritt wird lokal in diesem Browser gespeichert. Du kannst eine Pause einlegen und später im selben Browser fortfahren."
+    reaction:
+      excellent:
+        - "Sensor-Niveau-Genauigkeit — solche Daten bringen die Forschung wirklich voran!"
+        - "Du hast die Kurve vorhergesagt wie ein Profi. Seltene Präzision, wertvoller Beitrag."
+        - "Nahezu perfekt! Diese Runde ist ein starker Datenpunkt für die Studie."
+        - "Voll ins Schwarze — genau das, was die Forschung braucht."
+      good:
+        - "Gute Vorhersage — ein weiterer solider Datenpunkt für die Studie!"
+        - "Du hast den Trend gut erfasst. Das stärkt den Datensatz."
+        - "Solide Vorhersage! Dein Instinkt liefert echtes Signal."
+        - "Gute Arbeit. Konstante Runden wie diese machen die Analyse zuverlässiger."
+      average:
+        - "Nicht schlecht — knifflige Kurve. Dein Versuch liefert trotzdem Signal für die Studie."
+        - "Vernünftiger Versuch! Auch unperfekte Vorhersagen helfen, menschliche Intuition zu kartieren."
+        - "Faire Schätzung. Die Forschung profitiert auch von schwierigen Fällen."
+        - "Ordentlicher Einsatz — die Studie misst Intuition, nicht Perfektion."
+      keep_practicing:
+        - "Schwieriges Fenster. Schwierige Fälle sind besonders aufschlussreich für die Forschung."
+        - "Schwer vorherzusagen — Segmente mit hoher Varianz lehren uns am meisten."
+        - "Selbst Experten verfehlen diese! Genau das misst die Studie."
+        - "Mach dir nichts draus — wo Menschen Schwierigkeiten haben, lernt die Wissenschaft."
+    milestone:
+      first_round: "Erste Runde geschafft — du trägst zur Forschung bei!"
+      minimum_reached: "Minimum erreicht! Deine Daten sind wissenschaftlich nützlich. Weitere Runden machen sie noch stärker."
+      all_complete: "Alle Runden abgeschlossen — vielen Dank für einen vollständigen Datensatz!"
+    personal_best: "Deine beste Runde bisher!"
+    progress:
+      minimum_goal: "Minimum: %{min_useful}"
+      stretch_goal: "Ziel: %{total}"
+      bonus_rounds: "Bonusrunden"
 
   final:
     title: "Komplette Analyse"
@@ -338,7 +380,7 @@ de:
   results_disclaimer:
     line1: "Diese Ergebnisse dienen ausschließlich Forschungszwecken"
     line2: "Unabhängig von deinen Ergebnissen, ändere keine medizinischen Entscheidungen aufgrund dieser App"
-    line3: "Folge immer den Empfehlungen deines Behandlungsteams"
+    line3: "Konsultiere immer deinen Arzt, bevor du medizinische Entscheidungen triffst"
 
   faq:
     title: "Häufig gestellte Fragen"
@@ -355,6 +397,36 @@ de:
             a: "Glukose ist ein zentrales Stoffwechselsignal, das mit Energie, Kognition, Stimmung, Bewegungsreaktionen und langfristiger Gesundheit verbunden ist. Für Menschen ohne Diabetes kann die Prognose zeigen, wie Ernährung, Schlaf, Stress und Aktivität den Stoffwechsel in Echtzeit beeinflussen — nützlich für Prävention und Lebensstiloptimierung."
           - q: "Warum ist die menschliche Genauigkeit so wichtig für maschinelles Lernen?"
             a: "Es gibt derzeit keinen veröffentlichten menschlichen Referenzwert für CGM-Glukosevorhersagen. Ohne zu wissen, wie gut ein informierter Mensch Glukosetrends vorhersagen kann, lässt sich nicht beurteilen, ob ein KI-Modell wirklich nützlich ist — es könnte schlechter sein als ein erfahrener Diabetiker oder nur in bestimmten Szenarien besser. Diese Studie legt diesen Referenzwert fest, damit künftige KI-Modelle sinnvoll verglichen werden können."
+          - q: "Ein Mensch weiß viel mehr, als jedes Diagramm zeigt — Mahlzeiten, Schlaf, Stress, Verdauung, Zyklus. Ohne all das ist das doch nur Kaffeesatzlesen auf Kurven, oder?"
+            a: >-
+              Wenn du auf deinen CGM-Graphen schaust, hast du bereits ein Gefühl dafür, wohin der Glukosewert steuert.
+              Du zählst nicht jeden Faktor bewusst auf. Du schaust auf die Kurve und liest, was bereits passiert.
+
+
+              Das funktioniert, weil die Dinge, die du nicht protokolliert hast, trotzdem im Glukoseverlauf sichtbar werden.
+              Ein Spike nach dem Essen sieht aus wie ein Spike nach dem Essen — egal ob die Kohlenhydrate eingetragen wurden oder nicht.
+              Wirkendes Insulin zieht die Kurve auf eine erkennbare Weise nach unten.
+              Die Glukoselinie ist das Ergebnis von allem, was gerade passiert, auch von dem, was nicht getrackt wurde.
+
+
+              Außerdem: Wenn du deine CGM-Daten hochlädst, zeigt das Diagramm protokollierte Kohlenhydrate, Insulin und Bewegung als Markierungen. Es ist also keine nackte Glukoselinie.
+
+
+              Ist das wie „Technische Analyse" beim Aktienhandel? Nein.
+              Aktienkurse bewegen sich durch Massenpsychologie, und die Vorhersage selbst beeinflusst den Markt.
+              Glukose ist Biochemie. Insulin hat eine bekannte Wirkungskurve. Kohlenhydrate werden mit bekannter Geschwindigkeit aufgenommen.
+              Die nächste Stunde folgt größtenteils aus dem, was gerade bereits in Bewegung ist.
+
+
+              Forschungsergebnisse bestätigen das: Studien, die Glukose-Vorhersagemodelle mit und ohne Mahlzeiten- und Insulindaten verglichen haben,
+              stellten fest, dass das Hinzufügen dieser Kovariaten die kurzfristige Genauigkeit nicht verbesserte
+              ([Daniels et al., 2022](https://pmc.ncbi.nlm.nih.gov/articles/PMC8782424/);
+              [The Maastricht Study, 2021](https://pmc.ncbi.nlm.nih.gov/articles/PMC8224858/)).
+              Das CGM-Signal allein enthält genügend Informationen für die nächste Stunde.
+
+
+              Wir bitten niemanden, einem Modell seinen ganzen Tag zu beschreiben.
+              Die Frage ist: Wenn du auf den Bildschirm schaust, wie gut kannst du erkennen, wohin die Glukose steuert?
       - title: "Wie die Studie funktioniert"
         items:
           - q: "Wer kann teilnehmen?"
@@ -369,6 +441,19 @@ de:
             a: "Bitte starte nicht neu, nur weil du mit deiner Genauigkeit unzufrieden bist. Menschen neigen natürlich dazu, gute Ergebnisse zu behalten und schlechte zu verwerfen — das würde die Studie aber verzerren und die Ergebnisse wissenschaftlich weniger valide machen. Am besten ist es, mit einer weiteren Runde fortzufahren."
           - q: "Was sind die Genauigkeitsmetriken?"
             a: "Wir verwenden Standardmetriken — MAE, RMSE und MAPE — um zu messen, wie nah deine Glukosekurve an der echten lag. MAE ist der durchschnittliche absolute Fehler. RMSE bestraft größere Fehler stärker und hebt Fälle hervor, wo die Vorhersage stark falsch war. MAPE drückt den Fehler als Prozentsatz aus, was Vergleiche über verschiedene Glukosebereiche erleichtert. Zusammen geben diese Metriken ein vollständigeres Bild als eine einzelne Kennzahl."
+          - q: "Welche Einschränkungen hat diese Studie?"
+            a: >-
+              Wir möchten transparent sein:
+
+              - **Nur kurzer Zeithorizont.** Wir bitten dich, die nächste Stunde vorherzusagen. Langfristige Vorhersagen sind ein deutlich schwierigeres Problem, bei dem nicht erfasste Faktoren dominieren.
+
+              - **Protokollierte Ereignisse können unvollständig sein.** Das Diagramm zeigt, was deine CGM-App aufgezeichnet hat — wenn du eine Mahlzeit oder Dosis nicht protokolliert hast, erscheint sie nicht, und sowohl du als auch ein Modell arbeiten mit dem gleichen unvollständigen Bild.
+
+              - **Kein persönlicher Kontext.** Im echten Leben weißt du Dinge, die nicht in den Daten stehen — dass du eine Erkältung bekommst, dass du gleich joggen gehst, dass das dein dritter Kaffee ist. Diese Studie isoliert die Fähigkeit, Diagramme zu lesen, vom persönlichen Wissen.
+
+              - **Kein Echtzeitdruck.** Ruhig eine Vorhersagelinie zu zeichnen ist etwas anderes, als um 2 Uhr nachts im Halbschlaf eine Dosierungsentscheidung zu treffen.
+
+              - **Beispieldaten vs. eigene Daten.** Wenn du mit den eingebauten Beispieldaten spielst, kann deine Genauigkeit von der Vorhersage eigener Glukosewerte abweichen. Wir empfehlen dir, deinen eigenen CGM-Export hochzuladen (Dexcom, Libre, Medtronic oder Nightscout) — deine persönliche Intuition für deine eigenen Muster macht den Vergleich mit ML besonders interessant.
       - title: "Daten und Datenschutz"
         items:
           - q: "Werden meine Daten gespeichert?"

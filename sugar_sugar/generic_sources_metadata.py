@@ -11,6 +11,7 @@ class GenericSourceMetadata:
     age: str
     gender: str
     weight: str
+    sensor: str = ""
 
 
 def _project_root() -> Path:
@@ -34,8 +35,9 @@ def load_generic_sources_metadata() -> dict[str, GenericSourceMetadata]:
         age = str(value.get("age") or "").strip()
         gender = str(value.get("gender") or "").strip()
         weight = str(value.get("weight") or "").strip()
+        sensor = str(value.get("sensor") or "").strip()
         if not age or not gender or not weight:
             continue
-        out[key] = GenericSourceMetadata(age=age, gender=gender, weight=weight)
+        out[key] = GenericSourceMetadata(age=age, gender=gender, weight=weight, sensor=sensor)
     return out
 

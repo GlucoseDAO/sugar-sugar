@@ -43,7 +43,7 @@ import plotly.graph_objects as go
 import segno
 from plotly.subplots import make_subplots
 from dash import dcc, html
-from sugar_sugar.config import PREDICTION_HOUR_OFFSET
+from sugar_sugar.config import PREDICTION_HOUR_OFFSET, SHARE_ROUND_LABELS
 from sugar_sugar.encouragement import encouragement_text
 from sugar_sugar.i18n import normalize_locale, t
 
@@ -51,18 +51,45 @@ from sugar_sugar.i18n import normalize_locale, t
 # Draw order: Generic (A), My data (B), Mixed (C) — one subplot per format present.
 _FORMAT_DRAW_ORDER: list[str] = ["A", "B", "C"]
 
-# Per-format line colour (fills use the same hue with alpha, only under the curve).
-_FORMAT_PANEL: dict[str, dict[str, str]] = {
-    "A": {"line": "rgba(21, 101, 192, 0.92)"},
-    "B": {"line": "rgba(234, 88, 12, 0.92)"},
-    "C": {"line": "rgba(91, 33, 182, 0.88)"},
+# ---------------------------------------------------------------------------
+# Per-format colour palettes
+# ---------------------------------------------------------------------------
+# When only ONE format is displayed, every panel uses the classic green-to-red
+# scientific gradient.  When MULTIPLE formats share the page, each format gets
+# its own good-to-bad palette so the reader can tell panels apart at a glance.
+#
+#   A (Generic):           blue (good) -> cool grey (bad)
+#   B (My Data):           orange (good) -> warm grey (bad)
+#   C (Generic + My Data): green (good) -> red (bad)
+#
+# The zero-percent line always uses the "good" end of the panel's palette.
+
+_RGB3 = tuple[int, int, int]
+
+_PALETTE_SINGLE: tuple[_RGB3, _RGB3] = ((34, 139, 34), (220, 60, 20))
+_PALETTE_MULTI: dict[str, tuple[_RGB3, _RGB3]] = {
+    "A": ((33, 145, 140), (230, 175, 30)),
+    "B": ((148, 35, 141), (220, 200, 40)),
+    "C": ((34, 139, 34), (220, 60, 20)),
 }
-# Solid black baseline (scatter so markers can stay on top; drawn after variability lines)
-_ZERO_LINE: dict[str, Any] = {"color": "black", "width": 3.5}
-# Percent-error curve segments (between markers)
+_DEFAULT_PALETTE: tuple[_RGB3, _RGB3] = _PALETTE_SINGLE
+
+
+def _palette_for(fmt: str, n_formats: int) -> tuple[_RGB3, _RGB3]:
+    """Return (good_rgb, bad_rgb) for a format, context-aware."""
+    if n_formats <= 1:
+        return _PALETTE_SINGLE
+    return _PALETTE_MULTI.get(fmt.strip().upper(), _DEFAULT_PALETTE)
+
+
+def _good_rgba(fmt: str, n_formats: int, alpha: float = 1.0) -> str:
+    r, g, b = _palette_for(fmt, n_formats)[0]
+    return f"rgba({r},{g},{b},{alpha})"
+
+
+_ZERO_LINE_WIDTH: float = 3.5
 _VARIABILITY_LINE_WIDTH: float = 1.35
 _LEGEND_VARIABILITY_SAMPLE_WIDTH: float = 1.0
-_DEFAULT_FORMAT_STYLE: dict[str, str] = {"line": "rgba(255, 140, 0, 0.92)"}
 
 _UUID_RE: re.Pattern[str] = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
@@ -71,15 +98,10 @@ _RG_RGBA: re.Pattern[str] = re.compile(
     r"^rgba\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*([0-9.]+)\s*\)\s*$",
     re.IGNORECASE,
 )
-# Hatch: horizontal slices from baseline toward chord; alpha + grey increase toward the curve
 _N_FILL_SLICES: int = 8
 _FILL_ALPHA_TOP: float = 0.11
 _FILL_ALPHA_BOTTOM: float = 0.22
-# |y|/ref < 1 → blend toward full grey; ref = row max |% error|;
-# Exp < 1: stronger greying so mid/outer range moves toward #808080, not just faint hue
 _DESAT_GAMMA: float = 0.38
-# Literal neutral used at t=1.0
-_GREY_RGB: tuple[int, int, int] = (128, 128, 128)
 
 
 # ---------------------------------------------------------------------------
@@ -132,11 +154,9 @@ def _minutes_tickvals(n_points: int) -> list[int]:
     return [5 * i for i in range(n_points)]
 
 
-def _format_figure_styling(format_code: str) -> dict[str, str]:
-    return _FORMAT_PANEL.get(
-        str(format_code or "").strip().upper(),
-        _DEFAULT_FORMAT_STYLE,
-    )
+def _format_good_color(format_code: str, n_formats: int) -> str:
+    """Return the 'good' RGBA string for a format in the current layout context."""
+    return _good_rgba(format_code, n_formats)
 
 
 def _round_sort_key(ri: dict[str, Any]) -> tuple[int, int]:
@@ -144,34 +164,30 @@ def _round_sort_key(ri: dict[str, Any]) -> tuple[int, int]:
     return (n, id(ri))
 
 
-def _t_blend_to_grey(
+_SENSOR_MARD_PCT: float = 15.0
+
+
+def _t_error(
     abs_mag: float, ref_max: float, *, gamma: float = _DESAT_GAMMA
 ) -> float:
-    """0 = full line colour, 1 = exact neutral grey, scaled by *this* subplot's data range.
-
-    ``ref_max`` = max |percent error| in the row (or 0 if none).
-    """
-    if ref_max < 1e-12:
+    """0 = good colour, 1 = bad colour.  Errors within sensor MARD stay at 0."""
+    pct: float = abs(float(abs_mag))
+    if pct <= _SENSOR_MARD_PCT:
         return 0.0
-    t_lin: float = min(1.0, abs(float(abs_mag)) / ref_max)
+    effective_max: float = max(ref_max, _SENSOR_MARD_PCT + 1e-12)
+    t_lin: float = min(1.0, (pct - _SENSOR_MARD_PCT) / (effective_max - _SENSOR_MARD_PCT))
     return float(min(1.0, t_lin ** float(gamma)))
 
 
-def _blend_toward_grey(
-    line_rgba: str, t: float, alpha_override: Optional[float] = None
+def _blend_color(
+    good: _RGB3, bad: _RGB3, t: float, alpha: float = 0.92
 ) -> str:
-    """Linear blend of base RGB to ``_GREY_RGB``; *t* in [0,1]."""
+    """Blend from good RGB (t=0) to bad RGB (t=1)."""
     t2: float = max(0.0, min(1.0, t))
-    m = _RG_RGBA.match(str(line_rgba).strip())
-    if not m:
-        return line_rgba
-    r, g, b = int(m.group(1)), int(m.group(2)), int(m.group(3))
-    a = float(m.group(4)) if alpha_override is None else float(alpha_override)
-    gr, gg, gb = _GREY_RGB
-    r2 = int(r * (1.0 - t2) + gr * t2)
-    g2 = int(g * (1.0 - t2) + gg * t2)
-    b2 = int(b * (1.0 - t2) + gb * t2)
-    return f"rgba({r2},{g2},{b2},{a:.3f})"
+    r = int(good[0] * (1.0 - t2) + bad[0] * t2)
+    g = int(good[1] * (1.0 - t2) + bad[1] * t2)
+    b = int(good[2] * (1.0 - t2) + bad[2] * t2)
+    return f"rgba({r},{g},{b},{alpha:.3f})"
 
 
 def _add_gradient_hatch_axis_to_chord(
@@ -183,7 +199,7 @@ def _add_gradient_hatch_axis_to_chord(
     x1: float,
     p0: float,
     p1: float,
-    line_c: str,
+    palette: tuple[_RGB3, _RGB3],
     row_y_max: float,
     legend_rn: int,
 ) -> None:
@@ -210,7 +226,7 @@ def _add_gradient_hatch_axis_to_chord(
                 x1=xc,
                 p0=p0,
                 p1=0.0,
-                line_c=line_c,
+                palette=palette,
                 row_y_max=row_y_max,
                 legend_rn=legend_rn,
             )
@@ -222,7 +238,7 @@ def _add_gradient_hatch_axis_to_chord(
                 x1=x1,
                 p0=0.0,
                 p1=p1,
-                line_c=line_c,
+                palette=palette,
                 row_y_max=row_y_max,
                 legend_rn=legend_rn,
             )
@@ -238,8 +254,8 @@ def _add_gradient_hatch_axis_to_chord(
         a_fill: float = (
             _FILL_ALPHA_BOTTOM * (1.0 - t_mid) + _FILL_ALPHA_TOP * t_mid
         )
-        fill_t: float = _t_blend_to_grey(m_band, row_y_max)
-        fill_rgba: str = _blend_toward_grey(line_c, fill_t, a_fill)
+        fill_t: float = _t_error(m_band, row_y_max)
+        fill_rgba: str = _blend_color(palette[0], palette[1], fill_t, alpha=a_fill)
         fig.add_trace(
             go.Scatter(
                 x=[x0, x1, x1, x0, x0],
@@ -353,10 +369,18 @@ def compute_aggregate_stats(rounds: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def compute_percentile(rank: int, total: int) -> Optional[int]:
+    """Compute the percentile (top X%) from rank and total. Returns None if invalid."""
+    if total <= 0 or rank <= 0:
+        return None
+    pct: float = (rank / total) * 100.0
+    return max(1, math.ceil(pct))
+
+
 def _best_ranking_entry(share_record: dict[str, Any]) -> Optional[dict[str, Any]]:
     """Return the single best (lowest-rank) entry across per-format + overall.
 
-    Output shape: ``{"rank": int, "total": int, "scope": "overall"|fmt}``.
+    Output shape: ``{"rank": int, "total": int, "scope": "overall"|fmt, "percentile": int|None}``.
     Returns None when no ranks are available.
     """
     rankings: dict[str, Any] = dict(share_record.get("rankings") or {})
@@ -371,7 +395,11 @@ def _best_ranking_entry(share_record: dict[str, Any]) -> Optional[dict[str, Any]
         if rank <= 0:
             continue
         if best is None or rank < best["rank"]:
-            best = {"rank": rank, "total": total, "scope": str(entry.get("format") or "")}
+            best = {
+                "rank": rank, "total": total,
+                "scope": str(entry.get("format") or ""),
+                "percentile": compute_percentile(rank, total),
+            }
 
     overall = rankings.get("overall")
     if isinstance(overall, dict):
@@ -379,7 +407,10 @@ def _best_ranking_entry(share_record: dict[str, Any]) -> Optional[dict[str, Any]
             o_rank = int(overall.get("rank"))
             o_total = int(overall.get("total"))
             if o_rank > 0 and (best is None or o_rank < best["rank"]):
-                best = {"rank": o_rank, "total": o_total, "scope": "overall"}
+                best = {
+                    "rank": o_rank, "total": o_total, "scope": "overall",
+                    "percentile": compute_percentile(o_rank, o_total),
+                }
         except (TypeError, ValueError):
             pass
 
@@ -482,8 +513,9 @@ def _synthesis_legend_row_html(share_record: dict[str, Any], *, locale: str) -> 
     loc: str = normalize_locale(locale)
     rounds: list[dict[str, Any]] = list(share_record.get("rounds") or [])
     formats: list[str] = _formats_played_in_order(rounds)
+    n_fmt: int = len(formats)
     fmt0: str = str(formats[0] or "A").strip().upper() or "A"
-    line_c: str = _format_figure_styling(fmt0)["line"]
+    line_c: str = _format_good_color(fmt0, n_fmt)
     z_label: str = t("ui.share.synthesis.legend_zero", locale=loc)
     v_label: str = t("ui.share.synthesis.legend_variability", locale=loc)
     item_style: dict[str, str] = {
@@ -502,7 +534,7 @@ def _synthesis_legend_row_html(share_record: dict[str, Any], *, locale: str) -> 
             html.Div(
                 [
                     html.Span(
-                        style={**swatch, "borderBottom": "2.5px solid #0f0f0f", "alignSelf": "center"},
+                        style={**swatch, "borderBottom": f"2.5px solid {_good_rgba(fmt0, n_fmt)}", "alignSelf": "center"},
                     ),
                     html.Span(
                         z_label,
@@ -627,8 +659,8 @@ def build_synthesis_figure(
     first_zero: bool = True
 
     for row_idx, fmt in enumerate(formats, start=1):
-        sty: dict[str, str] = _format_figure_styling(fmt)
-        line_c: str = sty["line"]
+        palette: tuple[_RGB3, _RGB3] = _palette_for(fmt, n_fmt)
+        good_c: str = _good_rgba(fmt, n_fmt)
 
         rounds_f: list[dict[str, Any]] = [
             r
@@ -683,7 +715,7 @@ def build_synthesis_figure(
                     x1=xb,
                     p0=p0,
                     p1=p1,
-                    line_c=line_c,
+                    palette=palette,
                     row_y_max=row_y_max,
                     legend_rn=rn,
                 )
@@ -706,9 +738,7 @@ def build_synthesis_figure(
                     continue
                 x0, x1 = x2[j], x2[j + 1]
                 m_seg: float = max(abs(v0), abs(v1))
-                seg_c: str = _blend_toward_grey(
-                    line_c, _t_blend_to_grey(m_seg, row_y_max), None
-                )
+                seg_c: str = _blend_color(palette[0], palette[1], _t_error(m_seg, row_y_max))
                 fig.add_trace(
                     go.Scatter(
                         x=[x0, x1],
@@ -730,7 +760,7 @@ def build_synthesis_figure(
                 y=y_zero,
                 mode="lines",
                 name=leg_zero,
-                line=_ZERO_LINE,
+                line=dict(color=good_c, width=_ZERO_LINE_WIDTH),
                 connectgaps=True,
                 legendgroup="zero",
                 showlegend=show_lz,
@@ -763,9 +793,7 @@ def build_synthesis_figure(
                 m_x.append(x3[j])
                 m_y.append(yy)
                 m_col.append(
-                    _blend_toward_grey(
-                        line_c, _t_blend_to_grey(abs(yy), row_y_max), None
-                    )
+                    _blend_color(palette[0], palette[1], _t_error(abs(yy), row_y_max))
                 )
                 m_cd.append([rn3])
             if m_x:
@@ -786,6 +814,22 @@ def build_synthesis_figure(
                     ),
                     row=row_idx, col=1,
                 )
+                _show_label: bool = (
+                    SHARE_ROUND_LABELS == "all"
+                    or (SHARE_ROUND_LABELS == "single" and n_fmt <= 1)
+                )
+                if _show_label:
+                    lc_last: str = m_col[-1] if m_col else "rgba(100,100,100,0.7)"
+                    fig.add_annotation(
+                        x=m_x[-1], y=m_y[-1],
+                        text=f"r{rn3}",
+                        showarrow=False,
+                        font=dict(size=8, color=lc_last),
+                        xanchor="left", yanchor="bottom",
+                        xshift=4, yshift=3,
+                        opacity=0.7,
+                        row=row_idx, col=1,
+                    )
 
     x_title: str = t("ui.share.synthesis.x_axis_time", locale=loc)
     y_name: str = t("ui.share.synthesis.y_axis_short", locale=loc)
@@ -815,7 +859,7 @@ def build_synthesis_figure(
         fig.update_xaxes(**x_kw)
 
     if show_legend_in_figure and formats:
-        var_leg_color: str = _format_figure_styling(formats[0])["line"]
+        var_leg_color: str = _format_good_color(formats[0], n_fmt)
         fig.add_trace(
             go.Scatter(
                 x=[None],
@@ -933,9 +977,15 @@ def build_share_card_figure(
     user_info: dict[str, Any] = dict(share_record.get("user_info") or {})
     name: str = _safe_display_name(user_info)
 
-    mae: float = stats.get("mae_mgdl") or float("nan")
-    rmse: float = stats.get("rmse_mgdl") or float("nan")
+    mae: float = stats.get("mae_mgdl", float("nan"))
+    rmse: float = stats.get("rmse_mgdl", float("nan"))
+    mard: float = stats.get("mape", float("nan"))
+    accuracy: float = stats.get("accuracy", float("nan"))
+    accuracy_str: str = f"{_format_number(accuracy)}%" if not math.isnan(accuracy) else "?"
+    mard_str: str = f"{_format_number(mard)}%" if not math.isnan(mard) else "?"
     rounds_played: int = int(stats.get("rounds_played") or 0)
+    best_entry: Optional[dict[str, Any]] = _best_ranking_entry(share_record)
+    percentile: Optional[int] = best_entry.get("percentile") if best_entry else None
     encourage: str = encouragement_text(stats, loc, seed=seed)
     generated_at: Optional[str] = _format_generated_at(share_record, locale=loc)
     play_url: str = _play_url_from_share(share_url)
@@ -967,42 +1017,66 @@ def build_share_card_figure(
     leg_var: str = t("ui.share.synthesis.legend_variability", locale=loc)
     # Paper y: 0=bottom, 1=top. Traces use [_CARD_TRACE_Y0, _CARD_TRACE_Y1] only.
     y_legend: float = 0.755
-    y_stats: float
-    y_quote: float
     if name:
-        y_stats = 0.888
-        y_quote = 0.828
+        y_stats_base: float = 0.878
+        y_quote_base: float = 0.812
     else:
-        y_stats = 0.908
-        y_quote = 0.848
+        y_stats_base = 0.898
+        y_quote_base = 0.832
 
+    headline: str = t("ui.share.subtitle", locale=loc)
+    _MAX_HEADLINE_LINE = 36
+    headline_wrapped: bool = False
+    if len(headline) > _MAX_HEADLINE_LINE:
+        q_idx: int = headline.find("?")
+        if q_idx != -1 and q_idx < len(headline) - 1:
+            headline = headline[: q_idx + 1] + "<br>" + headline[q_idx + 1 :].lstrip()
+        else:
+            mid: int = len(headline) // 2
+            sp: int = headline.rfind(" ", 0, mid + 8)
+            if sp > 0:
+                headline = headline[:sp] + "<br>" + headline[sp + 1 :]
+        headline_wrapped = True
+    dy: float = 0.030 if headline_wrapped else 0.0
     fig.add_annotation(
         xref="paper", yref="paper",
-        x=0.5, y=0.987,
+        x=0.5, y=0.993,
         xanchor="center", yanchor="top",
-        text=f"<b>{t('ui.share.title', locale=loc)}</b>",
+        text=f"<b>{headline}</b>",
         showarrow=False,
         font=dict(size=36, color="rgba(15,23,42,1)"),
+    )
+    fig.add_annotation(
+        xref="paper", yref="paper",
+        x=0.5, y=0.938 - dy,
+        xanchor="center", yanchor="top",
+        text=t("ui.share.title", locale=loc),
+        showarrow=False,
+        font=dict(size=18, color="rgba(100,116,139,1)"),
     )
     if name:
         fig.add_annotation(
             xref="paper", yref="paper",
-            x=0.5, y=0.928,
+            x=0.5, y=0.918 - dy,
             xanchor="center", yanchor="top",
             text=name,
             showarrow=False,
-            font=dict(size=18, color="rgba(71,85,105,1)"),
+            font=dict(size=16, color="rgba(71,85,105,1)"),
         )
-    stats_line: str = (
-        f"<b>{_format_number(mae)}</b> mg/dL {mae_label}"
-        f"   \u2022   "
-        f"<b>{_format_number(rmse)}</b> mg/dL {rmse_label}"
-        f"   \u2022   "
-        f"<b>{rounds_played}</b> {rounds_label}"
-    )
+    mard_label: str = t("ui.share.stat_mard", locale=loc)
+    parts: list[str] = [f"<b>{accuracy_str}</b> {t('ui.share.stat_accuracy', locale=loc)}"]
+    if percentile is not None:
+        parts.append(f"<b>{t('ui.share.stat_percentile', locale=loc, percentile=f'{percentile}%')}</b>")
+    parts.extend([
+        f"<b>{mard_str}</b> {mard_label}",
+        f"<b>{_format_number(mae)}</b> mg/dL {mae_label}",
+        f"<b>{_format_number(rmse)}</b> mg/dL {rmse_label}",
+        f"<b>{rounds_played}</b> {rounds_label}",
+    ])
+    stats_line: str = "   \u2022   ".join(parts)
     fig.add_annotation(
         xref="paper", yref="paper",
-        x=0.5, y=y_stats,
+        x=0.5, y=y_stats_base - dy,
         xanchor="center", yanchor="top",
         text=stats_line,
         showarrow=False,
@@ -1010,23 +1084,24 @@ def build_share_card_figure(
     )
     fig.add_annotation(
         xref="paper", yref="paper",
-        x=0.5, y=y_quote,
+        x=0.5, y=y_quote_base - dy,
         xanchor="center", yanchor="top",
         text=f"<i>{encourage}</i>",
         showarrow=False,
-        font=dict(size=16, color="rgba(30,58,138,1)"),
+        font=dict(size=20, color="rgba(30,58,138,1)"),
     )
 
     formats_played: list[str] = _formats_played_in_order(rounds)
     fmt0: str = str(formats_played[0]).strip().upper() if formats_played else "A"
     if fmt0 not in ("A", "B", "C"):
         fmt0 = "A"
-    var_color: str = _format_figure_styling(fmt0)["line"]
+    n_fmt_card: int = len(formats_played)
+    var_color: str = _format_good_color(fmt0, n_fmt_card)
     fig.add_shape(
         type="line",
         xref="paper", yref="paper",
         x0=0.28, x1=0.35, y0=y_legend, y1=y_legend,
-        line={"color": "#0f0f0f", "width": 3.2},
+        line={"color": _good_rgba(fmt0, n_fmt_card), "width": 3.2},
         layer="above",
     )
     fig.add_annotation(
@@ -1236,17 +1311,31 @@ def create_share_layout(
     user_info: dict[str, Any] = dict(share_record.get("user_info") or {})
     name: str = _safe_display_name(user_info)
 
-    mae: float = stats.get("mae_mgdl") or float("nan")
-    rmse: float = stats.get("rmse_mgdl") or float("nan")
+    mae: float = stats.get("mae_mgdl", float("nan"))
+    rmse: float = stats.get("rmse_mgdl", float("nan"))
+    mard: float = stats.get("mape", float("nan"))
+    accuracy: float = stats.get("accuracy", float("nan"))
+    accuracy_str: str = f"{_format_number(accuracy)}%" if not math.isnan(accuracy) else "?"
+    mard_str: str = f"{_format_number(mard)}%" if not math.isnan(mard) else "?"
     rounds_played: int = int(stats.get("rounds_played") or 0)
     best_entry: Optional[dict[str, Any]] = _best_ranking_entry(share_record)
+    percentile: Optional[int] = best_entry.get("percentile") if best_entry else None
 
-    invite_text: str = t(
-        "ui.share.invite_text",
-        locale=loc,
-        mae=_format_number(mae),
-        rounds=rounds_played,
-    )
+    if percentile is not None:
+        invite_text: str = t(
+            "ui.share.invite_text_ranked",
+            locale=loc,
+            accuracy=accuracy_str,
+            rounds=rounds_played,
+            percentile=f"{percentile}%",
+        )
+    else:
+        invite_text = t(
+            "ui.share.invite_text",
+            locale=loc,
+            accuracy=accuracy_str,
+            rounds=rounds_played,
+        )
     encourage: str = encouragement_text(stats, loc, seed=share_id)
     generated_at: Optional[str] = _format_generated_at(share_record, locale=loc)
 
@@ -1275,6 +1364,11 @@ def create_share_layout(
                 t("ui.share.share_on_linkedin", locale=loc),
                 f"https://www.linkedin.com/sharing/share-offsite/?url={encoded_url}",
                 color="#0A66C2", icon="fa-linkedin",
+            ),
+            _share_button(
+                t("ui.share.share_on_telegram", locale=loc),
+                f"https://t.me/share/url?url={encoded_url}&text={urllib.parse.quote(invite_text, safe='')}",
+                color="#26A5E4", icon="fa-telegram",
             ),
         ],
         className="share-buttons",
@@ -1316,17 +1410,28 @@ def create_share_layout(
             best_sub: str = t("ui.share.best_rank_scope_overall", locale=loc)
         else:
             best_sub = _resolve_format_label(scope, locale=loc)
+        if percentile is not None:
+            best_sub = t("ui.share.stat_percentile", locale=loc, percentile=f"{percentile}%")
     else:
         best_value = t("ui.share.stat_no_ranking", locale=loc)
         best_sub = ""
 
+    tile_list: list[html.Div] = [
+        stat_tile(t("ui.share.stat_accuracy", locale=loc), accuracy_str,
+                  sub=t("ui.share.stat_accuracy_hint", locale=loc)),
+        stat_tile(t("ui.share.stat_mard", locale=loc), mard_str,
+                  sub=t("ui.share.stat_mard_hint", locale=loc)),
+        stat_tile(t("ui.share.stat_mae", locale=loc), f"{_format_number(mae)} mg/dL",
+                  sub=t("ui.share.stat_mae_hint", locale=loc)),
+        stat_tile(t("ui.share.stat_rmse", locale=loc), f"{_format_number(rmse)} mg/dL",
+                  sub=t("ui.share.stat_rmse_hint", locale=loc)),
+        stat_tile(t("ui.share.stat_rounds", locale=loc), str(rounds_played),
+                  sub=t("ui.share.stat_rounds_hint", locale=loc)),
+        stat_tile(t("ui.share.stat_ranking", locale=loc), best_value, sub=best_sub),
+    ]
     stats_row: html.Div = html.Div(
-        [
-            stat_tile(t("ui.share.stat_mae", locale=loc), f"{_format_number(mae)} mg/dL"),
-            stat_tile(t("ui.share.stat_rmse", locale=loc), f"{_format_number(rmse)} mg/dL"),
-            stat_tile(t("ui.share.stat_rounds", locale=loc), str(rounds_played)),
-            stat_tile(t("ui.share.stat_ranking", locale=loc), best_value, sub=best_sub),
-        ],
+        tile_list,
+        className="share-stats-row",
         style={"display": "flex", "flexWrap": "wrap", "gap": "14px",
                "marginTop": "8px", "justifyContent": "center"},
         disable_n_clicks=True,
@@ -1507,7 +1612,7 @@ def create_share_layout(
         disable_n_clicks=True,
     )
 
-    download_href: str = f"/share/{share_id}/image.png"
+    download_href: str = f"/share/{share_id}/image.png?lang={loc}"
 
     action_buttons: html.Div = html.Div(
         [
@@ -1555,13 +1660,13 @@ def create_share_layout(
 
     header_children: list[Any] = [
         html.H1(
-            t("ui.share.title", locale=loc),
-            style={"fontSize": "clamp(32px,4.5vw,52px)", "margin": "0 0 2px 0",
+            t("ui.share.subtitle", locale=loc),
+            style={"fontSize": "clamp(32px,4.5vw,52px)", "margin": "0 0 4px 0",
                    "lineHeight": "1.12",
                    "color": "#0f172a", "textAlign": "center"},
         ),
         html.P(
-            t("ui.share.subtitle", locale=loc),
+            t("ui.share.title", locale=loc),
             style={"fontSize": "clamp(16px,2.5vw,20px)",
                    "color": "#475569", "textAlign": "center",
                    "margin": "0 0 2px 0"},
@@ -1636,6 +1741,5 @@ def create_share_layout(
         disable_n_clicks=True,
         style={
             "background": "linear-gradient(135deg,#eff6ff 0%,#f8fafc 40%,#fdf2f8 100%)",
-            "maxWidth": "1100px",
         },
     )

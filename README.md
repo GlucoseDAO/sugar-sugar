@@ -188,6 +188,19 @@ uv run chart --prefill --noise 0.10   # ±10% noise
 uv run chart --unit mmol/L --locale de
 ```
 
+### Share page debugging
+
+Preview the share page with synthetic prediction data — no need to play a full game:
+
+```bash
+uv run share                            # single-format (Generic), 12 rounds
+uv run share --formats "A,B,C"          # multi-format: Generic + My Data + Mixed
+uv run share --formats "A,B" --rounds 8 # custom round count
+uv run share --locale de                # test in German
+```
+
+Formats: **A** = Generic, **B** = My Data, **C** = Mixed. Rounds cycle through formats evenly (e.g. 12 rounds with A,B,C → 4 rounds each). The command generates a share record, saves it to disk, and opens the browser at `/share/<id>`. Useful for testing the share card PNG, OG tags, social buttons, and per-format colour palettes.
+
 ### Clearing localStorage during development
 
 ```bash

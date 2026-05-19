@@ -12,6 +12,7 @@ import polars as pl
 from datetime import datetime
 import time
 from pathlib import Path
+import math
 import base64
 import dash_bootstrap_components as dbc
 import os
@@ -42,7 +43,7 @@ logs_dir.mkdir(exist_ok=True)
 to_nice_stdout()
 to_nice_file(logs_dir / 'sugar_sugar.json', logs_dir / 'sugar_sugar.log')
 
-from sugar_sugar.i18n import setup_i18n, normalize_locale, t, t_raw
+from sugar_sugar.i18n import setup_i18n, normalize_locale, t, t_list, t_raw
 setup_i18n()
 
 from sugar_sugar.data import load_glucose_data, load_glucose_data_from_nightscout
@@ -58,6 +59,11 @@ from sugar_sugar.config import (
     DEBUG_MODE,
     DEPLOY_BUILD,
     MAX_ROUNDS,
+    MIN_USEFUL_ROUNDS,
+    SHARE_FORMATS,
+    SHARE_NAME,
+    SHARE_NOISE,
+    SHARE_ROUNDS,
     STORAGE_TYPE,
     UMAMI_DOMAINS,
     UMAMI_HOST_URL,
@@ -72,6 +78,7 @@ from sugar_sugar.components.startup import StartupPage
 from sugar_sugar.components.landing import LandingPage
 from sugar_sugar.components.consent_form import ConsentFormPage
 from sugar_sugar.components.submit import SubmitComponent
+from sugar_sugar.encouragement import pick_bracket
 from sugar_sugar.components.header import HeaderComponent
 from sugar_sugar.components.ending import EndingPage
 from sugar_sugar.components.navbar import NavBar
@@ -299,6 +306,200 @@ example_initial_df_store = dataframe_to_store_dict(_init_window_df)
 example_events_df_store = events_dataframe_to_store_dict(_init_events_df)
 example_initial_slider_value = _init_start
 
+# ---------------------------------------------------------------------------
+# Share-mode: generate fake multi-round data, persist a share record, and
+# navigate directly to /share/<id> on startup.  Activated by _SHARE_MODE=1
+# (set by the ``share`` CLI command).
+# ---------------------------------------------------------------------------
+_is_share_mode = os.environ.get("_SHARE_MODE") == "1"
+_share_mode_id: Optional[str] = None
+
+if _is_share_mode:
+    import random as _share_rnd
+    _share_rounds_n = int(os.environ.get("_SHARE_ROUNDS", str(SHARE_ROUNDS)))
+    _share_noise = float(os.environ.get("_SHARE_NOISE", str(SHARE_NOISE)))
+    _share_locale = os.environ.get("_SHARE_LOCALE", "en")
+    _share_formats_env = os.environ.get("_SHARE_FORMATS", SHARE_FORMATS)
+    _share_formats = [f.strip().upper() for f in _share_formats_env.split(",") if f.strip()]
+    _share_source = os.environ.get("_SHARE_SOURCE", "example.csv")
+    _share_is_example = os.environ.get("_CHART_FILE") is None
+
+    _share_full_df = _init_full_df.clone()
+    _share_used_starts: set[int] = set()
+    _share_all_rounds: list[dict[str, Any]] = []
+
+    for _ri in range(_share_rounds_n):
+        _fmt = _share_formats[_ri % len(_share_formats)]
+        _win_df, _win_start = get_random_data_window(
+            _share_full_df, _chart_points, _share_used_starts,
+        )
+        _share_used_starts.add(_win_start)
+        _win_df = _win_df.with_columns(pl.lit(0.0).alias("prediction"))
+
+        _sn = len(_win_df)
+        _s_visible = _sn - PREDICTION_HOUR_OFFSET
+        _s_gl = _win_df.get_column("gl").to_list()
+        _s_preds = [0.0] * _sn
+        _s_pred_steps = _sn - _s_visible
+        for _si in range(_s_visible, _sn):
+            _sg = _s_gl[_si]
+            if _sg is not None:
+                _s_step_frac = ((_si - _s_visible) / max(_s_pred_steps - 1, 1)) ** 1.8
+                _s_step_noise = _share_noise * _s_step_frac
+                _s_preds[_si] = round(
+                    _sg * (1.0 + _share_rnd.uniform(-_s_step_noise, _s_step_noise)), 1
+                )
+        _win_df = _win_df.with_columns(
+            pl.Series("prediction", _s_preds, dtype=pl.Float64)
+        )
+
+        _s_actual_row: dict[str, str] = {"metric": "Actual Glucose"}
+        _s_pred_row: dict[str, str] = {"metric": "Predicted"}
+        _s_abs_err_row: dict[str, str] = {"metric": "Absolute Error"}
+        _s_rel_err_row: dict[str, str] = {"metric": "Relative Error (%)"}
+        for _ti in range(_sn):
+            _a = _s_gl[_ti]
+            _p = _s_preds[_ti]
+            _s_actual_row[f"t{_ti}"] = "-" if _a is None else f"{float(_a):.1f}"
+            if _p == 0.0 or _a is None:
+                _s_pred_row[f"t{_ti}"] = "-"
+                _s_abs_err_row[f"t{_ti}"] = "-"
+                _s_rel_err_row[f"t{_ti}"] = "-"
+            else:
+                _s_pred_row[f"t{_ti}"] = f"{_p:.1f}"
+                _s_err = abs(float(_a) - _p)
+                _s_abs_err_row[f"t{_ti}"] = f"{_s_err:.1f}"
+                _s_rel_err_row[f"t{_ti}"] = (
+                    f"{(_s_err / float(_a) * 100):.1f}%" if _a != 0 else "-"
+                )
+
+        _share_all_rounds.append({
+            "round_number": _ri + 1,
+            "prediction_window_start": _win_start,
+            "prediction_window_size": _sn,
+            "prediction_table_data": [
+                _s_actual_row, _s_pred_row, _s_abs_err_row, _s_rel_err_row,
+            ],
+            "format": _fmt,
+            "is_example_data": _share_is_example,
+            "data_source_name": _share_source,
+        })
+
+    _share_study_id = str(uuid.uuid4())
+    _share_run_id = str(uuid.uuid4())
+    _share_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    _share_played_formats = sorted(
+        {r["format"] for r in _share_all_rounds},
+        key=lambda x: FORMAT_ORDER.get(str(x), 999),
+    )
+
+    def _metrics_from_rounds(rounds: list[dict[str, Any]]) -> dict[str, float]:
+        all_actual: list[float] = []
+        all_pred: list[float] = []
+        for rnd in rounds:
+            ptd = rnd.get("prediction_table_data", [])
+            if len(ptd) < 2:
+                continue
+            actual_row, pred_row = ptd[0], ptd[1]
+            for k in actual_row:
+                if k == "metric":
+                    continue
+                a_s, p_s = actual_row[k], pred_row[k]
+                if a_s != "-" and p_s != "-":
+                    try:
+                        all_actual.append(float(a_s))
+                        all_pred.append(float(p_s))
+                    except ValueError:
+                        continue
+        n = len(all_actual)
+        if n == 0:
+            return {"mae": 0.0, "mse": 0.0, "rmse": 0.0, "mape": 0.0}
+        mae = sum(abs(a - p) for a, p in zip(all_actual, all_pred)) / n
+        mse = sum((a - p) ** 2 for a, p in zip(all_actual, all_pred)) / n
+        rmse = mse ** 0.5
+        nonzero = sum(1 for a in all_actual if a != 0)
+        mape = (sum(abs((a - p) / a) * 100 for a, p in zip(all_actual, all_pred) if a != 0) / nonzero) if nonzero else 0.0
+        return {"mae": mae, "mse": mse, "rmse": rmse, "mape": mape}
+
+    import tempfile, shutil
+    _ranking_header = "study_id,run_id,number,timestamp,format,rounds_played,is_example_data,data_source_name,overall_mae_mgdl,overall_mse_mgdl,overall_rmse_mgdl,overall_mape\n"
+
+    def _append_ranking_row(path: Path, fmt: str, rounds_for_fmt: list[dict[str, Any]]) -> None:
+        m = _metrics_from_rounds(rounds_for_fmt)
+        if not path.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(_ranking_header, encoding="utf-8")
+        row = (
+            f"{_share_study_id},{_share_run_id},0,{_share_timestamp},{fmt},"
+            f"{len(rounds_for_fmt)},{_share_is_example},{_share_source},"
+            f"{m['mae']},{m['mse']},{m['rmse']},{m['mape']}\n"
+        )
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write(row)
+
+    _tmp_ranking_dir = Path(tempfile.mkdtemp(prefix="sugar_share_ranking_"))
+    _real_ranking_dir = project_root / "data" / "input"
+
+    _rounds_by_fmt: dict[str, list[dict[str, Any]]] = {}
+    for _r in _share_all_rounds:
+        _rounds_by_fmt.setdefault(_r["format"], []).append(_r)
+
+    for _fmt_key, _fmt_rounds in _rounds_by_fmt.items():
+        _real_fmt_csv = _real_ranking_dir / f"prediction_ranking_{_fmt_key}.csv"
+        _tmp_fmt_csv = _tmp_ranking_dir / f"prediction_ranking_{_fmt_key}.csv"
+        if _real_fmt_csv.exists():
+            shutil.copy2(_real_fmt_csv, _tmp_fmt_csv)
+        _append_ranking_row(_tmp_fmt_csv, _fmt_key, _fmt_rounds)
+
+    _real_overall_csv = _real_ranking_dir / "prediction_ranking.csv"
+    _tmp_overall_csv = _tmp_ranking_dir / "prediction_ranking.csv"
+    if _real_overall_csv.exists():
+        shutil.copy2(_real_overall_csv, _tmp_overall_csv)
+    _append_ranking_row(_tmp_overall_csv, "ALL", _share_all_rounds)
+
+    def _share_rank(fmt_filter: Optional[str], csv_name: str) -> Optional[tuple[int, int]]:
+        return _rank_from_ranking_csv(
+            _tmp_ranking_dir / csv_name,
+            study_id=_share_study_id,
+            format_filter=fmt_filter,
+            mode="best",
+        )
+
+    _share_per_format: list[dict[str, Any]] = []
+    for _fmt_key in sorted(_rounds_by_fmt, key=lambda x: FORMAT_ORDER.get(x, 999)):
+        _info = _share_rank(_fmt_key, f"prediction_ranking_{_fmt_key}.csv")
+        if _info:
+            _share_per_format.append({"format": _fmt_key, "rank": _info[0], "total": _info[1]})
+    _share_overall = _share_rank(None, "prediction_ranking.csv")
+    _share_rankings: dict[str, Any] = {
+        "per_format": _share_per_format,
+        "overall": {"rank": _share_overall[0], "total": _share_overall[1]} if _share_overall else None,
+    }
+    shutil.rmtree(_tmp_ranking_dir, ignore_errors=True)
+
+    _share_record: dict[str, Any] = {
+        "schema_version": 2,
+        "created_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "locale": normalize_locale(_share_locale),
+        "rounds": _share_all_rounds,
+        "played_formats": _share_played_formats,
+        "rankings": _share_rankings,
+        "user_info": {
+            "name": os.environ.get("_SHARE_NAME", SHARE_NAME),
+            "study_id": _share_study_id,
+            "format": _share_formats[0],
+            "uses_cgm": True,
+            "max_rounds": MAX_ROUNDS,
+        },
+    }
+    _share_mode_id = share_store.save_share(_share_record)
+    with start_action(action_type=u"share_mode_setup") as _share_action:
+        _share_action.add_success_fields(
+            share_id=_share_mode_id,
+            rounds=_share_rounds_n,
+            rankings=str(_share_rankings),
+        )
+
 external_stylesheets = [
     'https://codepen.io/chriddyp/pen/bWLwgP.css',
     dbc.themes.BOOTSTRAP,
@@ -365,7 +566,7 @@ def _download_study_pdf():
 #    Humans who hit this URL get redirected to the real Dash page.
 # ---------------------------------------------------------------------------
 
-_SHARE_PNG_CACHE: dict[str, bytes] = {}
+_SHARE_PNG_CACHE: dict[tuple[str, str], bytes] = {}
 
 _SOCIAL_CRAWLER_USER_AGENT_TOKENS: tuple[str, ...] = (
     "facebookexternalhit",
@@ -444,7 +645,23 @@ def _share_card_og_response(share_id: str) -> Any:
     loc: str = normalize_locale(locale)
     share_url: str = _build_share_url(share_id)
     image_url: str = f"{share_url}/image.png"
-    title: str = html_escape(t("ui.share.title", locale=loc), quote=True)
+
+    from sugar_sugar.components.share import compute_aggregate_stats, _best_ranking_entry, _format_number
+    og_stats = compute_aggregate_stats(list(record.get("rounds") or []))
+    og_accuracy = og_stats.get("accuracy", float("nan"))
+    og_accuracy_str = f"{_format_number(og_accuracy)}%" if not math.isnan(og_accuracy) else "?"
+    og_best = _best_ranking_entry(record)
+    og_percentile = og_best.get("percentile") if og_best else None
+    if og_percentile is not None:
+        title = html_escape(
+            t("ui.share.og_title_ranked", locale=loc, percentile=f"{og_percentile}%", accuracy=og_accuracy_str),
+            quote=True,
+        )
+    else:
+        title = html_escape(
+            t("ui.share.og_title_unranked", locale=loc, accuracy=og_accuracy_str),
+            quote=True,
+        )
     description: str = html_escape(t("ui.share.subtitle", locale=loc), quote=True)
     escaped_share_url: str = html_escape(share_url, quote=True)
     escaped_image_url: str = html_escape(image_url, quote=True)
@@ -492,19 +709,20 @@ def _serve_share_og_to_social_crawlers() -> Optional[Any]:
 
 @server.route("/share/<share_id>/image.png")
 def _share_card_png(share_id: str) -> Any:
-    from flask import abort
+    from flask import abort, request as flask_req
     record = share_store.load_share(share_id)
     if record is None:
         abort(404)
-    cached: Optional[bytes] = _SHARE_PNG_CACHE.get(share_id)
+    locale: str = flask_req.args.get("lang") or str(record.get("locale") or "en")
+    cache_key = (share_id, locale)
+    cached: Optional[bytes] = _SHARE_PNG_CACHE.get(cache_key)
     if cached is None:
-        locale: str = str(record.get("locale") or "en")
         share_url: str = _build_share_url(share_id)
         fig = build_share_card_figure(
             record, share_url=share_url, locale=locale, seed=share_id,
         )
         cached = fig.to_image(format="png", width=1080, height=1080, scale=1, engine="kaleido")
-        _SHARE_PNG_CACHE[share_id] = cached
+        _SHARE_PNG_CACHE[cache_key] = cached
     response = flask_send_file(
         BytesIO(cached),
         mimetype="image/png",
@@ -622,7 +840,11 @@ else:
     _chart_user_info = None
 
 app.layout = html.Div([
-    dcc.Location(id='url', refresh=False, **({'pathname': '/prediction'} if _is_chart_mode else {})),
+    dcc.Location(id='url', refresh=False, **(
+        {'pathname': f'/share/{_share_mode_id}'} if _is_share_mode and _share_mode_id
+        else {'pathname': '/prediction'} if _is_chart_mode
+        else {}
+    )),
     dcc.Store(id='user-info-store', data=_chart_user_info, storage_type=STORAGE_TYPE),
     dcc.Store(id='last-click-time', data=0),
     # Fingerprint sentinel: value must equal DEPLOY_BUILD in config.py.
@@ -638,7 +860,7 @@ app.layout = html.Div([
     dcc.Store(id='is-example-data', data=_chart_is_example, storage_type=STORAGE_TYPE),
     dcc.Store(id='data-source-name', data=_chart_source if _is_chart_mode else "example.csv", storage_type=STORAGE_TYPE),
     dcc.Store(id='randomization-initialized', data=_is_chart_mode, storage_type=STORAGE_TYPE),
-    dcc.Store(id='glucose-chart-mode', data={'hide_last_hour': True}, storage_type=STORAGE_TYPE),
+    dcc.Store(id='glucose-chart-mode', data={'hide_last_hour': True}, storage_type='memory'),
     dcc.Store(id='glucose-unit', data=_chart_unit if _is_chart_mode else 'mg/dL', storage_type=STORAGE_TYPE),
     dcc.Store(id='interface-language', data=_chart_locale if _is_chart_mode else 'en', storage_type=STORAGE_TYPE),
     dcc.Store(id='user-agent', data=None, storage_type=STORAGE_TYPE),
@@ -1000,7 +1222,7 @@ def update_prediction_text_on_language_change(
      Output('ending-disclaimer-line2', 'children'),
      Output('ending-disclaimer-line3', 'children'),
      Output('ending-round-info', 'children'),
-     Output('ending-round-motivation', 'children'),
+     Output('ending-gamification', 'children'),
      Output('ending-units-line', 'children'),
      Output('ending-graph-explanation', 'children'),
      Output('ending-prediction-results-title', 'children'),
@@ -1037,6 +1259,10 @@ def update_ending_text_on_language_change(
     max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS) if user_info else MAX_ROUNDS
     current_round_number = int(user_info.get('current_round_number') or rounds_played) if user_info else rounds_played
     is_last_round = current_round_number >= max_rounds
+    min_useful = int(user_info.get('min_useful_rounds') or MIN_USEFUL_ROUNDS) if user_info else MIN_USEFUL_ROUNDS
+    prediction_table_data = user_info.get('prediction_table_data') if user_info else None
+    current_mae = _compute_round_mae(prediction_table_data) if prediction_table_data else None
+    all_rounds: list[dict[str, Any]] = (user_info.get('rounds') or []) if user_info else []
 
     metric_label_map: dict[str, str] = {
         "Actual Glucose": t("ui.table.actual_glucose", locale=locale),
@@ -1081,7 +1307,15 @@ def update_ending_text_on_language_change(
         t("ui.results_disclaimer.line2", locale=locale),
         t("ui.results_disclaimer.line3", locale=locale),
         t("ui.common.round_of", locale=locale, current=current_round_number, total=max_rounds),
-        t("ui.ending.round_motivation", locale=locale, total=max_rounds, min_useful=max(1, max_rounds // 2)),
+        _build_gamification_section(
+            current_round=current_round_number,
+            max_rounds=max_rounds,
+            min_useful=min_useful,
+            mae=current_mae,
+            rounds=all_rounds,
+            locale=locale,
+            is_last_round=is_last_round,
+        ).children,
         t("ui.ending.units_line", locale=locale, unit=unit),
         t("ui.ending.graph_explanation", locale=locale),
         t("ui.ending.prediction_results", locale=locale),
@@ -1796,6 +2030,207 @@ def show_upload_required_alert(
         ]
     return dbc.Alert(children, color="info", style={"marginBottom": "10px"})
 
+def _compute_round_mae(prediction_table_data: list[dict[str, str]]) -> Optional[float]:
+    """Extract MAE from raw prediction table data (always in mg/dL)."""
+    if len(prediction_table_data) < 2:
+        return None
+    actual_row = prediction_table_data[0]
+    pred_row = prediction_table_data[1]
+    errors: list[float] = []
+    for key in actual_row:
+        if key == "metric":
+            continue
+        try:
+            a, p = float(actual_row[key]), float(pred_row[key])
+            errors.append(abs(a - p))
+        except (ValueError, TypeError):
+            continue
+    return sum(errors) / len(errors) if errors else None
+
+
+def _pick_reaction(mae: Optional[float], round_number: int, locale: str) -> str:
+    bracket = pick_bracket(mae)
+    pool = t_list(f"ui.ending.reaction.{bracket}", locale=locale)
+    if not pool:
+        return ""
+    return pool[(round_number - 1) % len(pool)]
+
+
+def _is_personal_best(mae: Optional[float], rounds: list[dict[str, Any]]) -> bool:
+    if mae is None or not rounds:
+        return False
+    for r in rounds[:-1]:
+        prev_mae = _compute_round_mae(r.get("prediction_table_data") or [])
+        if prev_mae is not None and prev_mae <= mae:
+            return False
+    return len(rounds) > 1
+
+
+def _pick_milestone(current_round: int, max_rounds: int, min_useful: int, locale: str) -> Optional[str]:
+    if current_round == 1:
+        return t("ui.ending.milestone.first_round", locale=locale)
+    if current_round == min_useful:
+        return t("ui.ending.milestone.minimum_reached", locale=locale)
+    if current_round == max_rounds:
+        return t("ui.ending.milestone.all_complete", locale=locale)
+    return None
+
+
+def _build_progress_bar(current_round: int, max_rounds: int, min_useful: int, locale: str) -> html.Div:
+    """Two-phase segmented progress bar: green up to min_useful, gold for stretch."""
+    segments: list[html.Div] = []
+    for i in range(1, max_rounds + 1):
+        is_min_phase = i <= min_useful
+        filled = i <= current_round
+        if filled:
+            bg = "#4CBB17" if is_min_phase else "#D4A017"
+        else:
+            bg = "#e0e0e0" if is_min_phase else "#f5f0e0"
+        border_right = "2px solid white" if i < max_rounds else "none"
+        border_left = "3px solid #888" if i == min_useful + 1 else "none"
+        segments.append(html.Div(
+            disable_n_clicks=True,
+            style={
+                "flex": "1",
+                "height": "22px",
+                "backgroundColor": bg,
+                "borderRight": border_right,
+                "borderLeft": border_left,
+                "transition": "background-color 0.3s",
+            },
+        ))
+
+    labels = html.Div([
+        html.Span(
+            t("ui.ending.progress.minimum_goal", locale=locale, min_useful=min_useful),
+            style={"fontSize": "13px", "color": "#4a5568", "fontWeight": "600"},
+        ),
+        html.Span(
+            t("ui.ending.progress.stretch_goal", locale=locale, total=max_rounds),
+            style={"fontSize": "13px", "color": "#9e7c16", "fontWeight": "600"},
+        ),
+    ], disable_n_clicks=True, style={
+        "display": "flex",
+        "justifyContent": "space-between",
+        "marginTop": "4px",
+    })
+
+    return html.Div([
+        html.Div(
+            segments,
+            disable_n_clicks=True,
+            style={
+                "display": "flex",
+                "borderRadius": "10px",
+                "overflow": "hidden",
+                "border": "1px solid #bbb",
+                "boxShadow": "inset 0 1px 3px rgba(0,0,0,0.15)",
+            },
+        ),
+        labels,
+    ], id="ending-progress-bar", disable_n_clicks=True, style={
+        "maxWidth": "550px",
+        "margin": "0 auto 10px auto",
+    })
+
+
+def _build_gamification_section(
+    current_round: int,
+    max_rounds: int,
+    min_useful: int,
+    mae: Optional[float],
+    rounds: list[dict[str, Any]],
+    locale: str,
+    *,
+    is_last_round: bool = False,
+) -> html.Div:
+    """Assemble progress bar, reaction line, milestone, motivation inside one card."""
+    children: list[Any] = []
+
+    children.append(_build_progress_bar(current_round, max_rounds, min_useful, locale))
+
+    reaction = _pick_reaction(mae, current_round, locale)
+    personal_best = _is_personal_best(mae, rounds)
+
+    reaction_parts: list[Any] = []
+    if reaction:
+        reaction_parts.append(html.Span(reaction, id="ending-reaction-text"))
+    if personal_best:
+        if reaction_parts:
+            reaction_parts.append("  ")
+        reaction_parts.append(html.Span(
+            t("ui.ending.personal_best", locale=locale),
+            id="ending-personal-best",
+            style={
+                "fontWeight": "bold",
+                "color": "#b8860b",
+                "backgroundColor": "#fff8e1",
+                "padding": "2px 10px",
+                "borderRadius": "12px",
+                "border": "1px solid #f0d060",
+                "fontSize": "clamp(14px, 2vw, 17px)",
+            },
+        ))
+    if not reaction_parts:
+        reaction_parts.append(html.Span("", id="ending-reaction-text"))
+        reaction_parts.append(html.Span("", id="ending-personal-best"))
+
+    children.append(html.Div(
+        reaction_parts,
+        id="ending-reaction-line",
+        disable_n_clicks=True,
+        style={
+            "textAlign": "center",
+            "fontSize": "clamp(16px, 2.2vw, 20px)",
+            "color": "#2c5282",
+            "fontWeight": "500",
+            "marginBottom": "6px",
+            "minHeight": "28px",
+            "lineHeight": "1.5",
+        },
+    ))
+
+    milestone = _pick_milestone(current_round, max_rounds, min_useful, locale)
+    children.append(html.Div(
+        milestone or "",
+        id="ending-milestone",
+        disable_n_clicks=True,
+        style={
+            "textAlign": "center",
+            "fontSize": "clamp(15px, 2vw, 18px)",
+            "color": "#1b5e20",
+            "fontWeight": "700",
+            "marginBottom": "4px",
+            "minHeight": "24px",
+            "display": "block" if milestone else "none",
+        },
+    ))
+
+    children.append(html.Div(
+        t("ui.ending.round_motivation", locale=locale, total=max_rounds, min_useful=min_useful),
+        id='ending-round-motivation',
+        disable_n_clicks=True,
+        style={
+            'textAlign': 'center',
+            'color': '#4a5568',
+            'fontSize': '13px',
+            'fontStyle': 'italic',
+            'marginTop': '6px',
+            'display': 'none' if is_last_round else 'block',
+        }
+    ))
+
+    return html.Div(children, id="ending-gamification", disable_n_clicks=True, style={
+        "maxWidth": "900px",
+        "margin": "10px auto 12px auto",
+        "padding": "16px 24px 12px 24px",
+        "backgroundColor": "#f0f7ff",
+        "borderRadius": "12px",
+        "border": "1px solid #c5d9f0",
+        "boxShadow": "0 2px 8px rgba(0,0,0,0.06)",
+    })
+
+
 def create_ending_layout(
     full_df_data: Optional[Dict],
     current_df_data: Optional[Dict],
@@ -1907,6 +2342,9 @@ def create_ending_layout(
     max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS) if user_info else MAX_ROUNDS
     current_round_number = int(user_info.get('current_round_number') or rounds_played) if user_info else rounds_played
     is_last_round = current_round_number >= max_rounds
+    min_useful = int(user_info.get('min_useful_rounds') or MIN_USEFUL_ROUNDS) if user_info else MIN_USEFUL_ROUNDS
+    current_mae = _compute_round_mae(prediction_table_data) if prediction_table_data else None
+    all_rounds: list[dict[str, Any]] = (user_info.get('rounds') or []) if user_info else []
     current_format = str((user_info or {}).get("format") or "A")
     uses_cgm = bool((user_info or {}).get("uses_cgm", False))
     allowed_formats: list[str] = (["C", "B", "A"] if uses_cgm else ["A"])
@@ -1932,11 +2370,14 @@ def create_ending_layout(
             if gender_raw in ("male", "female", "na")
             else meta.gender
         )
-        subject_parts.append(
+        meta_line = (
             f"{t('ui.startup.age_label', locale=locale)}: {meta.age} · "
             f"{t('ui.startup.gender_label', locale=locale)}: {gender_display} · "
             f"{t('ui.header.weight_label', locale=locale)}: {meta.weight}"
         )
+        if meta.sensor:
+            meta_line += f" · {t('ui.ending.sensor_label', locale=locale)}: {meta.sensor}"
+        subject_parts.append(meta_line)
     elif user_info:
         age = user_info.get('age')
         gender_raw = str(user_info.get('gender') or "").strip().lower()
@@ -1962,22 +2403,18 @@ def create_ending_layout(
         }),
         html.Div(
             [
+                html.I(className="close icon"),
                 html.P(t("ui.results_disclaimer.line1", locale=locale), id='ending-disclaimer-line1', style={'margin': '0'}),
                 html.P(t("ui.results_disclaimer.line2", locale=locale), id='ending-disclaimer-line2', style={'margin': '0'}),
                 html.P(t("ui.results_disclaimer.line3", locale=locale), id='ending-disclaimer-line3', style={'margin': '0'}),
             ],
+            className='ui warning message',
             disable_n_clicks=True,
             style={
                 'maxWidth': '900px',
                 'margin': '0 auto 15px auto',
-                'padding': '12px 16px',
-                'backgroundColor': '#fff7ed',
-                'border': '1px solid #fdba74',
-                'borderRadius': '10px',
-                'color': '#7c2d12',
                 'fontSize': '14px',
                 'lineHeight': '1.4',
-                'boxSizing': 'border-box',
             },
         ),
         html.Div(
@@ -1992,18 +2429,14 @@ def create_ending_layout(
                 'color': '#2c5282'
             }
         ),
-        html.Div(
-            t("ui.ending.round_motivation", locale=locale, total=max_rounds, min_useful=max(1, max_rounds // 2)),
-            id='ending-round-motivation',
-            disable_n_clicks=True,
-            style={
-                'textAlign': 'center',
-                'marginBottom': '5px',
-                'color': '#4a5568',
-                'fontSize': '13px',
-                'fontStyle': 'italic',
-                'display': 'none' if is_last_round else 'block',
-            }
+        _build_gamification_section(
+            current_round=current_round_number,
+            max_rounds=max_rounds,
+            min_useful=min_useful,
+            mae=current_mae,
+            rounds=all_rounds,
+            locale=locale,
+            is_last_round=is_last_round,
         ),
         html.Div(
             subject_info_line,
@@ -2540,22 +2973,18 @@ def create_final_layout(full_df_data: Optional[Dict], user_info: Dict[str, Any],
         }),
         html.Div(
             [
+                html.I(className="close icon"),
                 html.P(t("ui.results_disclaimer.line1", locale=locale), id='final-disclaimer-line1', style={'margin': '0'}),
                 html.P(t("ui.results_disclaimer.line2", locale=locale), id='final-disclaimer-line2', style={'margin': '0'}),
                 html.P(t("ui.results_disclaimer.line3", locale=locale), id='final-disclaimer-line3', style={'margin': '0'}),
             ],
+            className='ui warning message',
             disable_n_clicks=True,
             style={
                 'maxWidth': '900px',
                 'margin': '0 auto 15px auto',
-                'padding': '12px 16px',
-                'backgroundColor': '#fff7ed',
-                'border': '1px solid #fdba74',
-                'borderRadius': '10px',
-                'color': '#7c2d12',
                 'fontSize': '14px',
                 'lineHeight': '1.4',
-                'boxSizing': 'border-box',
             },
         ),
         html.Div(
@@ -4971,6 +5400,22 @@ def _ensure_chrome() -> None:
             kaleido.get_chrome_sync()
 
 
+import socket as _socket
+
+
+def _find_free_port(host: str, preferred: int, max_tries: int = 20) -> int:
+    """Return *preferred* if available, otherwise increment until a free port is found."""
+    for offset in range(max_tries):
+        candidate = preferred + offset
+        try:
+            with _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM) as s:
+                s.bind((host, candidate))
+                return candidate
+        except OSError:
+            continue
+    return preferred
+
+
 # Create typer app.  invoke_without_command + the @cli.callback default
 # mean ``uv run start`` (no subcommand) still works, while ``uv run chart``
 # routes to the ``chart`` subcommand via its own entrypoint.
@@ -5003,7 +5448,7 @@ def main(
     _ensure_chrome()
 
     dash_host = DASH_HOST if host is None else (host or DASH_HOST)
-    dash_port = DASH_PORT if port is None else port
+    dash_port = _find_free_port(dash_host, DASH_PORT if port is None else port)
     dash_debug = DASH_DEBUG if debug is None else debug
     if debug is not None:
         sugar_sugar_config.DEBUG_MODE = debug
@@ -5029,6 +5474,7 @@ def chart(
     locale: str = typer.Option("en", "--locale", "-l", help="UI locale (en, de, uk, ro)"),
     prefill: bool = typer.Option(False, "--prefill", help="Pre-fill predictions with noisy ground truth so submit/ending can be tested immediately"),
     noise: float = typer.Option(0.05, "--noise", help="Noise level for --prefill (fraction of gl value, e.g. 0.05 = +/-5%%)"),
+    clean: bool = typer.Option(False, "--clean", help="Clear browser localStorage on first connect so the session starts fresh"),
     host: Optional[str] = typer.Option(None, "--host", help="Host to run the server on"),
     port: Optional[int] = typer.Option(None, "--port", help="Port to run the server on"),
 ) -> None:
@@ -5057,19 +5503,75 @@ def chart(
         os.environ["_CHART_PREFILL"] = "1"
         os.environ["_CHART_NOISE"] = str(noise)
 
+    if clean:
+        os.environ["_CLEAN_STORAGE"] = "1"
+        for child in app.layout.children:
+            if getattr(child, 'id', None) == 'clean-storage-flag':
+                child.data = True
+                break
+
     sugar_sugar_config.DEBUG_MODE = True
 
     _ensure_chrome()
     _register_all_callbacks()
 
     dash_host = DASH_HOST if host is None else (host or DASH_HOST)
-    dash_port = DASH_PORT if port is None else port
+    dash_port = _find_free_port(dash_host, DASH_PORT if port is None else port)
 
     with start_action(
         action_type=u"start_chart_dev",
         file=str(file) if file else "example.csv",
         points=points,
         prefill=prefill,
+        host=dash_host,
+        port=dash_port,
+    ):
+        app.run(host=dash_host, port=dash_port, debug=True)
+
+
+@cli.command()
+def share(
+    file: Optional[Path] = typer.Option(None, "--file", "-f", help="CSV file to load. Default: built-in example."),
+    rounds: int = typer.Option(SHARE_ROUNDS, "--rounds", "-r", help="Number of fake rounds to generate"),
+    formats: str = typer.Option(SHARE_FORMATS, "--formats", help="Comma-separated format letters to cycle through (e.g. 'A,B,C')"),
+    noise: float = typer.Option(SHARE_NOISE, "--noise", help="Max noise at last prediction step (fraction, e.g. 0.30 = +/-30%%)"),
+    points: int = typer.Option(DEFAULT_POINTS, "--points", "-p", help="Number of data points per window"),
+    locale: str = typer.Option("en", "--locale", "-l", help="UI locale (en, de, uk, ro)"),
+    name: str = typer.Option(SHARE_NAME, "--name", "-n", help="Player name shown on the share card"),
+    host: Optional[str] = typer.Option(None, "--host", help="Host to run the server on"),
+    port: Optional[int] = typer.Option(None, "--port", help="Port to run the server on"),
+) -> None:
+    """Dev shortcut: generate fake multi-round data and open the share page.
+
+    Bypasses the entire game flow.  Generates N rounds of noisy predictions
+    from the example data (or a custom CSV), saves a share record to disk,
+    and starts Dash at /share/<id> so you can iterate on the share page
+    layout, card rendering, and social-sharing flow.
+    """
+    os.environ["_SHARE_MODE"] = "1"
+    os.environ["_SHARE_ROUNDS"] = str(max(1, rounds))
+    os.environ["_SHARE_FORMATS"] = formats
+    os.environ["_SHARE_NOISE"] = str(noise)
+    os.environ["_SHARE_LOCALE"] = normalize_locale(locale)
+    os.environ["_SHARE_NAME"] = name
+    os.environ["_SHARE_SOURCE"] = file.name if file else "example.csv"
+    os.environ["_CHART_POINTS"] = str(points)
+    if file:
+        os.environ["_CHART_FILE"] = str(file)
+
+    sugar_sugar_config.DEBUG_MODE = True
+
+    _ensure_chrome()
+    _register_all_callbacks()
+
+    dash_host = DASH_HOST if host is None else (host or DASH_HOST)
+    dash_port = _find_free_port(dash_host, DASH_PORT if port is None else port)
+
+    with start_action(
+        action_type=u"start_share_dev",
+        rounds=rounds,
+        formats=formats,
+        noise=noise,
         host=dash_host,
         port=dash_port,
     ):
@@ -5084,6 +5586,11 @@ def cli_main() -> None:
 def chart_main() -> None:
     """CLI entry point that defaults to the ``chart`` command."""
     cli(["chart"] + sys.argv[1:])
+
+
+def share_main() -> None:
+    """CLI entry point that defaults to the ``share`` command."""
+    cli(["share"] + sys.argv[1:])
 
 
 def setup_chrome_main() -> None:
