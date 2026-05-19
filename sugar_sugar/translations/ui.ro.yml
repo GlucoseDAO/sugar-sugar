@@ -330,30 +330,30 @@ ro:
     local_storage_note: "Progresul tău este salvat local în acest browser. Poți lua o pauză și relua mai târziu folosind același browser."
     reaction:
       excellent:
-        - "Precizie la nivel de senzor — date ca acestea chiar avansează cercetarea."
+        - "Precizie la nivel de senzor — date ca acestea chiar avansează cercetarea!"
         - "Ai citit curba ca un profesionist. Precizie rară, contribuție valoroasă."
-        - "Aproape perfect. Această rundă este un punct de date puternic pentru studiu."
+        - "Aproape perfect! Această rundă este un punct de date puternic pentru studiu."
         - "Exact pe țintă — exact ceea ce are nevoie cercetarea."
       good:
-        - "Citire bună — încă un punct de date solid pentru studiu."
+        - "Citire bună — încă un punct de date solid pentru studiu!"
         - "Ai prins tendința bine. Asta consolidează setul de date."
-        - "Predicție solidă — instinctul tău contribuie cu semnal real."
+        - "Predicție solidă! Instinctul tău contribuie cu semnal real."
         - "Bună treabă. Runde constante ca aceasta fac analiza mai fiabilă."
       average:
         - "Nu e rău — curbă dificilă. Încercarea ta adaugă totuși semnal la studiu."
-        - "Citire rezonabilă. Chiar și predicțiile imperfecte ajută la cartografierea intuiției umane."
+        - "Citire rezonabilă! Chiar și predicțiile imperfecte ajută la cartografierea intuiției umane."
         - "Estimare corectă. Cercetarea beneficiază și de cazurile dificile."
         - "Efort decent — studiul măsoară intuiția, nu perfecțiunea."
       keep_practicing:
         - "Fereastră dificilă. Cazurile dificile sunt deosebit de informative pentru cercetare."
         - "Greu de anticipat — segmentele cu variabilitate mare ne învață cel mai mult."
-        - "Chiar și experții ratează acestea. Exact asta măsoară studiul."
+        - "Chiar și experții ratează acestea! Exact asta măsoară studiul."
         - "Nu-ți face griji — acolo unde oamenii se chinuie, acolo învață știința."
     milestone:
-      first_round: "Prima rundă completată — contribui la cercetare."
-      minimum_reached: "Minimul atins — datele tale sunt utile științific. Rundele suplimentare le fac mai puternice."
-      all_complete: "Toate rundele completate — mulțumim pentru un set complet de date."
-    personal_best: "Cea mai bună rundă a ta până acum."
+      first_round: "Prima rundă completată — contribui la cercetare!"
+      minimum_reached: "Minimul atins! Datele tale sunt utile științific. Rundele suplimentare le fac mai puternice."
+      all_complete: "Toate rundele completate — mulțumim pentru un set complet de date!"
+    personal_best: "Cea mai bună rundă a ta până acum!"
     progress:
       minimum_goal: "Minim: %{min_useful}"
       stretch_goal: "Extins: %{total}"
@@ -379,7 +379,7 @@ ro:
   results_disclaimer:
     line1: "Aceste rezultate sunt exclusiv în scop de cercetare"
     line2: "Indiferent de rezultate, nu schimba nicio decizie medicală pe baza acestei aplicații"
-    line3: "Urmează întotdeauna recomandările furnizorului tău de servicii medicale"
+    line3: "Consultă întotdeauna medicul tău înainte de a lua decizii medicale"
 
   faq:
     title: "Întrebări frecvente"

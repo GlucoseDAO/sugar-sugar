@@ -825,7 +825,7 @@ app.layout = html.Div([
     dcc.Store(id='is-example-data', data=_chart_is_example, storage_type=STORAGE_TYPE),
     dcc.Store(id='data-source-name', data=_chart_source if _is_chart_mode else "example.csv", storage_type=STORAGE_TYPE),
     dcc.Store(id='randomization-initialized', data=_is_chart_mode, storage_type=STORAGE_TYPE),
-    dcc.Store(id='glucose-chart-mode', data={'hide_last_hour': True}, storage_type=STORAGE_TYPE),
+    dcc.Store(id='glucose-chart-mode', data={'hide_last_hour': True}, storage_type='memory'),
     dcc.Store(id='glucose-unit', data=_chart_unit if _is_chart_mode else 'mg/dL', storage_type=STORAGE_TYPE),
     dcc.Store(id='interface-language', data=_chart_locale if _is_chart_mode else 'en', storage_type=STORAGE_TYPE),
     dcc.Store(id='user-agent', data=None, storage_type=STORAGE_TYPE),
@@ -1187,7 +1187,6 @@ def update_prediction_text_on_language_change(
      Output('ending-disclaimer-line2', 'children'),
      Output('ending-disclaimer-line3', 'children'),
      Output('ending-round-info', 'children'),
-     Output('ending-round-motivation', 'children'),
      Output('ending-gamification', 'children'),
      Output('ending-units-line', 'children'),
      Output('ending-graph-explanation', 'children'),
@@ -1273,7 +1272,6 @@ def update_ending_text_on_language_change(
         t("ui.results_disclaimer.line2", locale=locale),
         t("ui.results_disclaimer.line3", locale=locale),
         t("ui.common.round_of", locale=locale, current=current_round_number, total=max_rounds),
-        t("ui.ending.round_motivation", locale=locale, total=max_rounds, min_useful=min_useful),
         _build_gamification_section(
             current_round=current_round_number,
             max_rounds=max_rounds,
@@ -1281,6 +1279,7 @@ def update_ending_text_on_language_change(
             mae=current_mae,
             rounds=all_rounds,
             locale=locale,
+            is_last_round=is_last_round,
         ).children,
         t("ui.ending.units_line", locale=locale, unit=unit),
         t("ui.ending.graph_explanation", locale=locale),
@@ -2053,12 +2052,12 @@ def _build_progress_bar(current_round: int, max_rounds: int, min_useful: int, lo
         else:
             bg = "#e0e0e0" if is_min_phase else "#f5f0e0"
         border_right = "2px solid white" if i < max_rounds else "none"
-        border_left = "2px solid #888" if i == min_useful + 1 else "none"
+        border_left = "3px solid #888" if i == min_useful + 1 else "none"
         segments.append(html.Div(
             disable_n_clicks=True,
             style={
                 "flex": "1",
-                "height": "14px",
+                "height": "22px",
                 "backgroundColor": bg,
                 "borderRight": border_right,
                 "borderLeft": border_left,
@@ -2069,16 +2068,16 @@ def _build_progress_bar(current_round: int, max_rounds: int, min_useful: int, lo
     labels = html.Div([
         html.Span(
             t("ui.ending.progress.minimum_goal", locale=locale, min_useful=min_useful),
-            style={"fontSize": "11px", "color": "#4a5568"},
+            style={"fontSize": "13px", "color": "#4a5568", "fontWeight": "600"},
         ),
         html.Span(
             t("ui.ending.progress.stretch_goal", locale=locale, total=max_rounds),
-            style={"fontSize": "11px", "color": "#9e7c16"},
+            style={"fontSize": "13px", "color": "#9e7c16", "fontWeight": "600"},
         ),
     ], disable_n_clicks=True, style={
         "display": "flex",
         "justifyContent": "space-between",
-        "marginTop": "2px",
+        "marginTop": "4px",
     })
 
     return html.Div([
@@ -2087,15 +2086,16 @@ def _build_progress_bar(current_round: int, max_rounds: int, min_useful: int, lo
             disable_n_clicks=True,
             style={
                 "display": "flex",
-                "borderRadius": "7px",
+                "borderRadius": "10px",
                 "overflow": "hidden",
-                "border": "1px solid #ccc",
+                "border": "1px solid #bbb",
+                "boxShadow": "inset 0 1px 3px rgba(0,0,0,0.15)",
             },
         ),
         labels,
     ], id="ending-progress-bar", disable_n_clicks=True, style={
-        "maxWidth": "500px",
-        "margin": "8px auto 4px auto",
+        "maxWidth": "550px",
+        "margin": "0 auto 10px auto",
     })
 
 
@@ -2106,8 +2106,10 @@ def _build_gamification_section(
     mae: Optional[float],
     rounds: list[dict[str, Any]],
     locale: str,
+    *,
+    is_last_round: bool = False,
 ) -> html.Div:
-    """Assemble progress bar, reaction line, milestone, and personal-best callout."""
+    """Assemble progress bar, reaction line, milestone, motivation inside one card."""
     children: list[Any] = []
 
     children.append(_build_progress_bar(current_round, max_rounds, min_useful, locale))
@@ -2120,11 +2122,19 @@ def _build_gamification_section(
         reaction_parts.append(html.Span(reaction, id="ending-reaction-text"))
     if personal_best:
         if reaction_parts:
-            reaction_parts.append(" — ")
+            reaction_parts.append("  ")
         reaction_parts.append(html.Span(
             t("ui.ending.personal_best", locale=locale),
             id="ending-personal-best",
-            style={"fontWeight": "bold", "color": "#D4A017"},
+            style={
+                "fontWeight": "bold",
+                "color": "#b8860b",
+                "backgroundColor": "#fff8e1",
+                "padding": "2px 10px",
+                "borderRadius": "12px",
+                "border": "1px solid #f0d060",
+                "fontSize": "clamp(14px, 2vw, 17px)",
+            },
         ))
     if not reaction_parts:
         reaction_parts.append(html.Span("", id="ending-reaction-text"))
@@ -2136,10 +2146,12 @@ def _build_gamification_section(
         disable_n_clicks=True,
         style={
             "textAlign": "center",
-            "fontSize": "15px",
+            "fontSize": "clamp(16px, 2.2vw, 20px)",
             "color": "#2c5282",
-            "marginBottom": "2px",
-            "minHeight": "22px",
+            "fontWeight": "500",
+            "marginBottom": "6px",
+            "minHeight": "28px",
+            "lineHeight": "1.5",
         },
     ))
 
@@ -2150,16 +2162,38 @@ def _build_gamification_section(
         disable_n_clicks=True,
         style={
             "textAlign": "center",
-            "fontSize": "13px",
-            "color": "#2d6a4f",
-            "fontWeight": "600",
+            "fontSize": "clamp(15px, 2vw, 18px)",
+            "color": "#1b5e20",
+            "fontWeight": "700",
             "marginBottom": "4px",
-            "minHeight": "20px",
+            "minHeight": "24px",
             "display": "block" if milestone else "none",
         },
     ))
 
-    return html.Div(children, id="ending-gamification", disable_n_clicks=True)
+    children.append(html.Div(
+        t("ui.ending.round_motivation", locale=locale, total=max_rounds, min_useful=min_useful),
+        id='ending-round-motivation',
+        disable_n_clicks=True,
+        style={
+            'textAlign': 'center',
+            'color': '#4a5568',
+            'fontSize': '13px',
+            'fontStyle': 'italic',
+            'marginTop': '6px',
+            'display': 'none' if is_last_round else 'block',
+        }
+    ))
+
+    return html.Div(children, id="ending-gamification", disable_n_clicks=True, style={
+        "maxWidth": "900px",
+        "margin": "10px auto 12px auto",
+        "padding": "16px 24px 12px 24px",
+        "backgroundColor": "#f0f7ff",
+        "borderRadius": "12px",
+        "border": "1px solid #c5d9f0",
+        "boxShadow": "0 2px 8px rgba(0,0,0,0.06)",
+    })
 
 
 def create_ending_layout(
@@ -2331,22 +2365,18 @@ def create_ending_layout(
         }),
         html.Div(
             [
+                html.I(className="close icon"),
                 html.P(t("ui.results_disclaimer.line1", locale=locale), id='ending-disclaimer-line1', style={'margin': '0'}),
                 html.P(t("ui.results_disclaimer.line2", locale=locale), id='ending-disclaimer-line2', style={'margin': '0'}),
                 html.P(t("ui.results_disclaimer.line3", locale=locale), id='ending-disclaimer-line3', style={'margin': '0'}),
             ],
+            className='ui warning message',
             disable_n_clicks=True,
             style={
                 'maxWidth': '900px',
                 'margin': '0 auto 15px auto',
-                'padding': '12px 16px',
-                'backgroundColor': '#fff7ed',
-                'border': '1px solid #fdba74',
-                'borderRadius': '10px',
-                'color': '#7c2d12',
                 'fontSize': '14px',
                 'lineHeight': '1.4',
-                'boxSizing': 'border-box',
             },
         ),
         html.Div(
@@ -2368,19 +2398,7 @@ def create_ending_layout(
             mae=current_mae,
             rounds=all_rounds,
             locale=locale,
-        ),
-        html.Div(
-            t("ui.ending.round_motivation", locale=locale, total=max_rounds, min_useful=min_useful),
-            id='ending-round-motivation',
-            disable_n_clicks=True,
-            style={
-                'textAlign': 'center',
-                'marginBottom': '5px',
-                'color': '#4a5568',
-                'fontSize': '13px',
-                'fontStyle': 'italic',
-                'display': 'none' if is_last_round else 'block',
-            }
+            is_last_round=is_last_round,
         ),
         html.Div(
             subject_info_line,
@@ -2917,22 +2935,18 @@ def create_final_layout(full_df_data: Optional[Dict], user_info: Dict[str, Any],
         }),
         html.Div(
             [
+                html.I(className="close icon"),
                 html.P(t("ui.results_disclaimer.line1", locale=locale), id='final-disclaimer-line1', style={'margin': '0'}),
                 html.P(t("ui.results_disclaimer.line2", locale=locale), id='final-disclaimer-line2', style={'margin': '0'}),
                 html.P(t("ui.results_disclaimer.line3", locale=locale), id='final-disclaimer-line3', style={'margin': '0'}),
             ],
+            className='ui warning message',
             disable_n_clicks=True,
             style={
                 'maxWidth': '900px',
                 'margin': '0 auto 15px auto',
-                'padding': '12px 16px',
-                'backgroundColor': '#fff7ed',
-                'border': '1px solid #fdba74',
-                'borderRadius': '10px',
-                'color': '#7c2d12',
                 'fontSize': '14px',
                 'lineHeight': '1.4',
-                'boxSizing': 'border-box',
             },
         ),
         html.Div(
@@ -5406,6 +5420,7 @@ def chart(
     locale: str = typer.Option("en", "--locale", "-l", help="UI locale (en, de, uk, ro)"),
     prefill: bool = typer.Option(False, "--prefill", help="Pre-fill predictions with noisy ground truth so submit/ending can be tested immediately"),
     noise: float = typer.Option(0.05, "--noise", help="Noise level for --prefill (fraction of gl value, e.g. 0.05 = +/-5%%)"),
+    clean: bool = typer.Option(False, "--clean", help="Clear browser localStorage on first connect so the session starts fresh"),
     host: Optional[str] = typer.Option(None, "--host", help="Host to run the server on"),
     port: Optional[int] = typer.Option(None, "--port", help="Port to run the server on"),
 ) -> None:
@@ -5433,6 +5448,13 @@ def chart(
     if prefill:
         os.environ["_CHART_PREFILL"] = "1"
         os.environ["_CHART_NOISE"] = str(noise)
+
+    if clean:
+        os.environ["_CLEAN_STORAGE"] = "1"
+        for child in app.layout.children:
+            if getattr(child, 'id', None) == 'clean-storage-flag':
+                child.data = True
+                break
 
     sugar_sugar_config.DEBUG_MODE = True
 

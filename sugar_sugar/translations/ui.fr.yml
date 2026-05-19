@@ -329,30 +329,30 @@ fr:
     local_storage_note: "Votre progression est enregistrée localement dans ce navigateur. Vous pouvez faire une pause et reprendre plus tard en utilisant le même navigateur."
     reaction:
       excellent:
-        - "Précision au niveau du capteur — des données comme celles-ci font vraiment avancer la recherche."
+        - "Précision au niveau du capteur — des données comme celles-ci font vraiment avancer la recherche!"
         - "Vous avez lu cette courbe comme un pro. Précision rare, contribution précieuse."
-        - "Presque parfait. Cette manche est un point de données solide pour l'étude."
+        - "Presque parfait! Cette manche est un point de données solide pour l'étude."
         - "En plein dans le mille — exactement ce dont la recherche a besoin."
       good:
-        - "Bonne lecture — encore un point de données solide pour l'étude."
+        - "Bonne lecture — encore un point de données solide pour l'étude!"
         - "Vous avez bien saisi la tendance. Cela renforce le jeu de données."
-        - "Prédiction solide — votre instinct apporte un vrai signal."
+        - "Prédiction solide! Votre instinct apporte un vrai signal."
         - "Beau travail. Des manches régulières comme celle-ci rendent l'analyse plus fiable."
       average:
         - "Pas mal — courbe difficile. Votre tentative ajoute quand même du signal à l'étude."
-        - "Lecture raisonnable. Même les prédictions imparfaites aident à cartographier l'intuition humaine."
+        - "Lecture raisonnable! Même les prédictions imparfaites aident à cartographier l'intuition humaine."
         - "Estimation correcte. La recherche bénéficie aussi des cas difficiles."
         - "Effort honnête — l'étude mesure l'intuition, pas la perfection."
       keep_practicing:
         - "Fenêtre difficile. Les cas compliqués sont particulièrement instructifs pour la recherche."
         - "Difficile à prévoir — les segments à forte variance nous apprennent le plus."
-        - "Même les experts se trompent sur ceux-ci. C'est exactement ce que l'étude mesure."
+        - "Même les experts se trompent sur ceux-ci! C'est exactement ce que l'étude mesure."
         - "Ne vous en faites pas — là où les humains peinent, c'est là que la science progresse."
     milestone:
-      first_round: "Première manche terminée — vous contribuez à la recherche."
-      minimum_reached: "Minimum atteint — vos données sont scientifiquement utiles. Des manches supplémentaires les renforcent."
-      all_complete: "Toutes les manches terminées — merci pour un jeu de données complet."
-    personal_best: "Votre meilleure manche jusqu'ici."
+      first_round: "Première manche terminée — vous contribuez à la recherche!"
+      minimum_reached: "Minimum atteint! Vos données sont scientifiquement utiles. Des manches supplémentaires les renforcent."
+      all_complete: "Toutes les manches terminées — merci pour un jeu de données complet!"
+    personal_best: "Votre meilleure manche jusqu'ici!"
     progress:
       minimum_goal: "Minimum : %{min_useful}"
       stretch_goal: "Objectif : %{total}"
@@ -378,7 +378,7 @@ fr:
   results_disclaimer:
     line1: "Ces scores sont uniquement à des fins de recherche"
     line2: "Quels que soient vos résultats, ne changez aucune décision médicale sur la base de cette application"
-    line3: "Suivez toujours les conseils de votre professionnel de santé"
+    line3: "Consultez toujours votre médecin avant de prendre des décisions médicales"
 
   faq:
     title: "Foire Aux Questions (FAQ)"
