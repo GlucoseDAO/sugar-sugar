@@ -196,7 +196,7 @@ en:
   share:
     button_share: "Share my results"
     title: "My Sugar Sugar results"
-    subtitle: "Can you read glucose better than me? Try it!"
+    subtitle: "Can you predict glucose better than me? Try it!"
     download_png: "Download image"
     download_png_hint: "Save the card as PNG, perfect for Instagram stories."
     generated_at: "Generated"
@@ -235,15 +235,15 @@ en:
     encouragement:
       excellent:
         lines:
-          - "I nailed the next hour's glucose — %{rounds} rounds and still reading it like a sensor. Your move."
+          - "I nailed the next hour's glucose — %{rounds} rounds and still predicting like a sensor. Your move."
           - "Caught every curve across %{rounds} rounds. Think you can keep up? Hit play."
-          - "%{rounds} rounds of near-perfect reads. Bet you cannot match this on your first try."
+          - "%{rounds} rounds of near-perfect predictions. Bet you cannot match this on your first try."
           - "This is what %{rounds} rounds of clean predictions looks like. Show me yours."
       good:
         lines:
           - "Solid run — %{rounds} rounds and my predictions kept landing close. Can you land closer?"
           - "Sharp enough to hold the line for %{rounds} rounds. Your turn — prove me wrong."
-          - "%{rounds} rounds, steady reads. Think your glucose instincts are better? Show me."
+          - "%{rounds} rounds, steady predictions. Think your glucose instincts are better? Show me."
           - "%{rounds} rounds and I am still tracking the curve. Who is topping this first?"
       average:
         lines:
@@ -253,10 +253,10 @@ en:
           - "Started climbing the ranking in %{rounds} rounds. Care to join me at the top?"
       keep_practicing:
         lines:
-          - "Glucose is humbling. %{rounds} rounds done — see if you can read it better than I did."
+          - "Glucose is humbling. %{rounds} rounds done — see if you can predict it better than I did."
           - "%{rounds} rounds in, still learning the curve. Your turn to try."
           - "Harder than it looks, right? %{rounds} rounds of honest attempts. Beat me. I dare you."
-          - "%{rounds} rounds and the line keeps winning. Think you read it better? Show me."
+          - "%{rounds} rounds and the line keeps winning. Think you can predict it better? Show me."
     synthesis:
       title: "Next hour prediction error"
       x_axis: "Time (minutes from the start of the hidden next hour; every 5-min step)"
@@ -323,22 +323,23 @@ en:
     view_complete_analysis: "View complete analysis"
     graph_explanation: "The chart shows the glucose window you predicted on. The orange dashed line separates the known history (left) from the hour you predicted (right). Your predictions are shown in red."
     data_source_label: "Data source: %{source}"
+    sensor_label: "Sensor"
     round_motivation: "You can stop any time, but completing all %{total} rounds gives the best data. At least %{min_useful} rounds are needed for useful results — every extra round helps!"
     local_storage_note: "Your progress is saved locally in this browser. You can take a break and resume later using the same browser."
     reaction:
       excellent:
         - "Sensor-level accuracy — data like this really moves the research forward!"
-        - "You read that curve like a pro. Rare precision, valuable contribution."
+        - "You predicted that curve like a pro. Rare precision, valuable contribution."
         - "Nearly perfect! This round is a strong data point for the study."
         - "Right on target — exactly what the research needs."
       good:
-        - "Good read — another solid data point for the study!"
+        - "Good prediction — another solid data point for the study!"
         - "You caught the trend well. This strengthens the dataset."
         - "Solid prediction! Your instinct is contributing real signal."
         - "Nice work. Consistent rounds like this make the analysis more reliable."
       average:
         - "Not bad — tricky curve. Your attempt still adds signal to the study."
-        - "Reasonable read! Even imperfect predictions help map human intuition."
+        - "Reasonable attempt! Even imperfect predictions help map human intuition."
         - "Fair estimate. The research benefits from hard cases too."
         - "Decent effort — the study measures intuition, not perfection."
       keep_practicing:

@@ -566,7 +566,7 @@ def _download_study_pdf():
 #    Humans who hit this URL get redirected to the real Dash page.
 # ---------------------------------------------------------------------------
 
-_SHARE_PNG_CACHE: dict[str, bytes] = {}
+_SHARE_PNG_CACHE: dict[tuple[str, str], bytes] = {}
 
 _SOCIAL_CRAWLER_USER_AGENT_TOKENS: tuple[str, ...] = (
     "facebookexternalhit",
@@ -709,19 +709,20 @@ def _serve_share_og_to_social_crawlers() -> Optional[Any]:
 
 @server.route("/share/<share_id>/image.png")
 def _share_card_png(share_id: str) -> Any:
-    from flask import abort
+    from flask import abort, request as flask_req
     record = share_store.load_share(share_id)
     if record is None:
         abort(404)
-    cached: Optional[bytes] = _SHARE_PNG_CACHE.get(share_id)
+    locale: str = flask_req.args.get("lang") or str(record.get("locale") or "en")
+    cache_key = (share_id, locale)
+    cached: Optional[bytes] = _SHARE_PNG_CACHE.get(cache_key)
     if cached is None:
-        locale: str = str(record.get("locale") or "en")
         share_url: str = _build_share_url(share_id)
         fig = build_share_card_figure(
             record, share_url=share_url, locale=locale, seed=share_id,
         )
         cached = fig.to_image(format="png", width=1080, height=1080, scale=1, engine="kaleido")
-        _SHARE_PNG_CACHE[share_id] = cached
+        _SHARE_PNG_CACHE[cache_key] = cached
     response = flask_send_file(
         BytesIO(cached),
         mimetype="image/png",
@@ -2369,11 +2370,14 @@ def create_ending_layout(
             if gender_raw in ("male", "female", "na")
             else meta.gender
         )
-        subject_parts.append(
+        meta_line = (
             f"{t('ui.startup.age_label', locale=locale)}: {meta.age} · "
             f"{t('ui.startup.gender_label', locale=locale)}: {gender_display} · "
             f"{t('ui.header.weight_label', locale=locale)}: {meta.weight}"
         )
+        if meta.sensor:
+            meta_line += f" · {t('ui.ending.sensor_label', locale=locale)}: {meta.sensor}"
+        subject_parts.append(meta_line)
     elif user_info:
         age = user_info.get('age')
         gender_raw = str(user_info.get('gender') or "").strip().lower()
@@ -5396,6 +5400,22 @@ def _ensure_chrome() -> None:
             kaleido.get_chrome_sync()
 
 
+import socket as _socket
+
+
+def _find_free_port(host: str, preferred: int, max_tries: int = 20) -> int:
+    """Return *preferred* if available, otherwise increment until a free port is found."""
+    for offset in range(max_tries):
+        candidate = preferred + offset
+        try:
+            with _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM) as s:
+                s.bind((host, candidate))
+                return candidate
+        except OSError:
+            continue
+    return preferred
+
+
 # Create typer app.  invoke_without_command + the @cli.callback default
 # mean ``uv run start`` (no subcommand) still works, while ``uv run chart``
 # routes to the ``chart`` subcommand via its own entrypoint.
@@ -5428,7 +5448,7 @@ def main(
     _ensure_chrome()
 
     dash_host = DASH_HOST if host is None else (host or DASH_HOST)
-    dash_port = DASH_PORT if port is None else port
+    dash_port = _find_free_port(dash_host, DASH_PORT if port is None else port)
     dash_debug = DASH_DEBUG if debug is None else debug
     if debug is not None:
         sugar_sugar_config.DEBUG_MODE = debug
@@ -5496,7 +5516,7 @@ def chart(
     _register_all_callbacks()
 
     dash_host = DASH_HOST if host is None else (host or DASH_HOST)
-    dash_port = DASH_PORT if port is None else port
+    dash_port = _find_free_port(dash_host, DASH_PORT if port is None else port)
 
     with start_action(
         action_type=u"start_chart_dev",
@@ -5545,7 +5565,7 @@ def share(
     _register_all_callbacks()
 
     dash_host = DASH_HOST if host is None else (host or DASH_HOST)
-    dash_port = DASH_PORT if port is None else port
+    dash_port = _find_free_port(dash_host, DASH_PORT if port is None else port)
 
     with start_action(
         action_type=u"start_share_dev",

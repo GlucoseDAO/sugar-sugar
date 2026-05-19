@@ -198,7 +198,7 @@ es:
   share:
     button_share: "Compartir mis resultados"
     title: "Mis resultados de Sugar Sugar"
-    subtitle: "¿Puedes leer la glucosa mejor que yo? ¡Inténtalo!"
+    subtitle: "¿Puedes predecir la glucosa mejor que yo? ¡Inténtalo!"
     download_png: "Descargar imagen"
     download_png_hint: "Guarda la tarjeta como PNG, perfecta para las historias de Instagram."
     generated_at: "Generado"
@@ -237,10 +237,10 @@ es:
     encouragement:
       excellent:
         lines:
-          - "Lees la glucosa como un pro. %{rounds} rondas y siempre preciso. ¿Crees que me puedes ganar?"
+          - "Predices la glucosa como un pro. %{rounds} rondas y siempre preciso. ¿Crees que me puedes ganar?"
           - "Cada curva pillada en %{rounds} rondas. Tu muro es el próximo - dale a jugar y trata de superarlo."
           - "Instinto de patrones al máximo. %{rounds} rondas y sigo sin fallar. Te toca."
-          - "Así se ven %{rounds} rondas leyendo limpio. Apuesto que no aguantas el ritmo."
+          - "Así se ven %{rounds} rondas prediciendo limpio. Apuesto que no aguantas el ritmo."
       good:
         lines:
           - "Buen ritmo. %{rounds} rondas y mis predicciones cayeron cerca. ¿Puedes caer más cerca?"
@@ -255,10 +255,10 @@ es:
           - "Empecé a subir en la tabla en %{rounds} rondas. ¿Te animas a acompañarme arriba?"
       keep_practicing:
         lines:
-          - "La glucosa es humilde. %{rounds} rondas hechas - a ver si la lees mejor que yo."
+          - "La glucosa es humilde. %{rounds} rondas hechas - a ver si la predices mejor que yo."
           - "%{rounds} rondas, todavía aprendiendo la curva. Ahora tú."
           - "Más difícil de lo que parece, ¿eh? %{rounds} intentos honestos. Gáname. Te reto."
-          - "%{rounds} rondas y la línea sigue ganando. ¿Crees que la lees mejor? Enséñame."
+          - "%{rounds} rondas y la línea sigue ganando. ¿Crees que la predices mejor? Enséñame."
     synthesis:
       title: "Error de predicción en la próxima hora"
       x_axis: "Tiempo (minutos desde el inicio de la siguiente hora oculta; cada paso de 5 min)"
@@ -325,6 +325,7 @@ es:
     view_complete_analysis: "Ver análisis completo"
     graph_explanation: "El gráfico muestra la ventana de glucosa sobre la que hiciste predicciones. La línea naranja discontinua separa el historial conocido (izquierda) de la hora que predijiste (derecha). Tus predicciones se muestran en rojo."
     data_source_label: "Fuente de datos: %{source}"
+    sensor_label: "Sensor"
     round_motivation: "Puedes parar en cualquier momento, pero completar las %{total} rondas da los mejores datos. Se necesitan al menos %{min_useful} rondas para obtener resultados útiles. ¡Cada ronda extra ayuda!"
     local_storage_note: "Tu progreso se guarda localmente en este navegador. Puedes tomarte un descanso y reanudarlo más tarde usando el mismo navegador."
     reaction:
@@ -334,7 +335,7 @@ es:
         - "Casi perfecto! Esta ronda es un dato sólido para el estudio."
         - "Justo en el blanco — exactamente lo que la investigación necesita."
       good:
-        - "Buena lectura — otro dato sólido para el estudio!"
+        - "Buena predicción — otro dato sólido para el estudio!"
         - "Captaste bien la tendencia. Esto fortalece el conjunto de datos."
         - "Predicción sólida! Tu instinto está aportando señal real."
         - "Buen trabajo. Rondas consistentes como esta hacen el análisis más fiable."

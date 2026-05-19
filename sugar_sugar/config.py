@@ -42,10 +42,14 @@ UMAMI_DOMAINS: str = os.getenv("UMAMI_DOMAINS", "sugar-sugar.glucosedao.org").st
 UMAMI_HOST_URL: str = os.getenv("UMAMI_HOST_URL", "https://sugar-sugar.glucosedao.org/stats").strip()
 
 # Share-mode defaults (used by `uv run share` dev shortcut)
-SHARE_ROUNDS: int = int(os.getenv("SHARE_ROUNDS", "4"))
+SHARE_ROUNDS: int = int(os.getenv("SHARE_ROUNDS", str(MAX_ROUNDS)))
 SHARE_NOISE: float = float(os.getenv("SHARE_NOISE", "0.30"))
 SHARE_FORMATS: str = os.getenv("SHARE_FORMATS", "A")
 SHARE_NAME: str = os.getenv("SHARE_NAME", "Dev Tester")
+
+# Round labels on the synthesis chart: "single" (only when one format),
+# "none" (never), "all" (always show, even with multiple formats).
+SHARE_ROUND_LABELS: str = os.getenv("SHARE_ROUND_LABELS", "single").strip().lower()
 
 # Application debug (e.g. test button); startup reads this dynamically after CLI may update it
 DEBUG_MODE: bool = _env_bool("DEBUG_MODE", "false")

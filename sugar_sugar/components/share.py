@@ -43,7 +43,7 @@ import plotly.graph_objects as go
 import segno
 from plotly.subplots import make_subplots
 from dash import dcc, html
-from sugar_sugar.config import PREDICTION_HOUR_OFFSET
+from sugar_sugar.config import PREDICTION_HOUR_OFFSET, SHARE_ROUND_LABELS
 from sugar_sugar.encouragement import encouragement_text
 from sugar_sugar.i18n import normalize_locale, t
 
@@ -68,8 +68,8 @@ _RGB3 = tuple[int, int, int]
 
 _PALETTE_SINGLE: tuple[_RGB3, _RGB3] = ((34, 139, 34), (220, 60, 20))
 _PALETTE_MULTI: dict[str, tuple[_RGB3, _RGB3]] = {
-    "A": ((21, 101, 192), (170, 175, 185)),
-    "B": ((234, 88, 12), (185, 170, 160)),
+    "A": ((33, 145, 140), (230, 175, 30)),
+    "B": ((148, 35, 141), (220, 200, 40)),
     "C": ((34, 139, 34), (220, 60, 20)),
 }
 _DEFAULT_PALETTE: tuple[_RGB3, _RGB3] = _PALETTE_SINGLE
@@ -164,13 +164,18 @@ def _round_sort_key(ri: dict[str, Any]) -> tuple[int, int]:
     return (n, id(ri))
 
 
+_SENSOR_MARD_PCT: float = 15.0
+
+
 def _t_error(
     abs_mag: float, ref_max: float, *, gamma: float = _DESAT_GAMMA
 ) -> float:
-    """0 = perfect (good colour), 1 = worst (bad colour), scaled by this subplot's range."""
-    if ref_max < 1e-12:
+    """0 = good colour, 1 = bad colour.  Errors within sensor MARD stay at 0."""
+    pct: float = abs(float(abs_mag))
+    if pct <= _SENSOR_MARD_PCT:
         return 0.0
-    t_lin: float = min(1.0, abs(float(abs_mag)) / ref_max)
+    effective_max: float = max(ref_max, _SENSOR_MARD_PCT + 1e-12)
+    t_lin: float = min(1.0, (pct - _SENSOR_MARD_PCT) / (effective_max - _SENSOR_MARD_PCT))
     return float(min(1.0, t_lin ** float(gamma)))
 
 
@@ -809,17 +814,22 @@ def build_synthesis_figure(
                     ),
                     row=row_idx, col=1,
                 )
-                lc0: str = m_col[0] if m_col else "rgba(100,100,100,0.7)"
-                fig.add_annotation(
-                    x=m_x[0], y=m_y[0],
-                    text=f"r{rn3}",
-                    showarrow=False,
-                    font=dict(size=8, color=lc0),
-                    xanchor="right", yanchor="bottom",
-                    xshift=-4, yshift=3,
-                    opacity=0.7,
-                    row=row_idx, col=1,
+                _show_label: bool = (
+                    SHARE_ROUND_LABELS == "all"
+                    or (SHARE_ROUND_LABELS == "single" and n_fmt <= 1)
                 )
+                if _show_label:
+                    lc_last: str = m_col[-1] if m_col else "rgba(100,100,100,0.7)"
+                    fig.add_annotation(
+                        x=m_x[-1], y=m_y[-1],
+                        text=f"r{rn3}",
+                        showarrow=False,
+                        font=dict(size=8, color=lc_last),
+                        xanchor="left", yanchor="bottom",
+                        xshift=4, yshift=3,
+                        opacity=0.7,
+                        row=row_idx, col=1,
+                    )
 
     x_title: str = t("ui.share.synthesis.x_axis_time", locale=loc)
     y_name: str = t("ui.share.synthesis.y_axis_short", locale=loc)
@@ -1007,26 +1017,38 @@ def build_share_card_figure(
     leg_var: str = t("ui.share.synthesis.legend_variability", locale=loc)
     # Paper y: 0=bottom, 1=top. Traces use [_CARD_TRACE_Y0, _CARD_TRACE_Y1] only.
     y_legend: float = 0.755
-    y_stats: float
-    y_quote: float
     if name:
-        y_stats = 0.878
-        y_quote = 0.812
+        y_stats_base: float = 0.878
+        y_quote_base: float = 0.812
     else:
-        y_stats = 0.898
-        y_quote = 0.832
+        y_stats_base = 0.898
+        y_quote_base = 0.832
 
+    headline: str = t("ui.share.subtitle", locale=loc)
+    _MAX_HEADLINE_LINE = 36
+    headline_wrapped: bool = False
+    if len(headline) > _MAX_HEADLINE_LINE:
+        q_idx: int = headline.find("?")
+        if q_idx != -1 and q_idx < len(headline) - 1:
+            headline = headline[: q_idx + 1] + "<br>" + headline[q_idx + 1 :].lstrip()
+        else:
+            mid: int = len(headline) // 2
+            sp: int = headline.rfind(" ", 0, mid + 8)
+            if sp > 0:
+                headline = headline[:sp] + "<br>" + headline[sp + 1 :]
+        headline_wrapped = True
+    dy: float = 0.030 if headline_wrapped else 0.0
     fig.add_annotation(
         xref="paper", yref="paper",
         x=0.5, y=0.993,
         xanchor="center", yanchor="top",
-        text=f"<b>{t('ui.share.subtitle', locale=loc)}</b>",
+        text=f"<b>{headline}</b>",
         showarrow=False,
-        font=dict(size=40, color="rgba(15,23,42,1)"),
+        font=dict(size=36, color="rgba(15,23,42,1)"),
     )
     fig.add_annotation(
         xref="paper", yref="paper",
-        x=0.5, y=0.938,
+        x=0.5, y=0.938 - dy,
         xanchor="center", yanchor="top",
         text=t("ui.share.title", locale=loc),
         showarrow=False,
@@ -1035,7 +1057,7 @@ def build_share_card_figure(
     if name:
         fig.add_annotation(
             xref="paper", yref="paper",
-            x=0.5, y=0.918,
+            x=0.5, y=0.918 - dy,
             xanchor="center", yanchor="top",
             text=name,
             showarrow=False,
@@ -1054,7 +1076,7 @@ def build_share_card_figure(
     stats_line: str = "   \u2022   ".join(parts)
     fig.add_annotation(
         xref="paper", yref="paper",
-        x=0.5, y=y_stats,
+        x=0.5, y=y_stats_base - dy,
         xanchor="center", yanchor="top",
         text=stats_line,
         showarrow=False,
@@ -1062,7 +1084,7 @@ def build_share_card_figure(
     )
     fig.add_annotation(
         xref="paper", yref="paper",
-        x=0.5, y=y_quote,
+        x=0.5, y=y_quote_base - dy,
         xanchor="center", yanchor="top",
         text=f"<i>{encourage}</i>",
         showarrow=False,
@@ -1590,7 +1612,7 @@ def create_share_layout(
         disable_n_clicks=True,
     )
 
-    download_href: str = f"/share/{share_id}/image.png"
+    download_href: str = f"/share/{share_id}/image.png?lang={loc}"
 
     action_buttons: html.Div = html.Div(
         [

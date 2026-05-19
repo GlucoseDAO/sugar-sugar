@@ -198,7 +198,7 @@ fr:
   share:
     button_share: "Partager mes résultats"
     title: "Mes résultats Sugar Sugar"
-    subtitle: "Sauras-tu lire la glycémie mieux que moi ? Essaie !"
+    subtitle: "Sauras-tu prédire la glycémie mieux que moi ? Essaie !"
     download_png: "Télécharger l'image"
     download_png_hint: "Enregistre la carte en PNG, parfait pour les stories Instagram."
     generated_at: "Généré"
@@ -237,10 +237,10 @@ fr:
     encouragement:
       excellent:
         lines:
-          - "Tu lis le sucre comme un pro. %{rounds} manches et toujours aussi précis. Tu crois pouvoir me battre ?"
+          - "Tu prédis le sucre comme un pro. %{rounds} manches et toujours aussi précis. Tu crois pouvoir me battre ?"
           - "Toutes les courbes attrapées sur %{rounds} manches. Ton fil est le prochain - lance-toi et essaie de me dépasser."
           - "Instinct des motifs, débloqué. %{rounds} manches et je rate toujours pas. À toi."
-          - "Voilà %{rounds} manches de lectures propres. Je parie que tu ne suis pas."
+          - "Voilà %{rounds} manches de prédictions propres. Je parie que tu ne suis pas."
       good:
         lines:
           - "Belle partie. %{rounds} manches et mes prédictions sont tombées proche. Tu peux tomber plus près ?"
@@ -255,10 +255,10 @@ fr:
           - "Je commence à grimper au classement en %{rounds} manches. Envie de me rejoindre en haut ?"
       keep_practicing:
         lines:
-          - "La glycémie rend humble. %{rounds} manches faites - à toi de la lire mieux que moi."
+          - "La glycémie rend humble. %{rounds} manches faites - à toi de la prédire mieux que moi."
           - "%{rounds} manches, j'apprends encore la courbe. À toi d'essayer."
           - "Plus dur que ça en a l'air, hein ? %{rounds} tentatives honnêtes. Bats-moi. Chiche."
-          - "%{rounds} manches et la ligne continue à gagner. Tu crois mieux lire ? Montre-moi."
+          - "%{rounds} manches et la ligne continue à gagner. Tu crois mieux prédire ? Montre-moi."
     synthesis:
       title: "Erreur de prédiction sur l’heure suivante"
       x_axis: "Temps (minutes depuis le début de l’heure masquée suivante — chaque pas de 5 min)"
@@ -325,16 +325,17 @@ fr:
     view_complete_analysis: "Voir l'analyse complète"
     graph_explanation: "Le graphique montre la fenêtre de glucose sur laquelle vous avez fait des prédictions. La ligne pointillée orange sépare l'historique connu (à gauche) de l'heure que vous avez prédite (à droite). Vos prédictions sont affichées en rouge."
     data_source_label: "Source de données : %{source}"
+    sensor_label: "Capteur"
     round_motivation: "Vous pouvez arrêter à tout moment, mais terminer les %{total} manches fournit les meilleures données. Au moins %{min_useful} manches sont nécessaires pour des résultats utiles — chaque manche supplémentaire aide !"
     local_storage_note: "Votre progression est enregistrée localement dans ce navigateur. Vous pouvez faire une pause et reprendre plus tard en utilisant le même navigateur."
     reaction:
       excellent:
         - "Précision au niveau du capteur — des données comme celles-ci font vraiment avancer la recherche!"
-        - "Vous avez lu cette courbe comme un pro. Précision rare, contribution précieuse."
+        - "Vous avez prédit cette courbe comme un pro. Précision rare, contribution précieuse."
         - "Presque parfait! Cette manche est un point de données solide pour l'étude."
         - "En plein dans le mille — exactement ce dont la recherche a besoin."
       good:
-        - "Bonne lecture — encore un point de données solide pour l'étude!"
+        - "Bonne prédiction — encore un point de données solide pour l'étude!"
         - "Vous avez bien saisi la tendance. Cela renforce le jeu de données."
         - "Prédiction solide! Votre instinct apporte un vrai signal."
         - "Beau travail. Des manches régulières comme celle-ci rendent l'analyse plus fiable."
