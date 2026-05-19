@@ -191,5 +191,8 @@ logs/*
 # Cursor IDE
 .cursor/
 
+# Claude
+.claude
+
 # Local backup archives (see backup/README.md)
 backup/archives/

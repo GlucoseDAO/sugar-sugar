@@ -5018,6 +5018,19 @@ def _register_all_callbacks() -> None:
     ending_page.register_callbacks(app)
 
 
+def _ensure_chrome() -> None:
+    """Ensure a Chromium browser is available for kaleido image export.
+
+    Checks choreographer's browser search first; if nothing is found,
+    downloads Chrome for Testing via ``kaleido.get_chrome_sync()``.
+    """
+    from choreographer.browsers.chromium import Chromium
+    if Chromium.find_browser(skip_local=False) is None:
+        import kaleido
+        with start_action(action_type="ensure_chrome_download"):
+            kaleido.get_chrome_sync()
+
+
 # Create typer app.  invoke_without_command + the @cli.callback default
 # mean ``uv run start`` (no subcommand) still works, while ``uv run chart``
 # routes to the ``chart`` subcommand via its own entrypoint.
@@ -5047,6 +5060,8 @@ def main(
                 child.data = True
                 break
 
+    _ensure_chrome()
+
     dash_host = DASH_HOST if host is None else (host or DASH_HOST)
     dash_port = DASH_PORT if port is None else port
     dash_debug = DASH_DEBUG if debug is None else debug
@@ -5055,7 +5070,7 @@ def main(
 
     _register_all_callbacks()
     app.layout.children[-1].children = [landing_page]
-    
+
     with start_action(
         action_type=u"start_dash_server",
         host=dash_host,
@@ -5104,6 +5119,7 @@ def chart(
 
     sugar_sugar_config.DEBUG_MODE = True
 
+    _ensure_chrome()
     _register_all_callbacks()
 
     dash_host = DASH_HOST if host is None else (host or DASH_HOST)
@@ -5128,6 +5144,14 @@ def cli_main() -> None:
 def chart_main() -> None:
     """CLI entry point that defaults to the ``chart`` command."""
     cli(["chart"] + sys.argv[1:])
+
+
+def setup_chrome_main() -> None:
+    """Download Chrome for Testing if no Chromium browser is available."""
+    _ensure_chrome()
+    from choreographer.browsers.chromium import Chromium
+    path = Chromium.find_browser(skip_local=False)
+    print(f"Chrome ready: {path}")
 
 
 if __name__ == '__main__':

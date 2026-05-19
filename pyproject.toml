@@ -17,16 +17,16 @@ requires-python = ">=3.11"
 dependencies = [
     "dash>=4.1.0",
     "dash-bootstrap-components>=2.0.4",
-    "plotly>=6.6.0",
-    "polars>=1.39.3",
-    "typer>=0.19.2",
+    "plotly>=6.7.0",
+    "polars>=1.40.1",
+    "typer>=0.25.1",
     "numpy>=2.3.0",
     "pycomfort>=0.0.18",
     "dotenv>=0.9.9",
-    "eliot>=1.15.0",
+    "eliot>=1.18.0",
     "i18nice[yaml]>=0.16.0",
     "markdown>=3.10.2",
-    "kaleido>=1.2.0",
+    "kaleido>=1.3.0",
     "segno>=1.6.0",
     "cgm-format[cli]>=0.8.2",
 ]
@@ -34,6 +34,7 @@ dependencies = [
 [project.scripts]
 start = "sugar_sugar.app:cli_main"
 chart = "sugar_sugar.app:chart_main"
+setup-chrome = "sugar_sugar.app:setup_chrome_main"
 
 [dependency-groups]
 dev = [

@@ -116,6 +116,31 @@ cd sugar-sugar
 uv sync
 ```
 
+### Chrome / Chromium (for share-card image export)
+
+The share page renders a PNG card using [kaleido](https://github.com/plotly/Kaleido), which needs a Chromium-based browser. On first startup the app checks for an installed browser (Chrome, Chromium, Brave, Edge); if none is found it automatically downloads **Chrome for Testing** (~130 MB) into `~/.local/share/choreographer/deps/`.
+
+Most developer machines already have Chrome, so nothing extra is needed. For headless servers or Docker, either:
+
+```bash
+# Option A: install system chromium (Debian/Ubuntu)
+apt-get install -y chromium
+
+# Option B: pre-download before first run
+uv run setup-chrome
+```
+
+Both options coexist safely — the app always checks the local download first, then falls back to a system browser.
+
+### Docker
+
+```bash
+docker build -t sugar-sugar .
+docker run -p 8050:8050 sugar-sugar
+```
+
+The included `Dockerfile` installs system Chromium so share-card rendering works out of the box.
+
 ### Configuration
 
 ```bash
