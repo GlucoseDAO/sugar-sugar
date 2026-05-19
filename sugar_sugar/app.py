@@ -42,7 +42,7 @@ logs_dir.mkdir(exist_ok=True)
 to_nice_stdout()
 to_nice_file(logs_dir / 'sugar_sugar.json', logs_dir / 'sugar_sugar.log')
 
-from sugar_sugar.i18n import setup_i18n, normalize_locale, t, t_raw
+from sugar_sugar.i18n import setup_i18n, normalize_locale, t, t_list, t_raw
 setup_i18n()
 
 from sugar_sugar.data import load_glucose_data, load_glucose_data_from_nightscout
@@ -58,6 +58,7 @@ from sugar_sugar.config import (
     DEBUG_MODE,
     DEPLOY_BUILD,
     MAX_ROUNDS,
+    MIN_USEFUL_ROUNDS,
     SHARE_FORMATS,
     SHARE_NAME,
     SHARE_NOISE,
@@ -76,6 +77,7 @@ from sugar_sugar.components.startup import StartupPage
 from sugar_sugar.components.landing import LandingPage
 from sugar_sugar.components.consent_form import ConsentFormPage
 from sugar_sugar.components.submit import SubmitComponent
+from sugar_sugar.encouragement import pick_bracket
 from sugar_sugar.components.header import HeaderComponent
 from sugar_sugar.components.ending import EndingPage
 from sugar_sugar.components.navbar import NavBar
@@ -1186,6 +1188,7 @@ def update_prediction_text_on_language_change(
      Output('ending-disclaimer-line3', 'children'),
      Output('ending-round-info', 'children'),
      Output('ending-round-motivation', 'children'),
+     Output('ending-gamification', 'children'),
      Output('ending-units-line', 'children'),
      Output('ending-graph-explanation', 'children'),
      Output('ending-prediction-results-title', 'children'),
@@ -1222,6 +1225,10 @@ def update_ending_text_on_language_change(
     max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS) if user_info else MAX_ROUNDS
     current_round_number = int(user_info.get('current_round_number') or rounds_played) if user_info else rounds_played
     is_last_round = current_round_number >= max_rounds
+    min_useful = int(user_info.get('min_useful_rounds') or MIN_USEFUL_ROUNDS) if user_info else MIN_USEFUL_ROUNDS
+    prediction_table_data = user_info.get('prediction_table_data') if user_info else None
+    current_mae = _compute_round_mae(prediction_table_data) if prediction_table_data else None
+    all_rounds: list[dict[str, Any]] = (user_info.get('rounds') or []) if user_info else []
 
     metric_label_map: dict[str, str] = {
         "Actual Glucose": t("ui.table.actual_glucose", locale=locale),
@@ -1266,7 +1273,15 @@ def update_ending_text_on_language_change(
         t("ui.results_disclaimer.line2", locale=locale),
         t("ui.results_disclaimer.line3", locale=locale),
         t("ui.common.round_of", locale=locale, current=current_round_number, total=max_rounds),
-        t("ui.ending.round_motivation", locale=locale, total=max_rounds, min_useful=max(1, max_rounds // 2)),
+        t("ui.ending.round_motivation", locale=locale, total=max_rounds, min_useful=min_useful),
+        _build_gamification_section(
+            current_round=current_round_number,
+            max_rounds=max_rounds,
+            min_useful=min_useful,
+            mae=current_mae,
+            rounds=all_rounds,
+            locale=locale,
+        ).children,
         t("ui.ending.units_line", locale=locale, unit=unit),
         t("ui.ending.graph_explanation", locale=locale),
         t("ui.ending.prediction_results", locale=locale),
@@ -1981,6 +1996,172 @@ def show_upload_required_alert(
         ]
     return dbc.Alert(children, color="info", style={"marginBottom": "10px"})
 
+def _compute_round_mae(prediction_table_data: list[dict[str, str]]) -> Optional[float]:
+    """Extract MAE from raw prediction table data (always in mg/dL)."""
+    if len(prediction_table_data) < 2:
+        return None
+    actual_row = prediction_table_data[0]
+    pred_row = prediction_table_data[1]
+    errors: list[float] = []
+    for key in actual_row:
+        if key == "metric":
+            continue
+        try:
+            a, p = float(actual_row[key]), float(pred_row[key])
+            errors.append(abs(a - p))
+        except (ValueError, TypeError):
+            continue
+    return sum(errors) / len(errors) if errors else None
+
+
+def _pick_reaction(mae: Optional[float], round_number: int, locale: str) -> str:
+    bracket = pick_bracket(mae)
+    pool = t_list(f"ui.ending.reaction.{bracket}", locale=locale)
+    if not pool:
+        return ""
+    return pool[(round_number - 1) % len(pool)]
+
+
+def _is_personal_best(mae: Optional[float], rounds: list[dict[str, Any]]) -> bool:
+    if mae is None or not rounds:
+        return False
+    for r in rounds[:-1]:
+        prev_mae = _compute_round_mae(r.get("prediction_table_data") or [])
+        if prev_mae is not None and prev_mae <= mae:
+            return False
+    return len(rounds) > 1
+
+
+def _pick_milestone(current_round: int, max_rounds: int, min_useful: int, locale: str) -> Optional[str]:
+    if current_round == 1:
+        return t("ui.ending.milestone.first_round", locale=locale)
+    if current_round == min_useful:
+        return t("ui.ending.milestone.minimum_reached", locale=locale)
+    if current_round == max_rounds:
+        return t("ui.ending.milestone.all_complete", locale=locale)
+    return None
+
+
+def _build_progress_bar(current_round: int, max_rounds: int, min_useful: int, locale: str) -> html.Div:
+    """Two-phase segmented progress bar: green up to min_useful, gold for stretch."""
+    segments: list[html.Div] = []
+    for i in range(1, max_rounds + 1):
+        is_min_phase = i <= min_useful
+        filled = i <= current_round
+        if filled:
+            bg = "#4CBB17" if is_min_phase else "#D4A017"
+        else:
+            bg = "#e0e0e0" if is_min_phase else "#f5f0e0"
+        border_right = "2px solid white" if i < max_rounds else "none"
+        border_left = "2px solid #888" if i == min_useful + 1 else "none"
+        segments.append(html.Div(
+            disable_n_clicks=True,
+            style={
+                "flex": "1",
+                "height": "14px",
+                "backgroundColor": bg,
+                "borderRight": border_right,
+                "borderLeft": border_left,
+                "transition": "background-color 0.3s",
+            },
+        ))
+
+    labels = html.Div([
+        html.Span(
+            t("ui.ending.progress.minimum_goal", locale=locale, min_useful=min_useful),
+            style={"fontSize": "11px", "color": "#4a5568"},
+        ),
+        html.Span(
+            t("ui.ending.progress.stretch_goal", locale=locale, total=max_rounds),
+            style={"fontSize": "11px", "color": "#9e7c16"},
+        ),
+    ], disable_n_clicks=True, style={
+        "display": "flex",
+        "justifyContent": "space-between",
+        "marginTop": "2px",
+    })
+
+    return html.Div([
+        html.Div(
+            segments,
+            disable_n_clicks=True,
+            style={
+                "display": "flex",
+                "borderRadius": "7px",
+                "overflow": "hidden",
+                "border": "1px solid #ccc",
+            },
+        ),
+        labels,
+    ], id="ending-progress-bar", disable_n_clicks=True, style={
+        "maxWidth": "500px",
+        "margin": "8px auto 4px auto",
+    })
+
+
+def _build_gamification_section(
+    current_round: int,
+    max_rounds: int,
+    min_useful: int,
+    mae: Optional[float],
+    rounds: list[dict[str, Any]],
+    locale: str,
+) -> html.Div:
+    """Assemble progress bar, reaction line, milestone, and personal-best callout."""
+    children: list[Any] = []
+
+    children.append(_build_progress_bar(current_round, max_rounds, min_useful, locale))
+
+    reaction = _pick_reaction(mae, current_round, locale)
+    personal_best = _is_personal_best(mae, rounds)
+
+    reaction_parts: list[Any] = []
+    if reaction:
+        reaction_parts.append(html.Span(reaction, id="ending-reaction-text"))
+    if personal_best:
+        if reaction_parts:
+            reaction_parts.append(" — ")
+        reaction_parts.append(html.Span(
+            t("ui.ending.personal_best", locale=locale),
+            id="ending-personal-best",
+            style={"fontWeight": "bold", "color": "#D4A017"},
+        ))
+    if not reaction_parts:
+        reaction_parts.append(html.Span("", id="ending-reaction-text"))
+        reaction_parts.append(html.Span("", id="ending-personal-best"))
+
+    children.append(html.Div(
+        reaction_parts,
+        id="ending-reaction-line",
+        disable_n_clicks=True,
+        style={
+            "textAlign": "center",
+            "fontSize": "15px",
+            "color": "#2c5282",
+            "marginBottom": "2px",
+            "minHeight": "22px",
+        },
+    ))
+
+    milestone = _pick_milestone(current_round, max_rounds, min_useful, locale)
+    children.append(html.Div(
+        milestone or "",
+        id="ending-milestone",
+        disable_n_clicks=True,
+        style={
+            "textAlign": "center",
+            "fontSize": "13px",
+            "color": "#2d6a4f",
+            "fontWeight": "600",
+            "marginBottom": "4px",
+            "minHeight": "20px",
+            "display": "block" if milestone else "none",
+        },
+    ))
+
+    return html.Div(children, id="ending-gamification", disable_n_clicks=True)
+
+
 def create_ending_layout(
     full_df_data: Optional[Dict],
     current_df_data: Optional[Dict],
@@ -2092,6 +2273,9 @@ def create_ending_layout(
     max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS) if user_info else MAX_ROUNDS
     current_round_number = int(user_info.get('current_round_number') or rounds_played) if user_info else rounds_played
     is_last_round = current_round_number >= max_rounds
+    min_useful = int(user_info.get('min_useful_rounds') or MIN_USEFUL_ROUNDS) if user_info else MIN_USEFUL_ROUNDS
+    current_mae = _compute_round_mae(prediction_table_data) if prediction_table_data else None
+    all_rounds: list[dict[str, Any]] = (user_info.get('rounds') or []) if user_info else []
     current_format = str((user_info or {}).get("format") or "A")
     uses_cgm = bool((user_info or {}).get("uses_cgm", False))
     allowed_formats: list[str] = (["C", "B", "A"] if uses_cgm else ["A"])
@@ -2177,8 +2361,16 @@ def create_ending_layout(
                 'color': '#2c5282'
             }
         ),
+        _build_gamification_section(
+            current_round=current_round_number,
+            max_rounds=max_rounds,
+            min_useful=min_useful,
+            mae=current_mae,
+            rounds=all_rounds,
+            locale=locale,
+        ),
         html.Div(
-            t("ui.ending.round_motivation", locale=locale, total=max_rounds, min_useful=max(1, max_rounds // 2)),
+            t("ui.ending.round_motivation", locale=locale, total=max_rounds, min_useful=min_useful),
             id='ending-round-motivation',
             disable_n_clicks=True,
             style={

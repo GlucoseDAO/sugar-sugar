@@ -32,6 +32,7 @@ STORAGE_TYPE: str = os.getenv("STORAGE_TYPE", "local")
 
 # Maximum number of prediction rounds per session
 MAX_ROUNDS: int = int(os.getenv("MAX_ROUNDS", "12"))
+MIN_USEFUL_ROUNDS: int = int(os.getenv("MIN_USEFUL_ROUNDS", str(max(1, MAX_ROUNDS // 2))))
 
 # Umami analytics. Defaults use the same-domain Caddy proxy so common
 # cross-domain analytics blocklists do not match the tracker URL.

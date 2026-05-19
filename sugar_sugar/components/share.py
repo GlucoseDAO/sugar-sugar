@@ -818,6 +818,19 @@ def build_synthesis_figure(
                     ),
                     row=row_idx, col=1,
                 )
+                label_text: str = f"r{rn3}"
+                for li in range(len(m_x)):
+                    lc: str = m_col[li] if m_col else "rgba(100,100,100,0.7)"
+                    fig.add_annotation(
+                        x=m_x[li], y=m_y[li],
+                        text=label_text,
+                        showarrow=False,
+                        font=dict(size=7, color=lc),
+                        xanchor="center", yanchor="bottom",
+                        yshift=3,
+                        opacity=0.6,
+                        row=row_idx, col=1,
+                    )
 
     x_title: str = t("ui.share.synthesis.x_axis_time", locale=loc)
     y_name: str = t("ui.share.synthesis.y_axis_short", locale=loc)

@@ -10,6 +10,7 @@ When the user draws the line it interpolates the position to detect closes gluco
 uv is used as the package manager for the project.
 uv run start is used to run the dash app.
 uv run chart is the fast dev shortcut: it starts Dash with data pre-loaded and routes straight to the prediction chart (bypasses landing, startup, and consent). Use this whenever the user asks to debug or test the chart in the browser. Only fall back to uv run start when the user explicitly needs the startup/landing/consent screens. uv run chart accepts --file, --points, --start, --unit, --locale, --host, --port options. Use --prefill to pre-fill the prediction region with noisy ground-truth values so the submit/ending/metrics flow can be tested without drawing (--noise controls the noise level, default 5%). Always prefer uv run chart --prefill over attempting browser automation for testing submit or ending pages.
+uv run share is the share page dev shortcut: it generates fake rounds with synthetic prediction data, saves a share record to disk, and opens the browser at `/share/<id>`. Use this whenever debugging the share page, share card PNG, OG tags, social buttons, or share-related styling. Accepts --port, --locale, --host options.
 
 ## Known Dash pitfalls
 

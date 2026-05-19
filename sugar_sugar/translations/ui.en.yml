@@ -325,6 +325,36 @@ en:
     data_source_label: "Data source: %{source}"
     round_motivation: "You can stop any time, but completing all %{total} rounds gives the best data. At least %{min_useful} rounds are needed for useful results — every extra round helps!"
     local_storage_note: "Your progress is saved locally in this browser. You can take a break and resume later using the same browser."
+    reaction:
+      excellent:
+        - "Sensor-level accuracy — data like this really moves the research forward."
+        - "You read that curve like a pro. Rare precision, valuable contribution."
+        - "Nearly perfect. This round is a strong data point for the study."
+        - "Right on target — exactly what the research needs."
+      good:
+        - "Good read — another solid data point for the study."
+        - "You caught the trend well. This strengthens the dataset."
+        - "Solid prediction — your instinct is contributing real signal."
+        - "Nice work. Consistent rounds like this make the analysis more reliable."
+      average:
+        - "Not bad — tricky curve. Your attempt still adds signal to the study."
+        - "Reasonable read. Even imperfect predictions help map human intuition."
+        - "Fair estimate. The research benefits from hard cases too."
+        - "Decent effort — the study measures intuition, not perfection."
+      keep_practicing:
+        - "Tough window. Difficult cases are especially informative for the research."
+        - "Hard to call — high-variance segments teach us the most."
+        - "Even experts miss these. That's exactly what the study is measuring."
+        - "Don't sweat it — where humans struggle is where the science learns."
+    milestone:
+      first_round: "First round in — you're contributing to the research."
+      minimum_reached: "Minimum reached — your data is scientifically useful. Extra rounds make it stronger."
+      all_complete: "All rounds complete — thank you for a full dataset."
+    personal_best: "Your best round so far."
+    progress:
+      minimum_goal: "Minimum: %{min_useful}"
+      stretch_goal: "Stretch: %{total}"
+      bonus_rounds: "Bonus rounds"
 
   final:
     title: "Complete Analysis"

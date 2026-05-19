@@ -327,6 +327,36 @@ es:
     data_source_label: "Fuente de datos: %{source}"
     round_motivation: "Puedes parar en cualquier momento, pero completar las %{total} rondas da los mejores datos. Se necesitan al menos %{min_useful} rondas para obtener resultados útiles. ¡Cada ronda extra ayuda!"
     local_storage_note: "Tu progreso se guarda localmente en este navegador. Puedes tomarte un descanso y reanudarlo más tarde usando el mismo navegador."
+    reaction:
+      excellent:
+        - "Precisión de nivel sensor — datos como estos realmente impulsan la investigación."
+        - "Leíste esa curva como un profesional. Precisión poco común, contribución valiosa."
+        - "Casi perfecto. Esta ronda es un dato sólido para el estudio."
+        - "Justo en el blanco — exactamente lo que la investigación necesita."
+      good:
+        - "Buena lectura — otro dato sólido para el estudio."
+        - "Captaste bien la tendencia. Esto fortalece el conjunto de datos."
+        - "Predicción sólida — tu instinto está aportando señal real."
+        - "Buen trabajo. Rondas consistentes como esta hacen el análisis más fiable."
+      average:
+        - "No está mal — curva complicada. Tu intento aún añade señal al estudio."
+        - "Lectura razonable. Incluso las predicciones imperfectas ayudan a mapear la intuición humana."
+        - "Estimación aceptable. La investigación también se beneficia de los casos difíciles."
+        - "Esfuerzo decente — el estudio mide la intuición, no la perfección."
+      keep_practicing:
+        - "Ventana difícil. Los casos complicados son especialmente informativos para la investigación."
+        - "Difícil de predecir — los segmentos de alta variabilidad son los que más nos enseñan."
+        - "Incluso los expertos fallan estos. Eso es exactamente lo que el estudio está midiendo."
+        - "No te preocupes — donde los humanos tienen dificultades es donde la ciencia aprende."
+    milestone:
+      first_round: "Primera ronda completada — estás contribuyendo a la investigación."
+      minimum_reached: "Mínimo alcanzado — tus datos son científicamente útiles. Las rondas adicionales los fortalecen."
+      all_complete: "Todas las rondas completadas — gracias por un conjunto de datos completo."
+    personal_best: "Tu mejor ronda hasta ahora."
+    progress:
+      minimum_goal: "Mínimo: %{min_useful}"
+      stretch_goal: "Objetivo: %{total}"
+      bonus_rounds: "Rondas extra"
 
   final:
     title: "Analyse complète"
