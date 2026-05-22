@@ -718,10 +718,14 @@ def _share_card_png(share_id: str) -> Any:
     cached: Optional[bytes] = _SHARE_PNG_CACHE.get(cache_key)
     if cached is None:
         share_url: str = _build_share_url(share_id)
-        fig = build_share_card_figure(
-            record, share_url=share_url, locale=locale, seed=share_id,
+        from sugar_sugar.share_png import render_share_card_png_bytes
+
+        cached = render_share_card_png_bytes(
+            record,
+            share_url=share_url,
+            locale=locale,
+            seed=share_id,
         )
-        cached = fig.to_image(format="png", width=1080, height=1080, scale=1, engine="kaleido")
         _SHARE_PNG_CACHE[cache_key] = cached
     response = flask_send_file(
         BytesIO(cached),
