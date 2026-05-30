@@ -28,45 +28,45 @@ fr:
     patient_consent_form_title: "Formulaire de consentement du patient"
     required_consents_title: "Consentements obligatoires"
     optional_consents_title: "Consentements facultatifs"
-    consent_upload_own_data: "J'accepte de télécharger mes propres données CGM pour les tâches facultatives."
-    tagline: "Un jeu pour tester vos super-pouvoirs de prédiction du glucose."
+    consent_upload_own_data: "J'accepte de téléverser mes propres données CGM pour les tâches facultatives."
+    tagline: "Un jeu pour tester tes super-pouvoirs de prédiction de la glycémie."
     how_it_works: "Comment ça marche"
     how_it_works_steps:
-      - "Téléchargez un fichier CSV Dexcom/Libre/Medtronic/Nightscout (ou utilisez l'exemple de données)"
-      - "Tracez votre tendance de glucose prédite sur le graphique"
-      - "Comparez vos prédictions aux valeurs réelles"
-      - "Consultez les mesures de précision (MAE/RMSE/MAPE)"
+      - "Téléverse un fichier CSV Dexcom/Libre/Medtronic/Nightscout (ou utilise le jeu de données d'exemple)"
+      - "Trace ta tendance de glycémie prédite sur le graphique"
+      - "Compare tes prédictions aux valeurs réelles"
+      - "Consulte les mesures de précision (MAE/RMSE/MAPE)"
     preview: "Aperçu"
     about_study_title: "À propos de l'étude"
-    about_study_text: "Nous étudions la précision avec laquelle les humains prédisent les tendances du glucose et les schémas que remarquent les utilisateurs expérimentés de CGM. Si vous choisissez de participer, votre gameplay et vos données CGM téléchargées pourront être utilisés pour des recherches ultérieures."
-    your_choices_title: "Vos choix"
-    your_choices_text: "Par défaut, nous supposons que vous acceptez de participer à l'étude. Si vous souhaitez uniquement jouer, cochez la première case."
+    about_study_text: "Nous étudions la précision avec laquelle les humains prédisent les tendances de la glycémie, et les schémas que remarquent les utilisateurs expérimentés de CGM. Si tu choisis de participer, ta partie et les données CGM que tu téléverses pourront être utilisées pour des recherches ultérieures."
+    your_choices_title: "Tes choix"
+    your_choices_text: "Par défaut, nous supposons que tu acceptes de participer à l'étude. Si tu veux seulement jouer, coche la première case."
     consent_play_only: "Je veux seulement jouer (ne pas stocker mes données CGM / de jeu)"
     consent_receive_results: "Je souhaite recevoir mes résultats plus tard"
-    consent_keep_updated: "Tenez-moi au courant des mises à jour du projet"
+    consent_keep_updated: "Tiens-moi au courant des mises à jour du projet"
     consent_acknowledge_label: "J'ai 18 ans ou plus et j'ai lu les conditions générales."
     consent_gdpr_label: "Je consens au traitement de mes données personnelles, aux fins énoncées dans l'avis de consentement, conformément au Règlement Général sur la Protection des Données (UE) 2016/679. Je comprends que mes données seront traitées de manière sécurisée, ne seront pas partagées avec des tiers non autorisés et que je peux retirer mon consentement à tout moment."
     open_consent_form: "Ouvrir l'avis de consentement"
-    consent_required_error: "Veuillez confirmer que vous avez 18 ans ou plus et que vous avez lu le formulaire de consentement pour continuer."
-    next_hint: "Suivant : vous remplirez un court formulaire, puis vous téléchargerez vos données CGM (ou utiliserez l'exemple de données)."
+    consent_required_error: "Merci de confirmer que tu as 18 ans ou plus et que tu as lu le formulaire de consentement pour continuer."
+    next_hint: "Suivant : tu rempliras un court formulaire, puis tu téléverseras tes données CGM (ou tu utiliseras le jeu de données d'exemple)."
 
   consent_form:
     title: "Avis de consentement"
-    subtitle: "Veuillez lire ces informations avant de continuer. Il s'agit d'un avis de consentement de base qui sera mis à jour."
-    adults_only: "Vous devez avoir 18 ans ou plus pour participer à cette étude."
+    subtitle: "Merci de lire ces informations avant de continuer. Il s'agit d'un avis de consentement de base qui sera mis à jour."
+    adults_only: "Tu dois avoir 18 ans ou plus pour participer à cette étude."
     summary_title: "Résumé"
     summary_bullets:
-      - "Vous jouerez à un jeu de prédiction du glucose jusqu'à 12 manches."
-      - "Nous pouvons stocker votre gameplay (prédictions, mesures de précision) pour la recherche."
-      - "Si vous choisissez de télécharger vos propres données CGM, nous pourrons les utiliser pour faire fonctionner le jeu et pour la recherche."
-      - "La participation est volontaire et vous pouvez arrêter à tout moment."
+      - "Tu joueras à un jeu de prédiction de la glycémie pendant jusqu'à 12 manches."
+      - "Nous pouvons stocker ta partie (prédictions, mesures de précision) à des fins de recherche."
+      - "Si tu choisis de téléverser tes propres données CGM, nous pourrons les utiliser pour faire fonctionner le jeu et pour la recherche."
+      - "La participation est volontaire et tu peux arrêter à tout moment."
     data_title: "Utilisation des données"
     data_bullets:
-      - "Des données d'exemple (génériques) peuvent être utilisées sans télécharger de données de capteur personnelles."
-      - "Si vous téléchargez un fichier, il peut contenir des informations de santé sensibles."
-      - "Nous utiliserons les données uniquement selon vos sélections sur la page de démarrage."
+      - "Les données d'exemple (génériques) peuvent être utilisées sans téléverser de données de capteur personnelles."
+      - "Si tu téléverses un fichier, il peut contenir des informations de santé sensibles."
+      - "Nous utiliserons les données uniquement selon les choix que tu fais sur la page de démarrage."
     withdraw_title: "Retrait"
-    withdraw_text: "Vous pouvez arrêter de participer à tout moment en fermant l'onglet ou la fenêtre du navigateur. Si vous souhaitez que vos données soient supprimées, veuillez contacter les organisateurs de l'étude."
+    withdraw_text: "Tu peux arrêter de participer à tout moment en fermant l'onglet ou la fenêtre du navigateur. Si tu souhaites que tes données soient supprimées, contacte les organisateurs de l'étude."
 
   about:
     title: "À propos de Sugar Sugar"
@@ -79,7 +79,7 @@ fr:
 
   contact:
     title: "Contactez-nous"
-    body: "Si vous avez des questions, des commentaires ou si vous souhaitez que vos données soient supprimées, veuillez nous contacter via les coordonnées ci-dessous."
+    body: "Si tu as des questions, des commentaires ou si tu souhaites que tes données soient supprimées, contacte-nous via les coordonnées ci-dessous."
     study_contacts_title: "Contacts de l'étude"
     general_email_title: "E-mail de l'équipe générale"
     social_title: "Médias sociaux et communauté"
@@ -94,105 +94,105 @@ fr:
 
   demo:
     title: "Démo"
-    body: "Essayez une démo rapide du jeu de prédiction du glucose Sugar Sugar."
+    body: "Essaie une démo rapide du jeu de prédiction de la glycémie Sugar Sugar."
 
   startup:
     fork_me: "Forkez-moi sur GitHub"
     required_fields_note: "* Champs obligatoires"
     email_label: "E-mail"
-    email_placeholder: "Entrez votre e-mail (facultatif sauf si vous voulez les résultats/mises à jour)"
+    email_placeholder: "Saisis ton e-mail (facultatif sauf si tu veux tes résultats/mises à jour)"
     age_label: "Âge"
-    age_placeholder: "Entrez votre âge"
-    age_must_be_18_error: "Vous devez avoir 18 ans ou plus pour participer à l'étude."
+    age_placeholder: "Saisis ton âge"
+    age_must_be_18_error: "Tu dois avoir 18 ans ou plus pour participer à l'étude."
     gender_label: "Genre"
-    gender_placeholder: "Sélectionnez votre genre"
+    gender_placeholder: "Sélectionne ton genre"
     gender_male: "Homme"
     gender_female: "Femme"
     gender_na: "N/A"
-    cgm_label: "Utilisez-vous un CGM ?"
-    cgm_placeholder: "Sélectionnez si vous utilisez un CGM"
+    cgm_label: "Utilises-tu un CGM ?"
+    cgm_placeholder: "Indique si tu utilises un CGM"
     yes: "Oui"
     no: "Non"
-    cgm_duration_label: "Veuillez préciser la durée d'utilisation (en années)"
-    cgm_duration_placeholder: "Entrez le nombre d'années"
-    diabetic_label: "Êtes-vous diabétique ?"
-    diabetic_placeholder: "Sélectionnez votre statut diabétique"
+    cgm_duration_label: "Merci de préciser la durée d'utilisation (en années)"
+    cgm_duration_placeholder: "Saisis le nombre d'années"
+    diabetic_label: "Es-tu diabétique ?"
+    diabetic_placeholder: "Sélectionne ton statut diabétique"
     diabetes_type_label: "Type de diabète"
-    diabetes_type_placeholder: "Sélectionnez le type de diabète"
+    diabetes_type_placeholder: "Sélectionne le type de diabète"
     diabetes_type_1: "Type 1"
     diabetes_type_2: "Type 2"
     diabetes_type_gestational: "Diabète gestationnel"
     diabetes_type_lada: "LADA (Diabète Auto-immun Latent chez l'Adulte)"
     diabetes_duration_label: "Durée du diabète (années)"
-    diabetes_duration_placeholder: "Entrez le nombre d'années"
+    diabetes_duration_placeholder: "Saisis le nombre d'années"
     location_label: "Localisation"
-    location_placeholder: "Entrez votre localisation"
+    location_placeholder: "Saisis ta localisation"
     contact_prefs_title: "Préférences de contact"
-    contact_prefs_text: "L'e-mail n'est requis que si vous avez demandé à recevoir les résultats plus tard ou à être tenu au courant."
-    just_test_me: "Testez-moi seulement"
+    contact_prefs_text: "L'e-mail n'est requis que si tu as demandé à recevoir tes résultats plus tard ou à être tenu au courant."
+    just_test_me: "Teste-moi seulement"
     start_prediction: "Démarrer la prédiction"
     format_label: "Format"
-    format_placeholder: "Choisissez une option"
+    format_placeholder: "Choisis une option"
     format_a_label: "Données génériques"
     format_b_label: "Mes données"
     format_c_label: "Génériques + Mes données"
     format_a_label_short: "Génériques"
     format_b_label_short: "Miennes"
     format_c_label_short: "Combinées"
-    format_help_a: "Données génériques — utilisez des données génériques (aucune donnée de capteur requise). 12 manches à l'aide d'un ensemble d'échantillons."
-    format_help_b: "Mes données — utilisez vos propres données. Téléchargez votre propre fichier et prévoyez uniquement sur celui-ci."
-    format_help_c: "Génériques + Mes données — essayez les deux. Vous téléchargerez votre propre fichier, mais chaque manche utilisera soit des données d'échantillon, soit vos propres données."
-    data_usage_consent_label: "J'accepte l'utilisation de mes données CGM téléchargées pour cette étude."
-    data_usage_consent_required: "Veuillez confirmer le consentement à l'utilisation des données pour continuer."
+    format_help_a: "Données génériques — utilise des données génériques (aucune donnée de capteur requise). 12 manches à partir d'un jeu de données d'exemple."
+    format_help_b: "Mes données — utilise tes propres données. Téléverse ton propre fichier et fais des prédictions uniquement dessus."
+    format_help_c: "Génériques + Mes données — essaie les deux. Tu téléverseras ton propre fichier, mais chaque manche utilisera soit des données d'exemple, soit tes propres données."
+    data_usage_consent_label: "J'accepte l'utilisation des données CGM que je téléverse pour cette étude."
+    data_usage_consent_required: "Merci de confirmer ton consentement à l'utilisation des données pour continuer."
 
   header:
     points_label: "Nombre de points à afficher :"
     time_window_label: "Position de la fenêtre temporelle :"
-    upload_prompt_1: "Glissez et déposez ou "
-    upload_prompt_2: "Téléchargez vos données ici"
+    upload_prompt_1: "Glisse et dépose ou "
+    upload_prompt_2: "Téléverse tes données ici"
     use_example_data: "Utiliser des données génériques"
-    upload_required: "Téléchargement requis"
+    upload_required: "Téléversement requis"
     upload_success: "Données chargées avec succès depuis %{filename}. Ces données seront utilisées pour les prédictions."
-    example_data_now_using: "Utilisation actuelle de données génériques. Téléchargez un fichier CSV pour une analyse personnalisée."
-    example_data_warning: "Données génériques actuellement utilisées. Téléchargez votre propre fichier CSV Dexcom/Libre/Medtronic/Nightscout pour une analyse personnalisée."
-    csv_tab_label: "CSV File"
+    example_data_now_using: "Utilisation actuelle de données génériques. Téléverse un fichier CSV pour une analyse personnalisée."
+    example_data_warning: "Données génériques actuellement utilisées. Téléverse ton propre fichier CSV Dexcom/Libre/Medtronic/Nightscout pour une analyse personnalisée."
+    csv_tab_label: "Fichier CSV"
     nightscout_tab_label: "Nightscout"
-    nightscout_url_placeholder: "https://your-nightscout-site.com"
-    nightscout_token_placeholder: "Access token (optional)"
-    nightscout_load_button: "Load from Nightscout"
-    nightscout_loading: "Loading data from Nightscout…"
-    nightscout_success: "Successfully loaded %{count} glucose readings from Nightscout."
-    nightscout_error: "Failed to load from Nightscout: %{error}"
-    nightscout_url_required: "Please enter a Nightscout URL."
-    nightscout_consent_required: "Please grant data usage consent before loading Nightscout data."
+    nightscout_url_placeholder: "https://ton-site-nightscout.com"
+    nightscout_token_placeholder: "Jeton d'accès (facultatif)"
+    nightscout_load_button: "Charger depuis Nightscout"
+    nightscout_loading: "Chargement des données depuis Nightscout…"
+    nightscout_success: "%{count} mesures de glycémie chargées avec succès depuis Nightscout."
+    nightscout_error: "Échec du chargement depuis Nightscout : %{error}"
+    nightscout_url_required: "Merci de saisir une URL Nightscout."
+    nightscout_consent_required: "Merci d'accorder ton consentement à l'utilisation des données avant de charger les données Nightscout."
     current_data_source: "Source de données actuelle :"
     weight_label: "Poids"
-    description_1: "Testez vos compétences en prédiction de glucose !"
-    description_2: "Cliquez sur le graphique ou tracez des lignes pour prédire les valeurs futures de glucose."
-    description_3: "Le jeu vous montrera la précision de vos prédictions par rapport aux mesures réelles."
+    description_1: "Teste tes compétences en prédiction de la glycémie !"
+    description_2: "Clique sur le graphique ou trace des lignes pour prédire les valeurs futures de glycémie."
+    description_3: "Le jeu te montrera la précision de tes prédictions par rapport aux mesures réelles."
     how_to_play: "Comment jouer :"
-    how_to_play_1: "1. Cliquez et faites glisser dans le graphique pour ajouter des prédictions"
-    how_to_play_2: "2. Tracez une ligne après l'autre pour créer des courbes de prédiction"
-    how_to_play_3: "3. Tracez votre prédiction jusqu'à la fin de la zone cachée pour soumettre"
+    how_to_play_1: "1. Clique et fais glisser dans le graphique pour ajouter des prédictions"
+    how_to_play_2: "2. Trace une ligne après l'autre pour créer des courbes de prédiction"
+    how_to_play_3: "3. Trace ta prédiction jusqu'à la fin de la zone cachée pour soumettre"
 
   prediction:
     units_label: "Unités :"
-    upload_required_alert: "Ce format nécessite vos propres données CGM. Veuillez télécharger un fichier CSV pour commencer."
-    upload_consent_recorded: "Consentement enregistré. Vous pouvez maintenant télécharger et utiliser vos données CGM dans cette session."
+    upload_required_alert: "Ce format nécessite tes propres données CGM. Merci de téléverser un fichier CSV pour commencer."
+    upload_consent_recorded: "Consentement enregistré. Tu peux maintenant téléverser et utiliser tes données CGM dans cette session."
     no_upload_back_to_final: "Pas de données CGM à téléverser ? Voir les résultats de tes manches précédentes"
 
   submit:
-    progress_no_data: "Faites des prédictions jusqu'à la fin de la zone cachée pour soumettre"
-    progress_some: "Continuez les prédictions jusqu'à la fin (%{done}/%{total} points)"
+    progress_no_data: "Fais des prédictions jusqu'à la fin de la zone cachée pour soumettre"
+    progress_some: "Continue tes prédictions jusqu'à la fin (%{done}/%{total} points)"
     progress_ready: "✓ Prêt à soumettre !"
-    progress_hidden_area: "Faites des prédictions dans la zone cachée pour soumettre"
+    progress_hidden_area: "Fais des prédictions dans la zone cachée pour soumettre"
     submit: "Soumettre"
 
   mobile_warning:
     text: "Note : Sugar Sugar est actuellement optimisé pour le bureau. Le support mobile arrive bientôt !"
 
   orientation:
-    title: "POUR DE MEILLEURS RÉSULTATS, UTILISEZ LE SITE EN MODE PAYSAGE"
+    title: "POUR DE MEILLEURS RÉSULTATS, UTILISE LE SITE EN MODE PAYSAGE"
     subtitle: ""
 
   share:
@@ -216,7 +216,7 @@ fr:
     invite_text: "J'ai prédit la glycémie pour l'heure suivante avec %{accuracy} de précision sur %{rounds} manches. Tu penses faire mieux ?"
     invite_text_ranked: "Je suis dans le top %{percentile} des prédicteurs de glycémie — %{accuracy} de précision sur %{rounds} manches. Tu peux me battre ?"
     card_footer: "Joue sur %{url}"
-    qr_scan_to_play: "Scannez pour jouer"
+    qr_scan_to_play: "Scanne pour jouer"
     stats_heading: "Ta carte de score"
     stat_mard: "MARD"
     stat_mard_hint: "Différence relative absolue moyenne"
@@ -240,28 +240,28 @@ fr:
     encouragement:
       excellent:
         lines:
-          - "Tu prédis le sucre comme un pro. %{rounds} manches et toujours aussi précis. Tu crois pouvoir me battre ?"
-          - "Toutes les courbes attrapées sur %{rounds} manches. Ton fil est le prochain - lance-toi et essaie de me dépasser."
-          - "Instinct des motifs, débloqué. %{rounds} manches et je rate toujours pas. À toi."
-          - "Voilà %{rounds} manches de prédictions propres. Je parie que tu ne suis pas."
+          - "J'ai mis dans le mille pour l'heure suivante — %{rounds} manches et je prédis toujours comme un capteur. À toi de jouer."
+          - "J'ai attrapé chaque courbe sur %{rounds} manches. Tu crois pouvoir suivre ? Lance-toi."
+          - "%{rounds} manches de prédictions quasi parfaites. Je parie que tu n'y arrives pas du premier coup."
+          - "Voilà à quoi ressemblent %{rounds} manches de prédictions impeccables. Montre-moi les tiennes."
       good:
         lines:
-          - "Belle partie. %{rounds} manches et mes prédictions sont tombées proche. Tu peux tomber plus près ?"
-          - "Assez fin pour tenir la ligne %{rounds} manches. À toi de jouer - prouve-moi le contraire."
-          - "%{rounds} manches, main stable. Plus rapide au stylo ? Montre-moi."
-          - "Plus souvent dans la courbe qu'à côté sur %{rounds} manches. Qui me bat en premier ?"
+          - "Belle partie — %{rounds} manches et mes prédictions sont tombées proche. Tu peux tomber plus près ?"
+          - "Assez affûté pour tenir la ligne pendant %{rounds} manches. À toi de jouer — prouve-moi le contraire."
+          - "%{rounds} manches, des prédictions régulières. Tu crois avoir un meilleur instinct pour la glycémie ? Montre-moi."
+          - "%{rounds} manches et je suis toujours la courbe. Qui passe devant en premier ?"
       average:
         lines:
-          - "%{rounds} manches et la courbe continue à bouger. Je parie que tu ne fais pas mieux au premier essai."
-          - "Je cours après la glycémie depuis %{rounds} manches. Facile, non ? Prouve-le."
-          - "%{rounds} manches au compteur. Les chiffres sont sournois - à toi de les deviner."
-          - "Je commence à grimper au classement en %{rounds} manches. Envie de me rejoindre en haut ?"
+          - "%{rounds} manches au compteur et la courbe continue de bouger. Je parie que tu ne bats pas mon score du premier coup."
+          - "Prédire la glycémie est plus délicat qu'il n'y paraît. %{rounds} manches terminées — tu peux faire mieux ?"
+          - "%{rounds} manches au compteur. Les chiffres sont sournois — vois si tu arrives à les devancer."
+          - "J'ai commencé à grimper au classement en %{rounds} manches. Envie de me rejoindre en haut ?"
       keep_practicing:
         lines:
-          - "La glycémie rend humble. %{rounds} manches faites - à toi de la prédire mieux que moi."
-          - "%{rounds} manches, j'apprends encore la courbe. À toi d'essayer."
-          - "Plus dur que ça en a l'air, hein ? %{rounds} tentatives honnêtes. Bats-moi. Chiche."
-          - "%{rounds} manches et la ligne continue à gagner. Tu crois mieux prédire ? Montre-moi."
+          - "La glycémie rend humble. %{rounds} manches terminées — vois si tu peux la prédire mieux que moi."
+          - "%{rounds} manches au compteur, j'apprends encore la courbe. À toi d'essayer."
+          - "Plus dur que ça en a l'air, hein ? %{rounds} manches de tentatives honnêtes. Bats-moi. Chiche."
+          - "%{rounds} manches et la ligne continue de gagner. Tu crois pouvoir mieux la prédire ? Montre-moi."
     synthesis:
       title: "Erreur de prédiction sur l’heure suivante"
       x_axis: "Temps (minutes depuis le début de l’heure masquée suivante — chaque pas de 5 min)"
@@ -292,7 +292,7 @@ fr:
   metrics:
     title: "Métriques"
     prediction_accuracy: "Précision de la prédiction"
-    placeholder_need_5: "Tracez des prédictions sur le graphique pour voir les mesures de précision"
+    placeholder_need_5: "Trace des prédictions sur le graphique pour voir les mesures de précision"
     title_accuracy_metrics: "Métriques de précision"
     no_metrics_available: "Aucune métrique disponible"
     desc:
@@ -310,15 +310,15 @@ fr:
 
   resume_dialog:
     title: "Bon retour !"
-    message: "Vous avez une session précédente enregistrée (manche %{round} sur %{total}). Voulez-vous continuer là où vous vous étiez arrêté ou recommencer ?"
-    message_no_round: "Vous avez une session précédente enregistrée. Voulez-vous continuer là où vous vous étiez arrêté ou recommencer ?"
-    warning: "Veuillez ne pas recommencer simplement parce que vous n'êtes pas satisfait de vos prédictions — recommencer fausse les données de recherche et compromet les résultats de l'étude."
+    message: "Tu as une session précédente enregistrée (manche %{round} sur %{total}). Veux-tu continuer là où tu t'étais arrêté ou recommencer ?"
+    message_no_round: "Tu as une session précédente enregistrée. Veux-tu continuer là où tu t'étais arrêté ou recommencer ?"
+    warning: "Merci de ne pas recommencer simplement parce que tu n'es pas satisfait de tes prédictions — recommencer fausse les données de recherche et compromet les résultats de l'étude."
     continue_btn: "Continuer"
     start_over_btn: "Recommencer"
 
   session_expired:
     title: "Session expirée"
-    text: "Veuillez recommencer depuis le début."
+    text: "Merci de recommencer depuis le début."
 
   ending:
     title: "Résumé de la prédiction"
@@ -326,37 +326,37 @@ fr:
     units_line: "Unités : %{unit}"
     next_round: "Manche suivante"
     view_complete_analysis: "Voir l'analyse complète"
-    graph_explanation: "Le graphique montre la fenêtre de glucose sur laquelle vous avez fait des prédictions. La ligne pointillée orange sépare l'historique connu (à gauche) de l'heure que vous avez prédite (à droite). Vos prédictions sont affichées en rouge."
+    graph_explanation: "Le graphique montre la fenêtre de glycémie sur laquelle tu as fait des prédictions. La ligne pointillée orange sépare l'historique connu (à gauche) de l'heure que tu as prédite (à droite). Tes prédictions sont affichées en rouge."
     data_source_label: "Source de données : %{source}"
     sensor_label: "Capteur"
-    round_motivation: "Vous pouvez arrêter à tout moment, mais terminer les %{total} manches fournit les meilleures données. Au moins %{min_useful} manches sont nécessaires pour des résultats utiles — chaque manche supplémentaire aide !"
-    local_storage_note: "Votre progression est enregistrée localement dans ce navigateur. Vous pouvez faire une pause et reprendre plus tard en utilisant le même navigateur."
+    round_motivation: "Tu peux arrêter à tout moment, mais terminer les %{total} manches fournit les meilleures données. Au moins %{min_useful} manches sont nécessaires pour des résultats utiles — chaque manche supplémentaire aide !"
+    local_storage_note: "Ta progression est enregistrée localement dans ce navigateur. Tu peux faire une pause et reprendre plus tard en utilisant le même navigateur."
     reaction:
       excellent:
-        - "Précision au niveau du capteur — des données comme celles-ci font vraiment avancer la recherche!"
-        - "Vous avez prédit cette courbe comme un pro. Précision rare, contribution précieuse."
-        - "Presque parfait! Cette manche est un point de données solide pour l'étude."
+        - "Précision au niveau du capteur — des données comme celles-ci font vraiment avancer la recherche !"
+        - "Tu as prédit cette courbe comme un pro. Précision rare, contribution précieuse."
+        - "Presque parfait ! Cette manche est un point de données solide pour l'étude."
         - "En plein dans le mille — exactement ce dont la recherche a besoin."
       good:
-        - "Bonne prédiction — encore un point de données solide pour l'étude!"
-        - "Vous avez bien saisi la tendance. Cela renforce le jeu de données."
-        - "Prédiction solide! Votre instinct apporte un vrai signal."
+        - "Bonne prédiction — encore un point de données solide pour l'étude !"
+        - "Tu as bien saisi la tendance. Cela renforce le jeu de données."
+        - "Prédiction solide ! Ton instinct apporte un vrai signal."
         - "Beau travail. Des manches régulières comme celle-ci rendent l'analyse plus fiable."
       average:
-        - "Pas mal — courbe difficile. Votre tentative ajoute quand même du signal à l'étude."
-        - "Lecture raisonnable! Même les prédictions imparfaites aident à cartographier l'intuition humaine."
+        - "Pas mal — courbe difficile. Ta tentative ajoute quand même du signal à l'étude."
+        - "Lecture raisonnable ! Même les prédictions imparfaites aident à cartographier l'intuition humaine."
         - "Estimation correcte. La recherche bénéficie aussi des cas difficiles."
         - "Effort honnête — l'étude mesure l'intuition, pas la perfection."
       keep_practicing:
         - "Fenêtre difficile. Les cas compliqués sont particulièrement instructifs pour la recherche."
         - "Difficile à prévoir — les segments à forte variance nous apprennent le plus."
-        - "Même les experts se trompent sur ceux-ci! C'est exactement ce que l'étude mesure."
-        - "Ne vous en faites pas — là où les humains peinent, c'est là que la science progresse."
+        - "Même les experts se trompent sur ceux-ci ! C'est exactement ce que l'étude mesure."
+        - "Ne t'en fais pas — là où les humains peinent, c'est là que la science progresse."
     milestone:
-      first_round: "Première manche terminée — vous contribuez à la recherche!"
-      minimum_reached: "Minimum atteint! Vos données sont scientifiquement utiles. Des manches supplémentaires les renforcent."
-      all_complete: "Toutes les manches terminées — merci pour un jeu de données complet!"
-    personal_best: "Votre meilleure manche jusqu'ici!"
+      first_round: "Première manche terminée — tu contribues à la recherche !"
+      minimum_reached: "Minimum atteint ! Tes données sont scientifiquement utiles. Des manches supplémentaires les renforcent."
+      all_complete: "Toutes les manches terminées — merci pour un jeu de données complet !"
+    personal_best: "Ta meilleure manche jusqu'ici !"
     progress:
       minimum_goal: "Minimum : %{min_useful}"
       stretch_goal: "Objectif : %{total}"
@@ -375,14 +375,14 @@ fr:
   switch_format:
     title: "Essayer une autre option"
     try_a: "Essayer Données d'exemple = utiliser des données génériques"
-    try_b: "Essayer Mes données = utiliser vos propres données"
-    try_c: "Essayer Exemple + Mes données = utiliser à la fois des données génériques et les vôtres"
-    not_eligible_no_cgm: "B/C ne sont disponibles que si vous avez indiqué avoir des données CGM."
+    try_b: "Essayer Mes données = utiliser tes propres données"
+    try_c: "Essayer Exemple + Mes données = utiliser à la fois des données génériques et les tiennes"
+    not_eligible_no_cgm: "B/C ne sont disponibles que si tu as indiqué avoir des données CGM."
 
   results_disclaimer:
     line1: "Ces scores sont uniquement à des fins de recherche"
-    line2: "Quels que soient vos résultats, ne changez aucune décision médicale sur la base de cette application"
-    line3: "Consultez toujours votre médecin avant de prendre des décisions médicales"
+    line2: "Quels que soient tes résultats, ne change aucune décision médicale sur la base de cette application"
+    line3: "Consulte toujours ton médecin avant de prendre des décisions médicales"
 
   faq:
     title: "Foire Aux Questions (FAQ)"
@@ -390,9 +390,9 @@ fr:
       - title: "Pourquoi cette étude est importante"
         items:
           - q: "Qu'est-ce que Sugar Sugar ?"
-            a: "Sugar Sugar est une application de recherche en ligne construite avec Dash. Elle transforme la prévision du glucose en un jeu interactif : vous voyez une partie d'une trace CGM, vous dessinez comment vous pensez qu'elle va continuer, puis vous comparez votre prédiction avec les valeurs réelles. L'objectif est de mesurer la précision avec laquelle les humains peuvent anticiper la dynamique du glucose à court terme."
+            a: "Sugar Sugar est une application de recherche en ligne construite avec Dash. Elle transforme la prévision de la glycémie en un jeu interactif : tu vois une partie d'une trace CGM, tu dessines comment tu penses qu'elle va continuer, puis tu compares ta prédiction avec les valeurs réelles. L'objectif est de mesurer la précision avec laquelle les humains peuvent anticiper la dynamique de la glycémie à court terme."
           - q: "S'agit-il d'une véritable étude de recherche ?"
-            a: "Oui. Sugar Sugar fait partie d'un véritable effort de recherche. L'étude a reçu l'autorisation du comité d'éthique de l'University Medicine Rostock (Universitätsmedizin Rostock) en Allemagne — nous le mentionnons dans le cadre du contexte de l'étude afin que vous sachiez que la recherche est menée de manière responsable."
+            a: "Oui. Sugar Sugar fait partie d'un véritable effort de recherche. L'étude a reçu l'autorisation du comité d'éthique de l'University Medicine Rostock (Universitätsmedizin Rostock) en Allemagne — nous le mentionnons dans le cadre du contexte de l'étude afin que tu saches que la recherche est menée de manière responsable."
           - q: "Pourquoi la prédiction du glucose est-elle importante pour les personnes diabétiques ?"
             a: "Pour les personnes diabétiques, des prévisions de glucose précises à court terme peuvent faciliter des décisions quotidiennes plus sûres concernant l'insuline, les glucides, l'exercice et le calendrier. Une meilleure prédiction peut aider à réduire les hauts et les bas dangereux et rendre la gestion du glucose moins stressante."
           - q: "Pourquoi la prédiction du glucose est-elle importante pour les personnes non diabétiques ?"
@@ -401,26 +401,26 @@ fr:
             a: "Il n'existe actuellement aucun benchmark publié de base humaine pour la prédiction du glucose CGM. Sans savoir si un humain informé peut prédire les tendances du glucose, nous ne pouvons pas évaluer si un modèle ML est réellement utile — il pourrait être moins bon qu'un diabétique averti, ou meilleur seulement dans des scénarios spécifiques. Cette étude établit cette base de référence afin que les futurs travaux de ML puissent être comparés de manière significative."
           - q: "Une personne sait bien plus que ce qu'un graphique montre — repas, sommeil, stress, digestion, cycle. Sans tout cela, n'est-ce pas juste de la voyance sur des courbes ?"
             a: >-
-              Quand vous regardez votre graphique CGM, vous avez déjà une intuition de la direction que prend le glucose.
-              Vous n'énumérez pas consciemment chaque facteur. Vous observez la courbe et vous lisez ce qui est déjà en train de se passer.
+              Quand tu regardes ton graphique CGM, tu as déjà une intuition de la direction que prend la glycémie.
+              Tu n'énumères pas consciemment chaque facteur. Tu observes la courbe et tu lis ce qui est déjà en train de se passer.
 
 
-              Cela fonctionne parce que les éléments que vous n'avez pas enregistrés se retrouvent quand même dans le glucose.
+              Cela fonctionne parce que les éléments que tu n'as pas enregistrés se retrouvent quand même dans la glycémie.
               Un pic post-repas ressemble à un pic post-repas, que les glucides aient été saisis ou non.
               L'insuline active tire la courbe vers le bas de manière reconnaissable.
-              La ligne de glucose est le résultat de tout ce qui se passe, y compris ce qui n'a pas été suivi.
+              La courbe de glycémie est le résultat de tout ce qui se passe, y compris ce qui n'a pas été suivi.
 
 
-              De plus, si vous téléchargez vos données CGM, le graphique affiche les glucides, l'insuline et l'exercice enregistrés sous forme de marqueurs. Ce n'est donc pas une simple courbe de glucose nue.
+              De plus, si tu téléverses tes données CGM, le graphique affiche les glucides, l'insuline et l'exercice enregistrés sous forme de marqueurs. Ce n'est donc pas une simple courbe de glycémie nue.
 
 
               Est-ce comparable à l'« analyse technique » en bourse ? Non.
               Les cours boursiers évoluent selon la psychologie collective, et la prédiction elle-même influence le marché.
-              Le glucose est de la biochimie. L'insuline a une courbe d'action connue. Les glucides sont absorbés à des vitesses connues.
+              La glycémie, c'est de la biochimie. L'insuline a une courbe d'action connue. Les glucides sont absorbés à des vitesses connues.
               L'heure suivante découle principalement de ce qui est déjà en mouvement.
 
 
-              La recherche le confirme : des études comparant des modèles de prédiction du glucose avec et sans données de repas et d'insuline
+              La recherche le confirme : des études comparant des modèles de prédiction de la glycémie avec et sans données de repas et d'insuline
               ont montré que l'ajout de ces covariables n'améliorait pas la précision à court terme
               ([Daniels et al., 2022](https://pmc.ncbi.nlm.nih.gov/articles/PMC8782424/) ;
               [The Maastricht Study, 2021](https://pmc.ncbi.nlm.nih.gov/articles/PMC8224858/)).
@@ -428,53 +428,53 @@ fr:
 
 
               Nous ne demandons à personne de décrire sa journée entière à un modèle.
-              La question est : en regardant l'écran, êtes-vous capable de deviner où va le glucose ?
+              La question est : en regardant l'écran, es-tu capable de deviner où va la glycémie ?
       - title: "Comment fonctionne l'étude"
         items:
           - q: "Qui peut participer ?"
             a: "Toute personne de 18 ans et plus. Les utilisateurs de CGM sont particulièrement précieux, mais les non-utilisateurs de CGM peuvent également jouer avec des données génériques."
           - q: "Quels appareils et formats CGM sont pris en charge ?"
-            a: "Les exports Dexcom, Libre, Medtronic et Nightscout sont pris en charge. Un ensemble de données d'exemple générique est également disponible si vous n'avez pas d'appareil CGM."
+            a: "Les exports Dexcom, Libre, Medtronic et Nightscout sont pris en charge. Un jeu de données d'exemple générique est également disponible si tu n'as pas d'appareil CGM."
           - q: "Combien de temps cela prend-il ?"
-            a: "Chaque manche prend environ 2 à 3 minutes. Une session complète (12 manches) dure environ 30 minutes, mais vous pouvez la répartir sur plusieurs visites."
+            a: "Chaque manche prend environ 2 à 3 minutes. Une session complète (12 manches) dure environ 30 minutes, mais tu peux la répartir sur plusieurs visites."
           - q: "Puis-je m'arrêter en cours de route et reprendre plus tard ?"
-            a: "Oui. Le jeu enregistre votre progression localement dans le navigateur. Si 12 manches vous semblent trop lourdes en une seule séance, fermez l'onglet et revenez plus tard — on vous proposera de continuer là où vous vous étiez arrêté. Quelques manches suffisent à être utiles, mais chaque manche supplémentaire améliore la qualité des données."
+            a: "Oui. Le jeu enregistre ta progression localement dans le navigateur. Si 12 manches te semblent trop lourdes en une seule séance, ferme l'onglet et reviens plus tard — on te proposera de continuer là où tu t'étais arrêté. Quelques manches suffisent à être utiles, mais chaque manche supplémentaire améliore la qualité des données."
           - q: "Et si je n'aime pas mes résultats ? Dois-je recommencer ?"
-            a: "Veuillez ne pas recommencer simplement parce que vous n'êtes pas satisfait de votre précision. Les gens préfèrent naturellement garder les bons scores et écarter les mauvais, mais cela fausserait l'étude et rendrait les résultats moins valables scientifiquement. Si vous vous sentez déçu, la meilleure chose à faire est de continuer avec une autre manche plutôt que de réinitialiser votre progression."
+            a: "Merci de ne pas recommencer simplement parce que tu n'es pas satisfait de ta précision. Les gens préfèrent naturellement garder les bons scores et écarter les mauvais, mais cela fausserait l'étude et rendrait les résultats moins valables scientifiquement. Si tu te sens déçu, la meilleure chose à faire est de continuer avec une autre manche plutôt que de réinitialiser ta progression."
           - q: "Quelles sont les métriques de précision ?"
-            a: "Nous utilisons des métriques de prévision standard — MAE, RMSE et MAPE — pour quantifier la proximité de votre courbe de glucose prédite par rapport à la courbe réelle. La MAE est l'erreur absolue moyenne : elle vous indique de combien vous vous êtes trompé en moyenne. La RMSE pénalise plus fortement les erreurs plus importantes, elle met donc en évidence les cas où la prédiction était très erronée. La MAPE exprime l'erreur en pourcentage, ce qui aide à comparer les performances sur différentes plages de glucose. Ensemble, ces mesures donnent une image plus complète qu'un score unique."
+            a: "Nous utilisons des métriques de prévision standard — MAE, RMSE et MAPE — pour quantifier la proximité de ta courbe de glycémie prédite par rapport à la courbe réelle. La MAE est l'erreur absolue moyenne : elle t'indique de combien tu t'es trompé en moyenne. La RMSE pénalise plus fortement les erreurs plus importantes, elle met donc en évidence les cas où la prédiction était très erronée. La MAPE exprime l'erreur en pourcentage, ce qui aide à comparer les performances sur différentes plages de glycémie. Ensemble, ces mesures donnent une image plus complète qu'un score unique."
           - q: "Quelles sont les limites de cette étude ?"
             a: >-
               Nous tenons à être transparents :
 
-              - **Horizon court uniquement.** Nous vous demandons de prédire l'heure suivante. La prédiction à plus long terme est un problème beaucoup plus difficile où les facteurs non mesurés dominent.
+              - **Horizon court uniquement.** Nous te demandons de prédire l'heure suivante. La prédiction à plus long terme est un problème beaucoup plus difficile où les facteurs non mesurés dominent.
 
-              - **Les événements enregistrés peuvent être incomplets.** Le graphique affiche ce que votre application CGM a enregistré — si vous n'avez pas saisi un repas ou une dose, cela n'apparaîtra pas, et vous comme un modèle travaillez avec la même image incomplète.
+              - **Les événements enregistrés peuvent être incomplets.** Le graphique affiche ce que ton application CGM a enregistré — si tu n'as pas saisi un repas ou une dose, cela n'apparaîtra pas, et toi comme un modèle travaillez avec la même image incomplète.
 
-              - **Pas de contexte personnel.** Dans la vie réelle, vous savez des choses qui ne figurent pas dans les données — que vous couvez un rhume, que vous êtes sur le point d'aller courir, que c'est votre troisième café. Cette étude isole la capacité de lecture du graphique de la connaissance personnelle.
+              - **Pas de contexte personnel.** Dans la vie réelle, tu sais des choses qui ne figurent pas dans les données — que tu couves un rhume, que tu es sur le point d'aller courir, que c'est ton troisième café. Cette étude isole la capacité de lecture du graphique de la connaissance personnelle.
 
               - **Pas de pression en temps réel.** Tracer calmement une ligne de prédiction est différent de prendre une décision de dosage à 2 heures du matin à moitié endormi.
 
-              - **Données d'exemple vs données personnelles.** Si vous jouez avec les données d'exemple intégrées, votre précision peut différer de la prédiction sur votre propre glucose. Nous vous encourageons à télécharger votre propre export CGM (Dexcom, Libre, Medtronic ou Nightscout) — votre intuition personnelle sur vos propres schémas fait partie de ce qui rend la comparaison avec le ML intéressante.
+              - **Données d'exemple vs données personnelles.** Si tu joues avec les données d'exemple intégrées, ta précision peut différer de la prédiction sur ta propre glycémie. Nous t'encourageons à téléverser ton propre export CGM (Dexcom, Libre, Medtronic ou Nightscout) — ton intuition personnelle sur tes propres schémas fait partie de ce qui rend la comparaison avec le ML intéressante.
       - title: "Données et confidentialité"
         items:
           - q: "Mes données sont-elles stockées ?"
-            a: "Tant que vous ne choisissez pas de soumettre, tout reste dans votre propre navigateur. Rien n'est envoyé à nos serveurs à moins que vous ne consentiez activement et que vous ne soumettiez vos résultats. Si vous sélectionnez \"Je veux seulement jouer\", aucune donnée ne quitte jamais votre appareil."
+            a: "Tant que tu ne choisis pas de soumettre, tout reste dans ton propre navigateur. Rien n'est envoyé à nos serveurs à moins que tu ne consentes activement et que tu ne soumettes tes résultats. Si tu sélectionnes \"Je veux seulement jouer\", aucune donnée ne quitte jamais ton appareil."
           - q: "Quelles données sont collectées si je consens ?"
-            a: "Données de jeu (prédictions tracées, mesures de précision), éventuellement votre fichier CGM téléchargé et un court questionnaire (âge, expérience CGM, statut diabétique, etc.)."
+            a: "Données de jeu (prédictions tracées, mesures de précision), éventuellement le fichier CGM que tu as téléversé et un court questionnaire (âge, expérience CGM, statut diabétique, etc.)."
           - q: "Mes données CGM sont-elles partagées avec des tiers ?"
             a: "Non. Les données sont utilisées uniquement pour cette étude et ne sont jamais vendues ou partagées avec des tiers non autorisés."
           - q: "Puis-je me retirer ?"
-            a: "Oui, à tout moment en fermant le navigateur. Pour faire supprimer les données déjà soumises, veuillez contacter l'équipe de l'étude."
+            a: "Oui, à tout moment en fermant le navigateur. Pour faire supprimer les données déjà soumises, contacte l'équipe de l'étude."
           - q: "Qu'est-ce qui empêche quelqu'un de falsifier ses résultats ?"
-            a: "Honnêtement ? Rien de technique. Puisque toutes les données résident dans le stockage local de votre propre navigateur, nous comptons entièrement sur l'honnêteté et la bonne foi des participants — et nous vous faisons sincèrement confiance. Cela dit, si vous voulez vraiment impressionner vos amis avec un score de prédiction suspicieusement parfait, faites simplement une capture d'écran et retouchez-la dans un éditeur d'images, ou utilisez les DevTools de votre navigateur pour modifier les chiffres affichés. Veuillez ne pas soumettre de fausses données à l'étude — cela nuit directement à la validité scientifique de la recherche dont tout le monde bénéficie."
+            a: "Honnêtement ? Rien de technique. Puisque toutes les données résident dans le stockage local de ton propre navigateur, nous comptons entièrement sur l'honnêteté et la bonne foi des participants — et nous te faisons sincèrement confiance. Cela dit, si tu veux vraiment impressionner tes amis avec un score de prédiction suspicieusement parfait, fais simplement une capture d'écran et retouche-la dans un éditeur d'images, ou utilise les DevTools de ton navigateur pour modifier les chiffres affichés. Merci de ne pas soumettre de fausses données à l'étude — cela nuit directement à la validité scientifique de la recherche dont tout le monde bénéficie."
       - title: "Aide et contribution"
         items:
           - q: "Et si j'ai trouvé un bug ?"
-            a: "Veuillez ouvrir un ticket sur le GitHub du projet à l'adresse [github.com/GlucoseDAO/sugar-sugar](https://github.com/GlucoseDAO/sugar-sugar). Les rapports de bugs sont très utiles pour améliorer l'application et pour identifier tout ce qui pourrait affecter l'expérience de l'étude ou la qualité des données."
+            a: "Ouvre un ticket sur le GitHub du projet à l'adresse [github.com/GlucoseDAO/sugar-sugar](https://github.com/GlucoseDAO/sugar-sugar). Les rapports de bugs sont très utiles pour améliorer l'application et pour identifier tout ce qui pourrait affecter l'expérience de l'étude ou la qualité des données."
           - q: "Je suis un développeur de logiciels. Puis-je contribuer à une fonctionnalité ?"
             a: "Oui, les contributions sont les bienvenues via le GitHub du projet à l'adresse [github.com/GlucoseDAO/sugar-sugar](https://github.com/GlucoseDAO/sugar-sugar). Nous accueillons particulièrement les corrections, les améliorations de l'interface utilisateur, le support de nouveaux capteurs ou formats de fichiers, et d'autres changements qui améliorent la convivialité sans modifier le protocole scientifique. Comme il s'agit d'une étude active, les changements qui affectent la conception de l'étude en cours de route — comme de nouveaux champs de questionnaire ou des modifications de la tâche principale — doivent d'abord être discutés avec l'équipe."
           - q: "Comment puis-je aider l'étude d'une autre manière ?"
-            a: "Même si vous n'êtes pas un développeur de logiciels, vous pouvez quand même beaucoup aider. Partagez l'étude avec les communautés concernées, informez d'autres utilisateurs de CGM ou des personnes intéressées, signalez les formulations peu claires ou les problèmes de convivialité, et contactez l'équipe de l'étude via les canaux de contact du projet si vous souhaitez collaborer de quelque manière que ce soit."
+            a: "Même si tu n'es pas développeur de logiciels, tu peux quand même beaucoup aider. Partage l'étude avec les communautés concernées, parles-en à d'autres utilisateurs de CGM ou à des personnes intéressées, signale les formulations peu claires ou les problèmes de convivialité, et contacte l'équipe de l'étude via les canaux de contact du projet si tu souhaites collaborer de quelque manière que ce soit."
           - q: "Où puis-je trouver la conception complète de l'étude ?"
             a: "Sur la page \"L'Étude\" dans la barre de navigation, qui comprend un téléchargement PDF et un lien vers le dépôt GitHub."

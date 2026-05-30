@@ -9,7 +9,7 @@ es:
     game: "Juego"
     finish_exit: "Finalizar / Salir"
     the_study: "El Estudio"
-    contact_us: "Contáctenos"
+    contact_us: "Contáctanos"
     video_instructions: "Instrucciones en video"
     faq: "Preguntas frecuentes (FAQ)"
 
@@ -43,7 +43,7 @@ es:
     your_choices_text: "Por defecto, asumimos que aceptas participar en el estudio. Si solo quieres jugar, marca la primera casilla."
     consent_play_only: "Solo quiero jugar (no guardar mis datos de CGM / juego)"
     consent_receive_results: "Quiero recibir mis resultados más tarde"
-    consent_keep_updated: "Manténganme informado sobre las actualizaciones del proyecto"
+    consent_keep_updated: "Mantenme al día sobre las novedades del proyecto"
     consent_acknowledge_label: "Tengo 18 años o más y he leído los términos y condiciones."
     consent_gdpr_label: "Doy mi consentimiento para el tratamiento de mis datos personales, para los fines indicados en el aviso de consentimiento, de acuerdo con el Reglamento General de Protección de Datos (UE) 2016/679. Entiendo que mis datos se manejarán de forma segura, no se compartirán con terceros no autorizados y que puedo retirar mi consentimiento en cualquier momento."
     open_consent_form: "Abrir aviso de consentimiento"
@@ -78,7 +78,7 @@ es:
     github_link_label: "Proyecto en GitHub"
 
   contact:
-    title: "Contáctenos"
+    title: "Contáctanos"
     body: "Si tienes preguntas, comentarios o quieres que se eliminen tus datos, ponte en contacto con nosotros a través de los datos que figuran a continuación."
     study_contacts_title: "Contactos del estudio"
     general_email_title: "Correo electrónico general del equipo"
@@ -97,7 +97,7 @@ es:
     body: "Prueba una demo rápida del juego de predicción de glucosa Sugar Sugar."
 
   startup:
-    fork_me: "Forkeame en GitHub"
+    fork_me: "Hazme un fork en GitHub"
     required_fields_note: "* Campos obligatorios"
     email_label: "Correo electrónico"
     email_placeholder: "Ingresa tu correo (opcional a menos que quieras resultados/actualizaciones)"
@@ -155,16 +155,16 @@ es:
     upload_success: "Datos cargados correctamente desde %{filename}. Estos datos se usarán para las predicciones."
     example_data_now_using: "Ahora usando datos genéricos. Sube un archivo CSV para análisis personalizado."
     example_data_warning: "Usando actualmente datos genéricos. Sube tu propio archivo CSV de Dexcom/Libre/Medtronic/Nightscout para análisis personalizado."
-    csv_tab_label: "CSV File"
+    csv_tab_label: "Archivo CSV"
     nightscout_tab_label: "Nightscout"
-    nightscout_url_placeholder: "https://your-nightscout-site.com"
-    nightscout_token_placeholder: "Access token (optional)"
-    nightscout_load_button: "Load from Nightscout"
-    nightscout_loading: "Loading data from Nightscout…"
-    nightscout_success: "Successfully loaded %{count} glucose readings from Nightscout."
-    nightscout_error: "Failed to load from Nightscout: %{error}"
-    nightscout_url_required: "Please enter a Nightscout URL."
-    nightscout_consent_required: "Please grant data usage consent before loading Nightscout data."
+    nightscout_url_placeholder: "https://tu-sitio-nightscout.com"
+    nightscout_token_placeholder: "Token de acceso (opcional)"
+    nightscout_load_button: "Cargar desde Nightscout"
+    nightscout_loading: "Cargando datos desde Nightscout…"
+    nightscout_success: "Se cargaron correctamente %{count} lecturas de glucosa desde Nightscout."
+    nightscout_error: "Error al cargar desde Nightscout: %{error}"
+    nightscout_url_required: "Por favor, introduce una URL de Nightscout."
+    nightscout_consent_required: "Por favor, concede el consentimiento de uso de datos antes de cargar datos de Nightscout."
     current_data_source: "Fuente de datos actual:"
     weight_label: "Peso"
     description_1: "¡Pon a prueba tus habilidades de predicción de glucosa!"
@@ -241,7 +241,7 @@ es:
       excellent:
         lines:
           - "Predices la glucosa como un pro. %{rounds} rondas y siempre preciso. ¿Crees que me puedes ganar?"
-          - "Cada curva pillada en %{rounds} rondas. Tu muro es el próximo - dale a jugar y trata de superarlo."
+          - "Cada curva pillada en %{rounds} rondas. Te toca a ti: dale a jugar y trata de superarme."
           - "Instinto de patrones al máximo. %{rounds} rondas y sigo sin fallar. Te toca."
           - "Así se ven %{rounds} rondas prediciendo limpio. Apuesto que no aguantas el ritmo."
       good:
@@ -249,11 +249,11 @@ es:
           - "Buen ritmo. %{rounds} rondas y mis predicciones cayeron cerca. ¿Puedes caer más cerca?"
           - "Fino para aguantar la línea %{rounds} rondas. Te toca - demuestra que me equivoco."
           - "%{rounds} rondas, pulso firme. ¿Te crees más rápido con el lápiz? Enséñame."
-          - "Le acerté a la curva más de lo que fallé en %{rounds} rondas. ¿Quién lo supera primero?"
+          - "%{rounds} rondas y sigo siguiendo la curva. ¿Quién lo supera primero?"
       average:
         lines:
           - "%{rounds} rondas y la curva sigue huyendo. Apuesto que no me ganas al primer intento."
-          - "Persiguiendo la glucosa %{rounds} rondas. Fácil, ¿no? Demuéstralo."
+          - "Predecir la glucosa es más complicado de lo que parece. %{rounds} rondas hechas, ¿puedes hacerlo mejor?"
           - "%{rounds} rondas metido. Los números son traicioneros - a ver si los engañas."
           - "Empecé a subir en la tabla en %{rounds} rondas. ¿Te animas a acompañarme arriba?"
       keep_practicing:
@@ -266,7 +266,7 @@ es:
       title: "Error de predicción en la próxima hora"
       x_axis: "Tiempo (minutos desde el inicio de la siguiente hora oculta; cada paso de 5 min)"
       x_axis_time: "Tiempo"
-      y_axis: "Error en porcentaje del valor real"
+      y_axis: "Error porcentual respecto al valor real (en cada paso de 5 min)"
       y_axis_short: "Error"
       legend_zero: "Sin desviación"
       legend_variability: "Línea de variabilidad"
@@ -333,37 +333,37 @@ es:
     local_storage_note: "Tu progreso se guarda localmente en este navegador. Puedes tomarte un descanso y reanudarlo más tarde usando el mismo navegador."
     reaction:
       excellent:
-        - "Precisión de nivel sensor — datos como estos realmente impulsan la investigación!"
+        - "¡Precisión de nivel sensor — datos como estos realmente impulsan la investigación!"
         - "Leíste esa curva como un profesional. Precisión poco común, contribución valiosa."
-        - "Casi perfecto! Esta ronda es un dato sólido para el estudio."
+        - "¡Casi perfecto! Esta ronda es un dato sólido para el estudio."
         - "Justo en el blanco — exactamente lo que la investigación necesita."
       good:
-        - "Buena predicción — otro dato sólido para el estudio!"
+        - "¡Buena predicción — otro dato sólido para el estudio!"
         - "Captaste bien la tendencia. Esto fortalece el conjunto de datos."
-        - "Predicción sólida! Tu instinto está aportando señal real."
+        - "¡Predicción sólida! Tu instinto está aportando señal real."
         - "Buen trabajo. Rondas consistentes como esta hacen el análisis más fiable."
       average:
         - "No está mal — curva complicada. Tu intento aún añade señal al estudio."
-        - "Lectura razonable! Incluso las predicciones imperfectas ayudan a mapear la intuición humana."
+        - "¡Lectura razonable! Incluso las predicciones imperfectas ayudan a mapear la intuición humana."
         - "Estimación aceptable. La investigación también se beneficia de los casos difíciles."
         - "Esfuerzo decente — el estudio mide la intuición, no la perfección."
       keep_practicing:
         - "Ventana difícil. Los casos complicados son especialmente informativos para la investigación."
         - "Difícil de predecir — los segmentos de alta variabilidad son los que más nos enseñan."
-        - "Incluso los expertos fallan estos! Eso es exactamente lo que el estudio está midiendo."
+        - "¡Incluso los expertos fallan estos! Eso es exactamente lo que el estudio está midiendo."
         - "No te preocupes — donde los humanos tienen dificultades es donde la ciencia aprende."
     milestone:
-      first_round: "Primera ronda completada — estás contribuyendo a la investigación!"
-      minimum_reached: "Mínimo alcanzado! Tus datos son científicamente útiles. Las rondas adicionales los fortalecen."
-      all_complete: "Todas las rondas completadas — gracias por un conjunto de datos completo!"
-    personal_best: "Tu mejor ronda hasta ahora!"
+      first_round: "¡Primera ronda completada — estás contribuyendo a la investigación!"
+      minimum_reached: "¡Mínimo alcanzado! Tus datos son científicamente útiles. Las rondas adicionales los fortalecen."
+      all_complete: "¡Todas las rondas completadas — gracias por un conjunto de datos completo!"
+    personal_best: "¡Tu mejor ronda hasta ahora!"
     progress:
       minimum_goal: "Mínimo: %{min_useful}"
       stretch_goal: "Objetivo: %{total}"
       bonus_rounds: "Rondas extra"
 
   final:
-    title: "Analyse complète"
+    title: "Análisis completo"
     rounds_played: "Rondas jugadas: %{played} / %{total}"
     played_formats: "Formatos jugados hasta ahora: %{formats}"
     ranking_title: "Ranking"
@@ -381,8 +381,8 @@ es:
 
   results_disclaimer:
     line1: "Estos resultados son solo para fines de investigación"
-    line2: "Independientemente de sus resultados, no cambie ninguna decisión médica basada en esta aplicación"
-    line3: "Consulte siempre a su médico antes de tomar decisiones médicas"
+    line2: "Independientemente de tus resultados, no cambies ninguna decisión médica basándote en esta aplicación"
+    line3: "Consulta siempre a tu médico antes de tomar decisiones médicas"
 
   faq:
     title: "Preguntas frecuentes (FAQ)"
