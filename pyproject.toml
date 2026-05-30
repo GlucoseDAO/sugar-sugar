@@ -31,6 +31,7 @@ dependencies = [
     "segno>=1.6.0",
     "cgm-format[cli]>=0.8.2",
     "gunicorn>=26.0.0",
+    "dash-ag-grid>=35.2.0",
 ]
 
 [project.scripts]

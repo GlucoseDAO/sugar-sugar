@@ -3,8 +3,7 @@ from functools import lru_cache
 from html import escape as html_escape
 from io import BytesIO
 import dash
-from dash import dcc, html, Output, Input, State, no_update, dash_table, ctx
-from dash.dash_table.Format import Format, Scheme
+from dash import dcc, html, Output, Input, State, no_update, ctx
 from dash.exceptions import PreventUpdate
 import plotly.graph_objs as go
 
@@ -40,8 +39,18 @@ except Exception:
 
 logs_dir = project_root / 'logs'
 logs_dir.mkdir(exist_ok=True)
-to_nice_stdout()
-to_nice_file(logs_dir / 'sugar_sugar.json', logs_dir / 'sugar_sugar.log')
+
+
+def _configure_eliot_logging() -> None:
+    """Install human-readable Eliot log renderers unless explicitly disabled."""
+    if os.environ.get("SUGAR_SUGAR_DISABLE_NICE_LOGS") == "1":
+        return
+
+    to_nice_stdout()
+    to_nice_file(logs_dir / 'sugar_sugar.json', logs_dir / 'sugar_sugar.log')
+
+
+_configure_eliot_logging()
 
 from sugar_sugar.i18n import setup_i18n, normalize_locale, t, t_list, t_raw
 setup_i18n()
@@ -75,6 +84,7 @@ import sugar_sugar.config as sugar_sugar_config
 from sugar_sugar.components.glucose import GlucoseChart
 from sugar_sugar.components.metrics import MetricsComponent
 from sugar_sugar.components.predictions import PredictionTableComponent
+from sugar_sugar.components.ag_grid import build_readonly_ag_grid, build_readonly_column_defs
 from sugar_sugar.components.startup import StartupPage
 from sugar_sugar.components.landing import LandingPage
 from sugar_sugar.components.consent_form import ConsentFormPage
@@ -1376,8 +1386,8 @@ def update_prediction_text_on_language_change(
      Output('ending-units-line', 'children'),
      Output('ending-graph-explanation', 'children'),
      Output('ending-prediction-results-title', 'children'),
-     Output('ending-prediction-table', 'data'),
-     Output('ending-prediction-table', 'columns'),
+     Output('ending-prediction-table', 'rowData'),
+     Output('ending-prediction-table', 'columnDefs'),
      Output('ending-metrics-container', 'children'),
      Output('ending-local-storage-note', 'children'),
      Output('finish-study-button-ending', 'children'),
@@ -1422,7 +1432,7 @@ def update_ending_text_on_language_change(
     }
 
     table_data: list[dict[str, str]] = no_update
-    table_columns: list[dict[str, str]] = no_update
+    table_columns: list[dict[str, Any]] = no_update
     if user_info and 'prediction_table_data' in user_info:
         raw_table = _convert_table_data_units(user_info['prediction_table_data'], unit)
         table_data = []
@@ -1430,11 +1440,11 @@ def update_ending_text_on_language_change(
             new_row = dict(row)
             new_row["metric"] = metric_label_map.get(str(row.get("metric", "")), str(row.get("metric", "")))
             table_data.append(new_row)
-        table_columns = [{'name': t("ui.table.metric_header", locale=locale), 'id': 'metric'}] + [
+        table_columns = build_readonly_column_defs([{'name': t("ui.table.metric_header", locale=locale), 'id': 'metric'}] + [
             {'name': f'T{i}', 'id': f't{i}', 'type': 'text'}
             for i in range(len(raw_table[0]) - 1)
             if raw_table and raw_table[1].get(f't{i}', '-') != '-'
-        ]
+        ])
 
     metrics_display: Any = no_update
     if user_info and 'prediction_table_data' in user_info:
@@ -2664,46 +2674,25 @@ def create_ending_layout(
                 'marginBottom': '15px',
                 'fontSize': 'clamp(18px, 3vw, 24px)'
             }),
-            dash_table.DataTable(
-                id='ending-prediction-table',
-                data=prediction_table_data_display,
-                columns=[{'name': t("ui.table.metric_header", locale=locale), 'id': 'metric'}] + [
-                    {'name': f'T{i}', 'id': f't{i}', 'type': 'text'}
-                    for i in range(len(prediction_table_data[0]) - 1)
-                    if prediction_table_data
-                    and prediction_table_data[1].get(f't{i}', '-') != '-'
-                ],
-                cell_selectable=False,
-                row_selectable=False,
-                editable=False,
-                style_table={
+            build_readonly_ag_grid(
+                table_id='ending-prediction-table',
+                row_data=prediction_table_data_display,
+                column_defs=build_readonly_column_defs(
+                    [{'name': t("ui.table.metric_header", locale=locale), 'id': 'metric'}] + [
+                        {'name': f'T{i}', 'id': f't{i}', 'type': 'text'}
+                        for i in range(len(prediction_table_data[0]) - 1)
+                        if prediction_table_data
+                        and prediction_table_data[1].get(f't{i}', '-') != '-'
+                    ]
+                ),
+                style={
                     'width': '100%',
                     'height': 'auto',
                     'maxHeight': 'clamp(300px, 40vh, 500px)',
                     'overflowY': 'auto',
                     'overflowX': 'auto',
-                    'tableLayout': 'fixed'
                 },
-                style_cell={
-                    'textAlign': 'center',
-                    'padding': 'clamp(2px, 1vw, 4px) clamp(1px, 0.5vw, 2px)',
-                    'fontSize': 'clamp(8px, 1.5vw, 12px)',
-                    'whiteSpace': 'nowrap',
-                    'overflow': 'hidden',
-                    'textOverflow': 'ellipsis',
-                    'lineHeight': '1.2',
-                    'minWidth': '40px'
-                },
-                style_data_conditional=[
-                    {
-                        'if': {'row_index': 0},
-                        'backgroundColor': 'rgba(200, 240, 200, 0.5)'
-                    },
-                    {
-                        'if': {'row_index': 1},
-                        'backgroundColor': 'rgba(255, 200, 200, 0.5)'
-                    }
-                ]
+                highlight_first_two_rows=True,
             )
         ], style={
             'marginBottom': '20px',
@@ -3216,34 +3205,24 @@ def create_final_layout(full_df_data: Optional[Dict], user_info: Dict[str, Any],
                     'fontSize': '14px'
                 }
             ),
-            dash_table.DataTable(
-                id='final-rounds-table',
-                data=round_rows,
-                columns=[
-                    {'name': 'Round', 'id': 'Round', 'type': 'numeric'},
-                    {'name': 'Pairs', 'id': 'Pairs', 'type': 'numeric'},
-                    {'name': 'MAE', 'id': 'MAE', 'type': 'numeric', 'format': Format(precision=2, scheme=Scheme.fixed)},
-                    {'name': 'MSE', 'id': 'MSE', 'type': 'numeric', 'format': Format(precision=2, scheme=Scheme.fixed)},
-                    {'name': 'RMSE', 'id': 'RMSE', 'type': 'numeric', 'format': Format(precision=2, scheme=Scheme.fixed)},
-                    {'name': 'MAPE', 'id': 'MAPE', 'type': 'numeric', 'format': Format(precision=2, scheme=Scheme.fixed)},
-                ],
-                cell_selectable=False,
-                row_selectable=False,
-                editable=False,
-                style_table={
+            build_readonly_ag_grid(
+                table_id='final-rounds-table',
+                row_data=round_rows,
+                column_defs=build_readonly_column_defs(
+                    [
+                        {'name': 'Round', 'id': 'Round', 'type': 'numeric'},
+                        {'name': 'Pairs', 'id': 'Pairs', 'type': 'numeric'},
+                        {'name': 'MAE', 'id': 'MAE', 'type': 'numeric'},
+                        {'name': 'MSE', 'id': 'MSE', 'type': 'numeric'},
+                        {'name': 'RMSE', 'id': 'RMSE', 'type': 'numeric'},
+                        {'name': 'MAPE', 'id': 'MAPE', 'type': 'numeric'},
+                    ],
+                    fixed_decimal_fields={'MAE', 'MSE', 'RMSE', 'MAPE'},
+                ),
+                style={
                     'width': '100%',
-                    'overflowX': 'auto'
+                    'overflowX': 'auto',
                 },
-                style_cell={
-                    'textAlign': 'center',
-                    'padding': '8px',
-                    'fontSize': '14px',
-                    'whiteSpace': 'nowrap'
-                },
-                style_header={
-                    'backgroundColor': '#f8fafc',
-                    'fontWeight': 'bold'
-                }
             )
         ], disable_n_clicks=True, style={
             'marginBottom': '20px',
