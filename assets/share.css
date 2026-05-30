@@ -150,6 +150,12 @@
 .share-btn {
   transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
   box-shadow: 0 3px 12px rgba(15, 23, 42, 0.15);
+  min-height: 44px;
+  height: 44px;
+  line-height: 1 !important;
+  box-sizing: border-box;
+  border: 0;
+  vertical-align: middle;
 }
 .share-btn:hover {
   transform: translateY(-1px);
@@ -161,6 +167,36 @@
 .share-btn:active {
   transform: translateY(0);
   filter: brightness(0.95);
+}
+
+.share-page .share-action-button.ui.button {
+  min-height: 44px;
+  height: 44px;
+  width: 220px;
+  padding: 0 22px !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  line-height: 1 !important;
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 !important;
+  vertical-align: middle;
+}
+
+.share-page #share-copy-link-feedback {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 6px);
+  transform: translateX(-50%);
+  margin: 0 !important;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.share-page .share-action-button.ui.button i,
+.share-page .share-btn i {
+  line-height: 1;
 }
 
 /* Copy-link feedback fades in via JS toggling opacity. */

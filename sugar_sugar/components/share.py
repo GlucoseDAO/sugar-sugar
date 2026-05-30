@@ -1253,7 +1253,7 @@ def build_share_card_figure(
 def _share_button(label: str, href: str, *, color: str, icon: str) -> html.A:
     """Render a pill-style social-share button."""
     return html.A(
-        [html.I(className=f"fab {icon}", style={"marginRight": "8px"}),
+        [html.I(className=f"fa-brands {icon}", style={"marginRight": "8px"}),
          label],
         href=href,
         target="_blank",
@@ -1269,7 +1269,56 @@ def _share_button(label: str, href: str, *, color: str, icon: str) -> html.A:
             "fontSize": "15px",
             "display": "inline-flex",
             "alignItems": "center",
+            "justifyContent": "center",
             "gap": "6px",
+        },
+    )
+
+
+def _share_copy_button(label: str) -> html.Button:
+    """Render the copy-link action in the same visual style as social links."""
+    return html.Button(
+        [html.I(className="fas fa-link", style={"marginRight": "8px"}), label],
+        id="share-copy-link-button",
+        n_clicks=0,
+        className="share-btn share-copy-btn",
+        style={
+            "backgroundColor": "#64748b",
+            "color": "white",
+            "padding": "12px 20px",
+            "borderRadius": "999px",
+            "border": "none",
+            "fontWeight": "600",
+            "fontSize": "15px",
+            "display": "inline-flex",
+            "alignItems": "center",
+            "justifyContent": "center",
+            "gap": "6px",
+            "cursor": "pointer",
+        },
+    )
+
+
+def _share_discord_button(label: str) -> html.Button:
+    """Render Discord share action; Discord has no URL-prefill web intent."""
+    return html.Button(
+        [html.I(className="fa-brands fa-discord", style={"marginRight": "8px"}), label],
+        id="share-discord-button",
+        n_clicks=0,
+        className="share-btn share-discord-btn",
+        style={
+            "backgroundColor": "#5865F2",
+            "color": "white",
+            "padding": "12px 20px",
+            "borderRadius": "999px",
+            "border": "none",
+            "fontWeight": "600",
+            "fontSize": "15px",
+            "display": "inline-flex",
+            "alignItems": "center",
+            "justifyContent": "center",
+            "gap": "6px",
+            "cursor": "pointer",
         },
     )
 
@@ -1370,6 +1419,8 @@ def create_share_layout(
                 f"https://t.me/share/url?url={encoded_url}&text={urllib.parse.quote(invite_text, safe='')}",
                 color="#26A5E4", icon="fa-telegram",
             ),
+            _share_discord_button(t("ui.share.share_on_discord", locale=loc)),
+            _share_copy_button(t("ui.share.share_as_link", locale=loc)),
         ],
         className="share-buttons",
         style={"display": "flex", "flexWrap": "wrap", "gap": "10px",
@@ -1621,30 +1672,12 @@ def create_share_layout(
                  t("ui.share.download_png", locale=loc)],
                 href=download_href,
                 download=f"sugar-sugar-{share_id}.png",
-                className="ui green button",
-                style={"padding": "14px 24px", "fontSize": "16px", "marginRight": "8px"},
-            ),
-            html.Button(
-                [html.I(className="fas fa-share-nodes", style={"marginRight": "8px"}),
-                 t("ui.share.share_native", locale=loc)],
-                id="share-native-button",
-                n_clicks=0,
-                className="ui blue button",
-                style={"padding": "14px 24px", "fontSize": "16px", "marginRight": "8px"},
-            ),
-            html.Button(
-                [html.I(className="fas fa-link", style={"marginRight": "8px"}),
-                 t("ui.share.copy_link", locale=loc)],
-                id="share-copy-link-button",
-                n_clicks=0,
-                className="ui button",
-                style={"padding": "14px 24px", "fontSize": "16px"},
+                className="ui green button share-action-button",
             ),
             html.Span(
                 t("ui.share.copy_link_success", locale=loc),
                 id="share-copy-link-feedback",
-                style={"marginLeft": "12px", "color": "#16a34a",
-                       "fontWeight": "600", "opacity": "0",
+                style={"color": "#16a34a", "fontWeight": "600", "opacity": "0",
                        "transition": "opacity 0.2s ease-in"},
                 disable_n_clicks=True,
             ),
@@ -1653,11 +1686,12 @@ def create_share_layout(
                  t("ui.share.play_again", locale=loc)],
                 id="share-play-again-button",
                 n_clicks=0,
-                className="ui button",
-                style={"padding": "14px 24px", "fontSize": "16px", "marginLeft": "8px"},
+                className="ui button share-action-button",
             ),
         ],
-        style={"marginTop": "20px", "textAlign": "center"},
+        style={"marginTop": "20px", "textAlign": "center", "display": "flex",
+               "justifyContent": "center", "alignItems": "center", "gap": "10px",
+               "flexWrap": "wrap", "position": "relative"},
         disable_n_clicks=True,
     )
 

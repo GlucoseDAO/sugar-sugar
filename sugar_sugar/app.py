@@ -543,7 +543,7 @@ external_stylesheets = [
     'https://codepen.io/chriddyp/pen/bWLwgP.css',
     dbc.themes.BOOTSTRAP,
     'https://cdn.jsdelivr.net/npm/fomantic-ui@2.9.3/dist/semantic.min.css',
-    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css',
+    'https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.2.0/css/all.min.css',
 ]
 
 external_scripts: list[dict[str, str]] = []
@@ -4032,16 +4032,12 @@ app.clientside_callback(
 
 app.clientside_callback(
     """
-    async function(n_clicks, url) {
+    function(n_clicks, url) {
         if (!n_clicks) { return window.dash_clientside.no_update; }
         if (!url) { return window.dash_clientside.no_update; }
-        var title = document.title || 'Sugar Sugar';
-        var text = 'Sugar Sugar glucose prediction results';
         try {
-            if (navigator.share) {
-                await navigator.share({title: title, text: text, url: url});
-            } else if (navigator.clipboard && navigator.clipboard.writeText) {
-                await navigator.clipboard.writeText(url);
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(url);
             } else {
                 var ta = document.createElement('textarea');
                 ta.value = url;
@@ -4052,11 +4048,8 @@ app.clientside_callback(
                 document.execCommand('copy');
                 document.body.removeChild(ta);
             }
-        } catch (e) {
-            if (e && e.name === 'AbortError') {
-                return window.dash_clientside.no_update;
-            }
-        }
+        } catch (e) { /* ignore */ }
+        window.open('https://discord.com/channels/@me', '_blank', 'noopener,noreferrer,width=980,height=720');
         var feedback = document.getElementById('share-copy-link-feedback');
         if (feedback) {
             feedback.style.opacity = '1';
@@ -4066,7 +4059,7 @@ app.clientside_callback(
     }
     """,
     Output('share-copy-link-feedback', 'style'),
-    Input('share-native-button', 'n_clicks'),
+    Input('share-discord-button', 'n_clicks'),
     State('share-url-value', 'children'),
     prevent_initial_call=True,
 )
