@@ -1625,6 +1625,14 @@ def create_share_layout(
                 style={"padding": "14px 24px", "fontSize": "16px", "marginRight": "8px"},
             ),
             html.Button(
+                [html.I(className="fas fa-share-nodes", style={"marginRight": "8px"}),
+                 t("ui.share.share_native", locale=loc)],
+                id="share-native-button",
+                n_clicks=0,
+                className="ui blue button",
+                style={"padding": "14px 24px", "fontSize": "16px", "marginRight": "8px"},
+            ),
+            html.Button(
                 [html.I(className="fas fa-link", style={"marginRight": "8px"}),
                  t("ui.share.copy_link", locale=loc)],
                 id="share-copy-link-button",

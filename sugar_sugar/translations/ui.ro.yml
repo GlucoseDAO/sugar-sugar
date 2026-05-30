@@ -206,6 +206,7 @@ ro:
     play_again: "Joacă din nou"
     copy_link: "Copiază linkul"
     copy_link_success: "Link copiat!"
+    share_native: "Distribuie"
     share_on_x: "Distribuie pe X"
     share_on_facebook: "Distribuie pe Facebook"
     share_on_whatsapp: "Distribuie pe WhatsApp"

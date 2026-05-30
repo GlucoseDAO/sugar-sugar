@@ -30,12 +30,14 @@ dependencies = [
     "matplotlib>=3.10.0",
     "segno>=1.6.0",
     "cgm-format[cli]>=0.8.2",
+    "gunicorn>=26.0.0",
 ]
 
 [project.scripts]
 start = "sugar_sugar.app:cli_main"
 chart = "sugar_sugar.app:chart_main"
 share = "sugar_sugar.app:share_main"
+serve = "sugar_sugar.app:serve_main"
 setup-chrome = "sugar_sugar.app:setup_chrome_main"
 
 [dependency-groups]

@@ -26,6 +26,10 @@ DOUBLE_CLICK_THRESHOLD: int = int(os.getenv("DOUBLE_CLICK_THRESHOLD", "500"))  #
 DASH_HOST: str = os.getenv("DASH_HOST", "127.0.0.1")
 DASH_PORT: int = int(os.getenv("DASH_PORT", "8050"))
 
+# Public canonical origin for crawler-facing URLs and share metadata.
+# In production set this to e.g. https://sugar-sugar.glucosedao.org.
+DEPLOY_URL: str = os.getenv("DEPLOY_URL", "").strip().rstrip("/")
+
 # Dash dcc.Store / component persistence type: 'local' (survives browser restart),
 # 'session' (cleared when tab closes), or 'memory' (cleared on page refresh).
 STORAGE_TYPE: str = os.getenv("STORAGE_TYPE", "local")
