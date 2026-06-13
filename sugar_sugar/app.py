@@ -3,8 +3,7 @@ from functools import lru_cache
 from html import escape as html_escape
 from io import BytesIO
 import dash
-from dash import dcc, html, Output, Input, State, no_update, dash_table, ctx
-from dash.dash_table.Format import Format, Scheme
+from dash import dcc, html, Output, Input, State, no_update, ctx
 from dash.exceptions import PreventUpdate
 import plotly.graph_objs as go
 
@@ -18,7 +17,7 @@ import dash_bootstrap_components as dbc
 import os
 import sys
 import typer
-from flask import send_file as flask_send_file, request as flask_request
+from flask import Response, send_file as flask_send_file, request as flask_request
 import uuid
 from dotenv import load_dotenv
 from eliot import start_action, start_task
@@ -40,8 +39,18 @@ except Exception:
 
 logs_dir = project_root / 'logs'
 logs_dir.mkdir(exist_ok=True)
-to_nice_stdout()
-to_nice_file(logs_dir / 'sugar_sugar.json', logs_dir / 'sugar_sugar.log')
+
+
+def _configure_eliot_logging() -> None:
+    """Install human-readable Eliot log renderers unless explicitly disabled."""
+    if os.environ.get("SUGAR_SUGAR_DISABLE_NICE_LOGS") == "1":
+        return
+
+    to_nice_stdout()
+    to_nice_file(logs_dir / 'sugar_sugar.json', logs_dir / 'sugar_sugar.log')
+
+
+_configure_eliot_logging()
 
 from sugar_sugar.i18n import setup_i18n, normalize_locale, t, t_list, t_raw
 setup_i18n()
@@ -57,6 +66,7 @@ from sugar_sugar.config import (
     DASH_HOST,
     DASH_PORT,
     DEBUG_MODE,
+    DEPLOY_URL,
     DEPLOY_BUILD,
     MAX_ROUNDS,
     MIN_USEFUL_ROUNDS,
@@ -74,6 +84,7 @@ import sugar_sugar.config as sugar_sugar_config
 from sugar_sugar.components.glucose import GlucoseChart
 from sugar_sugar.components.metrics import MetricsComponent
 from sugar_sugar.components.predictions import PredictionTableComponent
+from sugar_sugar.components.ag_grid import build_readonly_ag_grid, build_readonly_column_defs
 from sugar_sugar.components.startup import StartupPage
 from sugar_sugar.components.landing import LandingPage
 from sugar_sugar.components.consent_form import ConsentFormPage
@@ -100,6 +111,34 @@ GLUCOSE_MGDL_PER_MMOLL: float = 18.0
 
 FORMAT_ORDER: dict[str, int] = {"C": 0, "B": 1, "A": 2}
 GENERIC_SOURCES_METADATA = load_generic_sources_metadata()
+
+SITE_TITLE: str = "Sugar Sugar"
+SITE_DESCRIPTION: str = (
+    "Test your glucose prediction skills, compare your forecasts with real CGM data, "
+    "and help establish a human baseline for glucose forecasting research."
+)
+OG_PREVIEW_PATH: str = "/assets/og-card.png"
+OG_PREVIEW_VERSION: int = 1
+OG_PREVIEW_SIZE: tuple[int, int] = (1200, 630)
+PUBLIC_ROUTES: tuple[tuple[str, str, str], ...] = (
+    ("/", "Sugar Sugar", SITE_DESCRIPTION),
+    ("/about", "About Sugar Sugar", "Learn why the Sugar Sugar glucose prediction study matters."),
+    ("/faq", "Sugar Sugar FAQ", "Answers to common questions about the Sugar Sugar study and gameplay."),
+    ("/demo", "Video Instructions", "Watch how to play the Sugar Sugar glucose prediction game."),
+    ("/contact", "Contact GlucoseDAO", "Get in touch with the Sugar Sugar team."),
+)
+
+
+def canonical_base() -> str:
+    """Configured public origin without a trailing slash, or empty in local dev."""
+    return DEPLOY_URL.strip().rstrip("/")
+
+
+def _site_og_image_url() -> str:
+    """Site-wide OG image URL. Production should set DEPLOY_URL for absolute URLs."""
+    path: str = f"{OG_PREVIEW_PATH}?v={OG_PREVIEW_VERSION}"
+    base: str = canonical_base()
+    return f"{base}{path}" if base else path
 
 
 def _format_label(format_code: str, *, locale: str) -> str:
@@ -504,7 +543,7 @@ external_stylesheets = [
     'https://codepen.io/chriddyp/pen/bWLwgP.css',
     dbc.themes.BOOTSTRAP,
     'https://cdn.jsdelivr.net/npm/fomantic-ui@2.9.3/dist/semantic.min.css',
-    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css',
+    'https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.2.0/css/all.min.css',
 ]
 
 external_scripts: list[dict[str, str]] = []
@@ -539,6 +578,24 @@ app = dash.Dash(
                 "maximum-scale=5, user-scalable=yes"
             ),
         },
+        {"name": "robots", "content": "index, follow"},
+        {"name": "description", "content": SITE_DESCRIPTION},
+        {"property": "og:type", "content": "website"},
+        {"property": "og:site_name", "content": SITE_TITLE},
+        {"property": "og:title", "content": f"{SITE_TITLE} - Glucose Prediction Game"},
+        {"property": "og:description", "content": SITE_DESCRIPTION},
+        {"property": "og:url", "content": canonical_base() or "/"},
+        {"property": "og:image", "content": _site_og_image_url()},
+        {"property": "og:image:secure_url", "content": _site_og_image_url()},
+        {"property": "og:image:type", "content": "image/png"},
+        {"property": "og:image:width", "content": str(OG_PREVIEW_SIZE[0])},
+        {"property": "og:image:height", "content": str(OG_PREVIEW_SIZE[1])},
+        {"property": "og:image:alt", "content": "Sugar Sugar glucose prediction game preview card."},
+        {"name": "twitter:card", "content": "summary_large_image"},
+        {"name": "twitter:title", "content": f"{SITE_TITLE} - Glucose Prediction Game"},
+        {"name": "twitter:description", "content": SITE_DESCRIPTION},
+        {"name": "twitter:image", "content": _site_og_image_url()},
+        {"name": "twitter:image:alt", "content": "Sugar Sugar glucose prediction game preview card."},
     ],
 )
 app.title = "Sugar Sugar - Glucose Prediction Game"
@@ -552,6 +609,24 @@ def _download_study_pdf():
     if pdf_path is not None:
         return flask_send_file(str(pdf_path), mimetype="application/pdf", as_attachment=True, download_name=pdf_path.name)
     return "PDF not found", 404
+
+
+@server.route("/robots.txt")
+def _robots_txt() -> Response:
+    """Crawler policy with canonical sitemap and LLM overview links."""
+    return Response(_build_robots_txt(), mimetype="text/plain; charset=utf-8")
+
+
+@server.route("/sitemap.xml")
+def _sitemap_xml() -> Response:
+    """Canonical sitemap for public, non-stateful routes."""
+    return Response(_build_sitemap_xml(), mimetype="application/xml; charset=utf-8")
+
+
+@server.route("/llms.txt")
+def _llms_txt() -> Response:
+    """Short LLM-readable overview of the public site."""
+    return Response(_build_llms_txt(), mimetype="text/plain; charset=utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -592,6 +667,10 @@ def _first_forwarded_header_value(value: Optional[str]) -> Optional[str]:
 
 def _public_request_base_url() -> str:
     """Base URL as seen by users/crawlers, respecting reverse-proxy headers."""
+    deploy_url: str = canonical_base()
+    if deploy_url:
+        return deploy_url
+
     configured: Optional[str] = _first_forwarded_header_value(
         os.environ.get("SUGAR_SUGAR_PUBLIC_BASE_URL")
     )
@@ -608,6 +687,82 @@ def _public_request_base_url() -> str:
         scheme: str = forwarded_proto or flask_request.scheme or "https"
         return f"{scheme}://{forwarded_host}".rstrip("/")
     return flask_request.host_url.rstrip("/")
+
+
+def _public_base_url_for_crawler_file() -> str:
+    """Public base URL for crawler files, falling back to the active request."""
+    base: str = canonical_base()
+    if base:
+        return base
+    return _public_request_base_url()
+
+
+def _absolute_url_for_path(path: str) -> str:
+    """Build an absolute URL for a root-relative path in the current public origin."""
+    cleaned_path: str = "/" + str(path or "/").lstrip("/")
+    return f"{_public_base_url_for_crawler_file()}{cleaned_path}"
+
+
+def _build_robots_txt() -> str:
+    sitemap_url: str = _absolute_url_for_path("/sitemap.xml")
+    llms_url: str = _absolute_url_for_path("/llms.txt")
+    return "\n".join(
+        [
+            "User-agent: *",
+            "Allow: /",
+            "Allow: /llms.txt",
+            "Disallow: /_dash-",
+            "Disallow: /_reload-hash",
+            "Disallow: /share/*/image.png",
+            "",
+            f"Sitemap: {sitemap_url}",
+            f"# LLM-readable overview: {llms_url}",
+            "",
+        ]
+    )
+
+
+def _build_sitemap_xml() -> str:
+    lastmod: str = datetime.utcnow().date().isoformat()
+    entries: list[str] = []
+    for route, _title, _description in PUBLIC_ROUTES:
+        loc: str = html_escape(_absolute_url_for_path(route), quote=True)
+        entries.append(
+            "  <url>\n"
+            f"    <loc>{loc}</loc>\n"
+            f"    <lastmod>{lastmod}</lastmod>\n"
+            "    <changefreq>weekly</changefreq>\n"
+            f"    <priority>{'1.0' if route == '/' else '0.7'}</priority>\n"
+            "  </url>"
+        )
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        + "\n".join(entries)
+        + "\n</urlset>\n"
+    )
+
+
+def _build_llms_txt() -> str:
+    routes: str = "\n".join(
+        f"- {_absolute_url_for_path(route)} — {description}"
+        for route, _title, description in PUBLIC_ROUTES
+    )
+    return (
+        "# Sugar Sugar\n\n"
+        f"{SITE_DESCRIPTION}\n\n"
+        "Sugar Sugar is a Dash research app from GlucoseDAO. Participants predict "
+        "the next hour of CGM glucose values, compare predictions with ground truth, "
+        "and can share a public performance summary.\n\n"
+        "## Public Routes\n\n"
+        f"{routes}\n\n"
+        "## Crawl Guidance\n\n"
+        "- Public informational routes are crawlable.\n"
+        "- Game-flow routes such as /startup, /prediction, /ending, and /final are "
+        "stateful participant flows and should not be treated as durable documents.\n"
+        "- Share URLs under /share/<id> expose crawler-ready Open Graph metadata and "
+        "redirect humans into the live Dash share page.\n"
+    )
 
 
 def _build_share_url(share_id: str) -> str:
@@ -802,6 +957,7 @@ header_component = HeaderComponent(show_time_slider=False, initial_slider_value=
 startup_page = None  # Will be initialized in main()
 landing_page = None  # Will be initialized in main()
 ending_page = EndingPage()
+_callbacks_registered: bool = False
 
 # When _CHART_MODE env var is set, pre-populate stores for the prediction page
 # so the debug reloader preserves the state across forks.
@@ -1230,8 +1386,8 @@ def update_prediction_text_on_language_change(
      Output('ending-units-line', 'children'),
      Output('ending-graph-explanation', 'children'),
      Output('ending-prediction-results-title', 'children'),
-     Output('ending-prediction-table', 'data'),
-     Output('ending-prediction-table', 'columns'),
+     Output('ending-prediction-table', 'rowData'),
+     Output('ending-prediction-table', 'columnDefs'),
      Output('ending-metrics-container', 'children'),
      Output('ending-local-storage-note', 'children'),
      Output('finish-study-button-ending', 'children'),
@@ -1276,7 +1432,7 @@ def update_ending_text_on_language_change(
     }
 
     table_data: list[dict[str, str]] = no_update
-    table_columns: list[dict[str, str]] = no_update
+    table_columns: list[dict[str, Any]] = no_update
     if user_info and 'prediction_table_data' in user_info:
         raw_table = _convert_table_data_units(user_info['prediction_table_data'], unit)
         table_data = []
@@ -1284,11 +1440,11 @@ def update_ending_text_on_language_change(
             new_row = dict(row)
             new_row["metric"] = metric_label_map.get(str(row.get("metric", "")), str(row.get("metric", "")))
             table_data.append(new_row)
-        table_columns = [{'name': t("ui.table.metric_header", locale=locale), 'id': 'metric'}] + [
+        table_columns = build_readonly_column_defs([{'name': t("ui.table.metric_header", locale=locale), 'id': 'metric'}] + [
             {'name': f'T{i}', 'id': f't{i}', 'type': 'text'}
             for i in range(len(raw_table[0]) - 1)
             if raw_table and raw_table[1].get(f't{i}', '-') != '-'
-        ]
+        ])
 
     metrics_display: Any = no_update
     if user_info and 'prediction_table_data' in user_info:
@@ -2518,46 +2674,25 @@ def create_ending_layout(
                 'marginBottom': '15px',
                 'fontSize': 'clamp(18px, 3vw, 24px)'
             }),
-            dash_table.DataTable(
-                id='ending-prediction-table',
-                data=prediction_table_data_display,
-                columns=[{'name': t("ui.table.metric_header", locale=locale), 'id': 'metric'}] + [
-                    {'name': f'T{i}', 'id': f't{i}', 'type': 'text'}
-                    for i in range(len(prediction_table_data[0]) - 1)
-                    if prediction_table_data
-                    and prediction_table_data[1].get(f't{i}', '-') != '-'
-                ],
-                cell_selectable=False,
-                row_selectable=False,
-                editable=False,
-                style_table={
+            build_readonly_ag_grid(
+                table_id='ending-prediction-table',
+                row_data=prediction_table_data_display,
+                column_defs=build_readonly_column_defs(
+                    [{'name': t("ui.table.metric_header", locale=locale), 'id': 'metric'}] + [
+                        {'name': f'T{i}', 'id': f't{i}', 'type': 'text'}
+                        for i in range(len(prediction_table_data[0]) - 1)
+                        if prediction_table_data
+                        and prediction_table_data[1].get(f't{i}', '-') != '-'
+                    ]
+                ),
+                style={
                     'width': '100%',
                     'height': 'auto',
                     'maxHeight': 'clamp(300px, 40vh, 500px)',
                     'overflowY': 'auto',
                     'overflowX': 'auto',
-                    'tableLayout': 'fixed'
                 },
-                style_cell={
-                    'textAlign': 'center',
-                    'padding': 'clamp(2px, 1vw, 4px) clamp(1px, 0.5vw, 2px)',
-                    'fontSize': 'clamp(8px, 1.5vw, 12px)',
-                    'whiteSpace': 'nowrap',
-                    'overflow': 'hidden',
-                    'textOverflow': 'ellipsis',
-                    'lineHeight': '1.2',
-                    'minWidth': '40px'
-                },
-                style_data_conditional=[
-                    {
-                        'if': {'row_index': 0},
-                        'backgroundColor': 'rgba(200, 240, 200, 0.5)'
-                    },
-                    {
-                        'if': {'row_index': 1},
-                        'backgroundColor': 'rgba(255, 200, 200, 0.5)'
-                    }
-                ]
+                highlight_first_two_rows=True,
             )
         ], style={
             'marginBottom': '20px',
@@ -3070,34 +3205,24 @@ def create_final_layout(full_df_data: Optional[Dict], user_info: Dict[str, Any],
                     'fontSize': '14px'
                 }
             ),
-            dash_table.DataTable(
-                id='final-rounds-table',
-                data=round_rows,
-                columns=[
-                    {'name': 'Round', 'id': 'Round', 'type': 'numeric'},
-                    {'name': 'Pairs', 'id': 'Pairs', 'type': 'numeric'},
-                    {'name': 'MAE', 'id': 'MAE', 'type': 'numeric', 'format': Format(precision=2, scheme=Scheme.fixed)},
-                    {'name': 'MSE', 'id': 'MSE', 'type': 'numeric', 'format': Format(precision=2, scheme=Scheme.fixed)},
-                    {'name': 'RMSE', 'id': 'RMSE', 'type': 'numeric', 'format': Format(precision=2, scheme=Scheme.fixed)},
-                    {'name': 'MAPE', 'id': 'MAPE', 'type': 'numeric', 'format': Format(precision=2, scheme=Scheme.fixed)},
-                ],
-                cell_selectable=False,
-                row_selectable=False,
-                editable=False,
-                style_table={
+            build_readonly_ag_grid(
+                table_id='final-rounds-table',
+                row_data=round_rows,
+                column_defs=build_readonly_column_defs(
+                    [
+                        {'name': 'Round', 'id': 'Round', 'type': 'numeric'},
+                        {'name': 'Pairs', 'id': 'Pairs', 'type': 'numeric'},
+                        {'name': 'MAE', 'id': 'MAE', 'type': 'numeric'},
+                        {'name': 'MSE', 'id': 'MSE', 'type': 'numeric'},
+                        {'name': 'RMSE', 'id': 'RMSE', 'type': 'numeric'},
+                        {'name': 'MAPE', 'id': 'MAPE', 'type': 'numeric'},
+                    ],
+                    fixed_decimal_fields={'MAE', 'MSE', 'RMSE', 'MAPE'},
+                ),
+                style={
                     'width': '100%',
-                    'overflowX': 'auto'
+                    'overflowX': 'auto',
                 },
-                style_cell={
-                    'textAlign': 'center',
-                    'padding': '8px',
-                    'fontSize': '14px',
-                    'whiteSpace': 'nowrap'
-                },
-                style_header={
-                    'backgroundColor': '#f8fafc',
-                    'fontWeight': 'bold'
-                }
             )
         ], disable_n_clicks=True, style={
             'marginBottom': '20px',
@@ -3900,6 +4025,41 @@ app.clientside_callback(
     """,
     Output('share-copy-link-feedback', 'children'),
     Input('share-copy-link-button', 'n_clicks'),
+    State('share-url-value', 'children'),
+    prevent_initial_call=True,
+)
+
+
+app.clientside_callback(
+    """
+    function(n_clicks, url) {
+        if (!n_clicks) { return window.dash_clientside.no_update; }
+        if (!url) { return window.dash_clientside.no_update; }
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(url);
+            } else {
+                var ta = document.createElement('textarea');
+                ta.value = url;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }
+        } catch (e) { /* ignore */ }
+        window.open('https://discord.com/channels/@me', '_blank', 'noopener,noreferrer,width=980,height=720');
+        var feedback = document.getElementById('share-copy-link-feedback');
+        if (feedback) {
+            feedback.style.opacity = '1';
+            setTimeout(function() { feedback.style.opacity = '0'; }, 1800);
+        }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output('share-copy-link-feedback', 'style'),
+    Input('share-discord-button', 'n_clicks'),
     State('share-url-value', 'children'),
     prevent_initial_call=True,
 )
@@ -5378,7 +5538,9 @@ def find_nearest_time(x: Union[str, float, datetime], df: pl.DataFrame) -> datet
 
 def _register_all_callbacks() -> None:
     """Register all Dash component callbacks (shared by ``main`` and ``chart``)."""
-    global startup_page, landing_page
+    global startup_page, landing_page, _callbacks_registered
+    if _callbacks_registered:
+        return
     landing_page = LandingPage()
     startup_page = StartupPage()
 
@@ -5389,6 +5551,14 @@ def _register_all_callbacks() -> None:
     landing_page.register_callbacks(app)
     startup_page.register_callbacks(app)
     ending_page.register_callbacks(app)
+    _callbacks_registered = True
+
+
+def bootstrap_wsgi_application() -> Any:
+    """Prepare callbacks and initial layout for WSGI servers."""
+    _register_all_callbacks()
+    app.layout.children[-1].children = [landing_page]
+    return server
 
 
 def _ensure_chrome() -> None:
@@ -5582,6 +5752,46 @@ def share(
         app.run(host=dash_host, port=dash_port, debug=True)
 
 
+@cli.command()
+def serve(
+    host: Optional[str] = typer.Option(None, "--host", help="Host gunicorn should bind"),
+    port: Optional[int] = typer.Option(None, "--port", help="Port gunicorn should bind"),
+    workers: Optional[int] = typer.Option(None, "--workers", "-w", help="Gunicorn worker count"),
+    timeout: Optional[int] = typer.Option(None, "--timeout", help="Gunicorn worker timeout in seconds"),
+) -> None:
+    """Run the Dash app with gunicorn for production/staging deployments."""
+    _ensure_chrome()
+    bind_host: str = DASH_HOST if host is None else (host or DASH_HOST)
+    bind_port: int = DASH_PORT if port is None else port
+    worker_count: int = workers if workers is not None else int(os.getenv("WEB_CONCURRENCY", os.getenv("GUNICORN_WORKERS", "2")))
+    worker_timeout: int = timeout if timeout is not None else int(os.getenv("GUNICORN_TIMEOUT", "120"))
+    bind: str = f"{bind_host}:{bind_port}"
+    command: list[str] = [
+        "gunicorn",
+        "sugar_sugar.wsgi:application",
+        "--bind",
+        bind,
+        "--workers",
+        str(worker_count),
+        "--timeout",
+        str(worker_timeout),
+        "--access-logfile",
+        "-",
+        "--error-logfile",
+        "-",
+        "--forwarded-allow-ips",
+        os.getenv("GUNICORN_FORWARDED_ALLOW_IPS", "*"),
+    ]
+    with start_action(
+        action_type=u"serve_gunicorn",
+        host=bind_host,
+        port=bind_port,
+        workers=worker_count,
+        timeout=worker_timeout,
+    ):
+        os.execvp(command[0], command)
+
+
 def cli_main() -> None:
     """CLI entry point"""
     cli()
@@ -5595,6 +5805,11 @@ def chart_main() -> None:
 def share_main() -> None:
     """CLI entry point that defaults to the ``share`` command."""
     cli(["share"] + sys.argv[1:])
+
+
+def serve_main() -> None:
+    """CLI entry point that defaults to the ``serve`` command."""
+    typer.run(serve)
 
 
 def setup_chrome_main() -> None:

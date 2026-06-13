@@ -152,6 +152,7 @@ Edit `.env` to configure your server settings:
 ```bash
 DASH_HOST=127.0.0.1
 DASH_PORT=8050
+DEPLOY_URL=https://sugar-sugar.glucosedao.org
 DASH_DEBUG=True
 DEBUG_MODE=False
 UMAMI_SCRIPT_URL=https://sugar-sugar.glucosedao.org/stats/script.js
@@ -164,6 +165,10 @@ Umami tracking is disabled when either `UMAMI_SCRIPT_URL` or `UMAMI_WEBSITE_ID` 
 `UMAMI_DOMAINS` limits counting to listed production hostnames, and `UMAMI_HOST_URL`
 points Umami pageview requests at the same-domain `/stats` proxy.
 
+`DEPLOY_URL` is the canonical public origin used for Open Graph/Twitter preview
+tags, share URLs, `/robots.txt`, `/sitemap.xml`, and `/llms.txt`. Set it in
+production and restart the server after changing it.
+
 ### Running the app
 
 ```bash
@@ -175,6 +180,29 @@ Override via command line:
 ```bash
 uv run start --host 0.0.0.0 --port 3000 --debug
 ```
+
+### Production serving
+
+Use `uv run serve` for staging or production. It runs the Dash Flask server
+through gunicorn instead of Werkzeug, so the development-server warning is gone.
+
+```bash
+uv run serve --host 0.0.0.0 --port 8050 --workers 2
+```
+
+Useful production environment variables:
+
+```bash
+DEPLOY_URL=https://sugar-sugar.glucosedao.org
+DASH_HOST=0.0.0.0
+DASH_PORT=8050
+GUNICORN_WORKERS=2
+GUNICORN_TIMEOUT=120
+```
+
+Serve it behind a TLS reverse proxy such as Caddy or nginx. The app respects
+`X-Forwarded-Host` and `X-Forwarded-Proto` when `DEPLOY_URL` is not set, but
+`DEPLOY_URL` is the preferred production source of truth.
 
 ### Quick chart debugging
 
@@ -200,6 +228,31 @@ uv run share --locale de                # test in German
 ```
 
 Formats: **A** = Generic, **B** = My Data, **C** = Mixed. Rounds cycle through formats evenly (e.g. 12 rounds with A,B,C → 4 rounds each). The command generates a share record, saves it to disk, and opens the browser at `/share/<id>`. Useful for testing the share card PNG, OG tags, social buttons, and per-format colour palettes.
+
+### Social previews and crawler metadata
+
+The app exposes crawler-ready metadata in two layers:
+
+- Site-wide Open Graph/Twitter tags in the Dash HTML shell, pointing at
+  `/assets/og-card.png?v=1`. The file should be a 1200x630 PNG.
+- Per-result share URLs at `/share/<id>`. Social crawlers receive a thin OG shell
+  with the share card image at `/share/<id>/image.png`; humans see the live Dash
+  share page.
+
+Crawler helper routes are available at `/robots.txt`, `/sitemap.xml`, and
+`/llms.txt`.
+
+To verify the raw crawler response:
+
+```bash
+curl -sL -A "Twitterbot/1.0" https://sugar-sugar.glucosedao.org/ | rg 'og:|twitter:'
+curl -sI https://sugar-sugar.glucosedao.org/assets/og-card.png?v=1
+curl -sL -A "facebookexternalhit/1.1" https://sugar-sugar.glucosedao.org/share/<id> | rg 'og:'
+```
+
+After deploying preview changes, force re-scrapes with the Facebook Sharing
+Debugger, LinkedIn Post Inspector, and Telegram's `@WebpageBot`. Many networks
+cache previews for days, especially when the image URL does not change.
 
 ### Clearing localStorage during development
 

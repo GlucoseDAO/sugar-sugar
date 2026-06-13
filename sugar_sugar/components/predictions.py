@@ -1,7 +1,8 @@
-from typing import Optional, Tuple, Any
-from dash import html, dash_table, dcc, Output, Input
+from typing import Optional, Any
+from dash import html, dcc, Output, Input
 import polars as pl
 import dash
+from sugar_sugar.components.ag_grid import build_readonly_ag_grid, build_readonly_column_defs
 from sugar_sugar.config import STORAGE_TYPE
 
 
@@ -15,11 +16,11 @@ class PredictionTableComponent(html.Div):
             children=[
                 dcc.Store(id='current-df-store', data=None, storage_type=STORAGE_TYPE),
                 html.H4("Predictions Table", style={'fontSize': '20px', 'marginBottom': '10px'}),
-                dash_table.DataTable(
-                    id='prediction-table-data',
-                    data=[],  # Start empty - will be populated by callbacks
-                    columns=[],  # Start empty - will be populated by callbacks
-                    style_table={
+                build_readonly_ag_grid(
+                    table_id='prediction-table-data',
+                    row_data=[],
+                    column_defs=[],
+                    style={
                         'width': '100%',
                         'height': 'auto',
                         'maxHeight': 'clamp(300px, 40vh, 500px)',  # Responsive max height
@@ -27,37 +28,7 @@ class PredictionTableComponent(html.Div):
                         'overflowX': 'auto',  # Allow horizontal scroll for small screens
                         'tableLayout': 'fixed'  # Fixed layout for equal column distribution
                     },
-                    style_cell={
-                        'textAlign': 'center',
-                        'padding': 'clamp(2px, 1vw, 4px) clamp(1px, 0.5vw, 2px)',  # Responsive padding
-                        'fontSize': 'clamp(8px, 1.5vw, 12px)',  # Responsive font size
-                        'whiteSpace': 'nowrap',  # Prevent text wrapping to maintain compact layout
-                        'overflow': 'hidden',
-                        'textOverflow': 'ellipsis',
-                        'lineHeight': '1.2',
-                        'minWidth': '40px'  # Minimum width for readability
-                    },
-                    style_cell_conditional=[],  # Will be set dynamically by callback
-                    style_header={
-                        'backgroundColor': '#f8fafc',
-                        'fontWeight': 'bold',
-                        'fontSize': 'clamp(8px, 1.5vw, 12px)',  # Responsive font size
-                        'padding': 'clamp(4px, 1vw, 6px) clamp(2px, 0.5vw, 4px)',  # Responsive padding
-                        'textAlign': 'center',
-                        'whiteSpace': 'normal',
-                        'height': 'auto',
-                        'minWidth': '40px'  # Minimum width for readability
-                    },
-                    style_data_conditional=[
-                        {
-                            'if': {'row_index': 0},
-                            'backgroundColor': 'rgba(200, 240, 200, 0.5)'
-                        },
-                        {
-                            'if': {'row_index': 1},
-                            'backgroundColor': 'rgba(255, 200, 200, 0.5)'
-                        }
-                    ]
+                    highlight_first_two_rows=True,
                 )
             ],
             style={
@@ -90,16 +61,18 @@ class PredictionTableComponent(html.Div):
             return df_data
 
         @app.callback(
-            [Output('prediction-table-data', 'data'),
-             Output('prediction-table-data', 'columns'),
-             Output('prediction-table-data', 'style_cell_conditional')],
+            [Output('prediction-table-data', 'rowData'),
+             Output('prediction-table-data', 'columnDefs')],
             [Input('current-df-store', 'data'),
              Input('glucose-unit', 'data')]
         )
-        def update_table(df_data: Optional[dict], glucose_unit: Optional[str]) -> Tuple[TableData, list[dict], list[dict]]:
+        def update_table(
+            df_data: Optional[dict],
+            glucose_unit: Optional[str],
+        ) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
             """Updates the predictions table based on the stored DataFrame state."""
             if not df_data:
-                return [], [], []
+                return [], []
             
             # Reconstruct DataFrame from stored data
             df = self._reconstruct_dataframe_from_dict(df_data)
@@ -111,23 +84,6 @@ class PredictionTableComponent(html.Div):
             # Generate columns configuration with dynamic widths
             columns = [{'name': 'Metric', 'id': 'metric'}]
             num_data_columns = len(df)
-            # Calculate width for data columns (75% total width divided by number of columns)
-            data_column_width = f"{75 / num_data_columns}%" if num_data_columns > 0 else "75%"
-            
-            # Create style conditional for data columns
-            style_cell_conditional = [
-                {
-                    'if': {'column_id': 'metric'},
-                    'textAlign': 'left',
-                    'fontWeight': 'bold',
-                    'width': '25%',  # Fixed percentage width for metric column
-                    'backgroundColor': '#f8fafc',
-                    'whiteSpace': 'nowrap',
-                    'overflow': 'hidden',
-                    'textOverflow': 'ellipsis'
-                }
-            ]
-            
             for i in range(num_data_columns):
                 # Use shorter column names for better fit - show time index
                 columns.append({
@@ -135,14 +91,8 @@ class PredictionTableComponent(html.Div):
                     'id': f't{i}',
                     'type': 'text'
                 })
-                
-                # Add width styling for each data column
-                style_cell_conditional.append({
-                    'if': {'column_id': f't{i}'},
-                    'width': data_column_width
-                })
             
-            return table_data, columns, style_cell_conditional
+            return table_data, build_readonly_column_defs(columns)
 
     def _reconstruct_dataframe_from_dict(self, df_data: dict[str, list[Any]]) -> pl.DataFrame:
         """Reconstruct a Polars DataFrame from stored dictionary data"""

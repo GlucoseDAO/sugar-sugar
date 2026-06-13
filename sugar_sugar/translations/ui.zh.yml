@@ -41,7 +41,7 @@ zh:
     your_choices_text: "默认情况下，我们假设您同意参加研究。如果您只想玩游戏，请勾选第一个框。"
     consent_play_only: "我只想玩游戏（不存储我的 CGM / 游戏数据）"
     consent_receive_results: "我希望以后收到我的结果"
-    consent_keep_updated: "保持我了解项目更新"
+    consent_keep_updated: "请向我推送项目的最新动态"
     consent_acknowledge_label: "我已年满 18 岁，并已阅读条款和条件。"
     consent_gdpr_label: "我同意根据通用数据保护条例 (EU) 2016/679 处理我的个人数据，用于同意通知中所述的目的。我明白我的数据将得到安全处理，不会与未经授权的第三方共享，并且我可以随时撤回我的同意。"
     open_consent_form: "打开同意通知"
@@ -153,16 +153,16 @@ zh:
     upload_success: "已成功从 %{filename} 加载数据。此数据将用于预测。"
     example_data_now_using: "现在使用通用数据。上传 CSV 文件进行个性化分析。"
     example_data_warning: "目前正在使用通用数据。上传您自己的 Dexcom/Libre/Medtronic/Nightscout CSV 文件进行个性化分析。"
-    csv_tab_label: "CSV File"
+    csv_tab_label: "CSV 文件"
     nightscout_tab_label: "Nightscout"
     nightscout_url_placeholder: "https://your-nightscout-site.com"
-    nightscout_token_placeholder: "Access token (optional)"
-    nightscout_load_button: "Load from Nightscout"
-    nightscout_loading: "Loading data from Nightscout…"
-    nightscout_success: "Successfully loaded %{count} glucose readings from Nightscout."
-    nightscout_error: "Failed to load from Nightscout: %{error}"
-    nightscout_url_required: "Please enter a Nightscout URL."
-    nightscout_consent_required: "Please grant data usage consent before loading Nightscout data."
+    nightscout_token_placeholder: "访问令牌（可选）"
+    nightscout_load_button: "从 Nightscout 加载"
+    nightscout_loading: "正在从 Nightscout 加载数据…"
+    nightscout_success: "已成功从 Nightscout 加载 %{count} 条血糖读数。"
+    nightscout_error: "从 Nightscout 加载失败：%{error}"
+    nightscout_url_required: "请输入 Nightscout 网址。"
+    nightscout_consent_required: "请在加载 Nightscout 数据前授予数据使用同意。"
     current_data_source: "当前数据源："
     weight_label: "体重"
     description_1: "测试您的血糖预测技能！"
@@ -203,11 +203,14 @@ zh:
     play_again: "再玩一次"
     copy_link: "复制链接"
     copy_link_success: "链接已复制！"
+    share_native: "分享"
+    share_as_link: "分享链接"
     share_on_x: "分享到 X"
     share_on_facebook: "分享到 Facebook"
     share_on_whatsapp: "分享到 WhatsApp"
     share_on_linkedin: "分享到 LinkedIn"
     share_on_telegram: "分享到 Telegram"
+    share_on_discord: "分享到 Discord"
     invite_text: "我预测了下一小时的血糖，%{rounds} 轮中准确率达 %{accuracy}。你能做得更好吗？"
     invite_text_ranked: "我是前 %{percentile} 的血糖预测者 — %{rounds} 轮中 %{accuracy} 准确率。你能超过我吗？"
     card_footer: "来 %{url} 一起玩"
@@ -235,39 +238,39 @@ zh:
     encouragement:
       excellent:
         lines:
-          - "你预测血糖像个行家。%{rounds} 轮，依然精准。觉得能赢我？"
-          - "%{rounds} 轮里，每条曲线都被你抓住了。轮到你发帖——上吧，试试超过这个。"
-          - "模式识别本能已解锁。%{rounds} 轮我还没失手。该你了。"
-          - "这就是 %{rounds} 轮干净预测的样子。敢说你跟得上？"
+          - "下一小时的血糖被我拿捏得死死的——%{rounds} 轮下来，预测还跟传感器一样准。该你出手了。"
+          - "%{rounds} 轮里，每条曲线都被我抓住了。觉得自己跟得上？点开始吧。"
+          - "%{rounds} 轮近乎完美的预测。打赌你第一次玩可比不了这个。"
+          - "这就是 %{rounds} 轮干净利落的预测。把你的成绩亮出来。"
       good:
         lines:
-          - "稳稳一局。%{rounds} 轮，我的预测贴得很近。你能更近吗？"
-          - "够敏锐，%{rounds} 轮都能守住线。该你了——反驳我。"
-          - "%{rounds} 轮，手稳。觉得画得比我快？来证明。"
-          - "%{rounds} 轮里，我蒙对曲线比蒙错多。谁先超过我？"
+          - "稳稳一局——%{rounds} 轮，我的预测一直贴得很近。你能更近吗？"
+          - "够敏锐，%{rounds} 轮都守住了线。轮到你了——来证明我错了。"
+          - "%{rounds} 轮，预测稳如老狗。觉得自己的血糖直觉更好？亮出来看看。"
+          - "%{rounds} 轮了，我还在紧跟曲线。看谁先登顶？"
       average:
         lines:
-          - "%{rounds} 轮过去，曲线还在跑。打赌你第一次玩赢不了我。"
-          - "追着血糖跑了 %{rounds} 轮。很简单对吧？证明一下。"
-          - "%{rounds} 轮深度。数字很滑——看你能不能反过来猜中。"
-          - "%{rounds} 轮里我开始爬排行榜。一起到榜顶来？"
+          - "%{rounds} 轮过去，曲线还在变。打赌你第一次玩赢不了我的分数。"
+          - "预测血糖比看上去难多了。%{rounds} 轮打完——你能做得更好吗？"
+          - "已经 %{rounds} 轮了。这些数字很狡猾——看你能不能反过来猜中它们。"
+          - "%{rounds} 轮下来，我开始往排行榜上爬了。要不要也来榜顶聚聚？"
       keep_practicing:
         lines:
-          - "血糖让人谦虚。%{rounds} 轮打完——看你能不能预测得比我好。"
-          - "%{rounds} 轮了，曲线我还在学。轮到你试试。"
-          - "比看起来难吧？%{rounds} 次诚实尝试。打败我。不服来。"
-          - "%{rounds} 轮，线还是赢。你预测得更好？来给我看看。"
+          - "血糖会让人服气。%{rounds} 轮打完——看你能不能预测得比我好。"
+          - "%{rounds} 轮过去，我还在摸索这条曲线。轮到你试试了。"
+          - "比看起来难吧？%{rounds} 轮老老实实的尝试。来打败我啊，我等着。"
+          - "%{rounds} 轮了，还是这条线占上风。觉得你能预测得更好？来给我看看。"
     synthesis:
       title: "下一小时预测误差"
-      x_axis: "时间（自隐藏下一小时起点起的分钟，每个5分钟点）"
+      x_axis: "时间（从隐藏的下一小时起点算起的分钟数，每 5 分钟一个点）"
       x_axis_time: "时间"
-      y_axis: "相对实际值的偏差（以百分比计）"
-      y_axis_short: "偏差"
+      y_axis: "相对实际值的误差百分比（每 5 分钟一个点）"
+      y_axis_short: "误差"
       legend_zero: "无偏差"
       legend_variability: "波动线"
-      legend_error: "相对实际，每轮一条线"
+      legend_error: "相对实际值的误差，每轮一条线"
       round_hover: "轮次"
-      caption: "每行是一种数据源。时间轴覆盖整段下一小时。纵轴为相对实际值的百分比。折线与0之间的填充表示该轮。"
+      caption: "每一行对应你使用过的一种数据源。时间轴覆盖整段下一小时（每 5 分钟一个点）。纵轴为相对实际值的误差百分比。折线与零线之间的阴影区域表示该轮的表现。"
       empty: "暂无图表数据。"
 
   chart:
@@ -340,7 +343,7 @@ zh:
       average:
         - "不错——曲线很棘手。你的尝试仍然为研究增添了信号。"
         - "合理的尝试！即使不完美的预测也有助于探索人类直觉。"
-        - "公正的估计。研究也从困难案例中受益。"
+        - "估计得还算靠谱。研究也能从困难的情况中获益。"
         - "不错的尝试——研究衡量的是直觉，而非完美。"
       keep_practicing:
         - "困难的窗口。困难案例对研究尤其有参考价值。"
@@ -405,7 +408,7 @@ zh:
               此外，如果你上传了自己的 CGM 数据，图表会显示已记录的碳水化合物、胰岛素和运动标记。所以这并不是一条光秃秃的血糖线。
 
 
-              这和股票交易中的"技术分析"一样吗？不一样。股价受群体心理驱动，预测本身就会影响市场。而血糖是生物化学过程。胰岛素有已知的作用曲线，碳水化合物以已知的速率吸收。接下来一小时的走势主要取决于当前已经在进行中的过程。
+              这和股票交易中的“技术分析”一样吗？不一样。股价受群体心理驱动，预测本身就会影响市场。而血糖是生物化学过程。胰岛素有已知的作用曲线，碳水化合物以已知的速率吸收。接下来一小时的走势主要取决于当前已经在进行中的过程。
 
 
               研究也证实了这一点：比较有无饮食和胰岛素输入的血糖预测模型的研究发现，添加这些协变量并未提高短期预测准确性（[Daniels et al., 2022](https://pmc.ncbi.nlm.nih.gov/articles/PMC8782424/)；[The Maastricht Study, 2021](https://pmc.ncbi.nlm.nih.gov/articles/PMC8224858/)）。仅凭 CGM 信号就足以预测接下来一小时的血糖。
