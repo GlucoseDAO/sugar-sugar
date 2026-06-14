@@ -21,10 +21,11 @@ Public API
     missing, **actual** at that time is used so the line still starts.
     Colours desaturate as |error| grows.
 - ``build_share_card_figure(share_record, share_url, *, locale)``:
-    Builds the 1080x1080 composite Plotly figure used for the downloadable
-    PNG and the Open Graph preview.  Vertical stack: title, stats, quote,
-    legend, chart (per-panel format labels), ranking (left) and QR (right)
-    in the footer band, QR linking to the play URL.
+    Builds the 1200x630 landscape composite Plotly figure used for the
+    downloadable PNG and the Open Graph preview (1.91:1 so FB/LinkedIn/X show
+    it uncropped).  Zones: title band (top), stats + encouragement quote
+    (left column), synthesis chart (right column), ranking (left) and QR
+    (right) in the footer band, QR linking to the play URL.
 - ``compute_aggregate_stats(rounds)``:
     Returns a dict with ``mae_mgdl``, ``rmse_mgdl``, ``mape``,
     ``rounds_played``, ``pairs`` used by both the layout and the LLM hook.
@@ -35,8 +36,10 @@ import base64
 import io
 import math
 import re
+import textwrap
 import urllib.parse
 from datetime import datetime
+from html import escape as html_escape
 from typing import Any, Optional
 
 import plotly.graph_objects as go
@@ -479,10 +482,24 @@ def _qrcode_png_data_uri(target_url: str) -> str:
 
 
 # Share card PNG: Plotly ``xref/ yref: paper`` is the *inner* plot, not the full figure,
-# so large margins do not reserve “safe” space — text must be placed in y-bands the
-# traces do not use, by shrinking ``yaxis.domain`` for every stacked subplot.
-_CARD_TRACE_Y0: float = 0.29
-_CARD_TRACE_Y1: float = 0.71
+# so large margins do not reserve “safe” space — text must be placed in bands the
+# traces do not use, by shrinking ``xaxis.domain`` / ``yaxis.domain`` for every subplot.
+#
+# The card is a 1.91:1 landscape (1200x630) so Facebook/LinkedIn/X show it as a large
+# image without cropping. Layout zones (paper coords, 0=bottom/left):
+#   - Title band:   full width, top.
+#   - Left column:  subtitle, name, stat lines, encouragement quote.
+#   - Right column: the synthesis chart (per-panel format labels are OFF here to
+#                   avoid the "Generic data" annotation overlapping the card text).
+#   - Footer band:  ranking lines (left) + QR (right), full width, bottom.
+SHARE_CARD_WIDTH: int = 1200
+SHARE_CARD_HEIGHT: int = 630
+
+# Right-column chart domain and the vertical band its stacked rows occupy.
+_CARD_CHART_X0: float = 0.52
+_CARD_CHART_X1: float = 0.99
+_CARD_TRACE_Y0: float = 0.08
+_CARD_TRACE_Y1: float = 0.82
 
 
 def _constrain_synthesis_panels_to_vertical_band(
@@ -955,8 +972,56 @@ def build_synthesis_figure(
 
 
 # ---------------------------------------------------------------------------
-# Square 1080x1080 share card
+# Landscape 1200x630 share card (1.91:1 — uncropped on FB / LinkedIn / X)
 # ---------------------------------------------------------------------------
+
+def _wrap_text(text: str, max_chars: int, max_lines: int = 3) -> str:
+    """Wrap to ``<br>``-joined lines for Plotly annotations.
+
+    ``textwrap`` also handles languages/phrases without spaces. The small
+    rebalance step avoids orphan final lines like a lone "it!".
+    """
+    cleaned: str = " ".join(str(text or "").split())
+    if not cleaned:
+        return ""
+    # CJK glyphs are roughly twice as wide as Latin glyphs at the same point
+    # size, and many translated strings have no spaces. Wrap them earlier by
+    # visual width so quotes cannot run into the chart column.
+    if any(
+        "\u4e00" <= ch <= "\u9fff"
+        or "\u3400" <= ch <= "\u4dbf"
+        or "\u3040" <= ch <= "\u30ff"
+        or "\uac00" <= ch <= "\ud7af"
+        for ch in cleaned
+    ):
+        max_chars = max(14, int(max_chars * 0.58))
+    lines: list[str] = textwrap.wrap(
+        cleaned,
+        width=max_chars,
+        break_long_words=True,
+        break_on_hyphens=False,
+    )
+    if len(lines) > max_lines:
+        lines = lines[: max_lines - 1] + [" ".join(lines[max_lines - 1 :])]
+    if len(lines) >= 2 and len(lines[-1]) <= 5 and " " in lines[-2]:
+        previous_words: list[str] = lines[-2].split()
+        moved: str = previous_words.pop()
+        lines[-2] = " ".join(previous_words)
+        lines[-1] = f"{moved} {lines[-1]}".strip()
+    return "<br>".join(line for line in lines if line)
+
+
+def _brand_colored_label(text: str) -> str:
+    """Bold label with the Sugar Sugar brand words coloured when present."""
+    escaped: str = html_escape(str(text or ""), quote=False)
+    brand: str = "Sugar Sugar"
+    if brand in escaped:
+        escaped = escaped.replace(
+            brand,
+            '<span style="color:#1565c0">Sugar Sugar</span>',
+        )
+    return f"<b>{escaped}</b>"
+
 
 def build_share_card_figure(
     share_record: dict[str, Any],
@@ -965,11 +1030,14 @@ def build_share_card_figure(
     locale: str,
     seed: Optional[str] = None,
 ) -> go.Figure:
-    """Build the 1080x1080 composite share card for kaleido/OG.
+    """Build the 1200x630 landscape composite share card for kaleido/OG.
 
-    In Plotly, ``paper`` is the *inner* plot, so we shrink every subplot
-    ``yaxis.domain`` to a middle band and place title, metrics, quote, legend
-    entirely above, and ranking + QR entirely below, the traces.
+    In Plotly, ``paper`` is the *inner* plot, so the synthesis chart is pinned to
+    the right column (``xaxis.domain``/``yaxis.domain``) and all text lives in the
+    top title band, the left column (stats + quote), and the bottom footer
+    (ranking + QR). The per-panel "Generic / My data" labels are disabled here so
+    they cannot overlap the card text. Fonts are sized for legibility in a social
+    thumbnail (title ~34pt, stats ~19pt).
     """
     loc: str = normalize_locale(locale)
     rounds: list[dict[str, Any]] = list(share_record.get("rounds") or [])
@@ -996,137 +1064,106 @@ def build_share_card_figure(
         locale=loc,
         show_title=False,
         show_legend_in_figure=False,
-        show_format_row_annotations=True,
+        show_format_row_annotations=False,
     )
     fig.update_layout(
-        width=1080, height=1080,
-        margin=dict(l=56, r=28, t=20, b=20),
+        width=SHARE_CARD_WIDTH, height=SHARE_CARD_HEIGHT,
+        margin=dict(l=8, r=10, t=8, b=8),
         paper_bgcolor="#f8fafc",
         plot_bgcolor="white",
         showlegend=False,
     )
     n_fmt: int = len(_formats_played_in_order(rounds))
     if n_fmt >= 1:
+        # Pin the stacked panels into the right column, vertical band only.
         _constrain_synthesis_panels_to_vertical_band(
             fig, n_fmt, y_lo=_CARD_TRACE_Y0, y_hi=_CARD_TRACE_Y1
         )
-    mae_label: str = t("ui.share.stat_mae", locale=loc)
-    rmse_label: str = t("ui.share.stat_rmse", locale=loc)
-    rounds_label: str = t("ui.share.stat_rounds", locale=loc)
-    leg_zero: str = t("ui.share.synthesis.legend_zero", locale=loc)
-    leg_var: str = t("ui.share.synthesis.legend_variability", locale=loc)
-    # Paper y: 0=bottom, 1=top. Traces use [_CARD_TRACE_Y0, _CARD_TRACE_Y1] only.
-    y_legend: float = 0.755
-    if name:
-        y_stats_base: float = 0.878
-        y_quote_base: float = 0.812
-    else:
-        y_stats_base = 0.898
-        y_quote_base = 0.832
+        for row in range(1, n_fmt + 1):
+            fig.update_xaxes(domain=(_CARD_CHART_X0, _CARD_CHART_X1), row=row, col=1)
+            # The y-axis already shows a "%" tick suffix; drop the title so it
+            # cannot bleed left into the stats/quote column.
+            fig.update_yaxes(title_text="", row=row, col=1)
 
-    headline: str = t("ui.share.subtitle", locale=loc)
-    _MAX_HEADLINE_LINE = 36
-    headline_wrapped: bool = False
-    if len(headline) > _MAX_HEADLINE_LINE:
-        q_idx: int = headline.find("?")
-        if q_idx != -1 and q_idx < len(headline) - 1:
-            headline = headline[: q_idx + 1] + "<br>" + headline[q_idx + 1 :].lstrip()
-        else:
-            mid: int = len(headline) // 2
-            sp: int = headline.rfind(" ", 0, mid + 8)
-            if sp > 0:
-                headline = headline[:sp] + "<br>" + headline[sp + 1 :]
-        headline_wrapped = True
-    dy: float = 0.030 if headline_wrapped else 0.0
+    # ---- Main title band (full width, above both columns) ----
+    left_x: float = 0.035
+    headline: str = _wrap_text(t("ui.share.subtitle", locale=loc), max_chars=76, max_lines=2)
     fig.add_annotation(
         xref="paper", yref="paper",
-        x=0.5, y=0.993,
+        x=0.5, y=0.985,
         xanchor="center", yanchor="top",
+        align="center",
         text=f"<b>{headline}</b>",
         showarrow=False,
-        font=dict(size=36, color="rgba(15,23,42,1)"),
+        font=dict(size=30, color="rgba(15,23,42,1)"),
     )
+
+    # ---- Left column (subheader, stats + quote) ----
     fig.add_annotation(
         xref="paper", yref="paper",
-        x=0.5, y=0.938 - dy,
-        xanchor="center", yanchor="top",
-        text=t("ui.share.title", locale=loc),
+        x=left_x, y=0.865,
+        xanchor="left", yanchor="top",
+        text=_brand_colored_label(t("ui.share.title", locale=loc)),
         showarrow=False,
-        font=dict(size=18, color="rgba(100,116,139,1)"),
+        font=dict(size=28, color="rgba(100,116,139,1)"),
     )
     if name:
         fig.add_annotation(
             xref="paper", yref="paper",
-            x=0.5, y=0.918 - dy,
-            xanchor="center", yanchor="top",
-            text=name,
+            x=left_x, y=0.790,
+            xanchor="left", yanchor="top",
+            text=f"<b>{name}</b>",
             showarrow=False,
-            font=dict(size=16, color="rgba(71,85,105,1)"),
+            font=dict(size=18, color="rgba(30,58,138,1)"),
         )
+
+    mae_label: str = t("ui.share.stat_mae", locale=loc)
+    rmse_label: str = t("ui.share.stat_rmse", locale=loc)
+    rounds_label: str = t("ui.share.stat_rounds", locale=loc)
     mard_label: str = t("ui.share.stat_mard", locale=loc)
-    parts: list[str] = [f"<b>{accuracy_str}</b> {t('ui.share.stat_accuracy', locale=loc)}"]
+    bullet: str = "   \u2022   "
+    stat_lines: list[str] = [
+        bullet.join([
+            f"<b>{accuracy_str}</b> {t('ui.share.stat_accuracy', locale=loc)}",
+            f"<b>{mard_str}</b> {mard_label}",
+        ]),
+        bullet.join([
+            f"<b>{_format_number(mae)}</b> mg/dL {mae_label}",
+            f"<b>{_format_number(rmse)}</b> mg/dL {rmse_label}",
+        ]),
+    ]
+    last_stat: str = f"<b>{rounds_played}</b> {rounds_label}"
     if percentile is not None:
-        parts.append(f"<b>{t('ui.share.stat_percentile', locale=loc, percentile=f'{percentile}%')}</b>")
-    parts.extend([
-        f"<b>{mard_str}</b> {mard_label}",
-        f"<b>{_format_number(mae)}</b> mg/dL {mae_label}",
-        f"<b>{_format_number(rmse)}</b> mg/dL {rmse_label}",
-        f"<b>{rounds_played}</b> {rounds_label}",
-    ])
-    stats_line: str = "   \u2022   ".join(parts)
+        last_stat = bullet.join([
+            last_stat,
+            f"<b>{t('ui.share.stat_percentile', locale=loc, percentile=f'{percentile}%')}</b>",
+        ])
+    stat_lines.append(last_stat)
+
+    y_stats_top: float = 0.735 if name else 0.785
+    stat_step: float = 0.066
+    for idx, line in enumerate(stat_lines):
+        fig.add_annotation(
+            xref="paper", yref="paper",
+            x=left_x, y=y_stats_top - idx * stat_step,
+            xanchor="left", yanchor="top",
+            text=line,
+            showarrow=False,
+            font=dict(size=19, color="rgba(15,23,42,1)"),
+        )
+
+    quote_y: float = y_stats_top - len(stat_lines) * stat_step - 0.018
     fig.add_annotation(
         xref="paper", yref="paper",
-        x=0.5, y=y_stats_base - dy,
-        xanchor="center", yanchor="top",
-        text=stats_line,
+        x=left_x, y=quote_y,
+        xanchor="left", yanchor="top",
+        align="left",
+        text=f"<i>{_wrap_text(encourage, max_chars=42, max_lines=3)}</i>",
         showarrow=False,
-        font=dict(size=17, color="rgba(15,23,42,1)"),
-    )
-    fig.add_annotation(
-        xref="paper", yref="paper",
-        x=0.5, y=y_quote_base - dy,
-        xanchor="center", yanchor="top",
-        text=f"<i>{encourage}</i>",
-        showarrow=False,
-        font=dict(size=20, color="rgba(30,58,138,1)"),
+        font=dict(size=19, color="rgba(30,58,138,1)"),
     )
 
-    formats_played: list[str] = _formats_played_in_order(rounds)
-    fmt0: str = str(formats_played[0]).strip().upper() if formats_played else "A"
-    if fmt0 not in ("A", "B", "C"):
-        fmt0 = "A"
-    n_fmt_card: int = len(formats_played)
-    var_color: str = _format_good_color(fmt0, n_fmt_card)
-    fig.add_shape(
-        type="line",
-        xref="paper", yref="paper",
-        x0=0.28, x1=0.35, y0=y_legend, y1=y_legend,
-        line={"color": _good_rgba(fmt0, n_fmt_card), "width": 3.2},
-        layer="above",
-    )
-    fig.add_annotation(
-        xref="paper", yref="paper",
-        x=0.355, y=y_legend, xanchor="left", yanchor="middle",
-        text=leg_zero,
-        showarrow=False,
-        font=dict(size=13, color="rgba(51,65,85,1)"),
-    )
-    fig.add_shape(
-        type="line",
-        xref="paper", yref="paper",
-        x0=0.55, x1=0.62, y0=y_legend, y1=y_legend,
-        line={"color": var_color, "width": 2.0},
-        layer="above",
-    )
-    fig.add_annotation(
-        xref="paper", yref="paper",
-        x=0.625, y=y_legend, xanchor="left", yanchor="middle",
-        text=leg_var,
-        showarrow=False,
-        font=dict(size=13, color="rgba(51,65,85,1)"),
-    )
-
-    # ---- Ranking (large, bottom) ----
+    # ---- Footer band (full width, bottom): ranking left, QR right ----
     rankings: dict[str, Any] = dict(share_record.get("rankings") or {})
     per_format_entries: list[dict[str, Any]] = list(rankings.get("per_format") or [])
     overall_entry: Optional[dict[str, Any]] = (
@@ -1138,11 +1175,7 @@ def build_share_card_figure(
             o_rank = int(overall_entry.get("rank"))
             o_total = int(overall_entry.get("total"))
             ranking_lines.append(
-                t(
-                    "ui.final.ranking_overall_line",
-                    locale=loc,
-                    rank=o_rank, total=o_total,
-                )
+                t("ui.final.ranking_overall_line", locale=loc, rank=o_rank, total=o_total)
             )
         except (TypeError, ValueError):
             pass
@@ -1153,90 +1186,71 @@ def build_share_card_figure(
         except (TypeError, ValueError):
             continue
         fmt = str(entry.get("format") or "")
-        label = _resolve_format_label(fmt, locale=loc)
-        ranking_lines.append(
-            t(
-                "ui.final.ranking_format_line",
-                locale=loc,
-                format=label, rank=r, total=total,
-            )
-        )
-    # Footer band: left column = ranking; right = scan hint + QR. Same top/bottom on both columns.
-    rank_left_x: float = 0.04
-    _rank_title_y_top: float = 0.205
-    _rank_first_line_y_top: float = 0.176
-    _rank_step: float = 0.026
-    # One line of body text in paper fraction (~px/fig_height for 14–17px on 1080)
-    _rank_line_paper_h: float = 0.022
-    _scan_font_pt: int = 12
-    _scan_line_paper_h: float = 0.02
-    _scan_qr_gap: float = 0.003
-    qr_col_x: float = 0.86
+        # Compact card-only form. The full web-page translation
+        # ("Ranking (Generic + My Data): ...") is too long in several locales
+        # and can collide with the QR column in a 1200x630 social thumbnail.
+        ranking_lines.append(f"{_resolve_format_label(fmt, locale=loc)}: {r} / {total}")
 
-    footer_y_top: float
-    footer_y_bottom: float
-    if ranking_lines:
-        footer_y_top = _rank_title_y_top
-        n_body: int = len(ranking_lines[:4])
-        y_last_line_top: float = (
-            _rank_first_line_y_top - max(0, n_body - 1) * _rank_step
+    rank_title_y: float = 0.360
+    rank_first_line_y: float = 0.300
+    _rank_bottom_limit: float = 0.05  # keep clear of generated_at at y=0.02
+    shown_ranking: list[str] = ranking_lines[:4]
+    if shown_ranking:
+        n_rank: int = len(shown_ranking)
+        rank_step: float = min(
+            0.052,
+            (rank_first_line_y - _rank_bottom_limit) / float(max(n_rank - 1, 1)),
         )
-        footer_y_bottom = y_last_line_top - _rank_line_paper_h
         fig.add_annotation(
             xref="paper", yref="paper",
-            x=rank_left_x, y=footer_y_top,
+            x=left_x, y=rank_title_y,
             xanchor="left", yanchor="top",
             text=f"<b>{t('ui.final.ranking_title', locale=loc)}</b>",
             showarrow=False,
-            font=dict(size=22, color="rgba(21,101,192,1)"),
+            font=dict(size=20, color="rgba(21,101,192,1)"),
         )
-        for idx, line in enumerate(ranking_lines[:4]):
+        for idx, line in enumerate(shown_ranking):
             em_o, em_c = ("<b>", "</b>") if idx == 0 else ("", "")
             fig.add_annotation(
                 xref="paper", yref="paper",
-                x=rank_left_x, y=_rank_first_line_y_top - idx * _rank_step,
+                x=left_x, y=rank_first_line_y - idx * rank_step,
                 xanchor="left", yanchor="top",
                 text=f"{em_o}{line}{em_c}",
                 showarrow=False,
-                font=dict(
-                    size=17 if idx == 0 else 14,
-                    color="rgba(15,23,42,1)",
-                ),
+                font=dict(size=16 if idx == 0 else 14, color="rgba(15,23,42,1)"),
             )
-    else:
-        footer_y_top, footer_y_bottom = 0.18, 0.05
 
-    col_h: float = footer_y_top - footer_y_bottom
-    qr_h: float = max(0.0, col_h - _scan_line_paper_h - _scan_qr_gap)
-    # Square QR: same paper span on x and y (1080 square figure)
-    qr_w: float = qr_h
-
+    # QR beside the ranking in the whitespace between left text and graph.
+    # Card is 1200x630, so keep the QR square in *pixels* by giving sizey a
+    # larger paper span than sizex (1200/630 ratio).
+    qr_col_x: float = 0.405
+    qr_size_px: int = 220
+    qr_w: float = qr_size_px / float(SHARE_CARD_WIDTH)
+    qr_h: float = qr_size_px / float(SHARE_CARD_HEIGHT)
     fig.add_annotation(
         xref="paper", yref="paper",
-        x=qr_col_x, y=footer_y_top,
+        x=qr_col_x, y=0.402,
         xanchor="center", yanchor="top",
         text=t("ui.share.qr_scan_to_play", locale=loc),
         showarrow=False,
-        font=dict(size=_scan_font_pt, color="rgba(71,85,105,0.95)"),
+        font=dict(size=16, color="rgba(100,116,139,0.95)"),
     )
     fig.add_layout_image(
         dict(
             source=qri,
-            xref="paper",
-            yref="paper",
-            x=qr_col_x,
-            y=footer_y_bottom,
-            xanchor="center",
-            yanchor="bottom",
-            sizex=qr_w,
-            sizey=qr_h,
+            xref="paper", yref="paper",
+            x=qr_col_x, y=0.025,
+            xanchor="center", yanchor="bottom",
+            sizex=qr_w, sizey=qr_h,
             layer="above",
         )
     )
     if generated_at:
+        # Placed under the chart (not the left ranking column) so it never
+        # collides with a 4-line ranking block.
         fig.add_annotation(
             xref="paper", yref="paper",
-            x=0.04, y=0.022,
+            x=left_x, y=0.02,
             xanchor="left", yanchor="bottom",
             text=generated_at,
             showarrow=False,
@@ -1411,7 +1425,9 @@ def create_share_layout(
             ),
             _share_button(
                 t("ui.share.share_on_linkedin", locale=loc),
-                f"https://www.linkedin.com/sharing/share-offsite/?url={encoded_url}",
+                # share-offsite often opens an empty composer; the feed
+                # shareActive intent reliably opens LinkedIn's share box.
+                f"https://www.linkedin.com/feed/?shareActive=true&shareUrl={encoded_url}",
                 color="#0A66C2", icon="fa-linkedin",
             ),
             _share_button(

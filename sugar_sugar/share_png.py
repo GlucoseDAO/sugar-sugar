@@ -1,39 +1,51 @@
-"""Share-card PNG rendering (kaleido primary, matplotlib Agg fallback).
+"""Share-card PNG rendering.
 
-Primary path uses Plotly + kaleido v1, which needs a Chromium-based browser
-(``choreo_get_chrome`` download or a compatible system binary). When that is
-unavailable, :func:`render_share_card_png_bytes` falls back to a simplified
-1080×1080 card built with matplotlib's Agg backend (no Chrome).
+The share card is built **once** as a Plotly figure
+(:func:`sugar_sugar.components.share.build_share_card_figure`). Only the
+**image-export step** has a fallback chain — we never redraw the card in a
+second library:
+
+1. kaleido v1 (Plotly static export; needs a Chromium binary).
+2. on failure: self-provision Chrome (``kaleido.get_chrome_sync()``) and
+   retry once.
+3. last resort: serve the static branded site card (``assets/og-card.png``)
+   so the OG image is always a valid 1200x630 raster, and log the real
+   underlying error loudly.
+
+Why no matplotlib fallback: rendering a Plotly ``go.Figure`` to a raster
+*requires* a browser engine (kaleido/orca are both Chromium); a parallel
+matplotlib card inevitably drifts from the real design (tiny fonts,
+overlapping titles) and is what shipped a broken card to production. The
+correct fix is to make the Chromium export reliable and fail *loudly* — not
+to silently swap in a different-looking image.
+
+Note on the Chromium binary: ``kaleido.get_chrome_sync()`` downloads a
+self-contained Chrome-for-Testing into the user cache (no systemwide Chrome
+needed), but Chromium still links against system shared libraries
+(``libatk-1.0.so.0``, ``libnss3``, ``libgbm1`` …). On a slim/bare host those
+must be installed or Chrome dies on launch with ``BrowserFailedError`` (not
+the more helpful ``BrowserDepsError``). See README for the apt lib set.
 """
 from __future__ import annotations
 
-import io
-import math
+from pathlib import Path
 from typing import Any, Optional
 
 import plotly.graph_objects as go
 from eliot import start_action
 
-from sugar_sugar.components.share import (
-    _best_ranking_entry,
-    _format_number,
-    _formats_played_in_order,
-    _percent_error_series_for_round,
-    _play_url_from_share,
-    _prediction_next_hour_range,
-    _resolve_format_label,
-    _safe_display_name,
-    _window_size_for_round,
-    build_share_card_figure,
-    compute_aggregate_stats,
-)
-from sugar_sugar.encouragement import encouragement_text
-from sugar_sugar.i18n import normalize_locale, t
+from sugar_sugar.components.share import build_share_card_figure
+from sugar_sugar.i18n import normalize_locale
 
 PNG_SIGNATURE: bytes = b"\x89PNG\r\n\x1a\n"
-DEFAULT_SHARE_PNG_WIDTH: int = 1080
-DEFAULT_SHARE_PNG_HEIGHT: int = 1080
+# 1.91:1 large-image card — the size FB / LinkedIn / X / Telegram all accept.
+DEFAULT_SHARE_PNG_WIDTH: int = 1200
+DEFAULT_SHARE_PNG_HEIGHT: int = 630
 DEFAULT_SHARE_PNG_SCALE: int = 1
+
+# Static branded card used as the absolute last resort so the OG image URL
+# always returns a real 1200x630 raster, even if Chrome cannot launch.
+_STATIC_FALLBACK_CARD: Path = Path(__file__).resolve().parent.parent / "assets" / "og-card.png"
 
 
 class SharePngKaleidoUnavailableError(RuntimeError):
@@ -48,6 +60,12 @@ def _kaleido_failure_types() -> tuple[type[BaseException], ...]:
         pass
     else:
         types.append(BrowserFailedError)
+    try:
+        from choreographer.browsers._errors import BrowserDepsError
+    except ImportError:
+        pass
+    else:
+        types.append(BrowserDepsError)
     try:
         from kaleido.errors import ChromeNotFoundError as KaleidoChromeNotFoundError
     except ImportError:
@@ -66,38 +84,6 @@ def _kaleido_failure_types() -> tuple[type[BaseException], ...]:
 _KALEIDO_FAILURES: tuple[type[BaseException], ...] = _kaleido_failure_types()
 
 
-def render_plotly_figure_to_png(
-    fig: go.Figure,
-    *,
-    width: int = DEFAULT_SHARE_PNG_WIDTH,
-    height: int = DEFAULT_SHARE_PNG_HEIGHT,
-    scale: int = DEFAULT_SHARE_PNG_SCALE,
-    allow_fallback: bool = False,
-    share_record: Optional[dict[str, Any]] = None,
-    share_url: str = "",
-    locale: str = "en",
-    seed: Optional[str] = None,
-) -> bytes:
-    """Render a Plotly figure to PNG bytes via kaleido, optionally with fallback."""
-    try:
-        return _render_with_kaleido(fig, width=width, height=height, scale=scale)
-    except _KALEIDO_FAILURES as err:
-        if not allow_fallback or share_record is None:
-            raise SharePngKaleidoUnavailableError(
-                "Plotly kaleido PNG export failed; no Chromium browser available."
-            ) from err
-        with start_action(action_type=u"share_png_fallback_matplotlib") as action:
-            action.log(message_type="kaleido_failed", error_type=type(err).__name__)
-            return _render_share_png_matplotlib_fallback(
-                share_record,
-                share_url=share_url,
-                locale=locale,
-                seed=seed,
-                width=width,
-                height=height,
-            )
-
-
 def _render_with_kaleido(
     fig: go.Figure,
     *,
@@ -105,13 +91,92 @@ def _render_with_kaleido(
     height: int,
     scale: int,
 ) -> bytes:
-    """Plotly static export through kaleido (requires Chromium)."""
+    """Plotly static export through kaleido (requires a Chromium binary)."""
     return fig.to_image(
         format="png",
         width=width,
         height=height,
         scale=scale,
     )
+
+
+def _ensure_chrome_available() -> None:
+    """Self-provision the choreographer-managed Chrome for kaleido.
+
+    We check the *managed* download path, not ``find_browser`` — a
+    present-but-broken system/snap chromium otherwise satisfies ``find_browser``
+    and wins over (and prevents) the reliable managed download. kaleido prefers
+    the managed binary, so ensuring it exists makes export deterministic.
+
+    Kept local to avoid importing the heavy app module from the render path.
+    """
+    from choreographer.browsers.chromium import (
+        get_chrome_download_path,
+        get_old_chrome_download_path,
+    )
+
+    managed = get_chrome_download_path(mkdir=False)
+    old = get_old_chrome_download_path()
+    if (managed and managed.exists()) or (old and old.exists()):
+        return
+    import kaleido
+
+    kaleido.get_chrome_sync()
+
+
+def _static_fallback_card_bytes() -> bytes:
+    """Read the static branded card; raise if it is missing/corrupt."""
+    data: bytes = _STATIC_FALLBACK_CARD.read_bytes()
+    if not data.startswith(PNG_SIGNATURE):
+        raise SharePngKaleidoUnavailableError(
+            f"Static fallback card is not a valid PNG: {_STATIC_FALLBACK_CARD}"
+        )
+    return data
+
+
+def render_plotly_figure_to_png(
+    fig: go.Figure,
+    *,
+    width: int = DEFAULT_SHARE_PNG_WIDTH,
+    height: int = DEFAULT_SHARE_PNG_HEIGHT,
+    scale: int = DEFAULT_SHARE_PNG_SCALE,
+    allow_fallback: bool = True,
+) -> bytes:
+    """Render a Plotly figure to PNG bytes via kaleido, with an export-only fallback.
+
+    The fallback branches on the *export engine*, never on the figure: on a
+    kaleido/Chromium failure we self-provision Chrome and retry once, then (if
+    ``allow_fallback``) serve the static branded card. The real underlying
+    error is always logged so a missing-lib regression fails loudly instead of
+    silently degrading.
+    """
+    try:
+        return _render_with_kaleido(fig, width=width, height=height, scale=scale)
+    except _KALEIDO_FAILURES as err:
+        with start_action(action_type=u"share_png_kaleido_failed") as action:
+            action.log(
+                message_type=u"kaleido_failed",
+                error_type=type(err).__name__,
+                error=str(err),
+            )
+            # Self-heal: make sure a Chromium binary exists, then retry once.
+            try:
+                _ensure_chrome_available()
+                return _render_with_kaleido(fig, width=width, height=height, scale=scale)
+            except _KALEIDO_FAILURES as retry_err:
+                action.log(
+                    message_type=u"kaleido_failed_after_retry",
+                    error_type=type(retry_err).__name__,
+                    error=str(retry_err),
+                )
+                if not allow_fallback:
+                    raise SharePngKaleidoUnavailableError(
+                        "Plotly kaleido PNG export failed; Chromium could not "
+                        "launch (often missing system libraries such as "
+                        "libatk-1.0.so.0/libnss3 — see README)."
+                    ) from retry_err
+                action.log(message_type=u"share_png_static_fallback")
+                return _static_fallback_card_bytes()
 
 
 def render_share_card_png_bytes(
@@ -125,7 +190,7 @@ def render_share_card_png_bytes(
     scale: int = DEFAULT_SHARE_PNG_SCALE,
     allow_fallback: bool = True,
 ) -> bytes:
-    """Build the share card figure and export PNG bytes."""
+    """Build the share card figure once and export it to PNG bytes."""
     loc: str = normalize_locale(locale)
     fig: go.Figure = build_share_card_figure(
         share_record,
@@ -139,138 +204,4 @@ def render_share_card_png_bytes(
         height=height,
         scale=scale,
         allow_fallback=allow_fallback,
-        share_record=share_record,
-        share_url=share_url,
-        locale=loc,
-        seed=seed,
     )
-
-
-def _render_share_png_matplotlib_fallback(
-    share_record: dict[str, Any],
-    *,
-    share_url: str,
-    locale: str,
-    seed: Optional[str],
-    width: int,
-    height: int,
-) -> bytes:
-    """Simplified share card without Chrome (matplotlib Agg backend)."""
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    import segno
-
-    loc: str = normalize_locale(locale)
-    rounds: list[dict[str, Any]] = list(share_record.get("rounds") or [])
-    stats: dict[str, Any] = compute_aggregate_stats(rounds)
-    name: str = _safe_display_name(dict(share_record.get("user_info") or {}))
-    play_url: str = _play_url_from_share(share_url)
-
-    mae: float = float(stats.get("mae_mgdl", float("nan")))
-    rmse: float = float(stats.get("rmse_mgdl", float("nan")))
-    accuracy: float = float(stats.get("accuracy", float("nan")))
-    accuracy_str: str = (
-        f"{_format_number(accuracy)}%" if not math.isnan(accuracy) else "?"
-    )
-    rounds_played: int = int(stats.get("rounds_played") or 0)
-    best_entry: Optional[dict[str, Any]] = _best_ranking_entry(share_record)
-    percentile: Optional[int] = (
-        int(best_entry["percentile"]) if best_entry and best_entry.get("percentile") is not None else None
-    )
-    encourage: str = encouragement_text(stats, loc, seed=seed)
-
-    formats: list[str] = _formats_played_in_order(rounds)
-    n_panels: int = max(1, len(formats))
-
-    dpi: int = 100
-    fig_w_in: float = width / dpi
-    fig_h_in: float = height / dpi
-    fig, axes = plt.subplots(
-        n_panels,
-        1,
-        figsize=(fig_w_in, fig_h_in),
-        dpi=dpi,
-        squeeze=False,
-    )
-    fig.patch.set_facecolor("#f8fafc")
-
-    title: str = t("ui.share.subtitle", locale=loc)
-    fig.suptitle(title, fontsize=14, fontweight="bold", y=0.97)
-    header_lines: list[str] = []
-    if name:
-        header_lines.append(name)
-    header_lines.append(
-        f"{t('ui.share.stat_mae', locale=loc)} {_format_number(mae)} · "
-        f"{t('ui.share.stat_rmse', locale=loc)} {_format_number(rmse)} · "
-        f"{t('ui.share.stat_rounds', locale=loc)} {rounds_played} · "
-        f"{accuracy_str}"
-    )
-    if percentile is not None:
-        header_lines.append(
-            t("ui.share.stat_percentile", locale=loc, percentile=str(percentile))
-        )
-    fig.text(0.5, 0.92, "\n".join(header_lines), ha="center", va="top", fontsize=9)
-    fig.text(
-        0.5,
-        0.86,
-        encourage[:220] + ("…" if len(encourage) > 220 else ""),
-        ha="center",
-        va="top",
-        fontsize=8,
-        color="#334155",
-        wrap=True,
-    )
-
-    panel_axes: list[Any] = list(axes.flat)
-    if not formats:
-        ax0 = panel_axes[0]
-        ax0.set_axis_off()
-        ax0.text(
-            0.5,
-            0.5,
-            t("ui.share.synthesis.empty", locale=loc),
-            ha="center",
-            va="center",
-            transform=ax0.transAxes,
-        )
-    else:
-        for ax, fmt in zip(panel_axes, formats, strict=False):
-            fmt_rounds: list[dict[str, Any]] = [
-                r for r in rounds if str(r.get("format") or "").upper() == fmt
-            ]
-            ax.set_facecolor("white")
-            ax.axhline(0.0, color="black", linewidth=1.2, zorder=1)
-            ax.set_title(_resolve_format_label(fmt, locale=loc), fontsize=9)
-            ax.set_ylabel(t("ui.share.synthesis.y_axis_short", locale=loc), fontsize=8)
-            for rnd in fmt_rounds:
-                ws: int = _window_size_for_round(rnd)
-                hour_range: Optional[tuple[int, int]] = _prediction_next_hour_range(ws)
-                if hour_range is None:
-                    continue
-                ys: list[Optional[float]] = _percent_error_series_for_round(rnd, hour_range)
-                xs: list[int] = list(range(len(ys)))
-                y_vals: list[float] = [float(y) for y in ys if y is not None]
-                x_vals: list[int] = [x for x, y in zip(xs, ys, strict=True) if y is not None]
-                if x_vals:
-                    ax.plot(x_vals, y_vals, linewidth=1.0, alpha=0.55)
-            ax.grid(True, alpha=0.25)
-            ax.set_xlabel(t("ui.share.synthesis.x_axis_time", locale=loc), fontsize=8)
-
-    qr_ax = fig.add_axes([0.82, 0.02, 0.15, 0.15])
-    qr_ax.set_axis_off()
-    buf = io.BytesIO()
-    segno.make(play_url, error="m").save(buf, kind="png", scale=4, border=1)
-    buf.seek(0)
-    qr_img = plt.imread(buf)
-    qr_ax.imshow(qr_img)
-
-    fig.subplots_adjust(left=0.08, right=0.78, top=0.84, bottom=0.08, hspace=0.35)
-    out = io.BytesIO()
-    fig.savefig(out, format="png", facecolor=fig.patch.get_facecolor())
-    plt.close(fig)
-    png_bytes: bytes = out.getvalue()
-    if not png_bytes.startswith(PNG_SIGNATURE):
-        raise RuntimeError("matplotlib fallback did not produce a valid PNG")
-    return png_bytes

@@ -27,7 +27,7 @@ DASH_HOST: str = os.getenv("DASH_HOST", "127.0.0.1")
 DASH_PORT: int = int(os.getenv("DASH_PORT", "8050"))
 
 # Public canonical origin for crawler-facing URLs and share metadata.
-# In production set this to e.g. https://sugar-sugar.glucosedao.org.
+# In production set this to e.g. https://sugar-sugar.study.
 DEPLOY_URL: str = os.getenv("DEPLOY_URL", "").strip().rstrip("/")
 
 # Dash dcc.Store / component persistence type: 'local' (survives browser restart),
@@ -40,10 +40,10 @@ MIN_USEFUL_ROUNDS: int = int(os.getenv("MIN_USEFUL_ROUNDS", str(max(1, MAX_ROUND
 
 # Umami analytics. Defaults use the same-domain Caddy proxy so common
 # cross-domain analytics blocklists do not match the tracker URL.
-UMAMI_SCRIPT_URL: str = os.getenv("UMAMI_SCRIPT_URL", "https://sugar-sugar.glucosedao.org/stats/script.js").strip()
+UMAMI_SCRIPT_URL: str = os.getenv("UMAMI_SCRIPT_URL", "https://sugar-sugar.study/stats/script.js").strip()
 UMAMI_WEBSITE_ID: str = os.getenv("UMAMI_WEBSITE_ID", "7c6fb178-d8ff-439e-a9f3-e289d9ec7e97").strip()
-UMAMI_DOMAINS: str = os.getenv("UMAMI_DOMAINS", "sugar-sugar.glucosedao.org").strip()
-UMAMI_HOST_URL: str = os.getenv("UMAMI_HOST_URL", "https://sugar-sugar.glucosedao.org/stats").strip()
+UMAMI_DOMAINS: str = os.getenv("UMAMI_DOMAINS", "sugar-sugar.study").strip()
+UMAMI_HOST_URL: str = os.getenv("UMAMI_HOST_URL", "https://sugar-sugar.study/stats").strip()
 
 # Share-mode defaults (used by `uv run share` dev shortcut)
 SHARE_ROUNDS: int = int(os.getenv("SHARE_ROUNDS", str(MAX_ROUNDS)))

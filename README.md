@@ -118,19 +118,28 @@ uv sync
 
 ### Chrome / Chromium (for share-card image export)
 
-The share page renders a PNG card using [kaleido](https://github.com/plotly/Kaleido), which needs a Chromium-based browser. On first startup the app checks for an installed browser (Chrome, Chromium, Brave, Edge); if none is found it automatically downloads **Chrome for Testing** (~130 MB) into `~/.local/share/choreographer/deps/`.
+The share page renders a 1200x630 PNG card using [kaleido](https://github.com/plotly/Kaleido), which needs a Chromium-based browser. On startup the app ensures **Chrome for Testing** is downloaded into `~/.local/share/choreographer/deps/` via `uv run setup-chrome`; it prefers that managed binary over a system/snap Chromium so a broken system browser cannot silently win.
 
-Most developer machines already have Chrome, so nothing extra is needed. For headless servers or Docker, either:
+Chrome for Testing is not a fully static executable: on bare Linux hosts it still needs Chromium runtime shared libraries. On Ubuntu 24.04, install the runtime library set before starting gunicorn:
 
 ```bash
-# Option A: install system chromium (Debian/Ubuntu)
-apt-get install -y chromium
-
-# Option B: pre-download before first run
+sudo apt-get update
+sudo apt-get install -y \
+  libatk1.0-0t64 libatk-bridge2.0-0t64 libcups2t64 libdrm2 \
+  libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
+  libgbm1 libpango-1.0-0 libcairo2 libasound2t64 libatspi2.0-0t64 \
+  libnss3 libnspr4
 uv run setup-chrome
 ```
 
-Both options coexist safely — the app always checks the local download first, then falls back to a system browser.
+If image export falls back to the static `assets/og-card.png`, check `logs/sugar_sugar.log` for `share_png_kaleido_failed`. A direct smoke test for the managed Chrome binary is:
+
+```bash
+CHROME=$(find ~/.local/share/choreographer -type f -name chrome -path '*chrome-linux64*' | head -1)
+"$CHROME" --headless --no-sandbox --disable-gpu --disable-dev-shm-usage --dump-dom about:blank
+```
+
+Harmless DBus warnings are common on servers; an exit code of `0` with basic HTML output means Chrome can launch.
 
 ### Docker
 
@@ -152,13 +161,13 @@ Edit `.env` to configure your server settings:
 ```bash
 DASH_HOST=127.0.0.1
 DASH_PORT=8050
-DEPLOY_URL=https://sugar-sugar.glucosedao.org
+DEPLOY_URL=https://sugar-sugar.study
 DASH_DEBUG=True
 DEBUG_MODE=False
-UMAMI_SCRIPT_URL=https://sugar-sugar.glucosedao.org/stats/script.js
+UMAMI_SCRIPT_URL=https://sugar-sugar.study/stats/script.js
 UMAMI_WEBSITE_ID=7c6fb178-d8ff-439e-a9f3-e289d9ec7e97
-UMAMI_DOMAINS=sugar-sugar.glucosedao.org
-UMAMI_HOST_URL=https://sugar-sugar.glucosedao.org/stats
+UMAMI_DOMAINS=sugar-sugar.study
+UMAMI_HOST_URL=https://sugar-sugar.study/stats
 ```
 
 Umami tracking is disabled when either `UMAMI_SCRIPT_URL` or `UMAMI_WEBSITE_ID` is blank.
@@ -193,7 +202,7 @@ uv run serve --host 0.0.0.0 --port 8050 --workers 2
 Useful production environment variables:
 
 ```bash
-DEPLOY_URL=https://sugar-sugar.glucosedao.org
+DEPLOY_URL=https://sugar-sugar.study
 DASH_HOST=0.0.0.0
 DASH_PORT=8050
 GUNICORN_WORKERS=2
@@ -229,6 +238,21 @@ uv run share --locale de                # test in German
 
 Formats: **A** = Generic, **B** = My Data, **C** = Mixed. Rounds cycle through formats evenly (e.g. 12 rounds with A,B,C → 4 rounds each). The command generates a share record, saves it to disk, and opens the browser at `/share/<id>`. Useful for testing the share card PNG, OG tags, social buttons, and per-format colour palettes.
 
+To render the social-card PNGs for manual inspection across every supported
+translation, use the deterministic preview script:
+
+```bash
+uv run python scripts/render_share_card_previews.py
+uv run python scripts/render_share_card_previews.py --locale de
+uv run python scripts/render_share_card_previews.py --output-dir /tmp/share-card-previews
+```
+
+It writes both single-format and multi-format stress previews to
+`data/output/share-card-previews/` (`share-card-<locale>-single.png` and
+`share-card-<locale>-multi.png`). Use this before deploying social-preview
+layout changes to catch dangling translated headers, QR/text overlaps, and CJK
+wrapping issues.
+
 ### Social previews and crawler metadata
 
 The app exposes crawler-ready metadata in two layers:
@@ -245,9 +269,9 @@ Crawler helper routes are available at `/robots.txt`, `/sitemap.xml`, and
 To verify the raw crawler response:
 
 ```bash
-curl -sL -A "Twitterbot/1.0" https://sugar-sugar.glucosedao.org/ | rg 'og:|twitter:'
-curl -sI https://sugar-sugar.glucosedao.org/assets/og-card.png?v=1
-curl -sL -A "facebookexternalhit/1.1" https://sugar-sugar.glucosedao.org/share/<id> | rg 'og:'
+curl -sL -A "Twitterbot/1.0" https://sugar-sugar.study/ | rg 'og:|twitter:'
+curl -sI https://sugar-sugar.study/assets/og-card.png?v=1
+curl -sL -A "facebookexternalhit/1.1" https://sugar-sugar.study/share/<id> | rg 'og:'
 ```
 
 After deploying preview changes, force re-scrapes with the Facebook Sharing

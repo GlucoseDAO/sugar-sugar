@@ -120,6 +120,9 @@ SITE_DESCRIPTION: str = (
 OG_PREVIEW_PATH: str = "/assets/og-card.png"
 OG_PREVIEW_VERSION: int = 1
 OG_PREVIEW_SIZE: tuple[int, int] = (1200, 630)
+# Bump when the share-card PNG design changes so FB/X/LinkedIn re-fetch the
+# image instead of serving a stale crop from their own caches.
+SHARE_CARD_IMAGE_VERSION: int = 2
 PUBLIC_ROUTES: tuple[tuple[str, str, str], ...] = (
     ("/", "Sugar Sugar", SITE_DESCRIPTION),
     ("/about", "About Sugar Sugar", "Learn why the Sugar Sugar glucose prediction study matters."),
@@ -799,7 +802,7 @@ def _share_card_og_response(share_id: str) -> Any:
     locale: str = str(record.get("locale") or "en")
     loc: str = normalize_locale(locale)
     share_url: str = _build_share_url(share_id)
-    image_url: str = f"{share_url}/image.png"
+    image_url: str = f"{share_url}/image.png?v={SHARE_CARD_IMAGE_VERSION}"
 
     from sugar_sugar.components.share import compute_aggregate_stats, _best_ranking_entry, _format_number
     og_stats = compute_aggregate_stats(list(record.get("rounds") or []))
@@ -833,18 +836,18 @@ def _share_card_og_response(share_id: str) -> Any:
 <meta property="og:image" content="{escaped_image_url}">
 <meta property="og:image:secure_url" content="{escaped_image_url}">
 <meta property="og:image:type" content="image/png">
-<meta property="og:image:width" content="1080">
-<meta property="og:image:height" content="1080">
+<meta property="og:image:width" content="{OG_PREVIEW_SIZE[0]}">
+<meta property="og:image:height" content="{OG_PREVIEW_SIZE[1]}">
+<meta property="og:image:alt" content="{description}">
 <meta property="og:url" content="{escaped_share_url}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{title}">
 <meta name="twitter:description" content="{description}">
 <meta name="twitter:image" content="{escaped_image_url}">
-<meta name="twitter:url" content="{escaped_share_url}">
-<meta http-equiv="refresh" content="0; url={escaped_share_url}">
+<meta name="twitter:image:alt" content="{description}">
 </head>
 <body>
-<p>Loading... <a href="{escaped_share_url}">open {title}</a>.</p>
+<p><a href="{escaped_share_url}">Open {title}</a>.</p>
 </body>
 </html>
 """
@@ -895,7 +898,13 @@ def _share_card_png(share_id: str) -> Any:
 
 @server.route("/share/<share_id>/og")
 def _share_card_og(share_id: str) -> Any:
-    return _share_card_og_response(share_id)
+    # Crawlers get the OG metadata HTML; humans who land here are redirected
+    # server-side to the real Dash share page (we dropped the meta-refresh,
+    # which confused X/Twitter into showing the generic site card).
+    if _is_social_crawler(flask_request.headers.get("User-Agent", "")):
+        return _share_card_og_response(share_id)
+    from flask import redirect
+    return redirect(_build_share_url(share_id), code=302)
 
 app.clientside_callback(
     "function() { return window.navigator.userAgent || ''; }",
@@ -5555,9 +5564,16 @@ def _register_all_callbacks() -> None:
 
 
 def bootstrap_wsgi_application() -> Any:
-    """Prepare callbacks and initial layout for WSGI servers."""
+    """Prepare callbacks and initial layout for WSGI servers.
+
+    Each gunicorn worker imports this module, so provision Chrome here too:
+    the parent ``serve`` process may have downloaded it already (shared user
+    cache), but doing it per worker makes share-card export robust regardless
+    of how the app is launched.
+    """
     _register_all_callbacks()
     app.layout.children[-1].children = [landing_page]
+    _ensure_chrome()
     return server
 
 
@@ -5565,13 +5581,31 @@ def _ensure_chrome() -> None:
     """Ensure a Chromium browser is available for kaleido image export.
 
     Checks choreographer's browser search first; if nothing is found,
-    downloads Chrome for Testing via ``kaleido.get_chrome_sync()``.
+    downloads Chrome for Testing via ``kaleido.get_chrome_sync()``. The
+    downloaded binary is self-contained, but Chromium still links system
+    shared libraries (libatk-1.0.so.0, libnss3, libgbm1 …) — on a slim/bare
+    host those must be installed or Chrome dies on launch with
+    ``BrowserFailedError`` (see README for the apt lib set). The actual launch
+    failure is surfaced loudly by the render path in ``share_png.py``.
     """
-    from choreographer.browsers.chromium import Chromium
-    if Chromium.find_browser(skip_local=False) is None:
-        import kaleido
-        with start_action(action_type="ensure_chrome_download"):
-            kaleido.get_chrome_sync()
+    from choreographer.browsers.chromium import (
+        get_chrome_download_path,
+        get_old_chrome_download_path,
+    )
+    with start_action(action_type="ensure_chrome") as action:
+        # Ensure the *managed* download exists rather than trusting
+        # find_browser(): a present-but-broken system/snap chromium would
+        # otherwise satisfy find_browser, win over the managed binary kaleido
+        # prefers, and crash on launch (BrowserFailedError).
+        managed = get_chrome_download_path(mkdir=False)
+        old = get_old_chrome_download_path()
+        have_managed: bool = bool((managed and managed.exists()) or (old and old.exists()))
+        if not have_managed:
+            import kaleido
+            with start_action(action_type="ensure_chrome_download"):
+                kaleido.get_chrome_sync()
+            managed = get_chrome_download_path(mkdir=False)
+        action.log(message_type="chrome_resolved", path=str(managed))
 
 
 import socket as _socket
