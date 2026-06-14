@@ -130,6 +130,9 @@ ro:
     contact_prefs_text: "Email-ul este obligatoriu doar dacă ai cerut să primești rezultatele mai târziu sau să fii ținut la curent."
     just_test_me: "Doar testează-mă"
     start_prediction: "Pornește predicția"
+    wizard_back: "Înapoi"
+    wizard_next: "Înainte"
+    wizard_step: "Pasul %{current} din %{total}"
     format_label: "Format"
     format_placeholder: "Alege o opțiune"
     format_a_label: "Date generice"
@@ -191,7 +194,7 @@ ro:
     text: "Notă: Sugar Sugar este optimizat pentru desktop momentan. Suportul pentru mobil va veni în curând!"
 
   orientation:
-    title: "PENTRU CELE MAI BUNE REZULTATE, FOLOSEȘTE SITE-UL ÎN MOD PEISAJ"
+    title: "ROTEȘTE TELEFONUL ÎN MOD PEISAJ PENTRU A DESENA"
     subtitle: ""
 
   share:

@@ -85,14 +85,14 @@ from sugar_sugar.components.glucose import GlucoseChart
 from sugar_sugar.components.metrics import MetricsComponent
 from sugar_sugar.components.predictions import PredictionTableComponent
 from sugar_sugar.components.ag_grid import build_readonly_ag_grid, build_readonly_column_defs
-from sugar_sugar.components.startup import StartupPage
-from sugar_sugar.components.landing import LandingPage
+from sugar_sugar.components.startup import StartupPage, StartupPageMobile
+from sugar_sugar.components.landing import LandingPage, LandingPageMobile
 from sugar_sugar.components.consent_form import ConsentFormPage
 from sugar_sugar.components.submit import SubmitComponent
 from sugar_sugar.encouragement import pick_bracket
 from sugar_sugar.components.header import HeaderComponent
 from sugar_sugar.components.ending import EndingPage
-from sugar_sugar.components.navbar import NavBar
+from sugar_sugar.components.navbar import NavBar, MobileNavBar
 from sugar_sugar.components.share import (
     build_share_card_figure,
     create_expired_layout,
@@ -562,9 +562,12 @@ if UMAMI_SCRIPT_URL and UMAMI_WEBSITE_ID:
         _umami_script_attrs["data-host-url"] = UMAMI_HOST_URL
     external_scripts.append(_umami_script_attrs)
 
-# Dash defaults to width=device-width, which makes phones use a narrow layout viewport and
-# breaks chart/drawing. A fixed layout width matches what mobile browsers do for "Desktop
-# site": the page is laid out at desktop width and scaled to fit the screen.
+# Mobile-first: the STATIC default viewport is `device-width` so every page is
+# correct in portrait from first paint, with no dependency on a JS reflow.  The
+# ONE exception is `/prediction`, where Plotly drawline needs a wide layout
+# viewport -- a clientside callback (see below) flips the <meta> to this fixed
+# width only on that route.  Desktop browsers ignore the viewport meta entirely,
+# so neither value affects desktop layout.
 _DESKTOP_LAYOUT_VIEWPORT_CSS_PX: int = 1280
 
 app = dash.Dash(
@@ -576,10 +579,7 @@ app = dash.Dash(
     meta_tags=[
         {
             "name": "viewport",
-            "content": (
-                f"width={_DESKTOP_LAYOUT_VIEWPORT_CSS_PX}, "
-                "maximum-scale=5, user-scalable=yes"
-            ),
+            "content": "width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes",
         },
         {"name": "robots", "content": "index, follow"},
         {"name": "description", "content": SITE_DESCRIPTION},
@@ -1047,9 +1047,15 @@ app.layout = html.Div([
     dcc.Store(id='clean-storage-flag', data=_clean_storage, storage_type='memory'),
     # Holds the target page for the resume dialog; set by restore_page_on_load.
     dcc.Store(id='resume-dialog-target', data=None, storage_type='memory'),
+    # Current step index for the mobile startup wizard (StartupPageMobile).
+    # Memory: wizard position resets per page load, like page-restore-done.
+    dcc.Store(id='startup-step', data=0, storage_type='memory'),
 
     html.Div(id='mobile-warning', style={'display': 'none'}),
     html.Div(id='scroll-to-top-trigger', style={'display': 'none'}),
+    # Throwaway sink for the per-page viewport / route-class clientside callback
+    # (there is no real Dash Output for the <meta viewport> tag or <html> class).
+    html.Div(id='viewport-sink', style={'display': 'none'}),
 
     html.Div(id='resume-dialog-container', children=[], disable_n_clicks=True),
 
@@ -1115,6 +1121,53 @@ app.clientside_callback(
     Output('mobile-warning', 'style'),
     Input('user-agent', 'data'),
     prevent_initial_call=False,
+)
+
+
+# Per-page layout viewport + route class.  The chart-drawing page needs a wide
+# layout viewport (Plotly drawline coordinate mapping breaks at narrow phone
+# width); every other page gets a true mobile-first `device-width` viewport so
+# portrait reflows naturally.  We also stamp a `route-prediction` class on
+# <html> so CSS (orientation overlay, immersive chart) can target the chart page
+# specifically.  Output is a throwaway sink -- the real side effects are the
+# <meta> tag and the <html> class.
+app.clientside_callback(
+    """
+    function(pathname) {
+        var root = document.documentElement;
+        var isPrediction = (pathname === '/prediction');
+        if (root) {
+            if (isPrediction) { root.classList.add('route-prediction'); }
+            else { root.classList.remove('route-prediction'); }
+        }
+        var m = document.querySelector('meta[name="viewport"]');
+        if (m) {
+            var wide = 'width=1280, maximum-scale=5, user-scalable=yes';
+            var fluid = 'width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes';
+            m.setAttribute('content', isPrediction ? wide : fluid);
+        }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output('viewport-sink', 'children'),
+    Input('url', 'pathname'),
+    prevent_initial_call=False,
+)
+
+
+# Mobile burger menu: toggle the nav drawer open/closed.  n_clicks parity is
+# fine because the navbar is re-rendered fresh on every page navigation (which
+# resets n_clicks and closes the drawer).  These ids exist only in MobileNavBar.
+app.clientside_callback(
+    """
+    function(n) {
+        var open = (n || 0) % 2 === 1;
+        return {'display': open ? 'block' : 'none'};
+    }
+    """,
+    Output('mobile-nav-drawer', 'style'),
+    Input('mobile-nav-toggle', 'n_clicks'),
+    prevent_initial_call=True,
 )
 
 
@@ -1265,6 +1318,55 @@ def update_prediction_uploaded_data_consent_ui(
 
 _STATEFUL_PAGES = frozenset({'/prediction', '/ending'})
 
+# Keyword list mirrors the clientside `mobile-device` class setter.  Kept here so
+# the server-side layout branch (display_page / update_on_language_change) can pick
+# the mobile builder for structurally-different pages (startup wizard, landing).
+_MOBILE_UA_KEYWORDS: tuple[str, ...] = (
+    'iphone', 'android', 'ipad', 'mobile', 'mobi', 'opera mini',
+)
+
+
+def _is_mobile_ua(ua: Optional[str]) -> bool:
+    """True if the User-Agent string looks like a phone/tablet.
+
+    We read the live request header (request-scoped, always present) rather than
+    the async-hydrating ``user-agent`` dcc.Store, because the layout branch must
+    be correct on the very first render.  This is intentionally coarse: it only
+    decides *which layout* to serve; the clientside class-setter still owns the
+    finer ``(pointer: coarse)`` CSS gating.
+    """
+    if not ua:
+        return False
+    lc = ua.lower()
+    return any(kw in lc for kw in _MOBILE_UA_KEYWORDS)
+
+
+def _is_mobile_request() -> bool:
+    """Detect a mobile client from the current Flask request's User-Agent."""
+    return _is_mobile_ua(flask_request.headers.get('User-Agent', ''))
+
+
+def _startup_builder(*, locale: str) -> html.Div:
+    """Return the startup page builder appropriate for the requesting device."""
+    if _is_mobile_request():
+        return StartupPageMobile(locale=locale)
+    return StartupPage(locale=locale)
+
+
+def _landing_builder(*, locale: str) -> html.Div:
+    """Return the landing page builder appropriate for the requesting device."""
+    if _is_mobile_request():
+        return LandingPageMobile(locale=locale)
+    return LandingPage(locale=locale)
+
+
+def _navbar(*, locale: str, pathname: Optional[str]) -> html.Div:
+    """Return the compact mobile burger navbar or the desktop tabular menu."""
+    current = pathname or "/"
+    if _is_mobile_request():
+        return MobileNavBar(locale=locale, current_page=current)
+    return NavBar(locale=locale, current_page=current)
+
 
 @app.callback(
     [Output('page-content', 'children', allow_duplicate=True),
@@ -1292,7 +1394,7 @@ def update_on_language_change(
     a navbar refresh -- page content is left untouched via per-element callbacks.
     """
     locale = normalize_locale(interface_language)
-    navbar = NavBar(locale=locale, current_page=pathname or "/")
+    navbar = _navbar(locale=locale, pathname=pathname)
 
     if pathname in _STATEFUL_PAGES:
         return no_update, no_update, navbar
@@ -1314,7 +1416,7 @@ def update_on_language_change(
     if pathname == "/consent-form":
         return ConsentFormPage(locale=locale), warning_content, navbar
     if pathname == '/startup':
-        return StartupPage(locale=locale), warning_content, navbar
+        return _startup_builder(locale=locale), warning_content, navbar
     if pathname == '/about':
         return create_about_page(locale=locale), warning_content, navbar
     if pathname == '/contact':
@@ -1324,7 +1426,7 @@ def update_on_language_change(
     if pathname == '/faq':
         return create_faq_page(locale=locale), warning_content, navbar
     # Landing page
-    return LandingPage(locale=locale), warning_content, navbar
+    return _landing_builder(locale=locale), warning_content, navbar
 
 
 @app.callback(
@@ -1529,7 +1631,7 @@ def display_page(
     has_full = bool(full_df_data)
     print(f"DEBUG display_page: pathname={pathname} has_user_info={user_info is not None} has_prediction_table_data={has_ptd} has_full_df={has_full}")
     locale = normalize_locale(interface_language)
-    navbar = NavBar(locale=locale, current_page=pathname or "/")
+    navbar = _navbar(locale=locale, pathname=pathname)
     
     with start_action(action_type=u"display_page", pathname=pathname, locale=locale):
         warning_content = render_mobile_warning(user_agent, locale=locale)
@@ -1539,7 +1641,7 @@ def display_page(
             format_value = str(user_info.get("format") or "A")
             return create_prediction_layout(locale=locale, format_value=format_value, user_info=user_info), warning_content, navbar
         if pathname == '/startup':
-            return (StartupPage(locale=locale), warning_content, navbar)
+            return (_startup_builder(locale=locale), warning_content, navbar)
         if pathname == '/ending':
             # Check if we have the required data for ending page
             if not full_df_data or not user_info or 'prediction_table_data' not in user_info:
@@ -1601,7 +1703,7 @@ def display_page(
         if pathname == '/faq':
             return create_faq_page(locale=locale), warning_content, navbar
         # Default route: landing page
-        return (LandingPage(locale=locale), warning_content, navbar)
+        return (_landing_builder(locale=locale), warning_content, navbar)
 
 from dash import html
 
@@ -2024,6 +2126,7 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
             initial_slider_value=example_initial_slider_value,
             locale=locale,
             data_source_name=data_source_display,
+            className="prediction-header",
         ),
         html.Div(
             [
@@ -5572,7 +5675,6 @@ def bootstrap_wsgi_application() -> Any:
     of how the app is launched.
     """
     _register_all_callbacks()
-    app.layout.children[-1].children = [landing_page]
     _ensure_chrome()
     return server
 
@@ -5662,7 +5764,6 @@ def main(
         sugar_sugar_config.DEBUG_MODE = debug
 
     _register_all_callbacks()
-    app.layout.children[-1].children = [landing_page]
 
     with start_action(
         action_type=u"start_dash_server",

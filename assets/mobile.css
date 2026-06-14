@@ -1,129 +1,256 @@
 /* =============================================================================
-   Mobile overrides.
-
-   The app forces a 1280px layout viewport on all devices (see app.py).  On a
-   typical phone in landscape (~900 CSS px physical) that means everything is
-   rendered at ~70% of its intended size and then scaled down by the browser.
-   The result: tiny text, cramped chart, oversized navbar.
-
-   This stylesheet is scoped under `.mobile-device` (added to <html> by a
+   Mobile overrides.  Scoped under `html.mobile-device` (added to <html> by a
    clientside callback that inspects navigator.userAgent).  Desktop browsers
-   never match the selector and are untouched.
+   never match and are untouched.
 
-   Strategy: keep the 1280px layout (Plotly drawing needs the horizontal
-   space) but compensate for scaling with larger relative sizes, tighter
-   spacing, and compacted chrome.
+   Architecture (see app.py "Mobile-first" comment):
+   - The STATIC viewport is `width=device-width`, so every page reflows to the
+     real phone width in portrait.  CRITICAL: if ANY element is wider than the
+     screen, the browser expands the layout viewport to fit it and zooms the
+     whole page out (defeating mobile-first).  So the global rules below cap
+     widths and make the navbar fit.
+   - The ONE exception is `/prediction` (html.route-prediction), which keeps a
+     1280px viewport for Plotly drawline.  The 1280-scaling compensations
+     (bigger chart fonts, immersive landscape chrome) are scoped to that route.
    ========================================================================== */
 
 
-/* --- Navbar ---------------------------------------------------------------
-   The navbar ships as a Fomantic `massive` menu (~27px items).  At 1280px
-   scaled to a phone that is simply overwhelming and the right-side language
-   dropdown often wraps.  Drop it to "large" proportions on mobile. */
+/* --- Global: never let content force the viewport wider than the screen ----
+   A single overflowing element zooms the whole page out, so we defend against
+   it broadly.  Individual wide widgets (tables, iframes, charts) also get
+   max-width:100% in their page-specific rules. */
 
-html.mobile-device body .ui.massive.menu,
-html.mobile-device body .ui.massive.menu .item {
-  font-size: 1.14285714rem !important;  /* == .ui.large.menu */
+html.mobile-device:not(.route-prediction),
+html.mobile-device:not(.route-prediction) body {
+  /* lang.css pins `html, body { min-width: 1280px }` as a fallback for the old
+     forced-desktop strategy.  That single rule anchors the whole page to 1280
+     and defeats device-width.  Release it on the mobile-first pages (kept on
+     /prediction, which still wants the wide layout). */
+  min-width: 0 !important;
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
-html.mobile-device #navbar-container .ui.menu .item {
-  padding-left: 0.8em !important;
-  padding-right: 0.8em !important;
+html.mobile-device:not(.route-prediction) img,
+html.mobile-device:not(.route-prediction) iframe,
+html.mobile-device:not(.route-prediction) table,
+html.mobile-device:not(.route-prediction) .dash-table-container {
+  max-width: 100% !important;
 }
 
-html.mobile-device #navbar-container .lang-flag {
-  height: 22px !important;  /* compensates for scaling */
+/* Form controls: the classic chriddyp Dash CSS gives <input> a wide default,
+   and dcc.Input wraps it in an inline-block `.dash-input-container` that sizes
+   to that wide content -- inflating every ancestor and overflowing the phone.
+   Force the whole subtree to block layout capped at the viewport width. */
+html.mobile-device:not(.route-prediction) #page-content,
+html.mobile-device:not(.route-prediction) #page-content * {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+html.mobile-device .dash-input-container,
+html.mobile-device .dash-input,
+html.mobile-device .dash-input-element,
+html.mobile-device input,
+html.mobile-device textarea,
+html.mobile-device select,
+html.mobile-device .dash-dropdown,
+html.mobile-device .Select,
+html.mobile-device .Select-control {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+/* dcc.Input applies the Python `style=` to the WRAPPER (.dash-input-container),
+   leaving the real <input.dash-input-element> with the tiny chriddyp default --
+   which renders as an inset double-box.  Flatten the wrapper and style the
+   actual input so it's a single full-width, finger-friendly field. */
+html.mobile-device .dash-input-container {
+  padding: 0 !important;
+  border: none !important;
+  background: none !important;
+}
+html.mobile-device input.dash-input-element {
+  padding: 12px 14px !important;
+  font-size: 17px !important;
+  height: auto !important;
+  min-height: 48px !important;
+  border: 1px solid #ccc !important;
+  border-radius: 6px !important;
 }
 
 
-/* --- Chart tick / axis labels --------------------------------------------
-   Plotly's default tick font is 12px.  After the mobile scale-down that
-   reads as ~8px which is unusable.  Bump the SVG text sizes so the axis
-   labels, legend and title stay legible. */
+/* --- Mobile navbar (MobileNavBar: burger + title + language flag) ----------
+   The desktop `massive tabular menu` is ~1280px wide and would expand the
+   viewport; on mobile we render the compact MobileNavBar instead.  This bar is
+   intrinsically narrow so it never widens the layout viewport. */
 
-html.mobile-device .js-plotly-plot .xtick text,
-html.mobile-device .js-plotly-plot .ytick text,
-html.mobile-device .js-plotly-plot .legendtext {
+html.mobile-device .mobile-navbar {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+html.mobile-device .mobile-nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #2185d0;            /* Fomantic blue, matches desktop navbar */
+  color: #fff;
+  padding: 8px 12px;
+  box-sizing: border-box;
+}
+
+html.mobile-device .mobile-nav-burger {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  font-size: 26px;
+  line-height: 1;
+  color: #fff;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+html.mobile-device .mobile-nav-burger:active {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+html.mobile-device .mobile-nav-title {
+  flex: 1 1 auto;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+html.mobile-device .mobile-nav-lang {
+  flex: 0 0 auto;
+}
+
+/* The language dropdown reused from desktop: keep it compact and white-on-blue. */
+html.mobile-device .mobile-nav-lang .lang-dropdown {
+  color: #fff !important;
+  font-size: 15px;
+  padding: 6px 4px !important;
+}
+html.mobile-device .mobile-nav-lang .lang-flag {
+  height: 18px !important;
+}
+/* Open the hover menu to the LEFT so it doesn't overflow the right edge. */
+html.mobile-device .mobile-nav-lang .lang-dropdown > .menu {
+  left: auto !important;
+  right: 0 !important;
+}
+
+/* Drawer: full-width stacked links, toggled by the burger. */
+html.mobile-device .mobile-nav-drawer {
+  background: #1a6fb0;
+  width: 100%;
+  box-sizing: border-box;
+}
+html.mobile-device .mobile-nav-drawer .mobile-nav-link {
+  display: block;
+  padding: 16px 18px;
+  color: #fff;
+  font-size: 18px;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+html.mobile-device .mobile-nav-drawer .mobile-nav-link.active {
+  background: rgba(255, 255, 255, 0.16);
+  font-weight: 700;
+}
+html.mobile-device .mobile-nav-drawer .mobile-nav-link:active {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+
+/* --- Buttons: finger-friendly tap targets (Apple HIG / Material: >=44px) --- */
+
+html.mobile-device .ui.button,
+html.mobile-device button.ui {
+  min-height: 52px !important;
+  font-size: 17px !important;
+}
+
+/* The desktop validation callback rewrites #landing-continue's inline width to
+   220px; force it full-width on mobile. */
+html.mobile-device #landing-continue,
+html.mobile-device .landing-continue-mobile {
+  width: 100% !important;
+}
+
+
+/* --- Info pages (about / faq / contact / demo) ---------------------------- */
+
+html.mobile-device .info-page {
+  padding: 16px clamp(12px, 4vw, 24px) 32px !important;
+}
+
+
+/* ===========================================================================
+   /prediction ONLY (html.route-prediction): 1280px viewport, scaled down.
+   These compensate for the scale-down and build the immersive chart.
+   =========================================================================== */
+
+/* Chart tick / axis labels: 12px default reads ~8px after scaling. */
+html.route-prediction.mobile-device .js-plotly-plot .xtick text,
+html.route-prediction.mobile-device .js-plotly-plot .ytick text,
+html.route-prediction.mobile-device .js-plotly-plot .legendtext {
   font-size: 16px !important;
 }
 
-html.mobile-device .js-plotly-plot .xtitle,
-html.mobile-device .js-plotly-plot .ytitle {
+html.route-prediction.mobile-device .js-plotly-plot .xtitle,
+html.route-prediction.mobile-device .js-plotly-plot .ytitle {
   font-size: 18px !important;
 }
 
-html.mobile-device .js-plotly-plot .gtitle {
+html.route-prediction.mobile-device .js-plotly-plot .gtitle {
   font-size: 20px !important;
 }
 
+/* Blanket text bump (only meaningful on the scaled 1280 chart page). */
+html.route-prediction.mobile-device body :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(.js-plotly-plot *) {
+  font-size: 18px !important;
+}
 
-/* --- Prediction page spacing ---------------------------------------------
-   Tighten the outer padding/gap so the chart gets as much vertical room as
-   possible.  On phone landscape the viewport is only ~500 CSS px tall
-   (scaled from 1280-wide); every 20px of chrome matters. */
-
-html.mobile-device #page-content > div {
+/* Tighten outer padding so the chart gets vertical room. */
+html.route-prediction.mobile-device #page-content > div {
   padding-top: 8px !important;
   padding-bottom: 8px !important;
   gap: 10px !important;
 }
 
-html.mobile-device #prediction-glucose-chart-container {
+html.route-prediction.mobile-device #prediction-glucose-chart-container {
   min-height: 380px;
 }
 
-
-/* --- Buttons: guarantee finger-friendly tap targets ----------------------
-   Apple HIG and Material both recommend 44 CSS px minimum for touch.
-   After mobile scaling, a 40px button becomes ~28 physical px -- too small.
-   Enlarge the common action buttons. */
-
-html.mobile-device .ui.button,
-html.mobile-device button.ui {
-  min-height: 56px !important;
-  padding-top: 14px !important;
-  padding-bottom: 14px !important;
-  font-size: 18px !important;
-}
-
-html.mobile-device #submit-button {
+html.route-prediction.mobile-device #submit-button {
   min-height: 64px !important;
   font-size: 22px !important;
 }
 
-
-/* --- Blanket body text override ------------------------------------------
-   The existing `body :not(h1)...` rule in lang.css pins text at 16px which
-   reads as ~11px on phone-landscape.  Lift it to 18px on mobile so labels,
-   lists, and links remain readable.  Inline `fontSize` in Python still wins
-   for specific elements (that's fine). */
-
-html.mobile-device body :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(.js-plotly-plot *) {
-  font-size: 18px !important;
-}
-
-/* Restore menu sizing after the blanket rule */
-html.mobile-device body .ui.massive.menu,
-html.mobile-device body .ui.massive.menu .item,
-html.mobile-device body .ui.huge.menu,
-html.mobile-device body .ui.huge.menu .item {
-  font-size: 1.14285714rem !important;
-}
-
-
-/* --- Info pages ----------------------------------------------------------
-   Reduce outer padding -- the clamp-based padding is already responsive but
-   defaults to 40px vertical which wastes precious mobile screen. */
-
-html.mobile-device .info-page {
-  padding: 20px clamp(16px, 5vw, 40px) 40px !important;
-}
-
-
-/* --- Iframe (study design) -----------------------------------------------
-   Give the embedded study document a sensible min-height on mobile so it
-   renders before autosize-iframe.js kicks in. */
-
-html.mobile-device iframe[data-autosize="true"] {
-  min-height: 400px;
+/* Immersive landscape: collapse all chrome (navbar, the instructional header,
+   round indicator) so the chart fills the screen.  Native Plotly only -- never
+   CSS-rotate (breaks drawline touch mapping). */
+@media (orientation: landscape) and (pointer: coarse) and (max-device-width: 1024px) {
+  html.route-prediction.mobile-device #navbar-container,
+  html.route-prediction.mobile-device .prediction-header,
+  html.route-prediction.mobile-device #round-indicator {
+    display: none !important;
+  }
+  html.route-prediction.mobile-device #page-content > div {
+    padding: 4px !important;
+    gap: 4px !important;
+  }
+  html.route-prediction.mobile-device #prediction-glucose-chart-container {
+    min-height: 82vh !important;
+  }
 }

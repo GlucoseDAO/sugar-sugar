@@ -131,6 +131,9 @@ fr:
     contact_prefs_text: "L'e-mail n'est requis que si tu as demandé à recevoir tes résultats plus tard ou à être tenu au courant."
     just_test_me: "Teste-moi seulement"
     start_prediction: "Démarrer la prédiction"
+    wizard_back: "Retour"
+    wizard_next: "Suivant"
+    wizard_step: "Étape %{current} sur %{total}"
     format_label: "Format"
     format_placeholder: "Choisis une option"
     format_a_label: "Données génériques"
@@ -192,7 +195,7 @@ fr:
     text: "Note : Sugar Sugar est actuellement optimisé pour le bureau. Le support mobile arrive bientôt !"
 
   orientation:
-    title: "POUR DE MEILLEURS RÉSULTATS, UTILISE LE SITE EN MODE PAYSAGE"
+    title: "TOURNE TON TÉLÉPHONE EN MODE PAYSAGE POUR DESSINER"
     subtitle: ""
 
   share:

@@ -1,0 +1,366 @@
+"""Mobile screenshot harness.
+
+Renders the app's pages in a *nauseatingly narrow* phone viewport (and the
+chart page additionally in landscape) and saves full-page PNGs, so obvious
+visual artifacts -- overlaps, out-of-bounds content, clipped/oversized
+elements, misalignments -- can be caught without deploying to staging and
+opening on a real phone.
+
+It drives Chromium over the Chrome DevTools Protocol via ``choreographer``
+(already a transitive dependency through Plotly's kaleido), emulating a real
+mobile device: ``mobile=true`` device metrics + touch emulation, which makes
+``(pointer: coarse)`` / ``(hover: none)`` media queries match, plus a phone
+``User-Agent`` override so the server-side mobile-layout branch
+(``_is_mobile_request``) returns the mobile builders.
+
+Usage::
+
+    uv run python scripts/mobile_shots.py                     # all pages, default device
+    uv run python scripts/mobile_shots.py --device iphone-se  # a specific device preset
+    uv run python scripts/mobile_shots.py --only chart        # just the prediction group
+    uv run python scripts/mobile_shots.py --base-url http://127.0.0.1:8050  # running server
+
+Output goes to ``data/output/mobile_shots/`` by default.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import base64
+import os
+import shutil
+import signal
+import subprocess
+import sys
+import time
+import urllib.request
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Optional
+
+import typer
+
+# A phone-ish User-Agent so the server returns the mobile builders.
+_IPHONE_UA: str = (
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+    "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+)
+
+
+@dataclass(frozen=True)
+class Device:
+    """A viewport preset.  Dimensions are CSS pixels (the layout viewport)."""
+
+    name: str
+    width: int
+    height: int
+    scale: int = 2
+
+
+# Deliberately narrow presets.  `android-narrow` is the default torture test.
+DEVICES: dict[str, Device] = {
+    "android-narrow": Device("android-narrow", 360, 740),
+    "iphone-se": Device("iphone-se", 320, 568),
+    "iphone-13": Device("iphone-13", 390, 844),
+    "pixel-7": Device("pixel-7", 412, 915),
+}
+
+
+@dataclass(frozen=True)
+class Shot:
+    """A single screenshot job: a route plus optional landscape capture."""
+
+    label: str
+    path: str
+    landscape: bool = False  # also capture rotated (long edge horizontal)
+    settle_s: float = 1.5    # extra wait after hydration (charts need more)
+
+
+@dataclass
+class ServerGroup:
+    """A set of routes served by one spawned server invocation."""
+
+    name: str
+    cmd: list[str]
+    env: dict[str, str] = field(default_factory=dict)
+    shots: list[Shot] = field(default_factory=list)
+
+
+def _server_groups(port: int) -> list[ServerGroup]:
+    """Define which routes are captured under which server invocation."""
+    base = ["uv", "run"]
+    return [
+        ServerGroup(
+            name="entry",
+            cmd=base + ["start", "--port", str(port)],
+            shots=[
+                Shot("landing", "/"),
+                Shot("consent-form", "/consent-form"),
+                Shot("startup", "/startup"),
+                Shot("about", "/about"),
+                Shot("faq", "/faq"),
+                Shot("contact", "/contact"),
+                Shot("demo", "/demo"),
+            ],
+        ),
+        ServerGroup(
+            name="chart",
+            # --prefill fills the prediction region so submit/ending are reachable.
+            cmd=base + ["chart", "--prefill", "--port", str(port)],
+            shots=[
+                # Portrait shows the rotate-to-draw overlay; landscape is the
+                # immersive drawing layout.
+                Shot("prediction", "/prediction", landscape=True, settle_s=3.0),
+            ],
+        ),
+    ]
+
+
+def _wait_for_server(base_url: str, timeout_s: float = 60.0) -> bool:
+    """Poll the server root until it responds or the timeout elapses."""
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(base_url, timeout=2) as resp:
+                if resp.status < 500:
+                    return True
+        except Exception:
+            time.sleep(0.5)
+    return False
+
+
+async def _hydrate_wait(tab, timeout_s: float = 20.0) -> None:
+    """Wait until Dash has rendered page-content (or timeout)."""
+    deadline = time.monotonic() + timeout_s
+    expr = (
+        "(function(){var c=document.getElementById('page-content');"
+        "return !!(c && c.children && c.children.length>0);})()"
+    )
+    while time.monotonic() < deadline:
+        res = await tab.send_command(
+            "Runtime.evaluate", {"expression": expr, "returnByValue": True}
+        )
+        if res.get("result", {}).get("result", {}).get("value") is True:
+            return
+        await asyncio.sleep(0.25)
+
+
+async def _capture(
+    tab,
+    *,
+    base_url: str,
+    shot: Shot,
+    device: Device,
+    out_dir: Path,
+    landscape: bool,
+) -> Path:
+    """Emulate the device, navigate, and write a full-page PNG."""
+    if landscape:
+        w, h = device.height, device.width
+        suffix = "landscape"
+    else:
+        w, h = device.width, device.height
+        suffix = "portrait"
+
+    await tab.send_command(
+        "Emulation.setTouchEmulationEnabled", {"enabled": True, "maxTouchPoints": 5}
+    )
+    await tab.send_command("Emulation.setUserAgentOverride", {"userAgent": _IPHONE_UA})
+
+    # NOTE: mobile=False.  With mobile emulation ON, Chromium honours the page's
+    # <meta viewport> and -- crucially -- expands the layout viewport to fit any
+    # transiently-overflowing content, zooming the page out to ~1280 and making
+    # captures flaky/non-mobile.  With mobile=False the metrics width IS the
+    # layout viewport (deterministic device-width), which is exactly the
+    # mobile-first rendering we want to inspect.  We still send a phone
+    # User-Agent (so the server returns the mobile builders) and enable touch
+    # (so `pointer: coarse` media queries match).
+    # /prediction is intentionally a wide (1280) layout on mobile (the user
+    # rotates to landscape to draw); emulate it like a real phone (mobile=True
+    # honours the page's <meta viewport> -> 1280, scaled to the device) so the
+    # capture matches reality.  Every other page is mobile-first device-width,
+    # for which mobile=False gives a deterministic, non-zoomed capture.
+    is_chart = shot.path == "/prediction"
+    # Chart page only: mobile=True in LANDSCAPE so Chromium honours the 1280
+    # <meta> and renders the immersive chart scaled (like a real phone).  In
+    # portrait we want the fixed full-screen rotate overlay centred in the 360
+    # viewport, so mobile=False there.
+    metrics = {
+        "width": w,
+        "height": h,
+        "deviceScaleFactor": device.scale,
+        "mobile": is_chart and landscape,
+        "screenWidth": w,
+        "screenHeight": h,
+    }
+    await tab.send_command("Emulation.setDeviceMetricsOverride", metrics)
+    url = base_url.rstrip("/") + shot.path
+    await tab.send_command("Page.navigate", {"url": url})
+    await _hydrate_wait(tab)
+    await asyncio.sleep(shot.settle_s)
+
+    # Capture the FULL page without `captureBeyondViewport` (which, under
+    # mobile=False, re-lays-out at a ~1280 fallback width and ruins the shot).
+    # Instead grow the viewport height to the page's scroll height and take a
+    # plain viewport screenshot -- this keeps the true device width.
+    #
+    # EXCEPTIONS (capture the viewport as-is, don't grow):
+    #  - landscape shots: growing height flips orientation back to portrait,
+    #    re-triggering the rotate overlay and breaking landscape CSS.
+    #  - /prediction: portrait shows a fixed full-screen rotate overlay and
+    #    landscape is an immersive viewport-filling chart -- both are viewport-sized.
+    if not landscape and not is_chart:
+        sh = await tab.send_command(
+            "Runtime.evaluate",
+            {
+                "expression": "Math.max(document.body.scrollHeight, document.documentElement.scrollHeight)",
+                "returnByValue": True,
+            },
+        )
+        full_h = int(sh.get("result", {}).get("result", {}).get("value") or h)
+        full_h = max(h, min(full_h, 20000))  # clamp to a sane maximum
+        tall = dict(metrics)
+        tall["height"] = full_h
+        tall["screenHeight"] = full_h
+        await tab.send_command("Emulation.setDeviceMetricsOverride", tall)
+        await asyncio.sleep(0.3)
+
+    res = await tab.send_command(
+        "Page.captureScreenshot", {"format": "png", "captureBeyondViewport": False}
+    )
+    data = res.get("result", {}).get("data")
+    if not data:
+        raise RuntimeError(f"No screenshot data for {url} ({res})")
+
+    out_path = out_dir / f"{shot.label}-{device.name}-{suffix}.png"
+    out_path.write_bytes(base64.b64decode(data))
+    return out_path
+
+
+async def _run_group(
+    group: ServerGroup, *, base_url: str, device: Device, out_dir: Path
+) -> list[Path]:
+    """Screenshot every shot in a group against an already-running server."""
+    from choreographer import Browser
+    from choreographer.cli import get_chrome_sync
+
+    chrome = get_chrome_sync()
+    written: list[Path] = []
+    async with Browser(path=chrome, headless=True) as browser:
+        tab = await browser.create_tab("")
+        await tab.send_command("Page.enable")
+        await tab.send_command("Runtime.enable")
+        for shot in group.shots:
+            orientations = [False] + ([True] if shot.landscape else [])
+            for landscape in orientations:
+                try:
+                    p = await _capture(
+                        tab,
+                        base_url=base_url,
+                        shot=shot,
+                        device=device,
+                        out_dir=out_dir,
+                        landscape=landscape,
+                    )
+                    written.append(p)
+                    typer.echo(f"  ✓ {p.name}")
+                except Exception as exc:  # keep going; one bad page shouldn't abort
+                    typer.echo(f"  ✗ {shot.label} ({'landscape' if landscape else 'portrait'}): {exc}")
+    return written
+
+
+def _spawn_server(group: ServerGroup, *, port: int, log_path: Path) -> subprocess.Popen:
+    """Launch a server group in its own process group, logging to a file."""
+    env = {**os.environ, "DASH_DEBUG": "0", "DEBUG_MODE": "0", **group.env}
+    log = log_path.open("w")
+    return subprocess.Popen(
+        group.cmd,
+        env=env,
+        stdout=log,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,  # own process group so we can kill children too
+    )
+
+
+def _kill_server(proc: subprocess.Popen, *, port: int) -> None:
+    """Terminate the server and any stragglers on its port."""
+    try:
+        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+    except Exception:
+        proc.terminate()
+    try:
+        proc.wait(timeout=8)
+    except Exception:
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        except Exception:
+            proc.kill()
+    # Belt-and-suspenders: clear anything still bound to the port.
+    if shutil.which("fuser"):
+        subprocess.run(
+            ["fuser", "-k", f"{port}/tcp"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+
+
+def main(
+    device: str = typer.Option("android-narrow", "--device", "-d", help=f"Viewport preset: {', '.join(DEVICES)}"),
+    out: Path = typer.Option(Path("data/output/mobile_shots"), "--out", "-o", help="Output directory for PNGs"),
+    only: Optional[str] = typer.Option(None, "--only", help="Only this server group: entry | chart"),
+    base_url: Optional[str] = typer.Option(None, "--base-url", help="Use an already-running server instead of spawning one"),
+    port: int = typer.Option(8099, "--port", "-p", help="Port to spawn servers on"),
+) -> None:
+    """Render the app's pages on a narrow phone viewport and save screenshots."""
+    if device not in DEVICES:
+        typer.echo(f"Unknown device '{device}'. Choices: {', '.join(DEVICES)}")
+        raise typer.Exit(1)
+    dev = DEVICES[device]
+    out_dir = Path(out)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    groups = _server_groups(port)
+    if only:
+        groups = [g for g in groups if g.name == only]
+        if not groups:
+            typer.echo(f"No group named '{only}'.")
+            raise typer.Exit(1)
+
+    all_written: list[Path] = []
+
+    if base_url:
+        # Caller manages the server; just screenshot every selected group's shots.
+        for group in groups:
+            typer.echo(f"[{group.name}] using {base_url}")
+            all_written += asyncio.run(
+                _run_group(group, base_url=base_url, device=dev, out_dir=out_dir)
+            )
+    else:
+        for group in groups:
+            typer.echo(f"[{group.name}] starting server on :{port} ...")
+            log_path = out_dir / f"_server-{group.name}.log"
+            proc = _spawn_server(group, port=port, log_path=log_path)
+            try:
+                url = f"http://127.0.0.1:{port}/"
+                if not _wait_for_server(url):
+                    typer.echo(f"  ✗ server did not come up (see {log_path})")
+                    continue
+                all_written += asyncio.run(
+                    _run_group(group, base_url=url, device=dev, out_dir=out_dir)
+                )
+            finally:
+                _kill_server(proc, port=port)
+
+    typer.echo(f"\nWrote {len(all_written)} screenshot(s) to {out_dir}/")
+    for p in all_written:
+        typer.echo(f"  {p}")
+
+
+def cli() -> None:
+    """Console-script entry point."""
+    typer.run(main)
+
+
+if __name__ == "__main__":
+    cli()

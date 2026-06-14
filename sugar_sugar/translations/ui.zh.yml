@@ -129,6 +129,9 @@ zh:
     contact_prefs_text: "只有在您要求以后接收结果或了解更新时，才需要填写电子邮件。"
     just_test_me: "仅测试我"
     start_prediction: "开始预测"
+    wizard_back: "上一步"
+    wizard_next: "下一步"
+    wizard_step: "第 %{current}/%{total} 步"
     format_label: "格式"
     format_placeholder: "选择一个选项"
     format_a_label: "通用数据"
@@ -190,7 +193,7 @@ zh:
     text: "注意：Sugar Sugar 目前针对桌面端进行了优化。移动端支持即将推出！"
 
   orientation:
-    title: "为获得最佳效果，请使用横屏模式访问本站"
+    title: "请将手机旋转为横屏以进行绘制"
     subtitle: ""
 
   share:

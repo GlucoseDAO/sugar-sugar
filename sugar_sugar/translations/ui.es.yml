@@ -131,6 +131,9 @@ es:
     contact_prefs_text: "El correo electrónico solo es obligatorio si pediste recibir los resultados más tarde o estar al día."
     just_test_me: "Solo pruébame"
     start_prediction: "Iniciar predicción"
+    wizard_back: "Atrás"
+    wizard_next: "Siguiente"
+    wizard_step: "Paso %{current} de %{total}"
     format_label: "Formato"
     format_placeholder: "Elige una opción"
     format_a_label: "Datos genéricos"
@@ -192,7 +195,7 @@ es:
     text: "Nota: Sugar Sugar está optimizado para escritorio en este momento. ¡El soporte para móviles llegará pronto!"
 
   orientation:
-    title: "PARA OBTENER LOS MEJORES RESULTADOS, USA EL SITIO EN MODO HORIZONTAL"
+    title: "GIRA TU TELÉFONO EN MODO HORIZONTAL PARA DIBUJAR"
     subtitle: ""
 
   share:

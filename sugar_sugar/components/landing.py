@@ -28,6 +28,76 @@ def _image_data_uri(path: Path) -> Optional[str]:
     return f"data:image/{mime};base64,{b64}"
 
 
+def consent_controls_children(locale: str) -> list[Any]:
+    """The inner children of the ``consent-notice-scroll`` block.
+
+    Shared verbatim between the desktop ``LandingPage`` and the mobile
+    ``LandingPageMobile`` so the consent text + the six consent checklists
+    (with their stable ids the callbacks target) never drift apart.
+    """
+    return [
+        *consent_notice_children(locale),
+        html.Hr(style={"margin": "14px 0"}),
+        html.H4(
+            t("ui.landing.required_consents_title", locale=locale),
+            style={"fontSize": "18px", "fontWeight": "800", "color": "#0f172a", "marginBottom": "8px"},
+        ),
+        dbc.Checklist(
+            id="consent-acknowledge",
+            options=[{"label": f" {t('ui.landing.consent_acknowledge_label', locale=locale)}", "value": "ack"}],
+            value=[],
+            persistence=True,
+            persistence_type=STORAGE_TYPE,
+            style={"fontSize": "16px", "marginBottom": "10px"},
+        ),
+        dbc.Checklist(
+            id="consent-gdpr",
+            options=[{"label": f" {t('ui.landing.consent_gdpr_label', locale=locale)}", "value": "gdpr"}],
+            value=[],
+            persistence=True,
+            persistence_type=STORAGE_TYPE,
+            style={"fontSize": "16px"},
+        ),
+        html.Hr(style={"margin": "14px 0"}),
+        html.H4(
+            t("ui.landing.optional_consents_title", locale=locale),
+            style={"fontSize": "18px", "fontWeight": "800", "color": "#0f172a", "marginBottom": "8px"},
+        ),
+        dbc.Checklist(
+            id="consent-upload-own-data",
+            options=[{"label": f" {t('ui.landing.consent_upload_own_data', locale=locale)}", "value": "upload_own_data"}],
+            value=[],
+            persistence=True,
+            persistence_type=STORAGE_TYPE,
+            style={"fontSize": "16px", "marginBottom": "10px"},
+        ),
+        dbc.Checklist(
+            id="consent-play-only",
+            options=[{"label": f" {t('ui.landing.consent_play_only', locale=locale)}", "value": "play_only"}],
+            value=[],
+            persistence=True,
+            persistence_type=STORAGE_TYPE,
+            style={"fontSize": "16px"},
+        ),
+        dbc.Checklist(
+            id="consent-receive-results",
+            options=[{"label": f" {t('ui.landing.consent_receive_results', locale=locale)}", "value": "receive_results"}],
+            value=[],
+            persistence=True,
+            persistence_type=STORAGE_TYPE,
+            style={"fontSize": "16px", "marginTop": "10px"},
+        ),
+        dbc.Checklist(
+            id="consent-keep-updated",
+            options=[{"label": f" {t('ui.landing.consent_keep_updated', locale=locale)}", "value": "keep_updated"}],
+            value=[],
+            persistence=True,
+            persistence_type=STORAGE_TYPE,
+            style={"fontSize": "16px", "marginTop": "10px"},
+        ),
+    ]
+
+
 class LandingPage(html.Div):
     def __init__(self, *, locale: str = "en") -> None:
         self.component_id: str = "landing-page"
@@ -154,67 +224,7 @@ class LandingPage(html.Div):
                         style={"fontSize": "22px", "fontWeight": "800", "color": "#1565c0", "marginBottom": "10px"},
                     ),
                     html.Div(
-                        [
-                            *consent_notice_children(locale),
-                            html.Hr(style={"margin": "14px 0"}),
-                            html.H4(
-                                t("ui.landing.required_consents_title", locale=locale),
-                                style={"fontSize": "18px", "fontWeight": "800", "color": "#0f172a", "marginBottom": "8px"},
-                            ),
-                            dbc.Checklist(
-                                id="consent-acknowledge",
-                                options=[{"label": f" {t('ui.landing.consent_acknowledge_label', locale=locale)}", "value": "ack"}],
-                                value=[],
-                                persistence=True,
-                                persistence_type=STORAGE_TYPE,
-                                style={"fontSize": "16px", "marginBottom": "10px"},
-                            ),
-                            dbc.Checklist(
-                                id="consent-gdpr",
-                                options=[{"label": f" {t('ui.landing.consent_gdpr_label', locale=locale)}", "value": "gdpr"}],
-                                value=[],
-                                persistence=True,
-                                persistence_type=STORAGE_TYPE,
-                                style={"fontSize": "16px"},
-                            ),
-                            html.Hr(style={"margin": "14px 0"}),
-                            html.H4(
-                                t("ui.landing.optional_consents_title", locale=locale),
-                                style={"fontSize": "18px", "fontWeight": "800", "color": "#0f172a", "marginBottom": "8px"},
-                            ),
-                            dbc.Checklist(
-                                id="consent-upload-own-data",
-                                options=[{"label": f" {t('ui.landing.consent_upload_own_data', locale=locale)}", "value": "upload_own_data"}],
-                                value=[],
-                                persistence=True,
-                                persistence_type=STORAGE_TYPE,
-                                style={"fontSize": "16px", "marginBottom": "10px"},
-                            ),
-                            dbc.Checklist(
-                                id="consent-play-only",
-                                options=[{"label": f" {t('ui.landing.consent_play_only', locale=locale)}", "value": "play_only"}],
-                                value=[],
-                                persistence=True,
-                                persistence_type=STORAGE_TYPE,
-                                style={"fontSize": "16px"},
-                            ),
-                            dbc.Checklist(
-                                id="consent-receive-results",
-                                options=[{"label": f" {t('ui.landing.consent_receive_results', locale=locale)}", "value": "receive_results"}],
-                                value=[],
-                                persistence=True,
-                                persistence_type=STORAGE_TYPE,
-                                style={"fontSize": "16px", "marginTop": "10px"},
-                            ),
-                            dbc.Checklist(
-                                id="consent-keep-updated",
-                                options=[{"label": f" {t('ui.landing.consent_keep_updated', locale=locale)}", "value": "keep_updated"}],
-                                value=[],
-                                persistence=True,
-                                persistence_type=STORAGE_TYPE,
-                                style={"fontSize": "16px", "marginTop": "10px"},
-                            ),
-                        ],
+                        consent_controls_children(locale),
                         style={
                             "paddingRight": "10px",
                         },
@@ -404,4 +414,135 @@ class LandingPage(html.Div):
             )
 
             return "/startup", info, None
+
+
+class LandingPageMobile(html.Div):
+    """Single-column, portrait-first landing + consent page.
+
+    Reuses every id the landing callbacks target (``consent-notice-scroll``,
+    ``consent-acknowledge`` / ``consent-gdpr`` and the optional consents,
+    ``landing-error``, ``landing-continue``, plus the ``consent-scroll-complete``
+    store and ``consent-scroll-poll`` interval) so ``LandingPage.register_callbacks``
+    drives it unchanged.  No own callbacks are registered.
+
+    The consent text iframe owns the only scrollbar (CLAUDE.md single-scrollbar
+    rule): the page scrolls normally, the iframe scrolls its own content.  We do
+    NOT wrap it in an ``overflowY: auto`` container.
+    """
+
+    def __init__(self, *, locale: str = "en") -> None:
+        self.component_id = "landing-page"
+        self._locale = locale
+
+        hero = html.Div(
+            [
+                html.H1(
+                    t("ui.common.app_title", locale=locale),
+                    style={"fontSize": "32px", "fontWeight": "800", "letterSpacing": "-0.02em", "marginBottom": "8px"},
+                ),
+                html.Div(
+                    t("ui.landing.tagline", locale=locale),
+                    style={"fontSize": "16px", "color": "#334155", "marginBottom": "14px", "lineHeight": "1.4"},
+                ),
+                html.Div(
+                    [
+                        html.H3(
+                            t("ui.landing.how_it_works", locale=locale),
+                            style={"fontSize": "18px", "fontWeight": "800", "color": "#1565c0", "marginBottom": "6px"},
+                        ),
+                        html.Ul(
+                            [html.Li(item) for item in t_list("ui.landing.how_it_works_steps", locale=locale)],
+                            style={"margin": "0", "paddingLeft": "20px", "color": "#334155", "lineHeight": "1.6"},
+                        ),
+                    ],
+                    style={
+                        "background": "rgba(255,255,255,0.75)",
+                        "border": "1px solid rgba(15, 23, 42, 0.10)",
+                        "borderRadius": "14px",
+                        "padding": "12px 14px",
+                    },
+                ),
+            ],
+        )
+
+        study_info = html.Div(
+            [
+                html.H3(
+                    t("ui.landing.about_study_title", locale=locale),
+                    style={"fontSize": "18px", "fontWeight": "800", "color": "#1565c0", "marginBottom": "6px"},
+                ),
+                html.Div(
+                    t("ui.landing.about_study_text", locale=locale),
+                    style={"color": "#334155", "lineHeight": "1.6", "fontSize": "15px"},
+                ),
+            ],
+            style={
+                "background": "rgba(255,255,255,0.9)",
+                "border": "1px solid rgba(15, 23, 42, 0.10)",
+                "borderRadius": "14px",
+                "padding": "14px 16px",
+            },
+        )
+
+        consent_card = html.Div(
+            [
+                html.H3(
+                    t("ui.landing.patient_consent_form_title", locale=locale),
+                    style={"fontSize": "18px", "fontWeight": "800", "color": "#1565c0", "marginBottom": "10px"},
+                ),
+                html.Div(
+                    consent_controls_children(locale),
+                    id="consent-notice-scroll",
+                ),
+                html.Div(id="landing-error", style={"marginTop": "12px"}),
+                html.Button(
+                    t("ui.common.continue", locale=locale),
+                    id="landing-continue",
+                    className="ui green button landing-continue-mobile",
+                    disabled=True,
+                    style={
+                        "marginTop": "14px",
+                        "width": "100%",
+                        "fontWeight": "700",
+                        "backgroundColor": "#555555",
+                        "color": "white",
+                        "cursor": "not-allowed",
+                    },
+                ),
+                html.Div(
+                    t("ui.landing.next_hint", locale=locale),
+                    style={"color": "#64748b", "marginTop": "10px", "fontSize": "13px"},
+                ),
+            ],
+            style={
+                "background": "rgba(255,255,255,0.95)",
+                "border": "1px solid rgba(15, 23, 42, 0.10)",
+                "borderRadius": "14px",
+                "padding": "14px 16px",
+            },
+        )
+
+        super().__init__(
+            children=[
+                html.Div(
+                    className="landing-mobile",
+                    style={
+                        "minHeight": "100vh",
+                        "padding": "16px 12px 32px 12px",
+                        "display": "flex",
+                        "flexDirection": "column",
+                        "gap": "16px",
+                        "background": "linear-gradient(135deg, #eff6ff 0%, #f8fafc 35%, #fff7ed 100%)",
+                    },
+                    children=[
+                        hero,
+                        study_info,
+                        consent_card,
+                        dcc.Store(id="consent-scroll-complete", data=False, storage_type=STORAGE_TYPE),
+                        dcc.Interval(id="consent-scroll-poll", interval=500, n_intervals=0),
+                    ],
+                )
+            ],
+            id=self.component_id,
+        )
 

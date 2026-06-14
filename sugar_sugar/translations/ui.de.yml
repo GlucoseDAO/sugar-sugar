@@ -130,6 +130,9 @@ de:
     contact_prefs_text: "E‑Mail ist nur erforderlich, wenn du Ergebnisse später erhalten oder über Updates informiert werden möchtest."
     just_test_me: "Nur testen"
     start_prediction: "Vorhersage starten"
+    wizard_back: "Zurück"
+    wizard_next: "Weiter"
+    wizard_step: "Schritt %{current} von %{total}"
     format_label: "Format"
     format_placeholder: "Option auswählen"
     format_a_label: "Generische Daten"
@@ -191,7 +194,7 @@ de:
     text: "Hinweis: Sugar Sugar ist derzeit für Desktop optimiert. Mobile Unterstützung folgt bald!"
 
   orientation:
-    title: "FÜR BESTE ERGEBNISSE BITTE DIE WEBSITE IM QUERFORMAT NUTZEN"
+    title: "DREHE DEIN TELEFON INS QUERFORMAT, UM ZU ZEICHNEN"
     subtitle: ""
 
   share:

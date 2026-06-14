@@ -129,6 +129,9 @@ en:
     contact_prefs_text: "Email is only required if you asked to receive results later or to be kept up to date."
     just_test_me: "Just Test Me"
     start_prediction: "Start Prediction"
+    wizard_back: "Back"
+    wizard_next: "Next"
+    wizard_step: "Step %{current} of %{total}"
     format_label: "Format"
     format_placeholder: "Choose an option"
     format_a_label: "Generic Data"
@@ -190,7 +193,7 @@ en:
     text: "Note: Sugar Sugar is optimised for desktop at the moment. Mobile support is coming soon!"
 
   orientation:
-    title: "FOR BEST RESULTS PLEASE USE LANDSCAPE MODE TO ACCESS THE SITE"
+    title: "ROTATE YOUR PHONE TO LANDSCAPE TO DRAW"
     subtitle: ""
 
   share:
