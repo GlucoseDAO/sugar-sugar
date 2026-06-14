@@ -39,7 +39,7 @@ The game has up to 12 rounds. Each round takes about 2–3 minutes; a full sessi
 
 ## Screenshots
 
-![Game Interface](images/screenshot.png)
+![Game Interface](assets/images/screenshot.png)
 *sugar-sugar in action — try to predict where that line is going!*
 
 ## Data and privacy

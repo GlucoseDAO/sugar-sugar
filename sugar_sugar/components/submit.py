@@ -71,7 +71,7 @@ class SubmitComponent(html.Div):
                 }
             ),
             dcc.Store(id='prediction-stats-store', data=None, storage_type=STORAGE_TYPE)
-        ], style={'display': 'flex', 'flexDirection': 'column', 'justifyContent': 'center', 'alignItems': 'center'})
+        ], id="prediction-actions", style={'display': 'flex', 'flexDirection': 'column', 'justifyContent': 'center', 'alignItems': 'center'})
 
     def _repair_misaligned_csv_rows(self) -> None:
         """Repair CSV rows whose columns were written in desired_fieldnames order instead of
@@ -527,6 +527,7 @@ class SubmitComponent(html.Div):
         
         @app.callback(
             [Output('submit-button', 'disabled'),
+             Output('submit-button', 'children'),
              Output('submit-button', 'style'),
              Output('prediction-progress-label', 'children'),
              Output('prediction-progress-label', 'style')],
@@ -537,7 +538,7 @@ class SubmitComponent(html.Div):
         def update_submit_button_state(
             df_data: Optional[dict[str, Any]],
             interface_language: Optional[str],
-        ) -> tuple[bool, dict[str, str], str, dict[str, str]]:
+        ) -> tuple[bool, str, dict[str, Any], str, dict[str, Any]]:
             """Enable submit button only when there are predictions to the end of the hidden area"""
             locale = normalize_locale(interface_language)
             base_style = {
@@ -560,7 +561,7 @@ class SubmitComponent(html.Div):
             if not df_data:
                 disabled_style = {**base_style, 'backgroundColor': '#cccccc', 'color': '#666666', 'cursor': 'not-allowed'}
                 label_style = {**base_label_style, 'color': '#6c757d'}
-                return True, disabled_style, t("ui.submit.progress_no_data", locale=locale), label_style
+                return True, t("ui.submit.submit", locale=locale), disabled_style, t("ui.submit.progress_no_data", locale=locale), label_style
             
             # Reconstruct DataFrame to check for predictions
             df = self._reconstruct_dataframe_from_dict(df_data)
@@ -604,8 +605,8 @@ class SubmitComponent(html.Div):
                 
                 if predictions_to_end:
                     enabled_style = {**base_style, 'backgroundColor': '#4CBB17', 'color': 'white', 'cursor': 'pointer'}
-                    label_style = {**base_label_style, 'color': '#3A9B12', 'fontWeight': 'bold'}
-                    return False, enabled_style, t("ui.submit.progress_ready", locale=locale), label_style
+                    label_style = {**base_label_style, 'display': 'none'}
+                    return False, t("ui.submit.progress_ready", locale=locale), enabled_style, "", label_style
                 else:
                     disabled_style = {**base_style, 'backgroundColor': '#999999', 'color': 'white', 'cursor': 'not-allowed'}
                     label_style = {**base_label_style, 'color': '#6c757d'}
@@ -615,11 +616,11 @@ class SubmitComponent(html.Div):
                         done=user_predictions_count,
                         total=required_user_predictions,
                     )
-                    return True, disabled_style, status_text, label_style
+                    return True, t("ui.submit.submit", locale=locale), disabled_style, status_text, label_style
             else:
                 disabled_style = {**base_style, 'backgroundColor': '#cccccc', 'color': '#666666', 'cursor': 'not-allowed'}
                 label_style = {**base_label_style, 'color': '#6c757d'}
-                return True, disabled_style, t("ui.submit.progress_hidden_area", locale=locale), label_style
+                return True, t("ui.submit.submit", locale=locale), disabled_style, t("ui.submit.progress_hidden_area", locale=locale), label_style
 
     def _reconstruct_dataframe_from_dict(self, df_data: dict[str, list[Any]]) -> pl.DataFrame:
         """Reconstruct a Polars DataFrame from stored dictionary data"""

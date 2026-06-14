@@ -1439,7 +1439,6 @@ def update_on_language_change(
      Output('header-time-window-label', 'children'),
      Output('prediction-units-label', 'children'),
      Output('prediction-consent-label', 'children'),
-     Output('submit-button', 'children'),
      Output('finish-study-button', 'children'),
      Output('nightscout-load-button', 'children')],
     [Input('interface-language', 'data')],
@@ -1481,7 +1480,6 @@ def update_prediction_text_on_language_change(
         t("ui.header.time_window_label", locale=locale),
         t("ui.prediction.units_label", locale=locale),
         t("ui.startup.data_usage_consent_label", locale=locale),
-        t("ui.submit.submit", locale=locale),
         t("ui.common.finish_exit", locale=locale),
         t("ui.header.nightscout_load_button", locale=locale),
     )
@@ -1938,6 +1936,7 @@ def create_contact_page(*, locale: str) -> html.Div:
                         ),
                     ],
                     style=table_style(),
+                    className="contact-table",
                 ),
                 html.Hr(style={"margin": "18px 0"}),
             ]
@@ -1983,6 +1982,7 @@ def create_contact_page(*, locale: str) -> html.Div:
                     ),
                 ],
                 style=table_style(),
+                className="contact-table",
             )
         )
         page_children.append(html.Hr(style={"margin": "18px 0"}))
@@ -2016,6 +2016,7 @@ def create_contact_page(*, locale: str) -> html.Div:
                     ),
                 ],
                 style=table_style(),
+                className="contact-table",
             )
         )
         page_children.append(html.Hr(style={"margin": "18px 0"}))
@@ -2056,6 +2057,7 @@ def create_contact_page(*, locale: str) -> html.Div:
                     ),
                 ],
                 style=table_style(),
+                className="contact-table",
             )
         )
 
@@ -2169,6 +2171,7 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
             'marginBottom': '10px'
         }),
         html.Div([
+            html.Div(id='prediction-chart-meta', style={'fontWeight': '600', 'marginRight': '10px'}),
             html.Div(t("ui.prediction.units_label", locale=locale), id='prediction-units-label', style={'fontWeight': '600', 'marginRight': '10px'}),
             dbc.RadioItems(
                 id='glucose-unit-selector',
@@ -2185,14 +2188,14 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
             'alignItems': 'center',
             'gap': '10px',
             'marginBottom': '10px'
-        }),
+        }, id='prediction-units-row'),
         html.Div([
             html.Div(
                 GlucoseChart(id='glucose-graph', hide_last_hour=True),
                 id='prediction-glucose-chart-container'
             ),
             SubmitComponent(locale=locale)
-        ], style={'flex': '1'})
+        ], id='prediction-chart-submit-wrap', style={'flex': '1'})
     ], style={
         'margin': '0 auto',
         'padding': '0 20px',
@@ -2200,6 +2203,33 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
         'flexDirection': 'column',
         'gap': '20px'
     })
+
+
+@app.callback(
+    Output('prediction-chart-meta', 'children'),
+    [Input('current-window-df', 'data'),
+     Input('data-source-name', 'data')],
+    [State('url', 'pathname')],
+    prevent_initial_call=False
+)
+def update_prediction_chart_meta(
+    current_df_data: Optional[dict[str, Any]],
+    source_name: Optional[str],
+    pathname: Optional[str],
+) -> str:
+    if pathname != '/prediction' or not current_df_data:
+        raise PreventUpdate
+
+    time_values = current_df_data.get('time') or []
+    if not time_values:
+        raise PreventUpdate
+
+    start_time = datetime.fromisoformat(str(time_values[0])).strftime('%H:%M')
+    end_time = datetime.fromisoformat(str(time_values[-1])).strftime('%H:%M')
+    time_range = f"{start_time}-{end_time}"
+    if source_name:
+        return f"{source_name} · {time_range}"
+    return time_range
 
 
 @app.callback(
@@ -5731,6 +5761,71 @@ def _find_free_port(host: str, preferred: int, max_tries: int = 20) -> int:
 # routes to the ``chart`` subcommand via its own entrypoint.
 cli = typer.Typer(invoke_without_command=True)
 
+
+def _arg_value(argv: list[str], *names: str) -> Optional[str]:
+    """Return the value for a CLI option without fully invoking Typer."""
+    for index, arg in enumerate(argv):
+        for name in names:
+            if arg == name and index + 1 < len(argv):
+                return argv[index + 1]
+            prefix = f"{name}="
+            if arg.startswith(prefix):
+                return arg[len(prefix):]
+    return None
+
+
+def _arg_present(argv: list[str], *names: str) -> bool:
+    """Check whether any CLI flag is present."""
+    return any(arg in names for arg in argv)
+
+
+def _seed_chart_env_from_argv(argv: list[str], env: Dict[str, str]) -> None:
+    """Seed chart-mode env vars before the Dash app module is imported.
+
+    Python console-script entry points import this module before Typer dispatches
+    to ``chart()``.  Re-execing with these values already in the environment
+    lets module-level layout/store initialization see chart mode immediately.
+    """
+    env["_CHART_MODE"] = "1"
+
+    file_arg = _arg_value(argv, "--file", "-f")
+    if file_arg:
+        env["_CHART_FILE"] = file_arg
+        env["_CHART_SOURCE"] = Path(file_arg).name
+    else:
+        env.pop("_CHART_FILE", None)
+        env["_CHART_SOURCE"] = "example.csv"
+
+    env["_CHART_POINTS"] = _arg_value(argv, "--points", "-p") or str(DEFAULT_POINTS)
+
+    start_arg = _arg_value(argv, "--start", "-s")
+    if start_arg is not None:
+        env["_CHART_START"] = start_arg
+    else:
+        env.pop("_CHART_START", None)
+
+    unit_arg = _arg_value(argv, "--unit", "-u")
+    env["_CHART_UNIT"] = unit_arg if unit_arg in ("mg/dL", "mmol/L") else "mg/dL"
+    env["_CHART_LOCALE"] = normalize_locale(_arg_value(argv, "--locale", "-l") or "en")
+
+    if _arg_present(argv, "--prefill"):
+        env["_CHART_PREFILL"] = "1"
+        env["_CHART_NOISE"] = _arg_value(argv, "--noise") or "0.05"
+    else:
+        env.pop("_CHART_PREFILL", None)
+        env.pop("_CHART_NOISE", None)
+
+    if _arg_present(argv, "--clean"):
+        env["_CLEAN_STORAGE"] = "1"
+
+    if _arg_present(argv, "--debug"):
+        env["DASH_DEBUG"] = "1"
+        env["DEBUG_MODE"] = "1"
+    if _arg_present(argv, "--no-debug"):
+        env["DASH_DEBUG"] = "0"
+        env["DEBUG_MODE"] = "0"
+
+
 @cli.callback(invoke_without_command=True)
 def main(
     typer_ctx: typer.Context,
@@ -5784,6 +5879,8 @@ def chart(
     prefill: bool = typer.Option(False, "--prefill", help="Pre-fill predictions with noisy ground truth so submit/ending can be tested immediately"),
     noise: float = typer.Option(0.05, "--noise", help="Noise level for --prefill (fraction of gl value, e.g. 0.05 = +/-5%%)"),
     clean: bool = typer.Option(False, "--clean", help="Clear browser localStorage on first connect so the session starts fresh"),
+    debug: Optional[bool] = typer.Option(None, "--debug/--no-debug", help="Override Dash debug mode for this chart server"),
+    reloader: bool = typer.Option(False, "--reloader/--no-reloader", help="Enable Werkzeug's debug reloader. Disabled by default so chart-mode stores are deterministic."),
     host: Optional[str] = typer.Option(None, "--host", help="Host to run the server on"),
     port: Optional[int] = typer.Option(None, "--port", help="Port to run the server on"),
 ) -> None:
@@ -5819,7 +5916,8 @@ def chart(
                 child.data = True
                 break
 
-    sugar_sugar_config.DEBUG_MODE = True
+    dash_debug = (os.getenv("DASH_DEBUG", "").lower() not in ("0", "false", "no")) if debug is None else debug
+    sugar_sugar_config.DEBUG_MODE = dash_debug
 
     _ensure_chrome()
     _register_all_callbacks()
@@ -5834,8 +5932,10 @@ def chart(
         prefill=prefill,
         host=dash_host,
         port=dash_port,
+        debug=dash_debug,
+        reloader=reloader,
     ):
-        app.run(host=dash_host, port=dash_port, debug=True)
+        app.run(host=dash_host, port=dash_port, debug=dash_debug, use_reloader=dash_debug and reloader)
 
 
 @cli.command()
@@ -5934,7 +6034,17 @@ def cli_main() -> None:
 
 def chart_main() -> None:
     """CLI entry point that defaults to the ``chart`` command."""
-    cli(["chart"] + sys.argv[1:])
+    argv = sys.argv[1:]
+    if os.environ.get("_CHART_REEXECED") != "1":
+        env = {**os.environ}
+        _seed_chart_env_from_argv(argv, env)
+        env["_CHART_REEXECED"] = "1"
+        os.execvpe(
+            sys.executable,
+            [sys.executable, "-m", "sugar_sugar.app", "chart", *argv],
+            env,
+        )
+    cli(["chart"] + argv)
 
 
 def share_main() -> None:

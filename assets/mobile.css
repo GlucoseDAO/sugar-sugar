@@ -51,7 +51,7 @@ html.mobile-device:not(.route-prediction) #page-content * {
 html.mobile-device .dash-input-container,
 html.mobile-device .dash-input,
 html.mobile-device .dash-input-element,
-html.mobile-device input,
+html.mobile-device input:not([type="checkbox"]):not([type="radio"]),
 html.mobile-device textarea,
 html.mobile-device select,
 html.mobile-device .dash-dropdown,
@@ -62,6 +62,33 @@ html.mobile-device .Select-control {
   max-width: 100% !important;
   min-width: 0 !important;
   box-sizing: border-box !important;
+}
+
+/* Consent / option checkboxes (dbc.Checklist) render a real
+   <input type="checkbox"> next to its label.  The generic input rule above
+   used to stretch them to display:block; width:100%, which pushed the label to
+   the next line and rendered the box as a full-width empty rectangle.  Keep
+   them as small inline boxes sitting beside their (wrapping) label text. */
+html.mobile-device .form-check,
+html.mobile-device .dash-checklist .form-check,
+html.mobile-device label.form-check-label {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 8px !important;
+  width: 100% !important;
+}
+html.mobile-device input[type="checkbox"],
+html.mobile-device input[type="radio"] {
+  display: inline-block !important;
+  width: 18px !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  margin: 3px 0 0 0 !important;
+  flex: 0 0 auto !important;
+}
+html.mobile-device .form-check-label {
+  display: inline !important;
+  width: auto !important;
 }
 
 /* dcc.Input applies the Python `style=` to the WRAPPER (.dash-input-container),
@@ -188,10 +215,95 @@ html.mobile-device .landing-continue-mobile {
 }
 
 
+/* --- Startup wizard inputs: never clip the field box ----------------------
+   The flattened dcc.Input wrapper could collapse shorter than the 48px input,
+   clipping its bottom border, and the 6px gap made adjacent boxes look
+   bottomless.  Force the wrapper to grow with the input and give each field
+   breathing room. */
+html.mobile-device #startup-page .dash-input-container {
+  overflow: visible !important;
+  height: auto !important;
+  margin-bottom: 16px !important;
+}
+html.mobile-device #startup-page input.dash-input-element {
+  margin-bottom: 0 !important;
+}
+html.mobile-device #startup-page .dash-dropdown,
+html.mobile-device #startup-page .Select {
+  margin-bottom: 16px !important;
+}
+
+/* Number fields (age, CGM/diabetes duration): Dash renders its own
+   `.dash-input-stepper` -/+ buttons inside the input wrapper.  Once the input
+   is forced full-width (display:block) on mobile, those steppers wrap to a
+   second line and render as stray "-"/"+" controls below the field.  They add
+   nothing on a touch keypad, so hide them (and the native webkit spinner). */
+html.mobile-device .dash-input-stepper {
+  display: none !important;
+}
+html.mobile-device input[type="number"] {
+  -moz-appearance: textfield !important;
+  appearance: textfield !important;
+}
+html.mobile-device input[type="number"]::-webkit-outer-spin-button,
+html.mobile-device input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+
+
 /* --- Info pages (about / faq / contact / demo) ---------------------------- */
 
 html.mobile-device .info-page {
   padding: 16px clamp(12px, 4vw, 24px) 32px !important;
+}
+
+/* Contact tables: on a phone the 2-3 column tables squeeze the link/email cell
+   so narrow that long URLs/emails wrap with ugly 1-2 char danglers ("...rostock."
+   / "de").  Collapse each table to a single stacked column so every value gets
+   the full viewport width (most links then fit on one line), and use a slightly
+   narrower link font that breaks cleanly when a token is still too long. */
+html.mobile-device .info-page .contact-table thead {
+  display: none !important;
+}
+html.mobile-device .info-page .contact-table,
+html.mobile-device .info-page .contact-table tbody,
+html.mobile-device .info-page .contact-table tr,
+html.mobile-device .info-page .contact-table td {
+  display: block !important;
+  width: 100% !important;
+}
+html.mobile-device .info-page .contact-table tr {
+  padding: 8px 0 !important;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.10) !important;
+}
+html.mobile-device .info-page .contact-table td {
+  padding: 1px 0 !important;
+  border-bottom: none !important;
+}
+/* First cell of each row (the name / platform) reads as the row's heading. */
+html.mobile-device .info-page .contact-table td:first-child {
+  font-weight: 700 !important;
+  color: #0f172a !important;
+}
+html.mobile-device .info-page .contact-table a {
+  font-size: 14px !important;
+  letter-spacing: -0.01em !important;
+  overflow-wrap: anywhere !important;
+  word-break: normal !important;
+}
+
+
+/* --- Consent form page (/consent-form): full-bleed TOS-style reader --------
+   The standalone consent page used to nest the scrolling text inside a bordered
+   card with margins, wasting space and showing a box-in-a-box.  On mobile make
+   it one full-width scrollable panel that fills the screen, with the back
+   button anchored below it (the iframe owns the only scrollbar). */
+html.mobile-device #consent-form-page .consent-form-shell {
+  padding: 12px !important;
+}
+html.mobile-device #consent-form-page .consent-form-text {
+  border-radius: 10px !important;
 }
 
 
@@ -246,11 +358,85 @@ html.route-prediction.mobile-device #submit-button {
   html.route-prediction.mobile-device #round-indicator {
     display: none !important;
   }
+  /* Pin the page to exactly one viewport and let the chart flex-fill whatever
+     height is left after the (compact) units row and the submit button.  The
+     old fixed `min-height: 82vh` on the chart, stacked under the units row and
+     above submit, overflowed past 100vh and cropped the x-axis + submit off the
+     bottom of the screen. */
   html.route-prediction.mobile-device #page-content > div {
-    padding: 4px !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+    padding: 4px 6px !important;
+    gap: 4px !important;
+  }
+  html.route-prediction.mobile-device #prediction-units-row {
+    position: absolute !important;
+    left: 6px !important;
+    bottom: 4px !important;
+    z-index: 2 !important;
+    height: 46px !important;
+    margin-bottom: 0 !important;
+    display: flex !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 0 8px !important;
+    background: rgba(255, 255, 255, 0.9) !important;
+    border-radius: 6px !important;
+    white-space: nowrap !important;
+  }
+  html.route-prediction.mobile-device #prediction-chart-meta {
+    max-width: 250px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    margin-right: 8px !important;
+  }
+  html.route-prediction.mobile-device #glucose-unit-selector {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+  }
+  html.route-prediction.mobile-device #glucose-unit-selector .form-check {
+    display: flex !important;
+    align-items: center !important;
+    margin: 0 !important;
+    min-height: 0 !important;
+  }
+  /* chart + action row wrapper becomes a column that owns the remaining height */
+  html.route-prediction.mobile-device #prediction-chart-submit-wrap {
+    flex: 1 1 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
     gap: 4px !important;
   }
   html.route-prediction.mobile-device #prediction-glucose-chart-container {
-    min-height: 82vh !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+  }
+  html.route-prediction.mobile-device #prediction-actions {
+    flex: 0 0 46px !important;
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+    padding-left: 330px !important;
+  }
+  html.route-prediction.mobile-device #prediction-progress-label {
+    display: none !important;
+  }
+  html.route-prediction.mobile-device #submit-button,
+  html.route-prediction.mobile-device #finish-study-button {
+    flex: 0 0 auto !important;
+    width: 220px !important;
+    height: 46px !important;
+    min-height: 46px !important;
+    font-size: 18px !important;
+    line-height: 1.2 !important;
+    margin: 0 !important;
+    padding: 8px 12px !important;
   }
 }

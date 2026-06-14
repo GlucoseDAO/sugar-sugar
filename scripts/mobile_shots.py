@@ -74,6 +74,16 @@ class Shot:
     path: str
     landscape: bool = False  # also capture rotated (long edge horizontal)
     settle_s: float = 1.5    # extra wait after hydration (charts need more)
+    # Element ids to .click() in order before capturing (each followed by a
+    # short wait for the Dash callback + DOM update).  Used to walk the mobile
+    # startup wizard to a given step.
+    clicks: tuple[str, ...] = ()
+    # Arbitrary JS evaluated just before capture (e.g. scroll an inner iframe
+    # to its bottom so the end-of-form + button is visible).
+    pre_capture_js: Optional[str] = None
+    # Grow the viewport height to the page scrollHeight before capturing.
+    # Disable for viewport-sized pages (consent reader, chart).
+    grow_height: bool = True
 
 
 @dataclass
@@ -95,8 +105,28 @@ def _server_groups(port: int) -> list[ServerGroup]:
             cmd=base + ["start", "--port", str(port)],
             shots=[
                 Shot("landing", "/"),
-                Shot("consent-form", "/consent-form"),
+                Shot("consent-form", "/consent-form", grow_height=False),
+                # Same page scrolled to the end of the consent text so the
+                # bottom of the form + the back button are captured.
+                Shot(
+                    "consent-form-bottom",
+                    "/consent-form",
+                    grow_height=False,
+                    pre_capture_js=(
+                        "(function(){var f=document.querySelector("
+                        "'#consent-form-scroll iframe');"
+                        "if(f&&f.contentWindow&&f.contentWindow.document){"
+                        "var d=f.contentWindow.document;"
+                        "var el=d.scrollingElement||d.documentElement||d.body;"
+                        "el.scrollTop=el.scrollHeight;}})()"
+                    ),
+                ),
+                # Walk every step of the mobile startup wizard for validation.
                 Shot("startup", "/startup"),
+                Shot("startup-step2", "/startup", clicks=("startup-next",)),
+                Shot("startup-step3", "/startup", clicks=("startup-next",) * 2),
+                Shot("startup-step4", "/startup", clicks=("startup-next",) * 3),
+                Shot("startup-step5", "/startup", clicks=("startup-next",) * 4),
                 Shot("about", "/about"),
                 Shot("faq", "/faq"),
                 Shot("contact", "/contact"),
@@ -106,7 +136,10 @@ def _server_groups(port: int) -> list[ServerGroup]:
         ServerGroup(
             name="chart",
             # --prefill fills the prediction region so submit/ending are reachable.
-            cmd=base + ["chart", "--prefill", "--port", str(port)],
+            # --no-debug/--no-reloader keeps the harness independent of
+            # Werkzeug's debug fork while chart-mode env is still seeded by the
+            # chart entry point before app import.
+            cmd=base + ["chart", "--prefill", "--no-debug", "--no-reloader", "--port", str(port)],
             shots=[
                 # Portrait shows the rotate-to-draw overlay; landscape is the
                 # immersive drawing layout.
@@ -180,11 +213,15 @@ async def _capture(
     # honours the page's <meta viewport> -> 1280, scaled to the device) so the
     # capture matches reality.  Every other page is mobile-first device-width,
     # for which mobile=False gives a deterministic, non-zoomed capture.
+    # NOTE on the landscape chart: device-width must stay <=1024 so the
+    # immersive landscape CSS (gated on `max-device-width: 1024px`) applies;
+    # mobile=True keeps screenWidth=740 while the <meta> forces the LAYOUT
+    # viewport to 1280.  The catch is that the meta switch happens client-side
+    # AFTER first paint, and under a CDP override Chromium does not re-fit the
+    # page scale, so the capture shows the unscaled top-left slice and crops the
+    # chart's bottom.  We fix that below by re-applying the metrics once the
+    # meta has switched (see `_refit_chart_landscape`).
     is_chart = shot.path == "/prediction"
-    # Chart page only: mobile=True in LANDSCAPE so Chromium honours the 1280
-    # <meta> and renders the immersive chart scaled (like a real phone).  In
-    # portrait we want the fixed full-screen rotate overlay centred in the 360
-    # viewport, so mobile=False there.
     metrics = {
         "width": w,
         "height": h,
@@ -199,6 +236,63 @@ async def _capture(
     await _hydrate_wait(tab)
     await asyncio.sleep(shot.settle_s)
 
+    # Walk wizard steps (or any sequence of clicks) before capturing.  Each
+    # click fires a Dash callback (server round-trip), so wait for the DOM to
+    # settle between clicks.
+    for el_id in shot.clicks:
+        await tab.send_command(
+            "Runtime.evaluate",
+            {
+                "expression": (
+                    f"(function(){{var e=document.getElementById('{el_id}');"
+                    "if(e){e.click();}})()"
+                ),
+                "returnByValue": True,
+            },
+        )
+        await asyncio.sleep(0.7)
+
+    if shot.pre_capture_js:
+        await tab.send_command(
+            "Runtime.evaluate",
+            {"expression": shot.pre_capture_js, "returnByValue": True},
+        )
+        await asyncio.sleep(0.4)
+
+    # Landscape chart only: the /prediction page swaps its <meta viewport> to
+    # width=1280 client-side AFTER first paint.  Under a CDP metrics override
+    # Chromium does not re-fit the page scale on that swap, so it renders the
+    # unscaled top-left 740px slice of the 1280 layout and crops the chart.
+    # Clearing + re-applying the override forces a full re-emulation that
+    # re-reads the (now 1280) meta and scales the whole layout into the device
+    # viewport -- exactly what a real phone shows.
+    if is_chart and landscape:
+        await tab.send_command("Emulation.clearDeviceMetricsOverride")
+        await asyncio.sleep(0.15)
+        await tab.send_command("Emulation.setDeviceMetricsOverride", metrics)
+        await asyncio.sleep(0.5)
+
+    # Plotly only re-fits its SVG on a window `resize` event, not on a
+    # CSS-driven container resize (the clientside route-prediction class +
+    # 1280 viewport switch reshape the chart container after Plotly's first
+    # render).  A bare window-resize event races the layout, so also call
+    # Plotly.Plots.resize() on every plot directly -- without this the
+    # landscape chart keeps its initial, oversized height and the x-axis +
+    # Submit button fall off the bottom of the capture.
+    await tab.send_command(
+        "Runtime.evaluate",
+        {
+            "expression": (
+                "(function(){window.dispatchEvent(new Event('resize'));"
+                "if(window.Plotly){document.querySelectorAll('.js-plotly-plot')"
+                ".forEach(function(g){try{window.Plotly.Plots.resize(g);}catch(e){}});}"
+                "return true;})()"
+            ),
+            "returnByValue": True,
+        },
+    )
+    await asyncio.sleep(0.8)
+
     # Capture the FULL page without `captureBeyondViewport` (which, under
     # mobile=False, re-lays-out at a ~1280 fallback width and ruins the shot).
     # Instead grow the viewport height to the page's scroll height and take a
@@ -209,7 +303,7 @@ async def _capture(
     #    re-triggering the rotate overlay and breaking landscape CSS.
     #  - /prediction: portrait shows a fixed full-screen rotate overlay and
     #    landscape is an immersive viewport-filling chart -- both are viewport-sized.
-    if not landscape and not is_chart:
+    if shot.grow_height and not landscape and not is_chart:
         sh = await tab.send_command(
             "Runtime.evaluate",
             {

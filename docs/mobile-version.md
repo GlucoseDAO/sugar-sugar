@@ -196,11 +196,63 @@ These are the traps that cost the most time. The same list is mirrored in `CLAUD
     and scaled (matches a real phone's immersive chart); use `mobile:false` for
     `/prediction` **portrait** so the fixed full-screen overlay is centred in the 360
     viewport (with `mobile:true` it centres in 1280 and lands off the crop).
+  - **Landscape `/prediction` needs a metrics re-apply, or it crops the chart bottom.**
+    The `1280` meta switch is clientside and fires *after* first paint; under a CDP
+    device-metrics override Chromium does NOT re-fit the page scale on that swap, so the
+    capture shows the unscaled top-left 740px slice of the 1280 layout and the x-axis +
+    Submit fall off the bottom. Fix: after hydration+settle, `Emulation.clearDeviceMetricsOverride`
+    then re-apply the **same** `mobile:true` 740×360 metrics — this forces a full
+    re-emulation that re-reads the now-`1280` meta and scales the whole layout into the
+    device viewport. **Do NOT "fix" it by setting `screenWidth:1280`/`mobile:false`** —
+    that makes *device-width* 1280, which fails the `max-device-width:1024` gate on the
+    immersive landscape CSS, so the navbar + instructions reappear and the chart drops
+    below the fold. Device-width must stay ≤1024; only the *layout* viewport is 1280.
+  - **Plotly does not re-fit on a CSS-driven container resize, only on a window
+    `resize`.** A bare `window.dispatchEvent(new Event('resize'))` races the layout, so
+    also call `Plotly.Plots.resize(gd)` on every `.js-plotly-plot` just before capturing
+    the chart; otherwise the SVG keeps its initial (oversized) height.
+  - **`uv run chart` runs Dash with the debug reloader, whose forked child re-imports the
+    module and loses the chart-mode prefill** — so `/prediction` intermittently redirects
+    to the landing page and the harness captures the wrong page. If the chart shots show
+    the landing/consent content, this (not the CSS) is why; ensure the chart entry point
+    keeps the prefill alive across the reloader fork (env-var pattern), as with `--prefill`.
   - **Do NOT use `captureBeyondViewport:true`** — under `mobile:false` it re-lays-out at
     a ~1280 fallback and ruins the shot. Instead grow the viewport *height* to the
     page's `scrollHeight` and take a normal viewport capture. Skip the height-grow for
     landscape and `/prediction` (growing height flips orientation to portrait, breaking
     landscape CSS and the overlay; their content is viewport-sized anyway).
+
+- **Number inputs: hide Dash's own `.dash-input-stepper` buttons on mobile, NOT the
+  native webkit spinner.** Newer Dash `dcc.Input(type="number")` renders its own `−`/`+`
+  stepper `<button>`s *inside* the `.dash-input-container`. Once the input is forced
+  full-width (`display:block`) on mobile, those buttons wrap to a second line and render
+  as stray `−`/`+` controls below the field. The a11y tree labels them "Decrease value" /
+  "Increase value", which looks like a native spinner — but `::-webkit-inner-spin-button {
+  appearance:none }` will NOT remove them. Hide `html.mobile-device .dash-input-stepper {
+  display:none }` (the touch numeric keypad is the input method anyway). **Don't set
+  `overflow:hidden` on the wrapper to clip them** — that re-clips the input's own bottom
+  border (the original "editor boxes cropped on the bottom" bug).
+
+- **Don't let the generic `html.mobile-device input { display:block; width:100% }` rule
+  hit checkboxes/radios.** It stretches consent checkboxes to full width and pushes their
+  label to the next line. Exclude them
+  (`input:not([type="checkbox"]):not([type="radio"])`) and lay each `.form-check` out as a
+  `display:flex` row so the fixed-size box stays inline with its wrapping label.
+
+- **Consent reader (`/consent-form`): don't use a `height:100vh` flex shell.** `100vh`
+  ignores the navbar above `#page-content`, so the shell overflows by the navbar height
+  and the "Go to start" button is pushed below the fold (and a `min-height:100vh` shell
+  adds a second, page-level scrollbar — the recurring double-scrollbar bug). Instead let
+  the shell be normal flow and give the embedded iframe a reserved height
+  (`calc(100vh - 190px)`, room for navbar + button + paddings) so the iframe owns the
+  only scrollbar and the button stays on-screen. This is the full-bleed, single-box,
+  TOS/EULA-style layout (no nested inner card).
+
+- **Contact links: stack the tables into one column on mobile.** Wide multi-column tables
+  truncate long emails/URLs into 1–2 character dangling overhangs that read as
+  unprofessional. Collapse `thead`/`tr`/`td` to `display:block; width:100%`, bold the
+  first cell as a heading, and apply a narrower font with `overflow-wrap:anywhere;
+  word-break:normal` to links so they wrap cleanly at full width.
 
 - **Don't CSS-rotate the chart** (`transform: rotate(90deg)`) — it desyncs Plotly's
   drawline touch coordinates. The immersive landscape is achieved by hiding chrome and

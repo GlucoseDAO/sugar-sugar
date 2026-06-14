@@ -104,7 +104,7 @@ class LandingPage(html.Div):
         self._locale: str = locale
 
         project_root = Path(__file__).resolve().parents[2]
-        screenshot_path = project_root / "images" / "screenshot.png"
+        screenshot_path = project_root / "assets" / "images" / "screenshot.png"
         screenshot_src = _image_data_uri(screenshot_path)
 
         hero = dbc.Row(
