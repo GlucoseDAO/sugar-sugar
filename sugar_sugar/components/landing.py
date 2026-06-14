@@ -417,17 +417,10 @@ class LandingPage(html.Div):
 
 
 class LandingPageMobile(html.Div):
-    """Single-column, portrait-first landing + consent page.
+    """Short mobile entry page.
 
-    Reuses every id the landing callbacks target (``consent-notice-scroll``,
-    ``consent-acknowledge`` / ``consent-gdpr`` and the optional consents,
-    ``landing-error``, ``landing-continue``, plus the ``consent-scroll-complete``
-    store and ``consent-scroll-poll`` interval) so ``LandingPage.register_callbacks``
-    drives it unchanged.  No own callbacks are registered.
-
-    The consent text iframe owns the only scrollbar (CLAUDE.md single-scrollbar
-    rule): the page scrolls normally, the iframe scrolls its own content.  We do
-    NOT wrap it in an ``overflowY: auto`` container.
+    Mobile consent lives inside ``StartupPageMobile`` as the wizard's first
+    gated step.  Desktop keeps using ``LandingPage`` as the consent gate.
     """
 
     def __init__(self, *, locale: str = "en") -> None:
@@ -484,41 +477,17 @@ class LandingPageMobile(html.Div):
             },
         )
 
-        consent_card = html.Div(
-            [
-                html.H3(
-                    t("ui.landing.patient_consent_form_title", locale=locale),
-                    style={"fontSize": "18px", "fontWeight": "800", "color": "#1565c0", "marginBottom": "10px"},
-                ),
-                html.Div(
-                    consent_controls_children(locale),
-                    id="consent-notice-scroll",
-                ),
-                html.Div(id="landing-error", style={"marginTop": "12px"}),
-                html.Button(
-                    t("ui.common.continue", locale=locale),
-                    id="landing-continue",
-                    className="ui green button landing-continue-mobile",
-                    disabled=True,
-                    style={
-                        "marginTop": "14px",
-                        "width": "100%",
-                        "fontWeight": "700",
-                        "backgroundColor": "#555555",
-                        "color": "white",
-                        "cursor": "not-allowed",
-                    },
-                ),
-                html.Div(
-                    t("ui.landing.next_hint", locale=locale),
-                    style={"color": "#64748b", "marginTop": "10px", "fontSize": "13px"},
-                ),
-            ],
+        take_me_in = dcc.Link(
+            t("ui.landing.take_me_in", locale=locale),
+            href="/startup",
+            className="ui green button landing-mobile-cta",
             style={
-                "background": "rgba(255,255,255,0.95)",
-                "border": "1px solid rgba(15, 23, 42, 0.10)",
-                "borderRadius": "14px",
-                "padding": "14px 16px",
+                "width": "100%",
+                "fontWeight": "800",
+                "fontSize": "18px",
+                "padding": "16px",
+                "borderRadius": "12px",
+                "textAlign": "center",
             },
         )
 
@@ -537,9 +506,7 @@ class LandingPageMobile(html.Div):
                     children=[
                         hero,
                         study_info,
-                        consent_card,
-                        dcc.Store(id="consent-scroll-complete", data=False, storage_type=STORAGE_TYPE),
-                        dcc.Interval(id="consent-scroll-poll", interval=500, n_intervals=0),
+                        take_me_in,
                     ],
                 )
             ],

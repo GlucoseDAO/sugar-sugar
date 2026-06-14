@@ -49,6 +49,7 @@ fr:
     open_consent_form: "Ouvrir l'avis de consentement"
     consent_required_error: "Merci de confirmer que tu as 18 ans ou plus et que tu as lu le formulaire de consentement pour continuer."
     next_hint: "Suivant : tu rempliras un court formulaire, puis tu téléverseras tes données CGM (ou tu utiliseras le jeu de données d'exemple)."
+    take_me_in: "Entrer"
 
   consent_form:
     title: "Avis de consentement"
@@ -95,6 +96,7 @@ fr:
   demo:
     title: "Démo"
     body: "Essaie une démo rapide du jeu de prédiction de la glycémie Sugar Sugar."
+    fullscreen_video: "Regarder en plein écran"
 
   startup:
     fork_me: "Forkez-moi sur GitHub"

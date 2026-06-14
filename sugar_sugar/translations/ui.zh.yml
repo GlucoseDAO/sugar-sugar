@@ -47,6 +47,7 @@ zh:
     open_consent_form: "打开同意通知"
     consent_required_error: "请确认您已年满 18 岁并阅读了同意书以继续。"
     next_hint: "下一步：您将填写一份简短的表格，然后上传 CGM 数据（或使用示例数据集）。"
+    take_me_in: "开始"
 
   consent_form:
     title: "同意通知"
@@ -93,6 +94,7 @@ zh:
   demo:
     title: "演示"
     body: "尝试 Sugar Sugar 血糖预测游戏的快速演示。"
+    fullscreen_video: "全屏观看"
 
   startup:
     fork_me: "在 GitHub 上 Fork 我"

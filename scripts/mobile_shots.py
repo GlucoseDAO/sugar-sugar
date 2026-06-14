@@ -18,6 +18,7 @@ Usage::
     uv run python scripts/mobile_shots.py                     # all pages, default device
     uv run python scripts/mobile_shots.py --device iphone-se  # a specific device preset
     uv run python scripts/mobile_shots.py --only chart        # just the prediction group
+    uv run python scripts/mobile_shots.py --language-set babylon  # all locales, nested by language
     uv run python scripts/mobile_shots.py --base-url http://127.0.0.1:8050  # running server
 
 Output goes to ``data/output/mobile_shots/`` by default.
@@ -66,6 +67,15 @@ DEVICES: dict[str, Device] = {
 }
 
 
+# Screenshot language sets.  Keep the historic English-only flat output as the
+# default; "babylon" is the expanded all-language mode and writes one directory
+# per locale under the output root.
+LANGUAGE_SETS: dict[str, tuple[str, ...]] = {
+    "english": ("en",),
+    "babylon": ("en", "de", "uk", "ro", "ru", "zh", "fr", "es"),
+}
+
+
 @dataclass(frozen=True)
 class Shot:
     """A single screenshot job: a route plus optional landscape capture."""
@@ -78,6 +88,9 @@ class Shot:
     # short wait for the Dash callback + DOM update).  Used to walk the mobile
     # startup wizard to a given step.
     clicks: tuple[str, ...] = ()
+    # Arbitrary JS evaluated before clicks.  Used by gated flows where the
+    # harness must satisfy a required checkbox/scroll condition before clicking.
+    pre_click_js: Optional[str] = None
     # Arbitrary JS evaluated just before capture (e.g. scroll an inner iframe
     # to its bottom so the end-of-form + button is visible).
     pre_capture_js: Optional[str] = None
@@ -96,9 +109,20 @@ class ServerGroup:
     shots: list[Shot] = field(default_factory=list)
 
 
-def _server_groups(port: int) -> list[ServerGroup]:
+def _server_groups(port: int, *, locale: str) -> list[ServerGroup]:
     """Define which routes are captured under which server invocation."""
     base = ["uv", "run"]
+    accept_mobile_consent_js = (
+        "(function(){"
+        "var scroll=document.getElementById('consent-notice-scroll');"
+        "if(scroll){scroll.scrollTop=scroll.scrollHeight;}"
+        "['consent-acknowledge','consent-gdpr'].forEach(function(id){"
+        "var root=document.getElementById(id);"
+        "var input=root && root.querySelector('input');"
+        "if(input && !input.checked){input.click();}"
+        "});"
+        "})()"
+    )
     return [
         ServerGroup(
             name="entry",
@@ -123,10 +147,11 @@ def _server_groups(port: int) -> list[ServerGroup]:
                 ),
                 # Walk every step of the mobile startup wizard for validation.
                 Shot("startup", "/startup"),
-                Shot("startup-step2", "/startup", clicks=("startup-next",)),
-                Shot("startup-step3", "/startup", clicks=("startup-next",) * 2),
-                Shot("startup-step4", "/startup", clicks=("startup-next",) * 3),
-                Shot("startup-step5", "/startup", clicks=("startup-next",) * 4),
+                Shot("startup-step2", "/startup", pre_click_js=accept_mobile_consent_js, clicks=("startup-next",)),
+                Shot("startup-step3", "/startup", pre_click_js=accept_mobile_consent_js, clicks=("startup-next",) * 2),
+                Shot("startup-step4", "/startup", pre_click_js=accept_mobile_consent_js, clicks=("startup-next",) * 3),
+                Shot("startup-step5", "/startup", pre_click_js=accept_mobile_consent_js, clicks=("startup-next",) * 4),
+                Shot("startup-step6", "/startup", pre_click_js=accept_mobile_consent_js, clicks=("startup-next",) * 5),
                 Shot("about", "/about"),
                 Shot("faq", "/faq"),
                 Shot("contact", "/contact"),
@@ -139,7 +164,16 @@ def _server_groups(port: int) -> list[ServerGroup]:
             # --no-debug/--no-reloader keeps the harness independent of
             # Werkzeug's debug fork while chart-mode env is still seeded by the
             # chart entry point before app import.
-            cmd=base + ["chart", "--prefill", "--no-debug", "--no-reloader", "--port", str(port)],
+            cmd=base + [
+                "chart",
+                "--prefill",
+                "--no-debug",
+                "--no-reloader",
+                "--locale",
+                locale,
+                "--port",
+                str(port),
+            ],
             shots=[
                 # Portrait shows the rotate-to-draw overlay; landscape is the
                 # immersive drawing layout.
@@ -178,6 +212,27 @@ async def _hydrate_wait(tab, timeout_s: float = 20.0) -> None:
         await asyncio.sleep(0.25)
 
 
+async def _apply_locale(tab, locale: str) -> None:
+    """Switch the page to a non-default locale using the existing Dash callback."""
+    if locale == "en":
+        return
+
+    res = await tab.send_command(
+        "Runtime.evaluate",
+        {
+            "expression": (
+                f"(function(){{var e=document.getElementById('lang-{locale}');"
+                "if(!e){return false;} e.click(); return true;})()"
+            ),
+            "returnByValue": True,
+        },
+    )
+    clicked = res.get("result", {}).get("result", {}).get("value") is True
+    if not clicked:
+        raise RuntimeError(f"Could not find language switcher for locale '{locale}'")
+    await asyncio.sleep(0.9)
+
+
 async def _capture(
     tab,
     *,
@@ -186,6 +241,7 @@ async def _capture(
     device: Device,
     out_dir: Path,
     landscape: bool,
+    locale: str,
 ) -> Path:
     """Emulate the device, navigate, and write a full-page PNG."""
     if landscape:
@@ -235,6 +291,14 @@ async def _capture(
     await tab.send_command("Page.navigate", {"url": url})
     await _hydrate_wait(tab)
     await asyncio.sleep(shot.settle_s)
+    await _apply_locale(tab, locale)
+
+    if shot.pre_click_js:
+        await tab.send_command(
+            "Runtime.evaluate",
+            {"expression": shot.pre_click_js, "returnByValue": True},
+        )
+        await asyncio.sleep(1.0)
 
     # Walk wizard steps (or any sequence of clicks) before capturing.  Each
     # click fires a Dash callback (server round-trip), so wait for the DOM to
@@ -332,7 +396,7 @@ async def _capture(
 
 
 async def _run_group(
-    group: ServerGroup, *, base_url: str, device: Device, out_dir: Path
+    group: ServerGroup, *, base_url: str, device: Device, out_dir: Path, locale: str
 ) -> list[Path]:
     """Screenshot every shot in a group against an already-running server."""
     from choreographer import Browser
@@ -355,6 +419,7 @@ async def _run_group(
                         device=device,
                         out_dir=out_dir,
                         landscape=landscape,
+                        locale=locale,
                     )
                     written.append(p)
                     typer.echo(f"  ✓ {p.name}")
@@ -405,34 +470,49 @@ def main(
     only: Optional[str] = typer.Option(None, "--only", help="Only this server group: entry | chart"),
     base_url: Optional[str] = typer.Option(None, "--base-url", help="Use an already-running server instead of spawning one"),
     port: int = typer.Option(8099, "--port", "-p", help="Port to spawn servers on"),
+    language_set: str = typer.Option(
+        "english",
+        "--language-set",
+        "--variant",
+        help=f"Screenshot language set: {', '.join(LANGUAGE_SETS)}",
+    ),
 ) -> None:
     """Render the app's pages on a narrow phone viewport and save screenshots."""
     if device not in DEVICES:
         typer.echo(f"Unknown device '{device}'. Choices: {', '.join(DEVICES)}")
         raise typer.Exit(1)
+    if language_set not in LANGUAGE_SETS:
+        typer.echo(f"Unknown language set '{language_set}'. Choices: {', '.join(LANGUAGE_SETS)}")
+        raise typer.Exit(1)
     dev = DEVICES[device]
-    out_dir = Path(out)
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    groups = _server_groups(port)
-    if only:
-        groups = [g for g in groups if g.name == only]
-        if not groups:
-            typer.echo(f"No group named '{only}'.")
-            raise typer.Exit(1)
+    out_root = Path(out)
+    out_root.mkdir(parents=True, exist_ok=True)
+    locales = LANGUAGE_SETS[language_set]
 
     all_written: list[Path] = []
 
-    if base_url:
-        # Caller manages the server; just screenshot every selected group's shots.
+    for locale in locales:
+        out_dir = out_root if language_set == "english" else out_root / locale
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        groups = _server_groups(port, locale=locale)
+        if only:
+            groups = [g for g in groups if g.name == only]
+            if not groups:
+                typer.echo(f"No group named '{only}'.")
+                raise typer.Exit(1)
+
+        if base_url:
+            # Caller manages the server; just screenshot every selected group's shots.
+            for group in groups:
+                typer.echo(f"[{locale}:{group.name}] using {base_url}")
+                all_written += asyncio.run(
+                    _run_group(group, base_url=base_url, device=dev, out_dir=out_dir, locale=locale)
+                )
+            continue
+
         for group in groups:
-            typer.echo(f"[{group.name}] using {base_url}")
-            all_written += asyncio.run(
-                _run_group(group, base_url=base_url, device=dev, out_dir=out_dir)
-            )
-    else:
-        for group in groups:
-            typer.echo(f"[{group.name}] starting server on :{port} ...")
+            typer.echo(f"[{locale}:{group.name}] starting server on :{port} ...")
             log_path = out_dir / f"_server-{group.name}.log"
             proc = _spawn_server(group, port=port, log_path=log_path)
             try:
@@ -441,12 +521,12 @@ def main(
                     typer.echo(f"  ✗ server did not come up (see {log_path})")
                     continue
                 all_written += asyncio.run(
-                    _run_group(group, base_url=url, device=dev, out_dir=out_dir)
+                    _run_group(group, base_url=url, device=dev, out_dir=out_dir, locale=locale)
                 )
             finally:
                 _kill_server(proc, port=port)
 
-    typer.echo(f"\nWrote {len(all_written)} screenshot(s) to {out_dir}/")
+    typer.echo(f"\nWrote {len(all_written)} screenshot(s) to {out_root}/")
     for p in all_written:
         typer.echo(f"  {p}")
 

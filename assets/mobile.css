@@ -207,6 +207,19 @@ html.mobile-device button.ui {
   font-size: 17px !important;
 }
 
+html.mobile-device .landing-mobile-cta.ui.button {
+  display: block !important;
+  text-decoration: none !important;
+}
+
+html.mobile-device #startup-next:disabled,
+html.mobile-device #startup-next[disabled] {
+  background: #9ca3af !important;
+  color: #ffffff !important;
+  cursor: not-allowed !important;
+  opacity: 0.75 !important;
+}
+
 /* The desktop validation callback rewrites #landing-continue's inline width to
    220px; force it full-width on mobile. */
 html.mobile-device #landing-continue,
@@ -255,7 +268,36 @@ html.mobile-device input[type="number"]::-webkit-inner-spin-button {
 /* --- Info pages (about / faq / contact / demo) ---------------------------- */
 
 html.mobile-device .info-page {
+  /* The desktop `max-width: clamp(320px, 85vw, 1400px)` centres the page and
+     wastes ~15-30% of a phone's width as side margins.  On mobile let the
+     content use the full viewport (padding is the only inset). */
+  max-width: 100% !important;
   padding: 16px clamp(12px, 4vw, 24px) 32px !important;
+}
+
+html.mobile-device .demo-page .demo-fullscreen-button.ui.button {
+  width: 100% !important;
+  margin-top: 14px !important;
+  padding: 15px 18px !important;
+  font-size: 18px !important;
+  border-radius: 12px !important;
+}
+
+/* --- Contact page: bigger fonts, sized so the team email is the longest
+   single line and still fits with a comfortable safety margin -------------- */
+html.mobile-device .contact-page .contact-intro {
+  font-size: 17px !important;
+  line-height: 1.55 !important;
+  color: #374151 !important;
+}
+html.mobile-device .contact-page h2 {
+  font-size: 24px !important;
+}
+/* The general team email is the binding longest unbreakable line; size it up
+   to fill the reclaimed width while keeping a ~12-18% safety margin. */
+html.mobile-device .contact-page .contact-general-email {
+  font-size: 20px !important;
+  white-space: nowrap !important;
 }
 
 /* Contact tables: on a phone the 2-3 column tables squeeze the link/email cell
@@ -281,16 +323,31 @@ html.mobile-device .info-page .contact-table td {
   padding: 1px 0 !important;
   border-bottom: none !important;
 }
-/* First cell of each row (the name / platform) reads as the row's heading. */
+/* Secondary plain-text cells (e.g. the LinkedIn role) — kept a touch smaller
+   and muted so the link/heading hierarchy reads cleanly. */
+html.mobile-device .info-page .contact-table td {
+  font-size: 17px !important;
+}
+/* First cell of each row (the name / platform) reads as the row's heading, so
+   it should be the largest text in the row, proportional to the beefed links. */
 html.mobile-device .info-page .contact-table td:first-child {
   font-weight: 700 !important;
   color: #0f172a !important;
+  font-size: 22px !important;
 }
+/* Per-contact emails / link labels: beefed up to the team-email size and still
+   on one line.  The long study emails are the binding line here. */
 html.mobile-device .info-page .contact-table a {
-  font-size: 14px !important;
+  font-size: 20px !important;
   letter-spacing: -0.01em !important;
   overflow-wrap: anywhere !important;
   word-break: normal !important;
+}
+/* Short link labels (social/platform URLs, "Open profile") have plenty of room,
+   so make them slightly bigger and bolder to read as proper tap targets. */
+html.mobile-device .info-page .contact-table a[href^="http"] {
+  font-size: 21px !important;
+  font-weight: 600 !important;
 }
 
 
@@ -372,35 +429,75 @@ html.route-prediction.mobile-device #submit-button {
   html.route-prediction.mobile-device #prediction-units-row {
     position: absolute !important;
     left: 6px !important;
+    right: 550px !important;
     bottom: 4px !important;
     z-index: 2 !important;
     height: 46px !important;
     margin-bottom: 0 !important;
     display: flex !important;
-    justify-content: flex-start !important;
+    justify-content: flex-end !important;
     align-items: center !important;
-    gap: 10px !important;
-    padding: 0 8px !important;
-    background: rgba(255, 255, 255, 0.9) !important;
-    border-radius: 6px !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
     white-space: nowrap !important;
+    font-size: 22px !important;
   }
   html.route-prediction.mobile-device #prediction-chart-meta {
-    max-width: 250px !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    margin-right: 8px !important;
-  }
-  html.route-prediction.mobile-device #glucose-unit-selector {
+    max-width: 270px !important;
+    height: 46px !important;
     display: flex !important;
     align-items: center !important;
-    gap: 10px !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    margin-right: auto !important;
+    padding: 0 12px !important;
+    color: #1f2a44 !important;
+    background: linear-gradient(180deg, #ffffff 0%, #eef3f8 100%) !important;
+    border: 1px solid rgba(75, 95, 130, 0.35) !important;
+    border-radius: 8px !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 0 -1px 0 rgba(25, 45, 75, 0.08),
+      0 1px 3px rgba(25, 45, 75, 0.18) !important;
+  }
+  html.route-prediction.mobile-device #prediction-units-label {
+    height: 46px !important;
+    display: flex !important;
+    align-items: center !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    padding: 0 8px 0 10px !important;
+    color: #1f2a44 !important;
+    background: rgba(255, 255, 255, 0.94) !important;
+    border: 1px solid rgba(75, 95, 130, 0.25) !important;
+    border-right: 0 !important;
+    border-radius: 8px 0 0 8px !important;
+  }
+  html.route-prediction.mobile-device #glucose-unit-selector {
+    height: 46px !important;
+    display: flex !important;
+    align-items: center !important;
+    box-sizing: border-box !important;
+    gap: 8px !important;
+    padding: 0 10px 0 6px !important;
+    background: rgba(255, 255, 255, 0.94) !important;
+    border: 1px solid rgba(75, 95, 130, 0.25) !important;
+    border-left: 0 !important;
+    border-radius: 0 8px 8px 0 !important;
   }
   html.route-prediction.mobile-device #glucose-unit-selector .form-check {
     display: flex !important;
     align-items: center !important;
     margin: 0 !important;
     min-height: 0 !important;
+  }
+  html.route-prediction.mobile-device #glucose-unit-selector .form-check-input {
+    margin: 0 4px 0 0 !important;
+  }
+  html.route-prediction.mobile-device #glucose-unit-selector .form-check-label {
+    margin: 0 !important;
   }
   /* chart + action row wrapper becomes a column that owns the remaining height */
   html.route-prediction.mobile-device #prediction-chart-submit-wrap {
@@ -431,10 +528,10 @@ html.route-prediction.mobile-device #submit-button {
   html.route-prediction.mobile-device #submit-button,
   html.route-prediction.mobile-device #finish-study-button {
     flex: 0 0 auto !important;
-    width: 220px !important;
+    width: 264px !important;
     height: 46px !important;
     min-height: 46px !important;
-    font-size: 18px !important;
+    font-size: 22px !important;
     line-height: 1.2 !important;
     margin: 0 !important;
     padding: 8px 12px !important;

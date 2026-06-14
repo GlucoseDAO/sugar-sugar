@@ -47,6 +47,7 @@ en:
     open_consent_form: "Open consent notice"
     consent_required_error: "Please confirm you are 18+ and have read the consent form to continue."
     next_hint: "Next: you'll fill in a short form, then upload CGM data (or use the sample dataset)."
+    take_me_in: "Take me in"
 
   consent_form:
     title: "Consent notice"
@@ -80,7 +81,7 @@ en:
     body: "If you have questions, feedback, or want your data removed, please reach out using the contacts below."
     study_contacts_title: "Study contacts"
     general_email_title: "General team email"
-    social_title: "Social media & community"
+    social_title: "Social media"
     platforms_title: "Website & platforms"
     linkedin_title: "LinkedIn"
     col_name: "Name"
@@ -93,6 +94,7 @@ en:
   demo:
     title: "Demo"
     body: "Try a quick demo of the Sugar Sugar glucose prediction game."
+    fullscreen_video: "Watch fullscreen"
 
   startup:
     fork_me: "Fork me on GitHub"

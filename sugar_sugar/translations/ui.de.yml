@@ -47,6 +47,7 @@ de:
     open_consent_form: "Einwilligungsformular öffnen"
     consent_required_error: "Bitte bestätige, dass du 18+ bist und das Einwilligungsformular gelesen hast, um fortzufahren."
     next_hint: "Als Nächstes: kurzes Formular ausfüllen und dann CGM‑Daten hochladen (oder Beispieldaten verwenden)."
+    take_me_in: "Los geht's"
 
   about:
     title: "Über Sugar Sugar"
@@ -75,6 +76,7 @@ de:
   demo:
     title: "Demo"
     body: "Probiere eine kurze Demo des Sugar-Sugar-Glukose-Vorhersage-Spiels."
+    fullscreen_video: "Im Vollbild ansehen"
 
   consent_form:
     title: "Einwilligungserklärung"

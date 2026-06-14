@@ -1053,6 +1053,7 @@ app.layout = html.Div([
 
     html.Div(id='mobile-warning', style={'display': 'none'}),
     html.Div(id='scroll-to-top-trigger', style={'display': 'none'}),
+    html.Div(id='demo-video-sink', style={'display': 'none'}),
     # Throwaway sink for the per-page viewport / route-class clientside callback
     # (there is no real Dash Output for the <meta viewport> tag or <html> class).
     html.Div(id='viewport-sink', style={'display': 'none'}),
@@ -1167,6 +1168,68 @@ app.clientside_callback(
     """,
     Output('mobile-nav-drawer', 'style'),
     Input('mobile-nav-toggle', 'n_clicks'),
+    prevent_initial_call=True,
+)
+
+
+app.clientside_callback(
+    """
+    function(n) {
+        if (!n) {
+            return window.dash_clientside.no_update;
+        }
+
+        var shell = document.getElementById('demo-video-shell');
+        var frame = document.getElementById('demo-video-frame');
+        var youtubeUrl = 'https://www.youtube.com/watch?v=M9JDhLFfFbA';
+
+        function openYoutubeFallback() {
+            window.location.href = youtubeUrl;
+        }
+
+        if (!shell || !frame) {
+            openYoutubeFallback();
+            return window.dash_clientside.no_update;
+        }
+
+        var requestFullscreen = (
+            shell.requestFullscreen ||
+            shell.webkitRequestFullscreen ||
+            shell.msRequestFullscreen
+        );
+
+        if (!requestFullscreen) {
+            openYoutubeFallback();
+            return window.dash_clientside.no_update;
+        }
+
+        shell.classList.add('demo-video-immersive');
+
+        function clearImmersiveClass() {
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                shell.classList.remove('demo-video-immersive');
+                document.removeEventListener('fullscreenchange', clearImmersiveClass);
+                document.removeEventListener('webkitfullscreenchange', clearImmersiveClass);
+            }
+        }
+
+        document.addEventListener('fullscreenchange', clearImmersiveClass);
+        document.addEventListener('webkitfullscreenchange', clearImmersiveClass);
+
+        try {
+            var result = requestFullscreen.call(shell);
+            if (result && result.catch) {
+                result.catch(openYoutubeFallback);
+            }
+        } catch (e) {
+            openYoutubeFallback();
+        }
+
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output('demo-video-sink', 'children'),
+    Input('demo-fullscreen-button', 'n_clicks'),
     prevent_initial_call=True,
 )
 
@@ -1890,7 +1953,11 @@ def create_contact_page(*, locale: str) -> html.Div:
     info = load_contact_info()
     page_children: list[Any] = [
         html.H1(t("ui.contact.title", locale=locale)),
-        html.Div(t("ui.contact.body", locale=locale), style={"marginBottom": "14px"}),
+        html.Div(
+            t("ui.contact.body", locale=locale),
+            style={"marginBottom": "14px"},
+            className="contact-intro",
+        ),
     ]
 
     def table_style() -> dict[str, Any]:
@@ -1947,7 +2014,12 @@ def create_contact_page(*, locale: str) -> html.Div:
             [
                 html.H2(t("ui.contact.general_email_title", locale=locale)),
                 html.Div(
-                    html.A(info.general_email, href=f"mailto:{info.general_email}", style={"fontWeight": "700"}),
+                    html.A(
+                        info.general_email,
+                        href=f"mailto:{info.general_email}",
+                        style={"fontWeight": "700"},
+                        className="contact-general-email",
+                    ),
                     style={"marginBottom": "18px"},
                 ),
             ]
@@ -2061,7 +2133,7 @@ def create_contact_page(*, locale: str) -> html.Div:
             )
         )
 
-    return html.Div(page_children, className="info-page", disable_n_clicks=True)
+    return html.Div(page_children, className="info-page contact-page", disable_n_clicks=True)
 
 
 def create_demo_page(*, locale: str) -> html.Div:
@@ -2075,10 +2147,11 @@ def create_demo_page(*, locale: str) -> html.Div:
             ),
             html.Div(
                 html.Iframe(
+                    id="demo-video-frame",
                     src="https://www.youtube.com/embed/M9JDhLFfFbA",
                     title=t("ui.common.video_instructions", locale=locale),
                     allow=(
-                        "accelerometer; autoplay; clipboard-write; encrypted-media; "
+                        "accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; "
                         "gyroscope; picture-in-picture; web-share"
                     ),
                     style={
@@ -2090,6 +2163,7 @@ def create_demo_page(*, locale: str) -> html.Div:
                         "border": "0",
                     },
                 ),
+                id="demo-video-shell",
                 style={
                     "position": "relative",
                     "width": "100%",
@@ -2102,8 +2176,15 @@ def create_demo_page(*, locale: str) -> html.Div:
                 },
                 disable_n_clicks=True,
             ),
+            html.Button(
+                t("ui.demo.fullscreen_video", locale=locale),
+                id="demo-fullscreen-button",
+                className="ui blue button demo-fullscreen-button",
+                n_clicks=0,
+                **{"aria-label": t("ui.demo.fullscreen_video", locale=locale)},
+            ),
         ],
-        className="info-page",
+        className="info-page demo-page",
         disable_n_clicks=True,
     )
 
@@ -3563,7 +3644,13 @@ def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) ->
      State('diabetic-type-dropdown', 'value'),
      State('diabetes-duration-input', 'value'),
      State('location-input', 'value'),
-     State('user-info-store', 'data')],
+     State('user-info-store', 'data'),
+     State('consent-acknowledge', 'value'),
+     State('consent-gdpr', 'value'),
+     State('consent-upload-own-data', 'value'),
+     State('consent-play-only', 'value'),
+     State('consent-receive-results', 'value'),
+     State('consent-keep-updated', 'value')],
     prevent_initial_call=True
 )
 def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Optional[int | float], 
@@ -3571,7 +3658,13 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
                        format_value: Optional[str], data_usage_consent: Optional[list[str]],
                        diabetic: Optional[bool], diabetic_type: Optional[str], 
                        diabetes_duration: Optional[float], location: Optional[str],
-                       existing_user_info: Optional[Dict[str, Any]] = None) -> Tuple[str, Dict[str, Any]]:
+                       existing_user_info: Optional[Dict[str, Any]] = None,
+                       acknowledge_value: Optional[list[str]] = None,
+                       gdpr_value: Optional[list[str]] = None,
+                       upload_own_data_value: Optional[list[str]] = None,
+                       play_only_value: Optional[list[str]] = None,
+                       receive_results_value: Optional[list[str]] = None,
+                       keep_updated_value: Optional[list[str]] = None) -> Tuple[str, Dict[str, Any]]:
     """Handle start button on startup page"""
     if not n_clicks:
         return no_update, no_update
@@ -3587,6 +3680,28 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
         study_id = info.get('study_id') or str(uuid.uuid4())
         run_id = str(uuid.uuid4())
         uses_cgm_bool = bool(uses_cgm) if uses_cgm is not None else False
+        mobile_consent_values = [
+            acknowledge_value,
+            gdpr_value,
+            upload_own_data_value,
+            play_only_value,
+            receive_results_value,
+            keep_updated_value,
+        ]
+        has_mobile_consent = any(value is not None for value in mobile_consent_values)
+        if has_mobile_consent:
+            acknowledged = bool(acknowledge_value and "ack" in acknowledge_value)
+            gdpr_consented = bool(gdpr_value and "gdpr" in gdpr_value)
+            if not acknowledged or not gdpr_consented:
+                return no_update, no_update
+
+            any_selected = bool(play_only_value) or bool(receive_results_value) or bool(keep_updated_value)
+            no_selection = not any_selected
+            upload_own_data = bool(upload_own_data_value and "upload_own_data" in upload_own_data_value)
+            play_only = bool(play_only_value and "play_only" in play_only_value)
+            receive_results = bool(receive_results_value and "receive_results" in receive_results_value)
+            keep_updated = bool(keep_updated_value and "keep_updated" in keep_updated_value)
+            consent_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         info.update({
             'study_id': study_id,
@@ -3613,6 +3728,18 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
             'data_source_name': str(info.get('data_source_name', 'example.csv')),
         })
 
+        if has_mobile_consent:
+            info.update({
+                "consent_gdpr": gdpr_consented,
+                "consent_upload_own_data": upload_own_data,
+                "consent_play_only": play_only,
+                "consent_participate_in_study": (not play_only) and (not no_selection),
+                "consent_receive_results_later": receive_results,
+                "consent_keep_up_to_date": keep_updated,
+                "consent_no_selection": no_selection,
+                "consent_timestamp": consent_timestamp,
+            })
+
         # Ensure stable "number" across consent + stats + ranking CSVs.
         if info.get("number") is None:
             info["number"] = get_next_study_number()
@@ -3632,18 +3759,22 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
             info["consent_timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # Ensure consent CSV always has a row for this study_id (even when users bypass landing).
-        ensure_consent_agreement_row(
-            {
-                "study_id": info["study_id"],
-                "number": info.get("number", ""),
-                "timestamp": info.get("consent_timestamp", ""),
-                "play_only": bool(info.get("consent_play_only", False)),
-                "participate_in_study": bool(info.get("consent_participate_in_study", False)),
-                "receive_results_later": bool(info.get("consent_receive_results_later", False)),
-                "keep_up_to_date": bool(info.get("consent_keep_up_to_date", False)),
-                "no_selection": bool(info.get("consent_no_selection", True)),
-            }
-        )
+        consent_row: Dict[str, Any] = {
+            "study_id": info["study_id"],
+            "number": info.get("number", ""),
+            "timestamp": info.get("consent_timestamp", ""),
+            "play_only": bool(info.get("consent_play_only", False)),
+            "participate_in_study": bool(info.get("consent_participate_in_study", False)),
+            "receive_results_later": bool(info.get("consent_receive_results_later", False)),
+            "keep_up_to_date": bool(info.get("consent_keep_up_to_date", False)),
+            "no_selection": bool(info.get("consent_no_selection", True)),
+        }
+        if has_mobile_consent:
+            consent_row.update({
+                "gdpr_consent": gdpr_consented,
+                "upload_own_data": upload_own_data,
+            })
+        ensure_consent_agreement_row(consent_row)
         return '/prediction', info
     return no_update, no_update
 

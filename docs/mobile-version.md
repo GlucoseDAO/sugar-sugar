@@ -33,7 +33,7 @@ except the one step that physically needs width — line-drawing on the glucose 
   stateful interaction. So pages that need *structurally different* markup get
   **separate mobile builders** (new Python + callbacks); display-only pages get
   **responsive CSS** on the existing builders. The split:
-  - Separate mobile builders: **landing/consent**, **startup (wizard)**, **navbar (burger)**.
+  - Separate mobile builders: **landing entry**, **startup + consent wizard**, **navbar (burger)**.
   - Responsive CSS only: ending, final, share, faq, about, contact, demo.
   - `/prediction`: mostly CSS (immersive landscape) + a portrait rotate prompt.
 - **`width=device-width` by default, `1280` only on `/prediction`.** Mobile-first means
@@ -44,9 +44,10 @@ except the one step that physically needs width — line-drawing on the glucose 
   site. Now portrait works everywhere; the rotate prompt appears **only on
   `/prediction`**, where the user rotates to landscape for an **immersive full-screen
   chart** (chrome collapses). We never CSS-rotate the chart — it breaks touch mapping.
-- **Wizard for the startup form.** 11+ inputs on one page means the keyboard hides the
-  active field. The mobile startup is a 5-step wizard (1–3 fields per step) so the
-  keyboard never covers what you're typing.
+- **Wizard for consent + startup.** 11+ inputs on one page means the keyboard hides the
+  active field. Mobile now keeps the landing page short and puts consent in the
+  wizard as mandatory step 1, followed by the startup form steps (1–3 fields per
+  step) so the keyboard never covers what you're typing.
 
 ## 3. Implementation
 
@@ -81,17 +82,21 @@ except the one step that physically needs width — line-drawing on the glucose 
   navbars.
 - **`StartupPageMobile`** (`components/startup.py`): renders **every** input id of the
   desktop `StartupPage` (same ids, same persistence, plus all `*-required`/`*-error`
-  Output elements) grouped into `mobile-step-{0..4}` divs. `navigate_startup_wizard`
+  Output elements) plus the shared consent checklist ids in `mobile-step-{0..5}`
+  divs. Step 0 reuses `consent_controls_children()` inside `#consent-notice-scroll`
+  with the same scroll store/interval as desktop landing, and `startup-next.disabled`
+  is gated until the consent text has been scrolled and both required consent boxes
+  are ticked. `navigate_startup_wizard`
   (registered inside `StartupPage.register_callbacks`, `prevent_initial_call=True`)
   toggles each step's `display` and the Back/Next buttons + progress dots. Conditional
   parents live in the SAME step as their dependents (CGM→duration, diabetic→type+
   duration, format B/C→data-usage-consent) so a hidden step never strands a
   half-revealed cascade. The existing validation/conditional callbacks are unchanged.
-- **`LandingPageMobile`** (`components/landing.py`): single-column landing + consent
-  reusing `consent-notice-scroll`, the six consent checklist ids, `landing-error`,
-  `landing-continue`, and the scroll-poll store/interval. The consent iframe owns the
-  only scrollbar (single-scrollbar rule). `consent_controls_children(locale)` is shared
-  with the desktop builder so the consent controls never drift.
+- **`LandingPageMobile`** (`components/landing.py`): short single-column entry page:
+  hero / how-it-works, about-the-study summary, and one full-width "Take me in" link
+  to `/startup`. It deliberately does not render consent ids; mobile consent is
+  non-skippable because the wizard's first Next button is the gate and the final
+  Start button is the only route to `/prediction`.
 
 ### 3.4 CSS (`assets/mobile.css`, `assets/orientation.css`)
 
@@ -105,11 +110,67 @@ except the one step that physically needs width — line-drawing on the glucose 
 
 ### 3.5 Screenshot harness (`scripts/mobile_shots.py`)
 
-Renders every page on a narrow phone viewport (and `/prediction` also in landscape) and
-saves full-page PNGs to `data/output/mobile_shots/`, so visual artifacts can be caught
-without deploying to staging. It drives Chromium over the DevTools Protocol via
-`choreographer` (a transitive dep of Plotly's kaleido). Options: `--device`,
-`--only entry|chart`, `--base-url`, `--port`, `--out`. See the harness notes in
+Renders every mobile-relevant page on a narrow phone viewport and saves PNGs to
+`data/output/mobile_shots/`, so visual artifacts can be caught without deploying to
+staging. It drives Chromium over the DevTools Protocol via `choreographer` (a transitive
+dependency of Plotly's kaleido), sets a mobile Safari User-Agent so server-side mobile
+builders are selected, enables touch emulation so coarse-pointer CSS applies, and then
+uses carefully chosen device-metrics overrides per page.
+
+The harness is intentionally split into two server groups:
+
+- **`entry`** starts `uv run start --port <port>` and captures display/onboarding pages:
+  landing (`/`), consent form top and bottom (`/consent-form`), all six startup wizard
+  states (`/startup` plus repeated `startup-next` clicks), about, FAQ, contact, and demo.
+- **`chart`** starts `uv run chart --prefill --no-debug --no-reloader --locale <locale>
+  --port <port>` and captures `/prediction` in portrait and landscape. `--prefill`
+  avoids browser automation for drawing predictions, and `--no-reloader` avoids the
+  Werkzeug fork losing chart-mode environment.
+
+Device presets:
+
+- `android-narrow` (default): 360x740, the torture-test phone width.
+- `iphone-se`: 320x568.
+- `iphone-13`: 390x844.
+- `pixel-7`: 412x915.
+
+Language sets:
+
+- `english` (default): preserves the historic behaviour. It renders English only and
+  writes flat files directly under `data/output/mobile_shots/`, e.g.
+  `prediction-android-narrow-landscape.png`.
+- `babylon`: renders every supported locale (`en`, `de`, `uk`, `ro`, `ru`, `zh`, `fr`,
+  `es`) and writes one folder per language, e.g. `data/output/mobile_shots/ro/*.png`.
+  The normal pages switch locale by clicking the existing `lang-<code>` navbar element;
+  the chart server also receives `--locale <code>` at startup.
+
+Common commands:
+
+```bash
+uv run python scripts/mobile_shots.py
+uv run python scripts/mobile_shots.py --only chart
+uv run python scripts/mobile_shots.py --device iphone-se
+uv run python scripts/mobile_shots.py --language-set babylon
+uv run python scripts/mobile_shots.py --language-set babylon --only entry --port 8101
+uv run python scripts/mobile_shots.py --base-url http://127.0.0.1:8050
+uv run python scripts/mobile_shots.py --out /tmp/mobile-shots
+```
+
+The important options are:
+
+- `--device` / `-d`: choose a viewport preset.
+- `--only entry|chart`: run one server group.
+- `--language-set english|babylon` (alias `--variant`): choose default English-only or
+  all-locales output.
+- `--out` / `-o`: choose the output root.
+- `--port` / `-p`: choose the port used for spawned servers.
+- `--base-url`: use an already-running server instead of spawning one. This is useful
+  when debugging a single page manually, but remember that the spawned-mode chart group
+  normally starts with `uv run chart --prefill`.
+
+Each spawned group writes `_server-entry.log` or `_server-chart.log` beside its PNGs.
+If a shot fails, the harness logs the failure and keeps going so one broken page does not
+erase evidence from the rest of the run. See the harness notes in
 [Pitfalls](#pitfalls--lessons-learned) for the non-obvious CDP emulation choices.
 
 ## 4. Differences from the desktop web app
@@ -118,8 +179,8 @@ without deploying to staging. It drives Chromium over the DevTools Protocol via
 |---|---|---|
 | Layout viewport | `device-width` (meta ignored by desktop browsers) | `device-width`; `1280` only on `/prediction` |
 | Navbar | Fomantic `massive tabular menu` (one row) | `MobileNavBar` burger + drawer |
-| Startup form | One long `StartupPage` | `StartupPageMobile` 5-step wizard |
-| Landing/consent | Two-column hero + card | `LandingPageMobile` single column |
+| Startup form | One long `StartupPage` | `StartupPageMobile` 6-step wizard, starting with consent |
+| Landing/consent | Two-column hero + consent card | Short `LandingPageMobile` entry; consent is wizard step 1 |
 | `/prediction` portrait | Chart | "Rotate to draw" overlay |
 | `/prediction` landscape | Chart + full chrome | Immersive: chrome hidden, chart fills screen |
 | `min-width:1280` (lang.css) | Active | Released except on `/prediction` |
@@ -131,9 +192,18 @@ without deploying to staging. It drives Chromium over the DevTools Protocol via
   group) at 360px. `uv run python scripts/mobile_shots.py --only chart --port <free>`
   for just the prediction page (portrait overlay + landscape immersive). Run the two
   groups on different ports if the OS is slow to release the socket.
+- `uv run python scripts/mobile_shots.py --language-set babylon` — screenshots the same
+  page set in every supported language under `data/output/mobile_shots/<locale>/`. Use
+  this before shipping translation, navbar, consent, startup, or share/display-page
+  layout changes; long German/Romanian/Spanish labels and CJK wrapping catch different
+  bugs from English.
 - `uv run chart --prefill` — manual prediction/submit/ending flow.
 - Real-device check still recommended for touch drawing and keyboard behaviour, which
   the harness cannot fully reproduce.
+- For consent changes, manually verify the mobile path: `/` → "Take me in" →
+  `/startup`; the Step 1 Next button stays disabled until the consent iframe is
+  scrolled and the required boxes are checked; completing the wizard reaches
+  `/prediction` and writes a consent agreement row.
 
 ---
 
@@ -173,11 +243,13 @@ These are the traps that cost the most time. The same list is mirrored in `CLAUD
   inputs mounted in `display:none` step divs rather than conditionally rendering only
   the active step (which would also lose `persistence`).
 
-- **New callbacks for mobile-only ids go in the desktop component's `register_callbacks`
-  with `prevent_initial_call=True`** so they register once and stay inert on desktop
-  (where the ids are absent). Toggle only the `mobile-step-{i}` wrappers — never the
-  conditional sub-sections (`cgm-details` etc.) that already own their own `display`,
-  or the two callbacks fight.
+- **New callbacks for mobile-only ids go in the desktop component's `register_callbacks`**
+  so they register once and stay inert on desktop (where the ids are absent). Use
+  `prevent_initial_call=True` for navigation callbacks whose initial state is baked
+  into the layout; use `prevent_initial_call=False` only for initial gates that must
+  be active immediately, such as the consent step disabling `startup-next`. Toggle only
+  the `mobile-step-{i}` wrappers — never the conditional sub-sections (`cgm-details`
+  etc.) that already own their own `display`, or the two callbacks fight.
 
 - **Server-side UA detection (`flask_request.headers`) must choose the layout, not the
   `user-agent` dcc.Store** — the store hydrates async from localStorage and is `None` or
@@ -221,6 +293,15 @@ These are the traps that cost the most time. The same list is mirrored in `CLAUD
     page's `scrollHeight` and take a normal viewport capture. Skip the height-grow for
     landscape and `/prediction` (growing height flips orientation to portrait, breaking
     landscape CSS and the overlay; their content is viewport-sized anyway).
+
+- **Mobile landscape chart controls should reclaim every non-drawing pixel.** Treat the
+  short edge as the budget: remove unneeded wording ("Glucose Levels", repeated
+  "Source:" labels, standalone "Ready to submit!" status text), move metadata into the
+  bottom control strip, and group related controls into compact clusters. Prefer a
+  single bottom row with source/time, units, Submit, and Finish rather than stacked
+  rows. Keep visual heights matched across chips/buttons, use subtle borders or bevels
+  to delimit non-button metadata, and make fonts as large as comfortably possible after
+  the row still fits on the narrow landscape harness.
 
 - **Number inputs: hide Dash's own `.dash-input-stepper` buttons on mobile, NOT the
   native webkit spinner.** Newer Dash `dcc.Input(type="number")` renders its own `−`/`+`

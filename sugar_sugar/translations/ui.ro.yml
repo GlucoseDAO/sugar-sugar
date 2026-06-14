@@ -47,6 +47,7 @@ ro:
     open_consent_form: "Deschide formularul de consimțământ"
     consent_required_error: "Te rugăm să confirmi că ai 18+ ani și ai citit formularul de consimțământ pentru a continua."
     next_hint: "Urmează: vei completa un formular scurt, apoi vei încărca date CGM (sau vei folosi setul exemplu)."
+    take_me_in: "Intră în joc"
 
   about:
     title: "Despre Sugar Sugar"
@@ -62,7 +63,7 @@ ro:
     body: "Dacă ai întrebări, feedback sau vrei să îți fie șterse datele, te rugăm să folosești contactele de mai jos."
     study_contacts_title: "Contacte pentru studiu"
     general_email_title: "Email general al echipei"
-    social_title: "Social media & comunitate"
+    social_title: "Social media"
     platforms_title: "Website & platforme"
     linkedin_title: "LinkedIn"
     col_name: "Nume"
@@ -75,6 +76,7 @@ ro:
   demo:
     title: "Demo"
     body: "Încearcă o demonstrație rapidă a jocului Sugar Sugar de predicție a glucozei. Aceasta este o rundă de exemplu folosind date generice."
+    fullscreen_video: "Vizualizează pe tot ecranul"
 
   consent_form:
     title: "Formular de consimțământ"

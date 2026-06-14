@@ -205,6 +205,28 @@ body .ui.large.menu {
   color: #0d47a1;
 }
 
+.demo-fullscreen-button.ui.button {
+  margin-top: 16px;
+}
+
+#demo-video-shell:fullscreen,
+#demo-video-shell:-webkit-full-screen,
+#demo-video-shell.demo-video-immersive {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  padding-bottom: 0 !important;
+  border-radius: 0 !important;
+  background: #000 !important;
+}
+
+#demo-video-shell:fullscreen iframe,
+#demo-video-shell:-webkit-full-screen iframe,
+#demo-video-shell.demo-video-immersive iframe {
+  width: 100% !important;
+  height: 100% !important;
+}
+
 /* Study design content styling */
 .study-design-content h1,
 .study-design-content h2,

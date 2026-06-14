@@ -4,6 +4,7 @@ from dash import no_update
 import dash
 from typing import Any, Optional
 # DEBUG_MODE will be imported dynamically to get the latest value
+from sugar_sugar.components.landing import consent_controls_children
 from sugar_sugar.i18n import t
 from sugar_sugar.config import STORAGE_TYPE
 
@@ -446,6 +447,8 @@ class StartupPage(html.Div):
              Input('diabetes-duration-input', 'value'),
              Input('location-input', 'value'),
              Input('user-info-store', 'data'),
+             Input('consent-receive-results', 'value'),
+             Input('consent-keep-updated', 'value'),
              Input('interface-language', 'data')]
         )
         def update_form_validation(
@@ -459,6 +462,8 @@ class StartupPage(html.Div):
             diabetes_duration: Optional[int | float], 
             location: Optional[str],
             user_info: Optional[dict[str, Any]],
+            consent_receive_results: Optional[list[str]],
+            consent_keep_updated: Optional[list[str]],
             interface_language: Optional[str],
         ) -> tuple[
             bool,
@@ -481,7 +486,9 @@ class StartupPage(html.Div):
             info: dict[str, Any] = dict(user_info or {})
             wants_contact = bool(
                 info.get('consent_receive_results_later') or
-                info.get('consent_keep_up_to_date')
+                info.get('consent_keep_up_to_date') or
+                (consent_receive_results and 'receive_results' in consent_receive_results) or
+                (consent_keep_updated and 'keep_updated' in consent_keep_updated)
             )
             
             # Check each required field and set asterisk visibility
@@ -649,13 +656,38 @@ class StartupPage(html.Div):
                 _wizard_progress_children(step, interface_language),
             )
 
+        # The consent gate must run on initial mobile render so the first Next
+        # button starts disabled until the required consent actions are complete.
+        @app.callback(
+            Output('startup-next', 'disabled'),
+            [Input('consent-scroll-complete', 'data'),
+             Input('consent-acknowledge', 'value'),
+             Input('consent-gdpr', 'value'),
+             Input('startup-step', 'data')],
+            prevent_initial_call=False,
+        )
+        def gate_mobile_consent_step(
+            scroll_complete: Optional[bool],
+            acknowledge_value: Optional[list[str]],
+            gdpr_value: Optional[list[str]],
+            current_step: Optional[int],
+        ) -> bool:
+            step = int(current_step or 0)
+            if step != 0:
+                return False
+            return not (
+                bool(scroll_complete) and
+                bool(acknowledge_value and 'ack' in acknowledge_value) and
+                bool(gdpr_value and 'gdpr' in gdpr_value)
+            )
+
 
 # ---------------------------------------------------------------------------
 # Mobile startup wizard (StartupPageMobile)
 # ---------------------------------------------------------------------------
 # Number of wizard steps.  Must match the number of `mobile-step-{i}` wrappers
 # the builder renders and the Outputs in `navigate_startup_wizard`.
-WIZARD_STEPS: int = 5
+WIZARD_STEPS: int = 6
 
 # Mobile field styling: big tap targets, 16px+ to avoid iOS zoom-on-focus.
 _M_LABEL = {'fontSize': '18px', 'fontWeight': '800', 'marginBottom': '8px', 'color': '#0f172a', 'display': 'inline-block'}
@@ -737,7 +769,28 @@ class StartupPageMobile(html.Div):
         self.component_id = 'startup-page'
         self._locale = locale
 
-        # --- Step 0: identity (pure required fields, no conditional cascade) ---
+        # --- Step 0: consent (mandatory gate before form fields) ---
+        step_consent = [
+            html.H2(
+                t("ui.landing.patient_consent_form_title", locale=locale),
+                style={'fontSize': '22px', 'fontWeight': '800', 'color': '#2c5282', 'marginBottom': '12px'},
+                disable_n_clicks=True,
+            ),
+            html.Div(
+                consent_controls_children(locale),
+                id='consent-notice-scroll',
+                disable_n_clicks=True,
+            ),
+            html.Div(
+                t("ui.landing.next_hint", locale=locale),
+                style={'color': '#64748b', 'marginTop': '10px', 'fontSize': '13px'},
+                disable_n_clicks=True,
+            ),
+            dcc.Store(id='consent-scroll-complete', data=False, storage_type=STORAGE_TYPE),
+            dcc.Interval(id='consent-scroll-poll', interval=500, n_intervals=0),
+        ]
+
+        # --- Step 1: identity (pure required fields, no conditional cascade) ---
         step0 = [
             _m_label(t("ui.startup.email_label", locale=locale), 'email-required'),
             dcc.Input(
@@ -772,7 +825,7 @@ class StartupPageMobile(html.Div):
             ),
         ]
 
-        # --- Step 1: CGM (cgm-dropdown -> cgm-details/duration) ---
+        # --- Step 2: CGM (cgm-dropdown -> cgm-details/duration) ---
         step1 = [
             _m_label(t("ui.startup.cgm_label", locale=locale)),
             dcc.Dropdown(
@@ -795,7 +848,7 @@ class StartupPageMobile(html.Div):
             ]),
         ]
 
-        # --- Step 2: diabetes (diabetic-dropdown -> type + duration) ---
+        # --- Step 3: diabetes (diabetic-dropdown -> type + duration) ---
         step2 = [
             _m_label(t("ui.startup.diabetic_label", locale=locale), 'diabetic-required'),
             dcc.Dropdown(
@@ -832,7 +885,7 @@ class StartupPageMobile(html.Div):
             ]),
         ]
 
-        # --- Step 3: format & data-usage consent ---
+        # --- Step 4: format & data-usage consent ---
         step3 = [
             _m_label(t("ui.startup.format_label", locale=locale), 'format-required'),
             dcc.Dropdown(
@@ -868,7 +921,7 @@ class StartupPageMobile(html.Div):
             ),
         ]
 
-        # --- Step 4: contact prefs + submit (start-button driven by validation) ---
+        # --- Step 5: contact prefs + submit (start-button driven by validation) ---
         step4 = [
             html.Div(
                 [
@@ -902,7 +955,7 @@ class StartupPageMobile(html.Div):
             ),
         ]
 
-        steps = [step0, step1, step2, step3, step4]
+        steps = [step_consent, step0, step1, step2, step3, step4]
         step_divs = [
             html.Div(
                 children=content,
@@ -925,6 +978,7 @@ class StartupPageMobile(html.Div):
                     t("ui.startup.wizard_next", locale=locale),
                     id='startup-next',
                     className="ui blue button",
+                    disabled=True,
                     style=_wizard_nav_btn_style(visible=True),
                 ),
             ],
