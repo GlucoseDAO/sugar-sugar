@@ -1718,6 +1718,10 @@ def update_on_language_change(
         return no_update, no_update, navbar
 
     warning_content = render_mobile_warning(user_agent, locale=locale)
+    if _is_staging_mode and pathname and pathname.startswith('/staging'):
+        staging_layout = _staging_display(pathname, locale=locale, glucose_unit=glucose_unit)
+        if staging_layout is not None:
+            return staging_layout, warning_content, navbar
     if pathname == '/final':
         if user_info:
             return create_final_layout(full_df_data, user_info, glucose_unit, locale=locale), warning_content, navbar

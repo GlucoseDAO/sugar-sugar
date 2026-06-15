@@ -213,6 +213,27 @@ Serve it behind a TLS reverse proxy such as Caddy or nginx. The app respects
 `X-Forwarded-Host` and `X-Forwarded-Proto` when `DEPLOY_URL` is not set, but
 `DEPLOY_URL` is the preferred production source of truth.
 
+#### Staging mode (`--staging`)
+
+The staging deployment at `https://vanilla-sugar.glucosedao.org/` hosts the dev
+branch. Run it like production but with the prod+ test routes enabled:
+
+```bash
+uv run serve-staging                 # = uv run serve --staging
+uv run serve --staging --workers 2   # equivalent, explicit
+```
+
+`--staging` sets `_STAGING_MODE=1`, which adds gated test routes under
+`/staging/*` (`/staging` index, `/staging/ending`, `/staging/final`,
+`/staging/share`, `/staging/prediction`) that jump straight to prefilled
+states for remote/visual testing **without a playthrough**. They reuse the real
+page builders with synthetic data and do **not** alter production logic — with
+the flag off the app is byte-identical to plain `uv run serve`. Set
+`DEPLOY_URL=https://vanilla-sugar.glucosedao.org` on the staging host. See
+`docs/share-ops.md` → "Staging Mode" for details. **Note:** `/staging/*` is
+currently unauthenticated — gate it (basic-auth / IP allowlist) if the origin is
+publicly reachable.
+
 ### Quick chart debugging
 
 Skip landing/startup/consent and jump straight to the prediction chart:

@@ -461,6 +461,31 @@ def _spawn_server(group: ServerGroup, *, port: int, log_path: Path) -> subproces
     )
 
 
+def _port_is_free(port: int) -> bool:
+    """True when nothing accepts a TCP connection on the port (i.e. it is free)."""
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.5)
+        return s.connect_ex(("127.0.0.1", port)) != 0
+
+
+def _wait_for_port_free(port: int, timeout_s: float = 20.0) -> None:
+    """Block until the port is free (or timeout).
+
+    `uv run start` auto-increments the bind port when the requested one is busy,
+    so if the previous group's server is not fully dead the next server quietly
+    relocates to port+1 while the harness keeps polling the original port and
+    reports "server did not come up". Waiting for the port to free up before the
+    next spawn keeps every server on its requested port (this is the root cause of
+    the flaky babylon failures on sequential same-port spawns).
+    """
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        if _port_is_free(port):
+            return
+        time.sleep(0.25)
+
+
 def _kill_server(proc: subprocess.Popen, *, port: int) -> None:
     """Terminate the server and any stragglers on its port."""
     try:
@@ -482,6 +507,8 @@ def _kill_server(proc: subprocess.Popen, *, port: int) -> None:
             stderr=subprocess.DEVNULL,
             check=False,
         )
+    # Wait for the socket to be released so the next spawn binds this exact port.
+    _wait_for_port_free(port)
 
 
 def main(
