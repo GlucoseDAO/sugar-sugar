@@ -438,6 +438,18 @@ These are the traps that cost the most time. The same list is mirrored in `CLAUD
   first cell as a heading, and apply a narrower font with `overflow-wrap:anywhere;
   word-break:normal` to links so they wrap cleanly at full width.
 
+- **Mobile buttons/links need `touch-action: manipulation` or taps get swallowed.**
+  The viewport allows zoom (`user-scalable=yes, maximum-scale=5`), so mobile browsers
+  wait ~300 ms after each tap for a possible double-tap-zoom and treat rapid taps as
+  zoom gestures — which **drops clicks**, so a button or link only fires after several
+  taps (reported on Vivaldi Android: the wizard Next "worked on the 4th click", the
+  landing link "fired on the third tap"). It is NOT a Dash/callback bug and does NOT
+  reproduce in the headless harness (synthetic `.click()`/touch events bypass the
+  gesture wait). Fix: `touch-action: manipulation` on `a`/`button`/`.ui.button`/
+  `[role=button]`/`label`/`input`/`.form-check` (scoped to
+  `html.mobile-device:not(.route-prediction)`; the chart manages its own
+  `touch-action` for drawline). Pinch-zoom is preserved.
+
 - **Don't CSS-rotate the chart** (`transform: rotate(90deg)`) — it desyncs Plotly's
   drawline touch coordinates. The immersive landscape is achieved by hiding chrome and
   letting the native chart fill the viewport, not by rotation. **Don't use

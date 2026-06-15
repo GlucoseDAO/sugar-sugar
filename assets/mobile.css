@@ -31,6 +31,24 @@ html.mobile-device:not(.route-prediction) body {
   max-width: 100vw;
 }
 
+/* Tap reliability: the viewport allows zoom (user-scalable=yes), so mobile
+   browsers wait ~300 ms after each tap for a possible double-tap-zoom and treat
+   rapid taps as zoom gestures -- which SWALLOWS clicks, so a button/link only
+   fires after several taps (reported: "Next worked on the 4th click", and the
+   landing link "fired on the third tap"). `touch-action: manipulation` tells the
+   browser there is no double-tap-zoom on these elements, so every tap fires its
+   click immediately. Pinch-to-zoom is preserved. NOT applied to the /prediction
+   chart, which manages its own touch-action for drawline. */
+html.mobile-device:not(.route-prediction) a,
+html.mobile-device:not(.route-prediction) button,
+html.mobile-device:not(.route-prediction) .ui.button,
+html.mobile-device:not(.route-prediction) [role="button"],
+html.mobile-device:not(.route-prediction) label,
+html.mobile-device:not(.route-prediction) input,
+html.mobile-device:not(.route-prediction) .form-check {
+  touch-action: manipulation;
+}
+
 html.mobile-device:not(.route-prediction) img,
 html.mobile-device:not(.route-prediction) iframe,
 html.mobile-device:not(.route-prediction) table,
