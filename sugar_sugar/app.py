@@ -356,6 +356,12 @@ example_initial_slider_value = _init_start
 _is_share_mode = os.environ.get("_SHARE_MODE") == "1"
 _share_mode_id: Optional[str] = None
 
+# Staging mode (prod+): when _STAGING_MODE=1, extra `/staging/*` test routes are
+# exposed that jump straight to prefilled prediction / ending / final / share
+# states for remote testing, without a full playthrough. The flag defaults off,
+# so production is byte-identical. Set by `serve --staging` / `uv run serve-staging`.
+_is_staging_mode = os.environ.get("_STAGING_MODE") == "1"
+
 if _is_share_mode:
     import random as _share_rnd
     _share_rounds_n = int(os.environ.get("_SHARE_ROUNDS", str(SHARE_ROUNDS)))
@@ -906,6 +912,252 @@ def _share_card_og(share_id: str) -> Any:
     from flask import redirect
     return redirect(_build_share_url(share_id), code=302)
 
+
+# ---------------------------------------------------------------------------
+# Staging mode (prod+): synthetic prefilled nodes for remote testing.
+#
+# Every helper and route below is invoked ONLY when `_is_staging_mode` is True
+# (set by `serve --staging` / `uv run serve-staging`). They are defined at
+# module scope but never run at import time, so when the flag is off the app
+# behaves identically to production. They reuse the real layout builders
+# (create_ending_layout / create_final_layout / create_share_layout) and
+# share_store; only the synthetic *input* data is generated here. This is
+# deliberately additive: no production callback or builder is modified.
+# ---------------------------------------------------------------------------
+_STAGING_NODES: list[tuple[str, str]] = [
+    ("/staging/prediction", "Prefilled prediction chart (rotate to landscape on mobile)"),
+    ("/staging/ending", "Round-ending page with synthetic predictions + metrics"),
+    ("/staging/final", "Final results page with several synthetic rounds"),
+    ("/staging/share", "Generate a synthetic share record and open /share/<id>"),
+]
+
+
+def _staging_prefill_window(full_df: pl.DataFrame, *, noise: float = 0.05) -> tuple[pl.DataFrame, pl.DataFrame, int]:
+    """Pick a random window and fill its hidden region with noisy ground truth.
+
+    Returns ``(full_df_with_predictions, window_df, window_start)``. Mirrors the
+    ``--prefill`` logic used by chart mode at module import (lines ~327-344).
+    """
+    import random as _rnd
+    window_df, start = get_random_data_window(full_df, _chart_points)
+    window_df = window_df.with_columns(pl.lit(0.0).alias("prediction"))
+    n = len(window_df)
+    visible = n - PREDICTION_HOUR_OFFSET
+    gl = window_df.get_column("gl").to_list()
+    preds: list[float] = [0.0] * n
+    for i in range(visible, n):
+        if gl[i] is not None:
+            preds[i] = round(gl[i] * (1.0 + _rnd.uniform(-noise, noise)), 1)
+    window_df = window_df.with_columns(pl.Series("prediction", preds, dtype=pl.Float64))
+    for i in range(n):
+        pv = window_df.get_column("prediction")[i]
+        if pv != 0.0:
+            tv = window_df.get_column("time")[i]
+            full_df = full_df.with_columns(
+                pl.when(pl.col("time") == tv).then(pv).otherwise(pl.col("prediction")).alias("prediction")
+            )
+    return full_df, window_df, start
+
+
+def _staging_ptd_from_window(window_df: pl.DataFrame) -> list[dict[str, str]]:
+    """Build the 4-row ``prediction_table_data`` from a prefilled window.
+
+    Mirrors the table construction in the share-mode block (lines ~398-416).
+    """
+    n = len(window_df)
+    gl = window_df.get_column("gl").to_list()
+    preds = window_df.get_column("prediction").to_list()
+    actual_row: dict[str, str] = {"metric": "Actual Glucose"}
+    pred_row: dict[str, str] = {"metric": "Predicted"}
+    abs_row: dict[str, str] = {"metric": "Absolute Error"}
+    rel_row: dict[str, str] = {"metric": "Relative Error (%)"}
+    for ti in range(n):
+        a = gl[ti]
+        p = preds[ti]
+        actual_row[f"t{ti}"] = "-" if a is None else f"{float(a):.1f}"
+        if not p or a is None:
+            pred_row[f"t{ti}"] = abs_row[f"t{ti}"] = rel_row[f"t{ti}"] = "-"
+        else:
+            pred_row[f"t{ti}"] = f"{p:.1f}"
+            err = abs(float(a) - p)
+            abs_row[f"t{ti}"] = f"{err:.1f}"
+            rel_row[f"t{ti}"] = f"{(err / float(a) * 100):.1f}%" if a != 0 else "-"
+    return [actual_row, pred_row, abs_row, rel_row]
+
+
+def _staging_base_user_info() -> dict[str, Any]:
+    """A synthetic, already-consented user_info for staging nodes."""
+    return {
+        "study_id": str(uuid.uuid4()),
+        "run_id": str(uuid.uuid4()),
+        "email": "staging@vanilla-sugar.local",
+        "age": 30, "gender": "F", "uses_cgm": True, "cgm_duration_years": 2,
+        "format": "A", "run_format": "A",
+        "diabetic": True, "diabetic_type": "Type 1", "diabetes_duration": 6,
+        "location": "Staging",
+        "max_rounds": MAX_ROUNDS, "current_round_number": 1, "statistics_saved": False,
+        "is_example_data": True, "data_source_name": "example.csv",
+        "consent_completed": True, "consent_no_selection": False,
+        "consent_play_only": False, "consent_participate_in_study": True,
+        "consent_receive_results_later": False, "consent_keep_up_to_date": False,
+        "consent_timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+
+def _staging_ending_args() -> tuple[dict, dict, dict, dict[str, Any]]:
+    """Build (full_df_store, window_store, events_store, user_info) for /staging/ending."""
+    full_df, events_df = load_glucose_data()
+    full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
+    full_df, window_df, start = _staging_prefill_window(full_df)
+    info = _staging_base_user_info()
+    info.update({
+        "prediction_window_start": start,
+        "prediction_window_size": len(window_df),
+        "prediction_table_data": _staging_ptd_from_window(window_df),
+    })
+    return (
+        dataframe_to_store_dict(full_df),
+        dataframe_to_store_dict(window_df),
+        events_dataframe_to_store_dict(events_df),
+        info,
+    )
+
+
+def _staging_final_user_info(*, rounds_n: int = 3, formats: Optional[list[str]] = None) -> tuple[dict, dict[str, Any]]:
+    """Build (full_df_store, user_info-with-rounds) for /staging/final."""
+    fmts = formats or ["A", "B", "C"]
+    full_df, _events = load_glucose_data()
+    full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
+    rounds: list[dict[str, Any]] = []
+    for ri in range(rounds_n):
+        fmt = fmts[ri % len(fmts)]
+        _f, window_df, start = _staging_prefill_window(full_df.clone())
+        rounds.append({
+            "round_number": ri + 1,
+            "prediction_window_start": start,
+            "prediction_window_size": len(window_df),
+            "prediction_table_data": _staging_ptd_from_window(window_df),
+            "format": fmt,
+            "is_example_data": True,
+            "data_source_name": "example.csv",
+        })
+    info = _staging_base_user_info()
+    info.update({
+        "rounds": rounds,
+        "current_round_number": rounds_n,
+        "format": rounds[-1]["format"] if rounds else "A",
+    })
+    return dataframe_to_store_dict(full_df), info
+
+
+def _staging_build_share_record(*, rounds_n: int = 6, formats: Optional[list[str]] = None, locale: str = "en") -> str:
+    """Generate a synthetic share record on disk and return its share id."""
+    fmts = formats or ["A", "B", "C"]
+    full_df, _events = load_glucose_data()
+    full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
+    rounds: list[dict[str, Any]] = []
+    for ri in range(rounds_n):
+        fmt = fmts[ri % len(fmts)]
+        _f, window_df, start = _staging_prefill_window(full_df.clone())
+        rounds.append({
+            "round_number": ri + 1,
+            "prediction_window_start": start,
+            "prediction_window_size": len(window_df),
+            "prediction_table_data": _staging_ptd_from_window(window_df),
+            "format": fmt,
+            "is_example_data": True,
+            "data_source_name": "example.csv",
+        })
+    played_formats = sorted({r["format"] for r in rounds}, key=lambda x: FORMAT_ORDER.get(str(x), 999))
+    record: dict[str, Any] = {
+        "schema_version": 2,
+        "created_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "locale": normalize_locale(locale),
+        "rounds": rounds,
+        "played_formats": played_formats,
+        "rankings": {"per_format": [], "overall": None},
+        "user_info": {
+            "name": "Staging Tester",
+            "study_id": str(uuid.uuid4()),
+            "format": played_formats[0] if played_formats else "A",
+            "uses_cgm": True,
+            "max_rounds": MAX_ROUNDS,
+        },
+    }
+    return share_store.save_share(record)
+
+
+def _staging_index_layout(*, locale: str) -> html.Div:
+    """A simple index of the available staging test nodes."""
+    return html.Div(
+        [
+            html.H1("Staging test nodes", disable_n_clicks=True),
+            html.P(
+                "Prod+ test routes (active only when _STAGING_MODE=1). Each node "
+                "jumps straight to a prefilled state for remote/visual testing.",
+                disable_n_clicks=True,
+            ),
+            html.Ul(
+                [
+                    html.Li(
+                        [dcc.Link(path, href=path), html.Span(f" — {desc}")],
+                        disable_n_clicks=True,
+                    )
+                    for path, desc in _STAGING_NODES
+                ],
+                disable_n_clicks=True,
+            ),
+        ],
+        className="info-page",
+        disable_n_clicks=True,
+    )
+
+
+def _staging_display(pathname: str, *, locale: str, glucose_unit: Optional[str]) -> Optional[html.Div]:
+    """Render a staging node layout, or None to fall through (e.g. /staging/prediction)."""
+    if pathname in ("/staging", "/staging/"):
+        return _staging_index_layout(locale=locale)
+    if pathname == "/staging/ending":
+        full_store, window_store, events_store, info = _staging_ending_args()
+        return create_ending_layout(full_store, window_store, events_store, info, glucose_unit, locale=locale)
+    if pathname == "/staging/final":
+        full_store, info = _staging_final_user_info()
+        return create_final_layout(full_store, info, glucose_unit, locale=locale)
+    # /staging/prediction is handled by the _staging_seed_prediction callback,
+    # which seeds the stores and redirects to /prediction. Fall through here.
+    return None
+
+
+if _is_staging_mode:
+    @server.route("/staging/share")
+    def _staging_share_route() -> Any:
+        """Generate a synthetic share record and 302-redirect to /share/<id>."""
+        from flask import redirect, request as flask_req
+        locale = flask_req.args.get("lang") or "en"
+        formats_arg = flask_req.args.get("formats")
+        formats = [f.strip().upper() for f in formats_arg.split(",")] if formats_arg else None
+        share_id = _staging_build_share_record(locale=locale, formats=formats)
+        return redirect(f"/share/{share_id}", code=302)
+
+    @app.callback(
+        [Output('url', 'pathname', allow_duplicate=True),
+         Output('user-info-store', 'data', allow_duplicate=True),
+         Output('full-df', 'data', allow_duplicate=True),
+         Output('current-window-df', 'data', allow_duplicate=True),
+         Output('events-df', 'data', allow_duplicate=True),
+         Output('randomization-initialized', 'data', allow_duplicate=True),
+         Output('is-example-data', 'data', allow_duplicate=True),
+         Output('data-source-name', 'data', allow_duplicate=True)],
+        Input('url', 'pathname'),
+        prevent_initial_call=True,
+    )
+    def _staging_seed_prediction(pathname: Optional[str]) -> tuple[Any, ...]:
+        """Seed the prediction stores with a prefilled window, then route to /prediction."""
+        if pathname != '/staging/prediction':
+            raise PreventUpdate
+        full_store, window_store, events_store, info = _staging_ending_args()
+        return ('/prediction', info, full_store, window_store, events_store, True, True, "example.csv")
+
 app.clientside_callback(
     "function() { return window.navigator.userAgent || ''; }",
     Output('user-agent', 'data'),
@@ -1004,6 +1256,9 @@ if _is_chart_mode:
         "consent_keep_up_to_date": False,
         "consent_no_selection": False,
         "consent_timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        # Synthetic dev session is treated as already-consented so the
+        # display_page consent guard lets chart mode render /prediction.
+        "consent_completed": True,
     }
 else:
     _chart_user_info = None
@@ -1696,12 +1951,31 @@ def display_page(
     
     with start_action(action_type=u"display_page", pathname=pathname, locale=locale):
         warning_content = render_mobile_warning(user_agent, locale=locale)
+        if _is_staging_mode and pathname and pathname.startswith('/staging'):
+            staging_layout = _staging_display(pathname, locale=locale, glucose_unit=glucose_unit)
+            if staging_layout is not None:
+                return staging_layout, warning_content, navbar
         if pathname == "/consent-form":
             return ConsentFormPage(locale=locale), warning_content, navbar
+        # Consent guard: mandatory consent (acknowledge + GDPR) must have been
+        # recorded before the game flow is reachable. `consent_completed` is set
+        # by handle_landing_continue (desktop) and the mobile wizard's Start
+        # handler. Without it, a direct-URL / burger-menu visit could otherwise
+        # bypass the consent gate (desktop /startup omits the consent fields, so
+        # handle_start_button would skip its own check).
+        consent_done = bool(user_info and user_info.get('consent_completed'))
         if pathname == '/prediction' and user_info:
+            if not consent_done:
+                # No consent on record -> send the user to the consent entry.
+                return (_landing_builder(locale=locale), warning_content, navbar)
             format_value = str(user_info.get("format") or "A")
             return create_prediction_layout(locale=locale, format_value=format_value, user_info=user_info), warning_content, navbar
         if pathname == '/startup':
+            # On mobile, /startup IS the consent entry (wizard step 0), so it
+            # must stay reachable without a prior consent record. On desktop,
+            # consent lives on the landing page, so require it first.
+            if not _is_mobile_request() and not consent_done:
+                return (_landing_builder(locale=locale), warning_content, navbar)
             return (_startup_builder(locale=locale), warning_content, navbar)
         if pathname == '/ending':
             # Check if we have the required data for ending page
@@ -3738,6 +4012,10 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
                 "consent_keep_up_to_date": keep_updated,
                 "consent_no_selection": no_selection,
                 "consent_timestamp": consent_timestamp,
+                # Mobile wizard step 0 is the consent gate; reaching here with
+                # acknowledged+gdpr means consent is complete. Mirror the desktop
+                # landing flag so display_page's guard treats both paths alike.
+                "consent_completed": True,
             })
 
         # Ensure stable "number" across consent + stats + ranking CSVs.
@@ -6124,8 +6402,12 @@ def serve(
     port: Optional[int] = typer.Option(None, "--port", help="Port gunicorn should bind"),
     workers: Optional[int] = typer.Option(None, "--workers", "-w", help="Gunicorn worker count"),
     timeout: Optional[int] = typer.Option(None, "--timeout", help="Gunicorn worker timeout in seconds"),
+    staging: bool = typer.Option(False, "--staging", help="Enable prod+ staging test routes under /staging/*"),
 ) -> None:
     """Run the Dash app with gunicorn for production/staging deployments."""
+    if staging:
+        # Set before exec so every gunicorn worker re-reads it at import.
+        os.environ["_STAGING_MODE"] = "1"
     _ensure_chrome()
     bind_host: str = DASH_HOST if host is None else (host or DASH_HOST)
     bind_port: int = DASH_PORT if port is None else port
@@ -6185,6 +6467,19 @@ def share_main() -> None:
 
 def serve_main() -> None:
     """CLI entry point that defaults to the ``serve`` command."""
+    typer.run(serve)
+
+
+def serve_staging_main() -> None:
+    """CLI entry point: ``serve`` with the staging test routes enabled.
+
+    Equivalent to ``uv run serve --staging`` but available as its own command so
+    the staging deployment (https://vanilla-sugar.glucosedao.org/) can run the
+    dev branch with prod+ test nodes without remembering the flag.
+    """
+    os.environ["_STAGING_MODE"] = "1"
+    if "--staging" not in sys.argv:
+        sys.argv.append("--staging")
     typer.run(serve)
 
 

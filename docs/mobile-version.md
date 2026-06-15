@@ -8,6 +8,71 @@ If you only read one section, read **[Pitfalls & lessons learned](#pitfalls--les
 
 ---
 
+## 0. Present-state snapshot (flowpath reference)
+
+A verified baseline of how the mobile/desktop flow is wired as of June 2026, so
+future changes have a reference point. All line numbers are approximate.
+
+### Route map (`display_page`, `sugar_sugar/app.py`)
+
+| Pathname | Builder / handler | Device split | Guard |
+|---|---|---|---|
+| `/` (default) | `_landing_builder` → `LandingPage` (desktop) / `LandingPageMobile` | server UA | — |
+| `/consent-form` | `ConsentFormPage` | CSS only | — |
+| `/startup` | `_startup_builder` → `StartupPage` / `StartupPageMobile` (6-step wizard) | server UA | **desktop:** requires `consent_completed`, else landing |
+| `/prediction` | `create_prediction_layout` | CSS (immersive landscape) | requires `user_info` **and** `consent_completed`, else landing |
+| `/ending` | `create_ending_layout` | CSS | needs `full_df` + `prediction_table_data`, else session-expired |
+| `/final` | `create_final_layout` | CSS | needs `user_info`, else session-expired |
+| `/share/<id>` | `create_share_layout` (from disk record) | CSS (`.share-page`) | record must exist, else `create_expired_layout` |
+| `/about` `/faq` `/contact` `/demo` | info-page builders | CSS | — |
+| `/staging`, `/staging/{ending,final,share,prediction}` | `_staging_display` / staging routes | CSS | **only when `_STAGING_MODE=1`** (else fall through) |
+
+Builder selection is **server-side** (`_is_mobile_request()` reads the live Flask
+request User-Agent). Only **one** builder (mobile *or* desktop) is ever in the DOM
+per request — so the two consent component trees (landing vs wizard step 0) never
+coexist; the "duplicate consent ids" worry is moot.
+
+### Consent enforcement points
+
+1. **Desktop landing `/`** — `update_continue_button` gates the Continue button on
+   scroll+ack+gdpr; `handle_landing_continue` (`landing.py:295-416`) writes consent +
+   `consent_completed=True` and redirects to `/startup`.
+2. **Mobile wizard step 0** — `gate_mobile_consent_step` (`startup.py:661-682`)
+   disables `startup-next` while on step 0 until scroll+ack+gdpr. You cannot advance
+   past step 0 without consent, and returning to step 0 re-applies the gate.
+3. **The real gate — `handle_start_button`** (`app.py:3656-3779`) — on mobile
+   (`has_mobile_consent` True, because the wizard renders the consent fields) it
+   re-checks ack+gdpr and writes `consent_completed=True`. On desktop the consent
+   fields are absent (`has_mobile_consent` False) so it trusts the landing-page gate.
+4. **`display_page` consent guard** (`app.py`) — closes the residual desktop hole:
+   `/prediction` (both devices) and desktop `/startup` require `consent_completed` in
+   `user_info`; without it they render the landing/consent page. This stops a
+   direct-URL / burger-menu visit from reaching the game unconsented.
+
+Chart mode's synthetic user and every staging node set `consent_completed=True` so the
+guard lets them through.
+
+### Cross-device matrix
+
+| Scenario | Works? | Why |
+|---|---|---|
+| Share on desktop → open link on mobile (and vice-versa) | **Yes** | `/share/<id>` renders from `data/shares/<id>.json` on disk; responsive CSS; crawler OG via `/share/<id>/og`; the 1200×630 card is device-independent |
+| Resume a game session: mobile → desktop (or vice-versa) | **No** | All session state is `STORAGE_TYPE=local` (localStorage), which is **per-browser/per-device**. Nothing server-side keys the session for cross-device pickup. The on-disk share record is the *only* thing that crosses devices, and it is read-only. A designed fix (server-side resume code) is in the sprint backlog, not yet built. |
+| Same-device, close tab, reopen later | Yes | localStorage persists; `restore_page_on_load` shows the resume dialog |
+
+### Screenshot coverage matrix (`scripts/mobile_shots.py`)
+
+| Group | Server | Pages |
+|---|---|---|
+| `entry` | `uv run start` | `/`, `/consent-form` (top+bottom), `/startup` step 1–6, `/about`, `/faq`, `/contact`, `/demo` |
+| `result` | `uv run start` + `_STAGING_MODE=1` | `/staging/ending`, `/staging/final`, `/staging/share` (→ `/share/<id>`) |
+| `chart` | `uv run chart --prefill` | `/prediction` portrait + landscape |
+
+Together these cover every onboarding, gameplay, result, and share surface in at least
+one form.
+
+---
+
 ## 1. Why this exists (the problem)
 
 The app was originally desktop-only: it forced a fixed `width=1280` layout viewport
@@ -117,11 +182,18 @@ dependency of Plotly's kaleido), sets a mobile Safari User-Agent so server-side 
 builders are selected, enables touch emulation so coarse-pointer CSS applies, and then
 uses carefully chosen device-metrics overrides per page.
 
-The harness is intentionally split into two server groups:
+The harness is intentionally split into three server groups:
 
 - **`entry`** starts `uv run start --port <port>` and captures display/onboarding pages:
   landing (`/`), consent form top and bottom (`/consent-form`), all six startup wizard
   states (`/startup` plus repeated `startup-next` clicks), about, FAQ, contact, and demo.
+- **`result`** starts `uv run start --port <port>` with `_STAGING_MODE=1` and captures
+  the result/share surfaces via the prod+ staging nodes: `/staging/ending`,
+  `/staging/final`, and `/staging/share` (which 302-redirects to a freshly generated
+  `/share/<id>` whose synthetic record cycles formats A/B/C, exercising the multi-panel
+  synthesis graph). This is the deterministic way to screenshot `/ending`, `/final`, and
+  `/share` without a full playthrough — the project forbids LLM click-through, so the
+  staging nodes replace it. (Without `_STAGING_MODE` these routes don't exist.)
 - **`chart`** starts `uv run chart --prefill --no-debug --no-reloader --locale <locale>
   --port <port>` and captures `/prediction` in portrait and landscape. `--prefill`
   avoids browser automation for drawing predictions, and `--no-reloader` avoids the
@@ -188,9 +260,10 @@ erase evidence from the rest of the run. See the harness notes in
 
 ## 5. Testing
 
-- `uv run python scripts/mobile_shots.py` — screenshots all pages (entry group + chart
-  group) at 360px. `uv run python scripts/mobile_shots.py --only chart --port <free>`
-  for just the prediction page (portrait overlay + landscape immersive). Run the two
+- `uv run python scripts/mobile_shots.py` — screenshots all pages (entry + result +
+  chart groups) at 360px. `uv run python scripts/mobile_shots.py --only chart --port
+  <free>` for just the prediction page (portrait overlay + landscape immersive);
+  `--only result` for the ending/final/share pages (via the staging nodes). Run the
   groups on different ports if the OS is slow to release the socket.
 - `uv run python scripts/mobile_shots.py --language-set babylon` — screenshots the same
   page set in every supported language under `data/output/mobile_shots/<locale>/`. Use
@@ -339,3 +412,29 @@ These are the traps that cost the most time. The same list is mirrored in `CLAUD
   drawline touch coordinates. The immersive landscape is achieved by hiding chrome and
   letting the native chart fill the viewport, not by rotation. **Don't use
   `screen.orientation.lock()`** — it needs fullscreen and is unsupported on iOS Safari.
+
+- **Consent enforcement is asymmetric between desktop and mobile, and the Start
+  handler can't see it.** `handle_start_button` only re-checks consent when the consent
+  *fields* are present (`has_mobile_consent`), which is true on mobile (wizard step 0
+  renders them) but false on desktop (consent lives on the landing page). So a
+  direct-URL / burger visit to desktop `/startup` — bypassing the landing gate — would
+  reach `/prediction` unconsented. The fix is the `display_page` guard on the
+  `consent_completed` flag (`/prediction` both devices; `/startup` desktop only — mobile
+  `/startup` IS the consent entry and must stay reachable). **If you add a new synthetic
+  user path (chart mode, a staging node, a test), set `consent_completed=True` or the
+  guard will bounce it to landing.**
+
+- **localStorage is device-local — there is no cross-device resume.** A session started
+  on a phone cannot be continued on a desktop (and vice-versa): every session store is
+  `STORAGE_TYPE=local`. The only thing that crosses devices is the read-only on-disk
+  share record. Don't file "my game didn't follow me to my laptop" as a bug; it's the
+  architecture. A server-side resume code is the designed solution (backlog).
+
+- **Screenshot `/ending`, `/final`, `/share` via the staging nodes, not click-through.**
+  The harness `result` group runs `uv run start` with `_STAGING_MODE=1` and hits
+  `/staging/ending`, `/staging/final`, `/staging/share`. These render the *real*
+  builders with synthetic data, so they're deterministic and need no drawing/submit
+  automation. The synthetic rounds intentionally don't fill the per-round metrics table
+  on `/final` (or "Prediction Results" on `/ending`) — those boxes look empty in the
+  shots; that's a data quirk, not a layout bug. The aggregate metrics, charts, share
+  panels, and buttons all render and are what these shots verify.

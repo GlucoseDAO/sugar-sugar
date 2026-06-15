@@ -394,6 +394,11 @@ class LandingPage(html.Div):
             info["consent_keep_up_to_date"] = keep_updated
             info["consent_no_selection"] = no_selection
             info["consent_timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            # Explicit, unambiguous marker that mandatory consent (acknowledge +
+            # GDPR) was completed. `display_page` guards /startup (desktop) and
+            # /prediction on this flag so direct-URL/burger visits can't bypass
+            # the consent gate. See also handle_start_button (mobile wizard).
+            info["consent_completed"] = True
 
             if info.get("number") is None:
                 info["number"] = get_next_study_number()

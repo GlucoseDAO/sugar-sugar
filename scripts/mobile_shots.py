@@ -18,6 +18,7 @@ Usage::
     uv run python scripts/mobile_shots.py                     # all pages, default device
     uv run python scripts/mobile_shots.py --device iphone-se  # a specific device preset
     uv run python scripts/mobile_shots.py --only chart        # just the prediction group
+    uv run python scripts/mobile_shots.py --only result       # ending/final/share (staging)
     uv run python scripts/mobile_shots.py --language-set babylon  # all locales, nested by language
     uv run python scripts/mobile_shots.py --base-url http://127.0.0.1:8050  # running server
 
@@ -156,6 +157,25 @@ def _server_groups(port: int, *, locale: str) -> list[ServerGroup]:
                 Shot("faq", "/faq"),
                 Shot("contact", "/contact"),
                 Shot("demo", "/demo"),
+            ],
+        ),
+        ServerGroup(
+            name="result",
+            # Staging mode (prod+) exposes prefilled /staging/ending, /staging/final
+            # and a /staging/share redirect, so the result/share pages are
+            # screenshot-able without a full playthrough (the project forbids LLM
+            # click-through; staging nodes replace it). `_STAGING_MODE=1` activates
+            # the /staging/* routes; everything else is the normal `uv run start`
+            # server. These are display-only pages -> device-width, grow-height.
+            cmd=base + ["start", "--port", str(port)],
+            env={"_STAGING_MODE": "1"},
+            shots=[
+                Shot("ending", "/staging/ending", settle_s=3.0),
+                Shot("final", "/staging/final", settle_s=3.0),
+                # /staging/share 302-redirects to a freshly generated /share/<id>;
+                # the synthetic record cycles formats A/B/C so the multi-panel
+                # synthesis graph is exercised.
+                Shot("share", "/staging/share", settle_s=3.0),
             ],
         ),
         ServerGroup(
@@ -467,7 +487,7 @@ def _kill_server(proc: subprocess.Popen, *, port: int) -> None:
 def main(
     device: str = typer.Option("android-narrow", "--device", "-d", help=f"Viewport preset: {', '.join(DEVICES)}"),
     out: Path = typer.Option(Path("data/output/mobile_shots"), "--out", "-o", help="Output directory for PNGs"),
-    only: Optional[str] = typer.Option(None, "--only", help="Only this server group: entry | chart"),
+    only: Optional[str] = typer.Option(None, "--only", help="Only this server group: entry | result | chart"),
     base_url: Optional[str] = typer.Option(None, "--base-url", help="Use an already-running server instead of spawning one"),
     port: int = typer.Option(8099, "--port", "-p", help="Port to spawn servers on"),
     language_set: str = typer.Option(

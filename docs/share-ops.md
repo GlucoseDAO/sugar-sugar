@@ -218,6 +218,51 @@ Serve the app behind a TLS reverse proxy such as Caddy or nginx. The public
 origin should be HTTPS because social platforms require or strongly prefer HTTPS
 for images and metadata.
 
+## Staging Mode (prod+)
+
+The staging deployment at `https://vanilla-sugar.glucosedao.org/` hosts the dev
+branch. Run it like production but with the staging test routes enabled:
+
+```bash
+uv run serve-staging                 # = uv run serve --staging
+uv run serve --staging --workers 2   # equivalent, explicit
+```
+
+`--staging` sets the `_STAGING_MODE=1` environment variable before `os.execvp`,
+so every gunicorn worker re-reads it at import. When the flag is **off**
+(production default), none of the routes below exist and the app is byte-identical
+to plain `serve` — this is **prod+**: extra routes layered on top of the real
+pathways, with no change to production logic.
+
+The staging nodes let you reach prefilled states **remotely, page-by-page, without
+a playthrough and without restarting the server** (handy because simulating mobile
+is tedious):
+
+- `GET /staging` — index page linking the nodes.
+- `GET /staging/ending` — `create_ending_layout` with a synthetic prefilled round.
+- `GET /staging/final` — `create_final_layout` with several synthetic rounds
+  (formats A/B/C).
+- `GET /staging/share?formats=A,B,C&lang=de` — generates a synthetic share record
+  on disk and 302-redirects to `/share/<id>` (reuses `share_store.save_share`).
+- `GET /staging/prediction` — seeds the prediction stores with a prefilled window
+  (server callback) and routes to the real `/prediction`.
+
+Implementation notes:
+
+- The nodes reuse the **real** layout builders and `share_store`; only the synthetic
+  *input* data is generated (`_staging_*` helpers in `app.py`). They are defined at
+  module scope but invoked only from `_STAGING_MODE`-gated handlers, so they never run
+  at import when the flag is off.
+- Every synthetic `user_info` sets `consent_completed=True` so the `display_page`
+  consent guard lets the nodes render.
+- The screenshot harness `result` group (`scripts/mobile_shots.py`) uses these same
+  nodes to capture `/ending`, `/final`, and `/share` on a phone viewport.
+- **Security:** `/staging/*` is currently unauthenticated. If the staging origin is
+  publicly reachable, put basic-auth or an IP allowlist in front of `/staging/*`
+  (backlog item) so the test nodes aren't world-visible.
+- Set `DEPLOY_URL=https://vanilla-sugar.glucosedao.org` on the staging host so share
+  URLs, OG tags, and card image URLs resolve to the staging origin.
+
 ## Chrome And Kaleido Requirements
 
 Share-card PNG export uses Kaleido, and Kaleido needs a Chromium browser.

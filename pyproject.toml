@@ -38,6 +38,7 @@ start = "sugar_sugar.app:cli_main"
 chart = "sugar_sugar.app:chart_main"
 share = "sugar_sugar.app:share_main"
 serve = "sugar_sugar.app:serve_main"
+serve-staging = "sugar_sugar.app:serve_staging_main"
 setup-chrome = "sugar_sugar.app:setup_chrome_main"
 
 [dependency-groups]
