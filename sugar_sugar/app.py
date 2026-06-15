@@ -1002,6 +1002,7 @@ def _staging_base_user_info() -> dict[str, Any]:
         "consent_play_only": False, "consent_participate_in_study": True,
         "consent_receive_results_later": False, "consent_keep_up_to_date": False,
         "consent_timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "resume_code": resume_store.new_code(),
     }
 
 
@@ -1288,6 +1289,8 @@ if _is_chart_mode:
         # Synthetic dev session is treated as already-consented so the
         # display_page consent guard lets chart mode render /prediction.
         "consent_completed": True,
+        # Resume code so the /ending copy-resume-link button works in dev/testing.
+        "resume_code": resume_store.new_code(),
     }
 else:
     _chart_user_info = None
@@ -1358,6 +1361,7 @@ app.layout = html.Div([
     # Throwaway sinks for the clientside immersive handlers.
     html.Div(id="immersive-sink", style={"display": "none"}),
     html.Div(id="prediction-fullscreen-sink", style={"display": "none"}),
+    html.Div(id="copy-link-sink", style={"display": "none"}),
 ])
 
 
@@ -1651,6 +1655,52 @@ app.clientside_callback(
     """,
     Output('prediction-fullscreen-sink', 'children'),
     Input('prediction-fullscreen-button', 'n_clicks'),
+    prevent_initial_call=True,
+)
+
+
+# Copy a cross-device resume link (?resume=<code>) to the clipboard from the
+# between-rounds /ending summary (the in-round chart page has no screen budget).
+# The code lives in user-info-store (assigned at consent). Shows transient "copied"
+# feedback in the button text (reverted via setTimeout), localized through the
+# button's data-copied-text attribute. Falls back to execCommand on non-secure
+# contexts where navigator.clipboard is unavailable.
+app.clientside_callback(
+    """
+    function(n, userInfo) {
+        if (!n) { return window.dash_clientside.no_update; }
+        var btn = document.getElementById('ending-copy-link-button');
+        if (!btn) { return window.dash_clientside.no_update; }
+        var code = userInfo && userInfo.resume_code;
+        if (!code) { return window.dash_clientside.no_update; }
+        var url = window.location.origin + '/?resume=' + encodeURIComponent(code);
+        var original = btn.getAttribute('data-label') || btn.textContent;
+        btn.setAttribute('data-label', original);
+        var copiedMsg = btn.getAttribute('data-copied-text') || 'Copied!';
+        function feedback() {
+            btn.textContent = copiedMsg;
+            setTimeout(function(){ btn.textContent = original; }, 2200);
+        }
+        function fallbackCopy() {
+            try {
+                var ta = document.createElement('textarea');
+                ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+                document.body.appendChild(ta); ta.focus(); ta.select();
+                document.execCommand('copy'); document.body.removeChild(ta);
+            } catch (e) {}
+            feedback();
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(feedback).catch(fallbackCopy);
+        } else {
+            fallbackCopy();
+        }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output('copy-link-sink', 'children'),
+    Input('ending-copy-link-button', 'n_clicks'),
+    State('user-info-store', 'data'),
     prevent_initial_call=True,
 )
 
@@ -3502,6 +3552,32 @@ def create_ending_layout(
             'marginTop': '20px',
             'padding': '0 10px',
         }),
+        # Cross-device resume: copy a "?resume=<code>" link from the between-rounds
+        # summary (there's screen budget here, unlike the in-round chart page) so
+        # the player can continue this session on another device.
+        html.Div(
+            html.Button(
+                t("ui.resume_code.copy_link", locale=locale),
+                id='ending-copy-link-button',
+                type='button',
+                **{"data-copied-text": t("ui.resume_code.copied", locale=locale)},
+                style={
+                    'backgroundColor': '#ffffff',
+                    'color': '#2185d0',
+                    'padding': 'clamp(10px, 1.6vw, 14px) clamp(16px, 2.4vw, 22px)',
+                    'border': '1px solid #2185d0',
+                    'borderRadius': '8px',
+                    'fontSize': 'clamp(14px, 2vw, 18px)',
+                    'fontWeight': '700',
+                    'cursor': 'pointer',
+                    'maxWidth': '400px',
+                    'width': '100%',
+                },
+            ),
+            id='ending-copy-link-row',
+            disable_n_clicks=True,
+            style={'display': 'flex', 'justifyContent': 'center', 'marginTop': '12px', 'padding': '0 10px'},
+        ),
         html.Div(
             [
                 html.H3(

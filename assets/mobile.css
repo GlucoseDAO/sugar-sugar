@@ -9,9 +9,12 @@
      screen, the browser expands the layout viewport to fit it and zooms the
      whole page out (defeating mobile-first).  So the global rules below cap
      widths and make the navbar fit.
-   - The ONE exception is `/prediction` (html.route-prediction), which keeps a
-     1280px viewport for Plotly drawline.  The 1280-scaling compensations
-     (bigger chart fonts, immersive landscape chrome) are scoped to that route.
+   - `/prediction` (html.route-prediction) is ALSO device-width now. It used to
+     force a 1280px viewport for Plotly drawline, but that overflowed/cropped in
+     real fullscreen landscape, so the wide viewport was dropped: landscape uses
+     the real device width (~800-900px, plenty for drawing) and portrait puts the
+     chart in a horizontal scroller.  The route-scoped rules below build the
+     immersive landscape chart and bump chart fonts (now at native size).
    ========================================================================== */
 
 
@@ -970,11 +973,12 @@ html.mobile-device #consent-form-page .consent-form-text {
 
 
 /* ===========================================================================
-   /prediction ONLY (html.route-prediction): 1280px viewport, scaled down.
-   These compensate for the scale-down and build the immersive chart.
+   /prediction ONLY (html.route-prediction). Builds the immersive chart and
+   sizes chart fonts. (Historically these compensated for a 1280 scale-down;
+   /prediction is now device-width, so they render at native size.)
    =========================================================================== */
 
-/* Chart tick / axis labels: 12px default reads ~8px after scaling. */
+/* Chart tick / axis labels: bumped up from Plotly's small default. */
 html.route-prediction.mobile-device .js-plotly-plot .xtick text,
 html.route-prediction.mobile-device .js-plotly-plot .ytick text,
 html.route-prediction.mobile-device .js-plotly-plot .legendtext {
@@ -990,7 +994,7 @@ html.route-prediction.mobile-device .js-plotly-plot .gtitle {
   font-size: 20px !important;
 }
 
-/* Blanket text bump (only meaningful on the scaled 1280 chart page). */
+/* Blanket text bump on the chart page. */
 html.route-prediction.mobile-device body :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6):not(.js-plotly-plot *) {
   font-size: 18px !important;
 }
@@ -1995,5 +1999,29 @@ html.route-prediction.mobile-device #submit-button {
     font-size: 16px !important;
     line-height: 1.1 !important;
     border-radius: 12px !important;
+  }
+}
+
+/* --- Landscape header fine-tuning (final override, must stay last) ----------
+   The Round and Units chips had excess whitespace while the Source plaque was
+   squashed (filename hidden, only half the time range visible). Shrink Round to
+   75% (300->225) and Units to 60% (404->242) of their width and pull the Source
+   plaque's left/right edges in so it gets the freed space. Also drop the
+   how-to-play bubble font 20% (80->64). Appended last so it wins over the three
+   earlier (duplicated) landscape blocks. */
+@media (orientation: landscape) and (pointer: coarse) {
+  html.route-prediction.mobile-device #prediction-round-summary {
+    width: 225px !important;
+  }
+  html.route-prediction.mobile-device #prediction-source-plaque {
+    left: 237px !important;
+    right: 252px !important;
+  }
+  html.route-prediction.mobile-device #prediction-units-row {
+    width: 242px !important;
+  }
+  html.route-prediction.mobile-device .header-how-to-play-bubble,
+  html.route-prediction.mobile-device .header-how-to-play-body {
+    font-size: 64px !important;
   }
 }

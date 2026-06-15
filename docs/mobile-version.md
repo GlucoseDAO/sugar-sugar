@@ -126,11 +126,16 @@ except the one step that physically needs width — line-drawing on the glucose 
   - Separate mobile builders: **landing entry**, **startup + consent wizard**, **navbar (burger)**.
   - Responsive CSS only: ending, final, share, faq, about, contact, demo.
   - `/prediction`: CSS immersive landscape + a Start-button fullscreen/landscape-lock
-    request (the portrait rotate-nag overlay was removed).
-- **`width=device-width` by default, `1280` only on `/prediction`.** Mobile-first means
-  the default viewport is the real device width; the chart page is the single
-  exception because Plotly's `drawline` needs horizontal space and is unusable at
-  ~390px portrait width.
+    request and a persistent "Fullscreen mode" button (the portrait rotate-nag overlay
+    was removed). Portrait shows a native layout with a horizontal-scroll chart.
+- **`width=device-width` everywhere — including `/prediction`.** Mobile-first means the
+  viewport is always the real device width. `/prediction` *used to* force `width=1280`
+  for Plotly drawline, but that overflowed and cropped the right ~30% (incl. Submit) in
+  real fullscreen landscape, where the browser does NOT auto-scale 1280 to fit. The real
+  landscape device-width (~800–900px) is plenty for drawing, and portrait puts the chart
+  in a horizontal scroller. Two things forced the 1280 and BOTH had to be released
+  together: the clientside `<meta viewport>` switch *and* the `min-width:1280` anchor in
+  `lang.css` (see pitfalls — "where does 1280 keep popping up").
 - **Immersive landscape is the single mobile drawing mode.** The old landscape plaque
   blocked the whole site; portrait now works everywhere except drawing. On
   `/prediction` the user is in landscape (the wizard Start button best-effort enters
@@ -149,11 +154,13 @@ except the one step that physically needs width — line-drawing on the glucose 
 
 - Static meta: `width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes`.
 - A clientside callback keyed on `url.pathname` (a) adds/removes `route-prediction` on
-  `<html>` and (b) rewrites the `<meta viewport>` content to `width=1280` on
-  `/prediction`, `width=device-width` elsewhere. Output is a throwaway `viewport-sink`
-  div. `prevent_initial_call=False` so it runs on first load. Bump `DEPLOY_BUILD` in
+  `<html>` and (b) keeps the `<meta viewport>` content at `width=device-width`
+  everywhere — **including `/prediction`** (it no longer forces `width=1280`; that
+  cropped fullscreen landscape). On `/prediction` portrait it also scrolls the chart
+  container to the draw area. Output is a throwaway `viewport-sink` div.
+  `prevent_initial_call=False` so it runs on first load. Bump `DEPLOY_BUILD` in
   `config.py` when changing this JS (clientside JS is not fingerprinted, so browsers
-  cache it across restarts).
+  cache it across restarts — stale tabs otherwise POST to removed callbacks and 500).
 
 ### 3.2 Device detection + builder selection
 
@@ -198,9 +205,11 @@ except the one step that physically needs width — line-drawing on the glucose 
 ### 3.4 CSS (`assets/mobile.css`, `assets/orientation.css`)
 
 - `mobile.css` is scoped under `html.mobile-device`. Global rules release the
-  `min-width:1280` anchor, cap form controls, and style the burger navbar + drawer.
-  The 1280-scaling compensations (chart fonts, blanket text bump, immersive landscape)
-  are scoped to `html.route-prediction` only.
+  `min-width:1280` anchor on **all** mobile pages (the `:not(.route-prediction)` carve-out
+  was removed when `/prediction` went device-width), cap form controls, and style the
+  burger navbar + drawer. The `route-prediction`-scoped rules build the immersive
+  landscape chart and bump chart fonts; they used to compensate for the 1280 scale-down
+  but now render at native device-width size.
 - `orientation.css` is **retired** — the portrait "rotate to draw" nag overlay was
   removed (it was a second, non-playable mode the user could only dismiss). The single
   mobile `/prediction` flowpath is now: the immersive landscape CSS applies the moment
@@ -287,13 +296,13 @@ erase evidence from the rest of the run. See the harness notes in
 
 | Aspect | Desktop | Mobile |
 |---|---|---|
-| Layout viewport | `device-width` (meta ignored by desktop browsers) | `device-width`; `1280` only on `/prediction` |
+| Layout viewport | `device-width` (meta ignored by desktop browsers) | `device-width` on **every** page (incl. `/prediction`) |
 | Navbar | Fomantic `massive tabular menu` (one row) | `MobileNavBar` burger + drawer |
 | Startup form | One long `StartupPage` | `StartupPageMobile` 6-step wizard, starting with consent |
 | Landing/consent | Two-column hero + consent card | Short `LandingPageMobile` entry; consent is wizard step 1 |
-| `/prediction` portrait | Chart | Chart (no overlay); rotate or use Start-button fullscreen for the immersive landscape |
-| `/prediction` landscape | Chart + full chrome | Immersive: chrome hidden, chart fills screen |
-| `min-width:1280` (lang.css) | Active | Released except on `/prediction` |
+| `/prediction` portrait | Chart | Native layout, horizontal-scroll chart; "Fullscreen mode" button (no rotate-nag overlay) |
+| `/prediction` landscape | Chart + full chrome | Immersive: chrome hidden, chart fills the screen (`100dvh`) |
+| `min-width:1280` (lang.css) | Active | Released on **all** mobile pages |
 | Display pages | As-is | Reflow to single column via CSS |
 
 ## 5. Testing
@@ -327,9 +336,18 @@ These are the traps that cost the most time. The same list is mirrored in `CLAUD
 - **`html, body { min-width: 1280px }` in `assets/lang.css` is the master kill-switch.**
   A leftover from the forced-desktop strategy, it silently pins the entire page to 1280
   regardless of the viewport meta. Released in `mobile.css` via `min-width:0 !important`
-  on `html.mobile-device:not(.route-prediction)`. **If mobile pages render desktop-width
-  again, check this first.** This single rule was the root cause behind hours of
-  confusion where the navbar, inputs, and everything else "inherited" 1280.
+  on `html.mobile-device` (now **all** mobile pages — the `:not(.route-prediction)`
+  carve-out was removed when `/prediction` went device-width). **If mobile pages render
+  desktop-width again, check this first.** This single rule was the root cause behind
+  hours of confusion where the navbar, inputs, and everything else "inherited" 1280.
+
+- **"Where does 1280 keep popping up?" — there are TWO independent sources, kill both.**
+  `/prediction` rendered at 1280 (overflowing/cropping fullscreen landscape) due to (1)
+  the clientside `<meta viewport>` switch setting `width=1280`, AND (2) the `lang.css`
+  `min-width:1280px` anchor (released only for `:not(.route-prediction)` at the time).
+  Fixing the meta alone left the body pinned by `min-width`; the meta said
+  `device-width` but `innerWidth` stayed 1280. Both had to be released together for
+  `/prediction` to actually use the device width.
 
 - **Under `width=device-width`, any element wider than the screen makes the browser
   expand the layout viewport to fit it and zoom the whole page out.** Real phones do
@@ -377,21 +395,15 @@ These are the traps that cost the most time. The same list is mirrored in `CLAUD
     layout viewport (deterministic). `mobile:true` honours the meta AND triggers the
     flaky expand-to-fit behaviour, so the same page can come out 360 or 1280 between
     runs.
-  - Use `mobile:true` for `/prediction` in **landscape** so the `1280` meta is honoured
-    and scaled (matches a real phone's immersive chart); use `mobile:false` for
-    `/prediction` **portrait** so the fixed full-screen overlay is centred in the 360
-    viewport (with `mobile:true` it centres in 1280 and lands off the crop).
-  - **Landscape `/prediction` needs a metrics re-apply, or it crops the chart bottom.**
-    The `1280` meta switch is clientside and fires *after* first paint; under a CDP
-    device-metrics override Chromium does NOT re-fit the page scale on that swap, so the
-    capture shows the unscaled top-left 740px slice of the 1280 layout and the x-axis +
-    Submit fall off the bottom. Fix: after hydration+settle, `Emulation.clearDeviceMetricsOverride`
-    then re-apply the **same** `mobile:true` 740×360 metrics — this forces a full
-    re-emulation that re-reads the now-`1280` meta and scales the whole layout into the
-    device viewport. **Do NOT "fix" it by setting `screenWidth:1280`/`mobile:false`** —
-    that makes *device-width* 1280, which fails the `max-device-width:1024` gate on the
-    immersive landscape CSS, so the navbar + instructions reappear and the chart drops
-    below the fold. Device-width must stay ≤1024; only the *layout* viewport is 1280.
+  - **HISTORICAL / now obsolete:** `/prediction` used to force a `width=1280` meta, and
+    the immersive landscape CSS was gated on `max-device-width:1024`. That combination
+    needed delicate harness handling (emulate landscape with `mobile:true`, then
+    `clearDeviceMetricsOverride` + re-apply the same metrics to force the 1280 meta to
+    re-scale, and keep device-width ≤1024 so the immersive CSS matched). **None of that
+    applies now** — `/prediction` is device-width and the `max-device-width` gate is
+    gone, so emulate `/prediction` like any other page (set the metrics to the
+    portrait/landscape size you want and capture). If you see old shots cropping the
+    chart bottom, it's stale CSS/cache, not the meta trick.
   - **Plotly does not re-fit on a CSS-driven container resize, only on a window
     `resize`.** A bare `window.dispatchEvent(new Event('resize'))` races the layout, so
     also call `Plotly.Plots.resize(gd)` on every `.js-plotly-plot` just before capturing
@@ -465,13 +477,34 @@ These are the traps that cost the most time. The same list is mirrored in `CLAUD
   tracks the actually-visible area and keeps the controls on-screen. Fullscreen (which
   hides chrome) makes `vh`/`dvh` equal, but we can't rely on fullscreen always engaging.
 
-- **Fullscreen needs a user-gesture, so trigger it from the entering CLICK.** A
-  `requestFullscreen` from a route-change/store callback is rejected (no user
-  activation). It's wired to the wizard Start-button `n_clicks` (clientside, gated on
-  the `mobile-device` class). Burger "Game" → `/` → redirect loses the gesture, so that
-  path relies on the (now playable) `100dvh` landscape layout + manual rotate instead.
-  `screen.orientation.lock('landscape')` works on Android Chrome/Vivaldi after
-  fullscreen and rejects on iOS Safari (caught; user rotates manually).
+- **Fullscreen / immersive-entry know-how (the whole recipe).**
+  - **It must be a clientside callback fired by a real user GESTURE.** `requestFullscreen`
+    from a route-change / store-update callback is rejected by the browser ("no user
+    activation"). So it hangs off `n_clicks` of an actual button, clientside.
+  - **Two gesture entry points, both clientside:** (1) the wizard **Start button**
+    (`start-button`), so finishing the wizard drops you straight into the immersive
+    chart; (2) a **persistent "Fullscreen mode" button** on `/prediction` portrait, the
+    gesture-reliable way back in when you re-enter from the burger menu (burger "Game" →
+    `/` → redirect loses the gesture, so it can't auto-fullscreen). Both gate on the
+    `mobile-device` class so desktop never fullscreens.
+  - **The recipe:** `el.requestFullscreen()` on `document.documentElement` (reuse the
+    same path the demo-video fullscreen uses — it's proven on real devices), then
+    best-effort `screen.orientation.lock('landscape')`, then after a short delay
+    `window.dispatchEvent(new Event('resize'))` + `Plotly.Plots.resize(gd)` so the chart
+    fills the new viewport. Provide a `webkitRequestFullscreen`/`msRequestFullscreen`
+    fallback chain.
+  - **`screen.orientation.lock('landscape')` is now USED** (this reverses the old "never
+    use it" rule). It requires the fullscreen we just entered; it works on Android
+    Chrome/Vivaldi and **rejects on iOS Safari** — wrap it in try/catch + `.catch()` and
+    do nothing on failure (the user rotates manually; the `100dvh` landscape layout is
+    playable either way).
+  - **Don't rely on auto-fullscreen for playability.** iOS won't lock orientation and any
+    non-gesture entry won't fullscreen, so the landscape layout must be fully playable
+    *without* fullscreen (hence `100dvh` + device-width). Fullscreen is an enhancement,
+    not a requirement.
+  - **Localised button feedback without a server round-trip:** stash the translated
+    "copied/done" string in a `data-*` attribute (server-rendered via `t()`) and read it
+    in the clientside JS — e.g. the copy-resume-link button's `data-copied-text`.
 
 - **Mobile buttons/links need `touch-action: manipulation` or taps get swallowed.**
   The viewport allows zoom (`user-scalable=yes, maximum-scale=5`), so mobile browsers
@@ -487,8 +520,10 @@ These are the traps that cost the most time. The same list is mirrored in `CLAUD
 
 - **Don't CSS-rotate the chart** (`transform: rotate(90deg)`) — it desyncs Plotly's
   drawline touch coordinates. The immersive landscape is achieved by hiding chrome and
-  letting the native chart fill the viewport, not by rotation. **Don't use
-  `screen.orientation.lock()`** — it needs fullscreen and is unsupported on iOS Safari.
+  letting the native chart fill the viewport, not by rotation. (Note: the old "never use
+  `screen.orientation.lock()`" rule is **superseded** — we now call it best-effort
+  *after* entering fullscreen, catching the iOS Safari rejection. See the fullscreen
+  know-how above.)
 
 - **Consent enforcement is asymmetric between desktop and mobile, and the Start
   handler can't see it.** `handle_start_button` only re-checks consent when the consent
@@ -519,3 +554,36 @@ These are the traps that cost the most time. The same list is mirrored in `CLAUD
   on `/final` (or "Prediction Results" on `/ending`) — those boxes look empty in the
   shots; that's a data quirk, not a layout bug. The aggregate metrics, charts, share
   panels, and buttons all render and are what these shots verify.
+
+- **The landscape `/prediction` header chips are absolute-positioned — rebalance their
+  edges together.** Round / Source / Units are `position:absolute` (Round `left+width`,
+  Units `right+width`, Source pinned `left:<after Round>` / `right:<before Units>`). So
+  Source's width = `screenW − left − right`. At device-width (~820) the original Round
+  300px + Units 404px left Source only ~82px (filename + half the time range clipped).
+  Shrinking Round (→225) and Units (→242) does NOT help Source unless you ALSO move
+  Source's `left`/`right` in to match — otherwise the freed space is just empty gap.
+  The mobile.css has several near-duplicate landscape blocks; append a final
+  `@media (orientation: landscape) and (pointer: coarse)` override so it wins rather
+  than hunting the right copy.
+
+- **Put secondary / occasional actions on the between-rounds `/ending` page, not the
+  in-round `/prediction` page.** The chart page has zero spare screen budget on mobile
+  (the chart + the bottom control strip already fill `100dvh`). The cross-device
+  "copy resume link" button therefore lives on `/ending` (which has room), reading
+  `resume_code` from `user-info-store`. Don't cram extra controls into the in-round
+  action row — it's tuned to the pixel.
+
+- **Removing or renaming a clientside callback breaks already-open tabs until they
+  refresh.** A stale tab keeps POSTing the old callback id and the updated server 500s
+  with `KeyError: "Callback function not found for output '..<id>..'"`. This is NOT a
+  server bug — it's the cached client. Always bump `DEPLOY_BUILD` (forces fresh loads to
+  reload) when you add/remove/rename clientside callbacks, and hard-refresh the test tab.
+  Symptom doubles as a tell: if "the new behaviour doesn't work" AND the console shows a
+  `Callback function not found` 500, it's a stale client, not your new code.
+
+- **Once `/prediction` is device-width, size its elements at NATIVE px.** During the
+  brief 1280-scaled era, fixed-position elements (the old overlay X, the fullscreen
+  button) had to be sized ~3.3× larger to be tappable, because the page scaled to ~30%.
+  Now that `/prediction` is device-width there is no scale-down, so size everything at
+  real px. If you find an oddly huge or tiny `/prediction` element, check whether it was
+  tuned for the old 1280-scaled assumption.

@@ -329,6 +329,8 @@ en:
     placeholder: "Resume code"
     redeem_btn: "Resume"
     not_found: "We couldn't find a session for that code. Check it and try again."
+    copy_link: "🔗 Copy resume link"
+    copied: "✓ Link copied!"
 
   session_expired:
     title: "Session Expired"
