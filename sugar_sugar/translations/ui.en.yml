@@ -134,6 +134,7 @@ en:
     wizard_back: "Back"
     wizard_next: "Next"
     wizard_step: "Step %{current} of %{total}"
+    consent_gate_hint: "Tick both required boxes above (18+ / read the terms, and data-protection consent) to continue."
     format_label: "Format"
     format_placeholder: "Choose an option"
     format_a_label: "Generic Data"

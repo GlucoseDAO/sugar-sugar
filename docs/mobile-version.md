@@ -173,10 +173,13 @@ except the one step that physically needs width — line-drawing on the glucose 
 - **`StartupPageMobile`** (`components/startup.py`): renders **every** input id of the
   desktop `StartupPage` (same ids, same persistence, plus all `*-required`/`*-error`
   Output elements) plus the shared consent checklist ids in `mobile-step-{0..5}`
-  divs. Step 0 reuses `consent_controls_children()` inside `#consent-notice-scroll`
-  with the same scroll store/interval as desktop landing, and `startup-next.disabled`
-  is gated until the consent text has been scrolled and both required consent boxes
-  are ticked. `navigate_startup_wizard`
+  divs. Step 0 reuses `consent_controls_children()` inside `#consent-notice-scroll`,
+  and `startup-next.disabled` is gated **only on the two mandatory consent checkboxes**
+  (acknowledge + GDPR). It is deliberately **not** gated on scroll-to-end: that
+  detection watches the outer div, but on real mobile browsers the user scrolls the
+  inner consent iframe, so the div never registers "scrolled" and the user got
+  hard-locked with a dead Next button even after ticking both boxes (see pitfalls).
+  `navigate_startup_wizard`
   (registered inside `StartupPage.register_callbacks`, `prevent_initial_call=True`)
   toggles each step's `display` and the Back/Next buttons + progress dots. Conditional
   parents live in the SAME step as their dependents (CGM→duration, diabetic→type+
@@ -298,10 +301,12 @@ erase evidence from the rest of the run. See the harness notes in
 - `uv run chart --prefill` — manual prediction/submit/ending flow.
 - Real-device check still recommended for touch drawing and keyboard behaviour, which
   the harness cannot fully reproduce.
-- For consent changes, manually verify the mobile path: `/` → "Take me in" →
-  `/startup`; the Step 1 Next button stays disabled until the consent iframe is
-  scrolled and the required boxes are checked; completing the wizard reaches
-  `/prediction` and writes a consent agreement row.
+- For consent changes, manually verify the mobile path **on a real touch device**
+  (the headless harness cannot reproduce iframe touch-scroll): `/` → "Take me in" →
+  `/startup`; the Step 1 Next button stays disabled until **both required boxes**
+  (acknowledge + GDPR) are ticked, then enables (no scroll-to-end requirement on
+  mobile — see pitfalls); completing the wizard reaches `/prediction` and writes a
+  consent agreement row.
 
 ---
 

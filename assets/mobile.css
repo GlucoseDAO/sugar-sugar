@@ -130,6 +130,20 @@ html.mobile-device .mobile-nav-bar {
   box-sizing: border-box;
 }
 
+/* Wizard Next button: when the consent gate disables it, make it obviously
+   inert (grey + not-allowed), not a dimmed-but-still-blue Fomantic button that
+   reads as "clickable but broken". The className is swapped to
+   `startup-next-disabled` by gate_mobile_consent_step. */
+html.mobile-device #startup-next.startup-next-disabled,
+html.mobile-device #startup-next:disabled {
+  background-color: #9aa5b1 !important;
+  background-image: none !important;
+  color: #f1f5f9 !important;
+  cursor: not-allowed !important;
+  opacity: 1 !important;
+  box-shadow: none !important;
+}
+
 html.mobile-device .mobile-nav-burger {
   flex: 0 0 auto;
   width: 48px;

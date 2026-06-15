@@ -659,27 +659,45 @@ class StartupPage(html.Div):
         # The consent gate must run on initial mobile render so the first Next
         # button starts disabled until the required consent actions are complete.
         @app.callback(
-            Output('startup-next', 'disabled'),
-            [Input('consent-scroll-complete', 'data'),
-             Input('consent-acknowledge', 'value'),
+            [Output('startup-next', 'disabled'),
+             Output('startup-next', 'className'),
+             Output('startup-consent-hint', 'style')],
+            [Input('consent-acknowledge', 'value'),
              Input('consent-gdpr', 'value'),
              Input('startup-step', 'data')],
             prevent_initial_call=False,
         )
         def gate_mobile_consent_step(
-            scroll_complete: Optional[bool],
             acknowledge_value: Optional[list[str]],
             gdpr_value: Optional[list[str]],
             current_step: Optional[int],
-        ) -> bool:
+        ) -> tuple[bool, str, dict[str, str]]:
+            # The mobile wizard's Step 1 (consent) Next button is gated on the two
+            # mandatory consent checkboxes only. We deliberately do NOT gate on
+            # `consent-scroll-complete` here: the scroll-to-end detection watches the
+            # outer #consent-notice-scroll div, but on real mobile browsers the user
+            # scrolls the inner consent iframe instead, so the div's scroll position
+            # never reaches the end and the user gets hard-locked with a dead Next
+            # button even after ticking both boxes (reported on Vivaldi Android). The
+            # consent text is fully present in the (scrollable) iframe and the
+            # "I have read the terms" + GDPR checkboxes are the meaningful gate.
             step = int(current_step or 0)
+            hint_hidden = {'display': 'none'}
+            hint_shown = {
+                'display': 'block', 'marginTop': '10px', 'fontSize': '14px',
+                'color': '#b45309', 'textAlign': 'center',
+            }
             if step != 0:
-                return False
-            return not (
-                bool(scroll_complete) and
+                # Not the consent step: Next is always enabled and blue.
+                return False, "ui blue button", hint_hidden
+            blocked = not (
                 bool(acknowledge_value and 'ack' in acknowledge_value) and
                 bool(gdpr_value and 'gdpr' in gdpr_value)
             )
+            if blocked:
+                # Grey, clearly-disabled button + an explanation of why.
+                return True, "ui button startup-next-disabled", hint_shown
+            return False, "ui blue button", hint_hidden
 
 
 # ---------------------------------------------------------------------------
@@ -784,6 +802,14 @@ class StartupPageMobile(html.Div):
             html.Div(
                 t("ui.landing.next_hint", locale=locale),
                 style={'color': '#64748b', 'marginTop': '10px', 'fontSize': '13px'},
+                disable_n_clicks=True,
+            ),
+            # Explains why the Next button is disabled; toggled by
+            # gate_mobile_consent_step (hidden once both required boxes are ticked).
+            html.Div(
+                t("ui.startup.consent_gate_hint", locale=locale),
+                id='startup-consent-hint',
+                style={'display': 'none'},
                 disable_n_clicks=True,
             ),
             dcc.Store(id='consent-scroll-complete', data=False, storage_type=STORAGE_TYPE),
