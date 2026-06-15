@@ -15,6 +15,7 @@ class HeaderComponent(Div):
         show_time_slider: bool = True,
         show_upload_section: bool = True,
         show_example_button: bool = True,
+        show_data_source_section: bool = True,
         children: Optional[Sequence[Any]] = None,
         initial_slider_value: int = 0,
         data_source_name: str = "example.csv",
@@ -24,6 +25,7 @@ class HeaderComponent(Div):
         self.show_time_slider = show_time_slider
         self.show_upload_section = show_upload_section
         self.show_example_button = show_example_button
+        self.show_data_source_section = show_data_source_section
         self.initial_slider_value = initial_slider_value
         self.data_source_name = data_source_name
         if children is None:
@@ -180,75 +182,9 @@ class HeaderComponent(Div):
             self.create_controls(),
         ]
 
-        right_column_children.extend(
-            [
-                # Keep component IDs stable across formats; hide when not needed.
-                self.create_upload_section(visible=self.show_upload_section),
-                # Data source indicator (always visible).
-                html.Div(
-                    [
-                        html.Div(
-                            [
-                                html.Label(
-                                    t("ui.header.current_data_source", locale=self._locale),
-                                    id='header-data-source-label',
-                                    style={
-                                        'fontWeight': 'bold',
-                                        'marginRight': '8px',
-                                        'color': '#4a5568',
-                                        'fontSize': '14px',
-                                    },
-                                ),
-                                html.Div(
-                                    id='data-source-display',
-                                    children=self.data_source_name,
-                                    style={
-                                        'color': '#2c5282',
-                                        'fontStyle': 'italic',
-                                        'fontSize': '14px',
-                                        'fontWeight': '500',
-                                        'overflow': 'hidden',
-                                        'textOverflow': 'ellipsis',
-                                        'maxWidth': '300px',
-                                        'whiteSpace': 'nowrap',
-                                    },
-                                ),
-                            ],
-                            style={
-                                'display': 'flex',
-                                'alignItems': 'center',
-                                'width': '100%',
-                            },
-                        ),
-                        html.Div(
-                            id='generic-source-metadata-display',
-                            children="",
-                            style={
-                                'color': '#2c5282',
-                                'fontStyle': 'italic',
-                                'fontSize': '14px',
-                                'fontWeight': '500',
-                                'maxWidth': '100%',
-                                'whiteSpace': 'normal',
-                                'overflowWrap': 'anywhere',
-                                'marginTop': '4px',
-                            },
-                        ),
-                    ],
-                    style={
-                        'marginTop': '15px',
-                        'padding': '10px',
-                        'backgroundColor': '#f7fafc',
-                        'borderRadius': '5px',
-                        'display': 'flex',
-                        'flexDirection': 'column',
-                        'alignItems': 'flex-start',
-                        'width': '100%',
-                        'boxShadow': '0 1px 2px rgba(0,0,0,0.05)',
-                    },
-                ),
-            ]
-        )
+        right_column_children.append(self.create_upload_section(visible=self.show_upload_section))
+        if self.show_data_source_section:
+            right_column_children.append(self.create_data_source_section())
 
         return [
             html.H1(t("ui.common.app_title", locale=self._locale),
@@ -264,24 +200,41 @@ class HeaderComponent(Div):
                 # Left column - Game description and instructions
                 html.Div([
                     html.P(id='header-description', children=[
-                        t("ui.header.description_1", locale=self._locale) + " ",
-                        html.Br(),
-                        t("ui.header.description_2", locale=self._locale) + " ",
-                        t("ui.header.description_3", locale=self._locale),
+                        t("ui.header.description_1", locale=self._locale),
                     ], style={
                         'fontSize': '18px',
                         'color': '#4a5568',
                         'lineHeight': '1.5',
                         'marginBottom': '15px'
                     }),
-                    html.P(id='header-how-to-play', children=[
-                        html.Strong(t("ui.header.how_to_play", locale=self._locale)),
-                        html.Br(),
-                        t("ui.header.how_to_play_1", locale=self._locale),
-                        html.Br(),
-                        t("ui.header.how_to_play_2", locale=self._locale),
-                        html.Br(),
-                        t("ui.header.how_to_play_3", locale=self._locale),
+                    html.Div(id='header-how-to-play', children=[
+                        html.Button(
+                            t("ui.header.how_to_play", locale=self._locale),
+                            id="header-how-to-play-toggle",
+                            className="header-how-to-play-toggle",
+                            type="button",
+                        ),
+                        html.Div(
+                            [
+                                html.Button("×", id="header-how-to-play-close", className="header-how-to-play-close", type="button"),
+                                html.Div(
+                                    [
+                                        t("ui.header.description_2", locale=self._locale) + " ",
+                                        t("ui.header.description_3", locale=self._locale),
+                                        html.Br(),
+                                        t("ui.header.how_to_play_1", locale=self._locale),
+                                        html.Br(),
+                                        t("ui.header.how_to_play_2", locale=self._locale),
+                                        html.Br(),
+                                        t("ui.header.how_to_play_3", locale=self._locale),
+                                    ],
+                                    className="header-how-to-play-body",
+                                ),
+                            ],
+                            id="header-how-to-play-bubble",
+                            className="header-how-to-play-bubble",
+                            style={"display": "none"},
+                        ),
                     ], style={
                         'fontSize': '16px',
                         'color': '#4a5568',
@@ -300,3 +253,68 @@ class HeaderComponent(Div):
                 'alignItems': 'start'
             })
         ]
+
+    def create_data_source_section(self) -> html.Div:
+        """Create the data source indicator used by prediction/startup headers."""
+        return html.Div(
+            [
+                html.Div(
+                    [
+                        html.Label(
+                            t("ui.header.current_data_source", locale=self._locale),
+                            id='header-data-source-label',
+                            style={
+                                'fontWeight': 'bold',
+                                'marginRight': '8px',
+                                'color': '#4a5568',
+                                'fontSize': '14px',
+                            },
+                        ),
+                        html.Div(
+                            id='data-source-display',
+                            children=self.data_source_name,
+                            style={
+                                'color': '#2c5282',
+                                'fontStyle': 'italic',
+                                'fontSize': '14px',
+                                'fontWeight': '500',
+                                'overflow': 'hidden',
+                                'textOverflow': 'ellipsis',
+                                'maxWidth': '300px',
+                                'whiteSpace': 'nowrap',
+                            },
+                        ),
+                    ],
+                    style={
+                        'display': 'flex',
+                        'alignItems': 'center',
+                        'width': '100%',
+                    },
+                ),
+                html.Div(
+                    id='generic-source-metadata-display',
+                    children="",
+                    style={
+                        'color': '#2c5282',
+                        'fontStyle': 'italic',
+                        'fontSize': '14px',
+                        'fontWeight': '500',
+                        'maxWidth': '100%',
+                        'whiteSpace': 'normal',
+                        'overflowWrap': 'anywhere',
+                        'marginTop': '4px',
+                    },
+                ),
+            ],
+            style={
+                'marginTop': '15px',
+                'padding': '10px',
+                'backgroundColor': '#f7fafc',
+                'borderRadius': '5px',
+                'display': 'flex',
+                'flexDirection': 'column',
+                'alignItems': 'flex-start',
+                'width': '100%',
+                'boxShadow': '0 1px 2px rgba(0,0,0,0.05)',
+            },
+        )

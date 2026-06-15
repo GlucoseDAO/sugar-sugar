@@ -20,15 +20,588 @@
    it broadly.  Individual wide widgets (tables, iframes, charts) also get
    max-width:100% in their page-specific rules. */
 
-html.mobile-device:not(.route-prediction),
-html.mobile-device:not(.route-prediction) body {
+html.mobile-device,
+html.mobile-device body {
   /* lang.css pins `html, body { min-width: 1280px }` as a fallback for the old
      forced-desktop strategy.  That single rule anchors the whole page to 1280
-     and defeats device-width.  Release it on the mobile-first pages (kept on
-     /prediction, which still wants the wide layout). */
+     and defeats device-width.  Release it on ALL mobile pages -- including
+     /prediction, which no longer forces a 1280 viewport (the wide viewport
+     overflowed/cropped in real fullscreen landscape; the chart now uses the real
+     device-width, with a horizontal-scroll chart in portrait). Leaving it pinned
+     here was the recurring "1280 keeps popping up" + ~30% horizontal crop. */
   min-width: 0 !important;
   overflow-x: hidden;
   max-width: 100vw;
+}
+
+/* Final landscape composition: header | graph | footer. Kept after the legacy
+   landscape rules above so these declarations win. */
+@media (orientation: landscape) and (pointer: coarse) {
+  html.route-prediction.mobile-device #navbar-container {
+    display: none !important;
+  }
+
+  html.route-prediction.mobile-device #page-content > div {
+    position: relative !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+    padding: 4px 6px !important;
+    gap: 0 !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-round-summary,
+  html.route-prediction.mobile-device #prediction-source-plaque,
+  html.route-prediction.mobile-device #prediction-units-row,
+  html.route-prediction.mobile-device .prediction-header,
+  html.route-prediction.mobile-device #prediction-mobile-actions {
+    height: 46px !important;
+    min-height: 46px !important;
+    box-sizing: border-box !important;
+    z-index: 5 !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-round-summary {
+    position: absolute !important;
+    top: 4px !important;
+    left: 6px !important;
+    width: 300px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 !important;
+    color: #2c5282 !important;
+    background: #ffffff !important;
+    border: 1px solid rgba(75, 95, 130, 0.35) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 1px 3px rgba(25, 45, 75, 0.18) !important;
+    padding: 0 10px !important;
+    font-size: 26px !important;
+    font-weight: 800 !important;
+    line-height: 1.1 !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-round-summary #round-indicator {
+    width: 100% !important;
+    height: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    text-align: center !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-source-plaque {
+    position: absolute !important;
+    top: 4px !important;
+    left: 318px !important;
+    right: 420px !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 6px !important;
+    width: auto !important;
+    padding: 0 10px !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    background: #ffffff !important;
+    border: 1px solid rgba(75, 95, 130, 0.35) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 1px 3px rgba(25, 45, 75, 0.18) !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-source-plaque .prediction-source-line {
+    display: flex !important;
+    align-items: baseline !important;
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+    gap: 6px !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-source-plaque .prediction-source-label {
+    flex: 0 0 auto !important;
+    color: #4a5568 !important;
+    font-size: 15px !important;
+    font-weight: 800 !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-source-plaque #data-source-display {
+    flex: 0 1 auto !important;
+    min-width: 0 !important;
+    max-width: 180px !important;
+    color: #111827 !important;
+    font-size: 17px !important;
+    font-weight: 800 !important;
+    font-style: normal !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-source-plaque #prediction-chart-meta {
+    flex: 0 0 auto !important;
+    height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    color: #111827 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    font-size: 17px !important;
+    font-weight: 800 !important;
+    white-space: nowrap !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-source-plaque #generic-source-metadata-display {
+    display: none !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-units-row {
+    position: absolute !important;
+    top: 4px !important;
+    right: 6px !important;
+    left: auto !important;
+    bottom: auto !important;
+    width: 404px !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 0 10px !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    border: 1px solid rgba(75, 95, 130, 0.35) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 1px 3px rgba(25, 45, 75, 0.18) !important;
+    font-size: 18px !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-units-row #prediction-units-label,
+  html.route-prediction.mobile-device #prediction-units-row #glucose-unit-selector {
+    height: auto !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-chart-submit-wrap {
+    position: static !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    display: block !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-glucose-chart-container {
+    position: absolute !important;
+    top: 46px !important;
+    left: 6px !important;
+    right: 6px !important;
+    bottom: 34px !important;
+    z-index: 1 !important;
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-glucose-chart-container > #glucose-graph,
+  html.route-prediction.mobile-device #prediction-glucose-chart-container #glucose-graph-graph {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 100% !important;
+    min-height: 0 !important;
+  }
+
+  html.route-prediction.mobile-device .prediction-header {
+    position: absolute !important;
+    left: 6px !important;
+    bottom: 4px !important;
+    width: 220px !important;
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  html.route-prediction.mobile-device .prediction-header #header-app-title,
+  html.route-prediction.mobile-device .prediction-header #header-description,
+  html.route-prediction.mobile-device .prediction-header > div > div:nth-child(2) {
+    display: none !important;
+  }
+
+  html.route-prediction.mobile-device #header-how-to-play {
+    height: 46px !important;
+    display: flex !important;
+    align-items: center !important;
+    margin: 0 !important;
+  }
+
+  html.route-prediction.mobile-device .header-how-to-play-toggle {
+    width: 220px !important;
+    height: 46px !important;
+    padding: 0 12px !important;
+    color: #1f2a44 !important;
+    background: #ffffff !important;
+    border: 1px solid rgba(75, 95, 130, 0.35) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 1px 3px rgba(25, 45, 75, 0.18) !important;
+    font-size: 18px !important;
+    font-weight: 800 !important;
+  }
+
+  html.route-prediction.mobile-device .header-how-to-play-bubble {
+    position: fixed !important;
+    left: 160px !important;
+    right: 160px !important;
+    top: 129px !important;
+    max-height: calc(100dvh - 178px) !important;
+    overflow: auto !important;
+    z-index: 30 !important;
+    padding: 16px 46px 16px 18px !important;
+    font-size: 19px !important;
+    line-height: 1.4 !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-mobile-actions {
+    position: absolute !important;
+    right: 6px !important;
+    bottom: 4px !important;
+    width: 548px !important;
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  html.route-prediction.mobile-device .prediction-fullscreen-button {
+    display: none !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-actions {
+    width: 100% !important;
+    height: 46px !important;
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  html.route-prediction.mobile-device #submit-button,
+  html.route-prediction.mobile-device #finish-study-button {
+    flex: 0 0 270px !important;
+    width: 270px !important;
+    height: 46px !important;
+    min-height: 46px !important;
+    margin: 0 !important;
+    padding: 8px 12px !important;
+    font-size: 22px !important;
+    line-height: 1.2 !important;
+  }
+}
+
+/* Absolute final landscape corrections: this block intentionally sits last so
+   it wins over the older repeated landscape rules above. */
+@media (orientation: landscape) and (pointer: coarse) {
+  html.route-prediction.mobile-device #prediction-glucose-chart-container {
+    top: 46px !important;
+    bottom: 30px !important;
+    z-index: 1 !important;
+  }
+
+  html.route-prediction.mobile-device .header-how-to-play-bubble {
+    left: 160px !important;
+    right: 160px !important;
+    top: 129px !important;
+    max-height: calc(100dvh - 178px) !important;
+    font-size: 42px !important;
+    line-height: 1.16 !important;
+  }
+
+  html.route-prediction.mobile-device .header-how-to-play-bubble *,
+  html.route-prediction.mobile-device .header-how-to-play-bubble .header-how-to-play-body {
+    font-size: 42px !important;
+    line-height: 1.16 !important;
+  }
+}
+
+@media (orientation: landscape) and (pointer: coarse) {
+  html.route-prediction.mobile-device #navbar-container {
+    display: none !important;
+  }
+
+  html.route-prediction.mobile-device #page-content > div {
+    position: relative !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+    padding: 4px 6px !important;
+    gap: 0 !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-round-summary,
+  html.route-prediction.mobile-device #prediction-source-plaque,
+  html.route-prediction.mobile-device #prediction-units-row,
+  html.route-prediction.mobile-device .prediction-header,
+  html.route-prediction.mobile-device #prediction-mobile-actions {
+    height: 46px !important;
+    min-height: 46px !important;
+    box-sizing: border-box !important;
+    z-index: 5 !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-round-summary {
+    position: absolute !important;
+    top: 4px !important;
+    left: 6px !important;
+    width: 300px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    margin: 0 !important;
+    color: #2c5282 !important;
+    font-size: 20px !important;
+    font-weight: 800 !important;
+    line-height: 1.1 !important;
+    text-align: left !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-source-plaque {
+    position: absolute !important;
+    top: 4px !important;
+    left: 318px !important;
+    right: 420px !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 6px !important;
+    width: auto !important;
+    padding: 0 10px !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    background: #ffffff !important;
+    border: 1px solid rgba(75, 95, 130, 0.35) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 1px 3px rgba(25, 45, 75, 0.18) !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-source-plaque .prediction-source-line {
+    display: flex !important;
+    align-items: baseline !important;
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+    gap: 6px !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-source-plaque .prediction-source-label {
+    flex: 0 0 auto !important;
+    color: #4a5568 !important;
+    font-size: 15px !important;
+    font-weight: 800 !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-source-plaque #data-source-display {
+    flex: 0 1 auto !important;
+    min-width: 0 !important;
+    max-width: 180px !important;
+    color: #111827 !important;
+    font-size: 17px !important;
+    font-weight: 800 !important;
+    font-style: normal !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-source-plaque #prediction-chart-meta {
+    flex: 0 0 auto !important;
+    height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    color: #111827 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    font-size: 17px !important;
+    font-weight: 800 !important;
+    white-space: nowrap !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-source-plaque #generic-source-metadata-display {
+    display: none !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-units-row {
+    position: absolute !important;
+    top: 4px !important;
+    right: 6px !important;
+    left: auto !important;
+    bottom: auto !important;
+    width: 404px !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 0 10px !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    border: 1px solid rgba(75, 95, 130, 0.35) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 1px 3px rgba(25, 45, 75, 0.18) !important;
+    font-size: 18px !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-units-row #prediction-units-label,
+  html.route-prediction.mobile-device #prediction-units-row #glucose-unit-selector {
+    height: auto !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  html.route-prediction.mobile-device #glucose-unit-selector {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 14px !important;
+    width: auto !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-chart-submit-wrap {
+    position: static !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    display: block !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-glucose-chart-container {
+    position: absolute !important;
+    top: 46px !important;
+    left: 6px !important;
+    right: 6px !important;
+    bottom: 34px !important;
+    z-index: 1 !important;
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-glucose-chart-container > #glucose-graph,
+  html.route-prediction.mobile-device #prediction-glucose-chart-container #glucose-graph-graph {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 100% !important;
+    min-height: 0 !important;
+  }
+
+  html.route-prediction.mobile-device .prediction-header {
+    position: absolute !important;
+    left: 6px !important;
+    bottom: 4px !important;
+    width: 220px !important;
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  html.route-prediction.mobile-device .prediction-header #header-app-title,
+  html.route-prediction.mobile-device .prediction-header #header-description,
+  html.route-prediction.mobile-device .prediction-header > div > div:nth-child(2) {
+    display: none !important;
+  }
+
+  html.route-prediction.mobile-device #header-how-to-play {
+    height: 46px !important;
+    display: flex !important;
+    align-items: center !important;
+    margin: 0 !important;
+  }
+
+  html.route-prediction.mobile-device .header-how-to-play-toggle {
+    width: 220px !important;
+    height: 46px !important;
+    padding: 0 12px !important;
+    color: #1f2a44 !important;
+    background: #ffffff !important;
+    border: 1px solid rgba(75, 95, 130, 0.35) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 1px 3px rgba(25, 45, 75, 0.18) !important;
+    font-size: 18px !important;
+    font-weight: 800 !important;
+  }
+
+  html.route-prediction.mobile-device .header-how-to-play-bubble {
+    position: fixed !important;
+    left: 160px !important;
+    right: 160px !important;
+    top: 129px !important;
+    max-height: calc(100dvh - 178px) !important;
+    overflow: auto !important;
+    z-index: 30 !important;
+    padding: 16px 46px 16px 18px !important;
+    font-size: 19px !important;
+    line-height: 1.4 !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-mobile-actions {
+    position: absolute !important;
+    right: 6px !important;
+    bottom: 4px !important;
+    width: 548px !important;
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  html.route-prediction.mobile-device .prediction-fullscreen-button {
+    display: none !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-actions {
+    width: 100% !important;
+    height: 46px !important;
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  html.route-prediction.mobile-device #submit-button,
+  html.route-prediction.mobile-device #finish-study-button {
+    flex: 0 0 270px !important;
+    width: 270px !important;
+    height: 46px !important;
+    min-height: 46px !important;
+    margin: 0 !important;
+    padding: 8px 12px !important;
+    font-size: 22px !important;
+    line-height: 1.2 !important;
+  }
 }
 
 /* Tap reliability: the viewport allows zoom (user-scalable=yes), so mobile
@@ -452,34 +1025,361 @@ html.route-prediction.mobile-device #submit-button {
   display: none;
 }
 @media (orientation: portrait) {
-  /* IMPORTANT: /prediction forces a 1280 layout viewport, which the phone scales
-     down to ~30% of device width. So sizes here are in 1280-coord and must be
-     ~3.3x larger than the on-screen target (e.g. 54px font -> ~16px on a 390px
-     phone). Using px keeps it predictable because the layout viewport is always
-     1280 on this page. This is the same scaling trap that made the old overlay X
-     render ~10x too small. */
+  html.route-prediction.mobile-device,
+  html.route-prediction.mobile-device body {
+    min-width: 0 !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+    background: #f8fafc !important;
+  }
+
+  html.route-prediction.mobile-device #page-content {
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  html.route-prediction.mobile-device #page-content > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 12px !important;
+    gap: 6px !important;
+    box-sizing: border-box !important;
+  }
+
+  html.route-prediction.mobile-device .prediction-header {
+    padding: 2px 10px !important;
+    margin-bottom: 0 !important;
+    border-radius: 10px !important;
+    order: 0 !important;
+  }
+
+  html.route-prediction.mobile-device .prediction-header #header-app-title {
+    display: none !important;
+  }
+
+  html.route-prediction.mobile-device .prediction-header > div {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 2px !important;
+  }
+
+  html.route-prediction.mobile-device .prediction-header > div > div {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    padding-right: 0 !important;
+  }
+
+  html.route-prediction.mobile-device #header-description {
+    display: none !important;
+  }
+
+  html.route-prediction.mobile-device #header-how-to-play {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 15px !important;
+    line-height: 1.3 !important;
+  }
+
+  html.route-prediction.mobile-device .header-how-to-play-toggle {
+    cursor: pointer !important;
+    font-weight: 800 !important;
+    color: #2c5282 !important;
+    padding: 2px 0 !important;
+    touch-action: manipulation !important;
+    border: 0 !important;
+    background: transparent !important;
+    font: inherit !important;
+    text-align: left !important;
+  }
+
+  html.route-prediction.mobile-device .header-how-to-play-toggle::before {
+    content: "▶ ";
+  }
+
+  html.route-prediction.mobile-device #header-how-to-play:has(.header-how-to-play-bubble[style*="block"]) .header-how-to-play-toggle::before {
+    content: "▼ ";
+  }
+
+  html.route-prediction.mobile-device .header-how-to-play-bubble {
+    position: relative !important;
+    margin-top: 0 !important;
+    padding: 2px 0 4px 24px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  html.route-prediction.mobile-device .header-how-to-play-close {
+    display: none !important;
+  }
+
+  html.route-prediction.mobile-device #header-how-to-play .header-how-to-play-body {
+    padding: 0 !important;
+  }
+
+  html.route-prediction.mobile-device #data-source-display,
+  html.route-prediction.mobile-device #generic-source-metadata-display {
+    font-size: 14px !important;
+    line-height: 1.25 !important;
+  }
+
+  html.route-prediction.mobile-device #data-source-display {
+    color: #111827 !important;
+    font-size: 16px !important;
+    font-weight: 800 !important;
+    font-style: normal !important;
+  }
+
+  html.route-prediction.mobile-device #generic-source-metadata-display {
+    width: 100% !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  html.route-prediction.mobile-device #header-data-source-label {
+    font-size: 14px !important;
+  }
+
+  html.route-prediction.mobile-device #round-indicator {
+    display: block !important;
+    margin-bottom: 0 !important;
+    font-size: inherit !important;
+    font-weight: inherit !important;
+    color: inherit !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-round-summary {
+    display: block !important;
+    order: -1 !important;
+    text-align: center !important;
+    margin: 0 !important;
+    color: #2c5282 !important;
+    font-size: 19px !important;
+    font-weight: 800 !important;
+    line-height: 1.25 !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-round-tagline {
+    display: none !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-units-row {
+    justify-content: flex-end !important;
+    flex-wrap: nowrap !important;
+    gap: 8px !important;
+    margin-top: 4px !important;
+    margin-bottom: 4px !important;
+    margin-left: auto !important;
+    align-self: flex-end !important;
+    padding: 7px 10px !important;
+    width: fit-content !important;
+    border: 1px solid rgba(75, 95, 130, 0.18) !important;
+    border-radius: 10px !important;
+    background: #ffffff !important;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08) !important;
+    font-size: 15px !important;
+  }
+
+  html.route-prediction.mobile-device #glucose-unit-selector {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 12px !important;
+    width: auto !important;
+  }
+
+  html.route-prediction.mobile-device #glucose-unit-selector .form-check {
+    width: auto !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  html.route-prediction.mobile-device #glucose-unit-selector input[type="radio"] {
+    margin-top: 0 !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-chart-meta {
+    width: auto !important;
+    margin-right: 0 !important;
+    color: #111827 !important;
+    font-weight: 800 !important;
+    white-space: nowrap !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-chart-submit-wrap {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    min-width: 0 !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-glucose-chart-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 370px !important;
+    min-height: 370px !important;
+    overflow-x: scroll !important;
+    overflow-y: hidden !important;
+    box-sizing: border-box !important;
+    padding: 0 0 10px 0 !important;
+    background: #ffffff !important;
+    border: 4px solid #c4d7ee !important;
+    border-radius: 14px !important;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12) !important;
+    scrollbar-color: #2185d0 #dbeafe !important;
+    scrollbar-width: auto !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-glucose-chart-container::-webkit-scrollbar {
+    height: 22px !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-glucose-chart-container::-webkit-scrollbar-track {
+    background: #dbeafe !important;
+    border-radius: 999px !important;
+    box-shadow: inset 0 0 0 2px #bfdbfe !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-glucose-chart-container::-webkit-scrollbar-thumb {
+    background: #2185d0 !important;
+    border: 4px solid #dbeafe !important;
+    border-radius: 999px !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-glucose-chart-container > #glucose-graph,
+  html.route-prediction.mobile-device #prediction-glucose-chart-container #glucose-graph-graph {
+    width: 900px !important;
+    min-width: 900px !important;
+    height: 340px !important;
+    min-height: 340px !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-source-plaque {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 10px 14px !important;
+    background: #f7fafc !important;
+    border-radius: 10px !important;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08) !important;
+  }
+
+  html.route-prediction.mobile-device .prediction-source-line {
+    display: flex !important;
+    align-items: baseline !important;
+    gap: 6px !important;
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  html.route-prediction.mobile-device .prediction-source-label {
+    flex: 0 0 auto !important;
+    color: #4a5568 !important;
+    font-size: 14px !important;
+    font-weight: 800 !important;
+  }
+
+  html.route-prediction.mobile-device .prediction-source-name {
+    flex: 0 1 auto !important;
+    min-width: 0 !important;
+    color: #111827 !important;
+    font-size: 16px !important;
+    font-weight: 800 !important;
+    font-style: normal !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  html.route-prediction.mobile-device .prediction-source-time::before {
+    content: "·";
+    margin-right: 6px;
+  }
+
+  html.route-prediction.mobile-device .prediction-source-metadata {
+    color: #2c5282 !important;
+    font-size: 14px !important;
+    font-style: italic !important;
+    font-weight: 500 !important;
+    line-height: 1.2 !important;
+    width: 100% !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-mobile-actions {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    gap: 10px 12px !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-actions {
+    grid-column: 2 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: stretch !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-progress-label {
+    display: none !important;
+  }
+
+  html.route-prediction.mobile-device #submit-button,
+  html.route-prediction.mobile-device #finish-study-button {
+    width: 100% !important;
+    height: 60px !important;
+    min-height: 60px !important;
+    margin: 0 !important;
+    padding: 8px 10px !important;
+    font-size: 17px !important;
+    line-height: 1.15 !important;
+    border-radius: 10px !important;
+    white-space: normal !important;
+  }
+
   html.route-prediction.mobile-device .prediction-fullscreen-button {
-    display: block;
-    position: fixed;
-    left: 50%;
-    bottom: 48px;
-    transform: translateX(-50%);
-    z-index: 9000;
-    padding: 52px 76px;
-    font-size: 60px;
+    display: flex;
+    grid-column: 1 !important;
+    grid-row: 1 / span 2 !important;
+    width: 100%;
+    min-height: 128px;
+    align-items: center;
+    justify-content: center;
+    padding: 14px 12px;
+    box-sizing: border-box;
+    font-size: 18px;
     font-weight: 800;
-    line-height: 1.1;
+    line-height: 1.2;
+    text-align: center;
     color: #fff;
     background: #2185d0;
     border: 0;
-    border-radius: 20px;
-    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.32);
+    border-radius: 14px;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.26);
     cursor: pointer;
     touch-action: manipulation;
-    white-space: nowrap;
+    white-space: normal;
   }
   html.route-prediction.mobile-device .prediction-fullscreen-button:active {
-    transform: translateX(-50%) scale(0.97);
+    transform: scale(0.97);
   }
 }
 
@@ -493,7 +1393,8 @@ html.route-prediction.mobile-device #submit-button {
 @media (orientation: landscape) and (pointer: coarse) {
   html.route-prediction.mobile-device #navbar-container,
   html.route-prediction.mobile-device .prediction-header,
-  html.route-prediction.mobile-device #round-indicator {
+  html.route-prediction.mobile-device #prediction-round-summary,
+  html.route-prediction.mobile-device #prediction-source-plaque {
     display: none !important;
   }
   /* Pin the page to exactly one viewport and let the chart flex-fill whatever
@@ -622,5 +1523,477 @@ html.route-prediction.mobile-device #submit-button {
     line-height: 1.2 !important;
     margin: 0 !important;
     padding: 8px 12px !important;
+  }
+}
+
+/* Final landscape composition: header | graph | footer. Kept after the legacy
+   landscape rules above so these declarations win. */
+@media (orientation: landscape) and (pointer: coarse) {
+  html.route-prediction.mobile-device #navbar-container {
+    display: none !important;
+  }
+
+  html.route-prediction.mobile-device #page-content > div {
+    position: relative !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+    padding: 4px 6px !important;
+    gap: 0 !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-round-summary,
+  html.route-prediction.mobile-device #prediction-source-plaque,
+  html.route-prediction.mobile-device #prediction-units-row,
+  html.route-prediction.mobile-device .prediction-header,
+  html.route-prediction.mobile-device #prediction-mobile-actions {
+    height: 46px !important;
+    min-height: 46px !important;
+    box-sizing: border-box !important;
+    z-index: 5 !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-round-summary {
+    position: absolute !important;
+    top: 4px !important;
+    left: 6px !important;
+    width: 300px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    margin: 0 !important;
+    color: #2c5282 !important;
+    font-size: 20px !important;
+    font-weight: 800 !important;
+    line-height: 1.1 !important;
+    text-align: left !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-source-plaque {
+    position: absolute !important;
+    top: 4px !important;
+    left: 318px !important;
+    right: 420px !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 6px !important;
+    width: auto !important;
+    padding: 0 10px !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    background: #ffffff !important;
+    border: 1px solid rgba(75, 95, 130, 0.35) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 1px 3px rgba(25, 45, 75, 0.18) !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-source-plaque .prediction-source-line {
+    display: flex !important;
+    align-items: baseline !important;
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+    gap: 6px !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-source-plaque .prediction-source-label {
+    flex: 0 0 auto !important;
+    color: #4a5568 !important;
+    font-size: 15px !important;
+    font-weight: 800 !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-source-plaque #data-source-display {
+    flex: 0 1 auto !important;
+    min-width: 0 !important;
+    max-width: 180px !important;
+    color: #111827 !important;
+    font-size: 17px !important;
+    font-weight: 800 !important;
+    font-style: normal !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-source-plaque #prediction-chart-meta {
+    flex: 0 0 auto !important;
+    height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    color: #111827 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    font-size: 17px !important;
+    font-weight: 800 !important;
+    white-space: nowrap !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-source-plaque #generic-source-metadata-display {
+    display: none !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-units-row {
+    position: absolute !important;
+    top: 4px !important;
+    right: 6px !important;
+    left: auto !important;
+    bottom: auto !important;
+    width: 404px !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 0 10px !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    border: 1px solid rgba(75, 95, 130, 0.35) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 1px 3px rgba(25, 45, 75, 0.18) !important;
+    font-size: 18px !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-units-row #prediction-units-label,
+  html.route-prediction.mobile-device #prediction-units-row #glucose-unit-selector {
+    height: auto !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-chart-submit-wrap {
+    position: static !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    display: block !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-glucose-chart-container {
+    position: absolute !important;
+    top: 54px !important;
+    left: 6px !important;
+    right: 6px !important;
+    bottom: 54px !important;
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-glucose-chart-container > #glucose-graph,
+  html.route-prediction.mobile-device #prediction-glucose-chart-container #glucose-graph-graph {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 100% !important;
+    min-height: 0 !important;
+  }
+
+  html.route-prediction.mobile-device .prediction-header {
+    position: absolute !important;
+    left: 6px !important;
+    bottom: 4px !important;
+    width: 220px !important;
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  html.route-prediction.mobile-device .prediction-header #header-app-title,
+  html.route-prediction.mobile-device .prediction-header #header-description,
+  html.route-prediction.mobile-device .prediction-header > div > div:nth-child(2) {
+    display: none !important;
+  }
+
+  html.route-prediction.mobile-device #header-how-to-play {
+    height: 46px !important;
+    display: flex !important;
+    align-items: center !important;
+    margin: 0 !important;
+  }
+
+  html.route-prediction.mobile-device .header-how-to-play-toggle {
+    width: 220px !important;
+    height: 46px !important;
+    padding: 0 12px !important;
+    color: #1f2a44 !important;
+    background: #ffffff !important;
+    border: 1px solid rgba(75, 95, 130, 0.35) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 1px 3px rgba(25, 45, 75, 0.18) !important;
+    font-size: 18px !important;
+    font-weight: 800 !important;
+  }
+
+  html.route-prediction.mobile-device .header-how-to-play-bubble {
+    position: fixed !important;
+    left: 110px !important;
+    right: 110px !important;
+    top: 70px !important;
+    max-height: calc(100dvh - 140px) !important;
+    overflow: auto !important;
+    z-index: 30 !important;
+    padding: 16px 50px 16px 18px !important;
+    background: #ffffff !important;
+    border: 2px solid #93c5fd !important;
+    border-radius: 12px !important;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.32) !important;
+    font-size: 80px !important;
+    line-height: 1.12 !important;
+  }
+
+  html.route-prediction.mobile-device .header-how-to-play-close {
+    position: absolute !important;
+    top: 10px !important;
+    right: 12px !important;
+    left: auto !important;
+    width: 32px !important;
+    height: 32px !important;
+    border: 1px solid rgba(75, 95, 130, 0.25) !important;
+    border-radius: 999px !important;
+    background: #f8fafc !important;
+    color: #334155 !important;
+    font-size: 24px !important;
+    line-height: 1 !important;
+    text-align: center !important;
+    cursor: pointer !important;
+    z-index: 31 !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  html.route-prediction.mobile-device .header-how-to-play-body {
+    padding-right: 34px !important;
+    font-size: 80px !important;
+    line-height: 1.12 !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-mobile-actions {
+    position: absolute !important;
+    right: 6px !important;
+    bottom: 4px !important;
+    width: 548px !important;
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  html.route-prediction.mobile-device .prediction-fullscreen-button {
+    display: none !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-actions {
+    width: 100% !important;
+    height: 46px !important;
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  html.route-prediction.mobile-device #submit-button,
+  html.route-prediction.mobile-device #finish-study-button {
+    flex: 0 0 270px !important;
+    width: 270px !important;
+    height: 46px !important;
+    min-height: 46px !important;
+    margin: 0 !important;
+    padding: 8px 12px !important;
+    font-size: 22px !important;
+    line-height: 1.2 !important;
+  }
+}
+
+/* Absolute compact portrait corrections. This block must stay last because the
+   file contains older repeated prediction rules that otherwise override it. */
+@media (orientation: portrait) {
+  html.route-prediction.mobile-device #page-content > div {
+    position: relative !important;
+    padding: 4px 14px !important;
+    gap: 4px !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-round-summary {
+    order: -2 !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 138px 0 0 !important;
+    margin: 0 !important;
+    font-size: 18px !important;
+    line-height: 1.1 !important;
+    text-align: center !important;
+  }
+
+  html.route-prediction.mobile-device #round-indicator {
+    width: 100% !important;
+    margin: 0 !important;
+    line-height: 1.1 !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-units-row {
+    position: absolute !important;
+    top: 4px !important;
+    right: 14px !important;
+    left: auto !important;
+    bottom: auto !important;
+    width: 132px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 5px !important;
+    padding: 2px 6px !important;
+    margin: 0 !important;
+    align-self: auto !important;
+    box-sizing: border-box !important;
+    font-size: 12px !important;
+    line-height: 1 !important;
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-units-label {
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 12px !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+  }
+
+  html.route-prediction.mobile-device #glucose-unit-selector {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0 !important;
+    width: auto !important;
+  }
+
+  html.route-prediction.mobile-device #glucose-unit-selector .form-check {
+    width: auto !important;
+    min-height: 0 !important;
+    height: 19px !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    line-height: 1 !important;
+  }
+
+  html.route-prediction.mobile-device #glucose-unit-selector input[type="radio"] {
+    width: 14px !important;
+    min-width: 14px !important;
+    height: 14px !important;
+    margin: 0 !important;
+  }
+
+  html.route-prediction.mobile-device #glucose-unit-selector .form-check-label {
+    margin: 0 !important;
+    font-size: 13px !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+  }
+
+  html.route-prediction.mobile-device .prediction-header {
+    order: -1 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 8px !important;
+  }
+
+  html.route-prediction.mobile-device .prediction-header > div {
+    gap: 0 !important;
+  }
+
+  html.route-prediction.mobile-device #header-how-to-play {
+    line-height: 1.05 !important;
+  }
+
+  html.route-prediction.mobile-device .header-how-to-play-toggle {
+    width: 100% !important;
+    min-height: 32px !important;
+    padding: 4px 10px !important;
+    font-size: 16px !important;
+    line-height: 1.05 !important;
+  }
+
+  html.route-prediction.mobile-device .header-how-to-play-bubble {
+    padding: 2px 0 3px 22px !important;
+    line-height: 1.16 !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-chart-submit-wrap {
+    gap: 4px !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-glucose-chart-container {
+    height: 392px !important;
+    min-height: 392px !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-glucose-chart-container > #glucose-graph,
+  html.route-prediction.mobile-device #prediction-glucose-chart-container #glucose-graph-graph {
+    height: 362px !important;
+    min-height: 362px !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-mobile-actions {
+    gap: 6px 10px !important;
+    grid-template-rows: 86px !important;
+    align-items: stretch !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-actions {
+    height: 86px !important;
+    min-height: 86px !important;
+    max-height: 86px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: stretch !important;
+    gap: 6px !important;
+  }
+
+  html.route-prediction.mobile-device #submit-button,
+  html.route-prediction.mobile-device #finish-study-button {
+    flex: 0 0 40px !important;
+    width: 100% !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    margin: 0 !important;
+    padding: 4px 8px !important;
+    font-size: 16px !important;
+    line-height: 1.05 !important;
+    border-radius: 10px !important;
+  }
+
+  html.route-prediction.mobile-device .prediction-fullscreen-button {
+    height: 86px !important;
+    min-height: 86px !important;
+    max-height: 86px !important;
+    padding: 7px 10px !important;
+    font-size: 16px !important;
+    line-height: 1.1 !important;
+    border-radius: 12px !important;
   }
 }

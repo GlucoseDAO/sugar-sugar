@@ -200,7 +200,7 @@ en:
     # landscape flowpath). Keys kept harmless in case other locales still list them.
     title: "ROTATE YOUR PHONE TO LANDSCAPE TO DRAW"
     subtitle: ""
-    go_fullscreen: "⛶  Go fullscreen to draw"
+    go_fullscreen: "Fullscreen mode"
 
   share:
     button_share: "Share my results"

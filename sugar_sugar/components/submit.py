@@ -11,6 +11,17 @@ from sugar_sugar.config import PREDICTION_HOUR_OFFSET, STORAGE_TYPE
 from sugar_sugar.components.metrics import MetricsComponent
 from sugar_sugar.i18n import t, normalize_locale
 
+_MOBILE_UA_KEYWORDS: tuple[str, ...] = (
+    'iphone', 'android', 'ipad', 'mobile', 'mobi', 'opera mini',
+)
+
+
+def _is_mobile_ua(ua: Optional[str]) -> bool:
+    if not ua:
+        return False
+    lc = ua.lower()
+    return any(keyword in lc for keyword in _MOBILE_UA_KEYWORDS)
+
 class SubmitComponent(html.Div):
     def __init__(self, *, locale: str = "en") -> None:
         self._locale: str = normalize_locale(locale)
@@ -546,15 +557,22 @@ class SubmitComponent(html.Div):
              Output('prediction-progress-label', 'children'),
              Output('prediction-progress-label', 'style')],
             [Input('current-window-df', 'data'),
-             Input('interface-language', 'data')],
+             Input('interface-language', 'data'),
+             Input('user-agent', 'data')],
             prevent_initial_call=False
         )
         def update_submit_button_state(
             df_data: Optional[dict[str, Any]],
             interface_language: Optional[str],
+            user_agent: Optional[str],
         ) -> tuple[bool, str, dict[str, Any], str, dict[str, Any]]:
             """Enable submit button only when there are predictions to the end of the hidden area"""
             locale = normalize_locale(interface_language)
+            ready_text = (
+                f"✓ {t('ui.submit.submit', locale=locale)}"
+                if _is_mobile_ua(user_agent)
+                else t("ui.submit.progress_ready", locale=locale)
+            )
             base_style = {
                 'width': '300px', 
                 'fontSize': '25px', 
@@ -620,7 +638,7 @@ class SubmitComponent(html.Div):
                 if predictions_to_end:
                     enabled_style = {**base_style, 'backgroundColor': '#4CBB17', 'color': 'white', 'cursor': 'pointer'}
                     label_style = {**base_label_style, 'display': 'none'}
-                    return False, t("ui.submit.progress_ready", locale=locale), enabled_style, "", label_style
+                    return False, ready_text, enabled_style, "", label_style
                 else:
                     disabled_style = {**base_style, 'backgroundColor': '#999999', 'color': 'white', 'cursor': 'not-allowed'}
                     label_style = {**base_label_style, 'color': '#6c757d'}

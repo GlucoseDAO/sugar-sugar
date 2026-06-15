@@ -1355,21 +1355,6 @@ app.layout = html.Div([
 
     html.Div(id='page-content', children=[], disable_n_clicks=True),
 
-    # Mobile /prediction is a single immersive flowpath: clicking the wizard's
-    # final Start button enters fullscreen + landscape directly (clientside,
-    # below). There is deliberately NO portrait "rotate" nag overlay -- it was
-    # orphaned because it offered a second, non-playable mode.
-    #
-    # Persistent "Go fullscreen" button: a gesture-reliable way back into the
-    # immersive view when the Start-button auto-trigger didn't run (e.g. the user
-    # re-entered /prediction from the burger menu). CSS shows it only on mobile
-    # /prediction (prominent in portrait, a small corner button in landscape).
-    html.Button(
-        t("ui.orientation.go_fullscreen", locale="en"),
-        id="prediction-fullscreen-button",
-        className="prediction-fullscreen-button",
-        type="button",
-    ),
     # Throwaway sinks for the clientside immersive handlers.
     html.Div(id="immersive-sink", style={"display": "none"}),
     html.Div(id="prediction-fullscreen-sink", style={"display": "none"}),
@@ -1418,13 +1403,10 @@ app.clientside_callback(
 )
 
 
-# Per-page layout viewport + route class.  The chart-drawing page needs a wide
-# layout viewport (Plotly drawline coordinate mapping breaks at narrow phone
-# width); every other page gets a true mobile-first `device-width` viewport so
-# portrait reflows naturally.  We also stamp a `route-prediction` class on
-# <html> so CSS (orientation overlay, immersive chart) can target the chart page
-# specifically.  Output is a throwaway sink -- the real side effects are the
-# <meta> tag and the <html> class.
+# Per-page layout viewport + route class.  The chart-drawing page keeps a wide
+# layout viewport only in landscape, where drawing is the primary mode.  In
+# portrait it stays mobile-width and CSS puts the wide chart inside a horizontal
+# scroller so the surrounding UI remains readable.
 app.clientside_callback(
     """
     function(pathname) {
@@ -1434,12 +1416,34 @@ app.clientside_callback(
             if (isPrediction) { root.classList.add('route-prediction'); }
             else { root.classList.remove('route-prediction'); }
         }
-        var m = document.querySelector('meta[name="viewport"]');
-        if (m) {
-            var wide = 'width=1280, maximum-scale=5, user-scalable=yes';
-            var fluid = 'width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes';
-            m.setAttribute('content', isPrediction ? wide : fluid);
+        function scrollPredictionChartToDrawArea() {
+            var scroller = document.getElementById('prediction-glucose-chart-container');
+            if (!scroller) { return; }
+            if (window.matchMedia && window.matchMedia('(orientation: portrait)').matches) {
+                scroller.scrollLeft = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
+            }
         }
+        function applyViewport() {
+            var m = document.querySelector('meta[name="viewport"]');
+            if (!m) { return; }
+            // ALWAYS device-width on /prediction. We used to force width=1280 in
+            // landscape, but in real fullscreen landscape the browser does NOT
+            // auto-scale the 1280 layout to fit, so the right ~30% (incl. Submit)
+            // overflowed off-screen. The real landscape device-width (~800-900px)
+            // is plenty for drawing, and portrait uses a horizontal-scroll chart.
+            var fluid = 'width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes';
+            m.setAttribute('content', fluid);
+            window.setTimeout(scrollPredictionChartToDrawArea, 250);
+            window.setTimeout(scrollPredictionChartToDrawArea, 900);
+        }
+        applyViewport();
+        if (window.__sugarPredictionViewportHandler) {
+            window.removeEventListener('resize', window.__sugarPredictionViewportHandler);
+            window.removeEventListener('orientationchange', window.__sugarPredictionViewportHandler);
+        }
+        window.__sugarPredictionViewportHandler = applyViewport;
+        window.addEventListener('resize', applyViewport);
+        window.addEventListener('orientationchange', applyViewport);
         return window.dash_clientside.no_update;
     }
     """,
@@ -1461,6 +1465,32 @@ app.clientside_callback(
     """,
     Output('mobile-nav-drawer', 'style'),
     Input('mobile-nav-toggle', 'n_clicks'),
+    prevent_initial_call=True,
+)
+
+
+app.clientside_callback(
+    """
+    function(openClicks, closeClicks, currentStyle) {
+        var ctx = window.dash_clientside.callback_context;
+        if (!ctx || !ctx.triggered || !ctx.triggered.length) {
+            return currentStyle || {'display': 'none'};
+        }
+        var prop = ctx.triggered[0].prop_id || '';
+        if (prop.indexOf('header-how-to-play-close') === 0) {
+            return {'display': 'none'};
+        }
+        if (prop.indexOf('header-how-to-play-toggle') === 0) {
+            var visible = currentStyle && currentStyle.display !== 'none';
+            return {'display': visible ? 'none' : 'block'};
+        }
+        return currentStyle || {'display': 'none'};
+    }
+    """,
+    Output('header-how-to-play-bubble', 'style'),
+    [Input('header-how-to-play-toggle', 'n_clicks'),
+     Input('header-how-to-play-close', 'n_clicks')],
+    [State('header-how-to-play-bubble', 'style')],
     prevent_initial_call=True,
 )
 
@@ -1628,10 +1658,13 @@ app.clientside_callback(
 @app.callback(
     Output('prediction-fullscreen-button', 'children'),
     [Input('interface-language', 'data')],
+    [State('url', 'pathname')],
     prevent_initial_call=False,
 )
-def update_fullscreen_button_text(interface_language: Optional[str]) -> str:
+def update_fullscreen_button_text(interface_language: Optional[str], pathname: Optional[str]) -> str:
     """Keep the 'Go fullscreen' button translated as the language changes."""
+    if pathname != '/prediction':
+        raise PreventUpdate
     return t("ui.orientation.go_fullscreen", locale=normalize_locale(interface_language))
 
 
@@ -1866,6 +1899,7 @@ def update_on_language_change(
     [Output('header-app-title', 'children'),
      Output('header-description', 'children'),
      Output('header-how-to-play', 'children'),
+     Output('prediction-round-tagline', 'children'),
      Output('header-data-source-label', 'children'),
      Output('header-upload-prompt', 'children'),
      Output('use-example-data-button', 'children'),
@@ -1889,22 +1923,38 @@ def update_prediction_text_on_language_change(
     locale = normalize_locale(interface_language)
     return (
         t("ui.common.app_title", locale=locale),
+        "Prediction" if locale == "en" else t("ui.header.description_1", locale=locale),
         [
-            t("ui.header.description_1", locale=locale) + " ",
-            html.Br(),
-            t("ui.header.description_2", locale=locale) + " ",
-            t("ui.header.description_3", locale=locale),
+            html.Button(
+                t("ui.header.how_to_play", locale=locale),
+                id="header-how-to-play-toggle",
+                className="header-how-to-play-toggle",
+                type="button",
+            ),
+            html.Div(
+                [
+                    html.Button("×", id="header-how-to-play-close", className="header-how-to-play-close", type="button"),
+                    html.Div(
+                        [
+                            t("ui.header.description_2", locale=locale) + " ",
+                            t("ui.header.description_3", locale=locale),
+                            html.Br(),
+                            t("ui.header.how_to_play_1", locale=locale),
+                            html.Br(),
+                            t("ui.header.how_to_play_2", locale=locale),
+                            html.Br(),
+                            t("ui.header.how_to_play_3", locale=locale),
+                        ],
+                        className="header-how-to-play-body",
+                    ),
+                ],
+                id="header-how-to-play-bubble",
+                className="header-how-to-play-bubble",
+                style={"display": "none"},
+            ),
         ],
-        [
-            html.Strong(t("ui.header.how_to_play", locale=locale)),
-            html.Br(),
-            t("ui.header.how_to_play_1", locale=locale),
-            html.Br(),
-            t("ui.header.how_to_play_2", locale=locale),
-            html.Br(),
-            t("ui.header.how_to_play_3", locale=locale),
-        ],
-        t("ui.header.current_data_source", locale=locale),
+        t("ui.header.description_1", locale=locale),
+        "Source:" if locale == "en" else t("ui.header.current_data_source", locale=locale),
         [
             t("ui.header.upload_prompt_1", locale=locale),
             html.A(t("ui.header.upload_prompt_2", locale=locale)),
@@ -2595,6 +2645,7 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
             show_time_slider=False,
             show_upload_section=show_upload,
             show_example_button=(format_value == "A"),
+            show_data_source_section=False,
             initial_slider_value=example_initial_slider_value,
             locale=locale,
             data_source_name=data_source_display,
@@ -2633,15 +2684,26 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
             },
         ),
         html.Div(id="upload-required-alert", style={'margin': '0 auto', 'maxWidth': '900px'}),
-        html.Div(id='round-indicator', style={
-            'textAlign': 'center',
-            'fontSize': '18px',
-            'fontWeight': '600',
-            'color': '#2c5282',
-            'marginBottom': '10px'
-        }),
+        html.Div(
+            [
+                html.Span(
+                    t("ui.common.round_of", locale=locale, current=1, total=user_info.get("max_rounds", MAX_ROUNDS)).replace("Round", "Prediction Round", 1),
+                    id="prediction-round-tagline",
+                    className="prediction-round-tagline",
+                    style={"display": "none"},
+                ),
+                html.Div(id='round-indicator', style={
+                    'textAlign': 'center',
+                    'fontSize': '18px',
+                    'fontWeight': '600',
+                    'color': '#2c5282',
+                    'marginBottom': '10px'
+                }),
+            ],
+            id="prediction-round-summary",
+            disable_n_clicks=True,
+        ),
         html.Div([
-            html.Div(id='prediction-chart-meta', style={'fontWeight': '600', 'marginRight': '10px'}),
             html.Div(t("ui.prediction.units_label", locale=locale), id='prediction-units-label', style={'fontWeight': '600', 'marginRight': '10px'}),
             dbc.RadioItems(
                 id='glucose-unit-selector',
@@ -2664,7 +2726,37 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
                 GlucoseChart(id='glucose-graph', hide_last_hour=True),
                 id='prediction-glucose-chart-container'
             ),
-            SubmitComponent(locale=locale)
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            html.Label(
+                                "Source:" if locale == "en" else t("ui.header.current_data_source", locale=locale),
+                                id='header-data-source-label',
+                                className="prediction-source-label",
+                            ),
+                            html.Div(id='data-source-display', children=data_source_display, className="prediction-source-name"),
+                            html.Div(id='prediction-chart-meta', className="prediction-source-time"),
+                        ],
+                        className="prediction-source-line",
+                    ),
+                    html.Div(id='generic-source-metadata-display', children="", className="prediction-source-metadata"),
+                ],
+                id="prediction-source-plaque",
+                disable_n_clicks=True,
+            ),
+            html.Div(
+                [
+                    html.Button(
+                        t("ui.orientation.go_fullscreen", locale=locale),
+                        id="prediction-fullscreen-button",
+                        className="prediction-fullscreen-button",
+                        type="button",
+                    ),
+                    SubmitComponent(locale=locale),
+                ],
+                id="prediction-mobile-actions",
+            ),
         ], id='prediction-chart-submit-wrap', style={'flex': '1'})
     ], style={
         'margin': '0 auto',
@@ -2696,10 +2788,7 @@ def update_prediction_chart_meta(
 
     start_time = datetime.fromisoformat(str(time_values[0])).strftime('%H:%M')
     end_time = datetime.fromisoformat(str(time_values[-1])).strftime('%H:%M')
-    time_range = f"{start_time}-{end_time}"
-    if source_name:
-        return f"{source_name} · {time_range}"
-    return time_range
+    return f"{start_time}-{end_time}"
 
 
 @app.callback(
@@ -2746,10 +2835,16 @@ def sync_glucose_unit_selector(
     Output('round-indicator', 'children'),
     [Input('url', 'pathname'),
      Input('user-info-store', 'data'),
-     Input('interface-language', 'data')],
+     Input('interface-language', 'data'),
+     Input('user-agent', 'data')],
     prevent_initial_call=False
 )
-def update_round_indicator(pathname: Optional[str], user_info: Optional[Dict[str, Any]], interface_language: Optional[str]) -> str:
+def update_round_indicator(
+    pathname: Optional[str],
+    user_info: Optional[Dict[str, Any]],
+    interface_language: Optional[str],
+    user_agent: Optional[str],
+) -> str:
     if pathname != '/prediction':
         raise PreventUpdate
     if not user_info:
@@ -2757,7 +2852,13 @@ def update_round_indicator(pathname: Optional[str], user_info: Optional[Dict[str
     rounds_played = len(user_info.get('rounds') or [])
     current_round = int(user_info.get('current_round_number') or (rounds_played + 1))
     max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS)
-    return t("ui.common.round_of", locale=normalize_locale(interface_language), current=current_round, total=max_rounds)
+    locale = normalize_locale(interface_language)
+    round_text = t("ui.common.round_of", locale=locale, current=current_round, total=max_rounds)
+    if _is_mobile_ua(user_agent):
+        return round_text
+    if locale == "en":
+        return round_text.replace("Round", "Prediction Round", 1)
+    return round_text
 
 
 @app.callback(
@@ -6210,10 +6311,19 @@ def update_generic_source_metadata_display(
     else:
         gender_display = meta.gender
 
+    age_display = (
+        str(meta.age)
+        .replace("years old", "")
+        .replace("year old", "")
+        .strip()
+    )
+    weight_display = str(meta.weight).replace(" ", "")
+    if locale == "en":
+        return f"{age_display} yr old {gender_display}, weight {weight_display}"
+
     return (
-        f"{t('ui.startup.age_label', locale=locale)}: {meta.age} · "
-        f"{t('ui.startup.gender_label', locale=locale)}: {gender_display} · "
-        f"{t('ui.header.weight_label', locale=locale)}: {meta.weight}"
+        f"{age_display} · {gender_display} · "
+        f"{t('ui.header.weight_label', locale=locale)} {weight_display}"
     )
 
 # Add callback for random slider initialization when prediction page components are ready

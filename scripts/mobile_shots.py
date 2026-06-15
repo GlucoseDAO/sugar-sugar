@@ -195,9 +195,17 @@ def _server_groups(port: int, *, locale: str) -> list[ServerGroup]:
                 str(port),
             ],
             shots=[
-                # Portrait shows the rotate-to-draw overlay; landscape is the
-                # immersive drawing layout.
+                # Capture both closed and open How-to-play states in portrait
+                # and landscape; the same Shot with landscape=True writes both
+                # orientation PNGs.
                 Shot("prediction", "/prediction", landscape=True, settle_s=3.0),
+                Shot(
+                    "prediction-help-open",
+                    "/prediction",
+                    landscape=True,
+                    settle_s=3.0,
+                    clicks=("header-how-to-play-toggle",),
+                ),
             ],
         ),
     ]
