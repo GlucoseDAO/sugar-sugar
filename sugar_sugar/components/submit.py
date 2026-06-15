@@ -6,6 +6,7 @@ from datetime import datetime
 import uuid
 import csv
 from pathlib import Path
+from eliot import start_action
 from sugar_sugar.config import PREDICTION_HOUR_OFFSET, STORAGE_TYPE
 from sugar_sugar.components.metrics import MetricsComponent
 from sugar_sugar.i18n import t, normalize_locale
@@ -205,6 +206,19 @@ class SubmitComponent(html.Div):
         This writes a single row for the whole "study entry".
         If `user_info["rounds"]` is present, statistics are aggregated across rounds.
         """
+        # Consent gate (defense-in-depth): never persist study data for a session
+        # that has not completed mandatory consent. The display_page guard already
+        # blocks unconsented navigation to the game, but enforcing it here -- at the
+        # single write boundary -- also protects against a crafted client that
+        # fabricates user_info and triggers a finish callback directly.
+        if not user_info.get('consent_completed'):
+            with start_action(
+                action_type=u"save_statistics_skipped_no_consent",
+                study_id=str(user_info.get('study_id') or ''),
+            ):
+                pass
+            return
+
         csv_file_path = self._stats_csv_path
         
         rounds: list[dict[str, Any]] = user_info.get('rounds') or []
