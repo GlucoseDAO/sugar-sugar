@@ -196,6 +196,8 @@ en:
     text: "Note: Sugar Sugar is optimised for desktop at the moment. Mobile support is coming soon!"
 
   orientation:
+    # Retired: the portrait rotate-nag overlay was removed (single immersive
+    # landscape flowpath). Keys kept harmless in case other locales still list them.
     title: "ROTATE YOUR PHONE TO LANDSCAPE TO DRAW"
     subtitle: ""
 

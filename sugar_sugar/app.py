@@ -1355,22 +1355,12 @@ app.layout = html.Div([
 
     html.Div(id='page-content', children=[], disable_n_clicks=True),
 
-    # Portrait-orientation prompt for phones/tablets.  Pure CSS controls
-    # visibility (see assets/orientation.css); callbacks only refresh the
-    # translated text when the interface language changes.
-    html.Div(
-        t("ui.orientation.title", locale="en"),
-        id="orientation-overlay",
-        className="rotate-title",
-        disable_n_clicks=True,
-    ),
-    html.Button(
-        "X",
-        id="orientation-overlay-close",
-        className="orientation-overlay-close",
-        type="button",
-        **{"aria-label": "Close landscape mode notice"},
-    ),
+    # Mobile /prediction is a single immersive flowpath: clicking the wizard's
+    # final Start button enters fullscreen + landscape directly (clientside,
+    # below). There is deliberately NO portrait "rotate" nag overlay -- it was
+    # orphaned because it offered a second, non-playable mode. Throwaway sink for
+    # the clientside immersive handler.
+    html.Div(id="immersive-sink", style={"display": "none"}),
 ])
 
 
@@ -1525,39 +1515,57 @@ app.clientside_callback(
 )
 
 
-@app.callback(
-    Output('orientation-overlay', 'children'),
-    [Input('interface-language', 'data')],
-    prevent_initial_call=False,
+# Immersive entry: when the user clicks the wizard's final Start button on a
+# mobile device, request fullscreen on the whole page (the same Fullscreen API
+# the demo video uses successfully) and best-effort lock to landscape, so they
+# land directly in the immersive chart. Triggered by the Start-button gesture so
+# the browser honours requestFullscreen (a route-change callback would lose the
+# user-activation and be rejected). screen.orientation.lock() needs the fullscreen
+# we just entered; it works on Android Chrome/Vivaldi and rejects on iOS Safari
+# (where the user rotates manually -- the immersive landscape CSS still applies).
+# Desktop is excluded via the mobile-device class check.
+app.clientside_callback(
+    """
+    function(n) {
+        if (!n) { return window.dash_clientside.no_update; }
+        if (!document.documentElement.classList.contains('mobile-device')) {
+            return window.dash_clientside.no_update;
+        }
+        var el = document.documentElement;
+        var requestFullscreen = (
+            el.requestFullscreen ||
+            el.webkitRequestFullscreen ||
+            el.msRequestFullscreen
+        );
+        function lockLandscape() {
+            try {
+                if (screen.orientation && screen.orientation.lock) {
+                    var p = screen.orientation.lock('landscape');
+                    if (p && p.catch) { p.catch(function(){}); }
+                }
+            } catch (e) { /* unsupported (iOS Safari) -- ignore */ }
+            setTimeout(function(){
+                window.dispatchEvent(new Event('resize'));
+                if (window.Plotly) {
+                    document.querySelectorAll('.js-plotly-plot').forEach(function(g){
+                        try { window.Plotly.Plots.resize(g); } catch(e){}
+                    });
+                }
+            }, 400);
+        }
+        if (!requestFullscreen) { lockLandscape(); return window.dash_clientside.no_update; }
+        try {
+            var result = requestFullscreen.call(el);
+            if (result && result.then) { result.then(lockLandscape).catch(lockLandscape); }
+            else { lockLandscape(); }
+        } catch (e) { lockLandscape(); }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output('immersive-sink', 'children'),
+    Input('start-button', 'n_clicks'),
+    prevent_initial_call=True,
 )
-def update_orientation_overlay_text(interface_language: Optional[str]) -> str:
-    """Keep the portrait-prompt overlay translated as the language changes."""
-    locale = normalize_locale(interface_language)
-    return t("ui.orientation.title", locale=locale)
-
-
-@app.callback(
-    [Output('orientation-overlay', 'className'),
-     Output('orientation-overlay-close', 'className')],
-    [Input('orientation-overlay-close', 'n_clicks'),
-     Input('url', 'pathname')],
-    prevent_initial_call=False,
-)
-def update_orientation_overlay_visibility(
-    close_clicks: Optional[int],
-    pathname: Optional[str],
-) -> tuple[str, str]:
-    """Dismiss the portrait prompt, but reinstate it for a fresh landing page."""
-    if ctx.triggered_id == 'orientation-overlay-close' and close_clicks:
-        return (
-            'rotate-title orientation-overlay-dismissed',
-            'orientation-overlay-close orientation-overlay-dismissed',
-        )
-
-    if ctx.triggered_id in (None, 'url') and pathname == '/':
-        return 'rotate-title', 'orientation-overlay-close'
-
-    raise PreventUpdate
 
 
 @app.callback(

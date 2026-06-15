@@ -441,7 +441,14 @@ html.route-prediction.mobile-device #submit-button {
 /* Immersive landscape: collapse all chrome (navbar, the instructional header,
    round indicator) so the chart fills the screen.  Native Plotly only -- never
    CSS-rotate (breaks drawline touch mapping). */
-@media (orientation: landscape) and (pointer: coarse) and (max-device-width: 1024px) {
+/* NOTE: gated on orientation + coarse pointer ONLY. We deliberately dropped the
+   old `max-device-width: 1024px` clause: on real phones the landscape device-width
+   can exceed 1024 (high-DPI / the 1280 layout viewport this page forces), so that
+   clause made the media query FAIL on rotation and the immersive layout never
+   applied -- the chart stayed full-size and Submit/Finish fell off the bottom.
+   The `html.mobile-device` selector scope already restricts this to phones, so
+   the device-width clause was both redundant and the bug. */
+@media (orientation: landscape) and (pointer: coarse) {
   html.route-prediction.mobile-device #navbar-container,
   html.route-prediction.mobile-device .prediction-header,
   html.route-prediction.mobile-device #round-indicator {
@@ -453,7 +460,13 @@ html.route-prediction.mobile-device #submit-button {
      above submit, overflowed past 100vh and cropped the x-axis + submit off the
      bottom of the screen. */
   html.route-prediction.mobile-device #page-content > div {
-    height: 100vh !important;
+    /* 100dvh (dynamic viewport height) = the CURRENTLY visible area, which
+       shrinks when the browser chrome (address bar) is shown. Plain 100vh is the
+       chrome-excluded tall viewport, so with the address bar visible the bottom
+       control strip (Submit/Finish) was pushed below the fold and unreachable
+       (overflow:hidden + the chart eats touch-scroll). dvh keeps it on-screen. */
+    height: 100dvh !important;
+    max-height: 100dvh !important;
     overflow: hidden !important;
     padding: 4px 6px !important;
     gap: 4px !important;

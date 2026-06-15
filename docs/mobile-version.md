@@ -125,15 +125,19 @@ except the one step that physically needs width — line-drawing on the glucose 
   **responsive CSS** on the existing builders. The split:
   - Separate mobile builders: **landing entry**, **startup + consent wizard**, **navbar (burger)**.
   - Responsive CSS only: ending, final, share, faq, about, contact, demo.
-  - `/prediction`: mostly CSS (immersive landscape) + a portrait rotate prompt.
+  - `/prediction`: CSS immersive landscape + a Start-button fullscreen/landscape-lock
+    request (the portrait rotate-nag overlay was removed).
 - **`width=device-width` by default, `1280` only on `/prediction`.** Mobile-first means
   the default viewport is the real device width; the chart page is the single
   exception because Plotly's `drawline` needs horizontal space and is unusable at
   ~390px portrait width.
-- **Rotate-to-draw, not rotate-to-use.** The old landscape plaque blocked the whole
-  site. Now portrait works everywhere; the rotate prompt appears **only on
-  `/prediction`**, where the user rotates to landscape for an **immersive full-screen
-  chart** (chrome collapses). We never CSS-rotate the chart — it breaks touch mapping.
+- **Immersive landscape is the single mobile drawing mode.** The old landscape plaque
+  blocked the whole site; portrait now works everywhere except drawing. On
+  `/prediction` the user is in landscape (the wizard Start button best-effort enters
+  fullscreen + landscape lock; otherwise they rotate) for an **immersive full-screen
+  chart** (chrome collapses, controls pinned within `100dvh`). There is no portrait
+  rotate-nag overlay — it was a second, non-playable mode. We never CSS-rotate the
+  chart — it breaks touch mapping.
 - **Wizard for consent + startup.** 11+ inputs on one page means the keyboard hides the
   active field. Mobile now keeps the landing page short and puts consent in the
   wizard as mandatory step 1, followed by the startup form steps (1–3 fields per
@@ -197,9 +201,15 @@ except the one step that physically needs width — line-drawing on the glucose 
   `min-width:1280` anchor, cap form controls, and style the burger navbar + drawer.
   The 1280-scaling compensations (chart fonts, blanket text bump, immersive landscape)
   are scoped to `html.route-prediction` only.
-- `orientation.css` overlay is scoped to `html.route-prediction` — a responsive
-  "rotate to draw" prompt (`font-size: clamp(34px, 11vw, 150px)`), portrait + coarse
-  pointer only.
+- `orientation.css` is **retired** — the portrait "rotate to draw" nag overlay was
+  removed (it was a second, non-playable mode the user could only dismiss). The single
+  mobile `/prediction` flowpath is now: the immersive landscape CSS applies the moment
+  the phone is in landscape, and the wizard's Start button best-effort requests
+  fullscreen + landscape lock (clientside, mobile-only) so the user lands straight in
+  the immersive chart. Immersive landscape is gated on
+  `@media (orientation: landscape) and (pointer: coarse)` (NO `max-device-width` — see
+  pitfalls) and uses `100dvh` (not `100vh`) so the bottom controls stay on-screen under
+  the browser chrome.
 
 ### 3.5 Screenshot harness (`scripts/mobile_shots.py`)
 
@@ -281,7 +291,7 @@ erase evidence from the rest of the run. See the harness notes in
 | Navbar | Fomantic `massive tabular menu` (one row) | `MobileNavBar` burger + drawer |
 | Startup form | One long `StartupPage` | `StartupPageMobile` 6-step wizard, starting with consent |
 | Landing/consent | Two-column hero + consent card | Short `LandingPageMobile` entry; consent is wizard step 1 |
-| `/prediction` portrait | Chart | "Rotate to draw" overlay |
+| `/prediction` portrait | Chart | Chart (no overlay); rotate or use Start-button fullscreen for the immersive landscape |
 | `/prediction` landscape | Chart + full chrome | Immersive: chrome hidden, chart fills screen |
 | `min-width:1280` (lang.css) | Active | Released except on `/prediction` |
 | Display pages | As-is | Reflow to single column via CSS |
@@ -290,7 +300,7 @@ erase evidence from the rest of the run. See the harness notes in
 
 - `uv run python scripts/mobile_shots.py` — screenshots all pages (entry + result +
   chart groups) at 360px. `uv run python scripts/mobile_shots.py --only chart --port
-  <free>` for just the prediction page (portrait overlay + landscape immersive);
+  <free>` for just the prediction page (portrait chart + landscape immersive);
   `--only result` for the ending/final/share pages (via the staging nodes). Run the
   groups on different ports if the OS is slow to release the socket.
 - `uv run python scripts/mobile_shots.py --language-set babylon` — screenshots the same
@@ -437,6 +447,31 @@ These are the traps that cost the most time. The same list is mirrored in `CLAUD
   unprofessional. Collapse `thead`/`tr`/`td` to `display:block; width:100%`, bold the
   first cell as a heading, and apply a narrower font with `overflow-wrap:anywhere;
   word-break:normal` to links so they wrap cleanly at full width.
+
+- **Immersive landscape must NOT be gated on `max-device-width`.** The immersive
+  `/prediction` landscape CSS was gated on
+  `@media (orientation: landscape) and (pointer: coarse) and (max-device-width: 1024px)`.
+  On a real high-DPI phone the landscape device-width can EXCEED 1024 (and this page
+  forces a 1280 layout viewport), so the query failed on rotation and the immersive
+  layout never applied — the chart stayed full-size and Submit/Finish fell off the
+  bottom (reported: "turning the phone doesn't trigger immersive"; the controls were
+  unreachable because the chart eats touch-scroll). The `html.mobile-device` selector
+  scope already restricts this to phones, so `max-device-width` was redundant AND the
+  bug. Gate on `(orientation: landscape) and (pointer: coarse)` only.
+
+- **Use `100dvh`, not `100vh`, for the immersive shell.** `100vh` is the chrome-excluded
+  tall viewport, so with the address bar visible the bottom control strip sits below the
+  fold and `overflow:hidden` blocks scrolling to it. `100dvh` (dynamic viewport height)
+  tracks the actually-visible area and keeps the controls on-screen. Fullscreen (which
+  hides chrome) makes `vh`/`dvh` equal, but we can't rely on fullscreen always engaging.
+
+- **Fullscreen needs a user-gesture, so trigger it from the entering CLICK.** A
+  `requestFullscreen` from a route-change/store callback is rejected (no user
+  activation). It's wired to the wizard Start-button `n_clicks` (clientside, gated on
+  the `mobile-device` class). Burger "Game" → `/` → redirect loses the gesture, so that
+  path relies on the (now playable) `100dvh` landscape layout + manual rotate instead.
+  `screen.orientation.lock('landscape')` works on Android Chrome/Vivaldi after
+  fullscreen and rejects on iOS Safari (caught; user rotates manually).
 
 - **Mobile buttons/links need `touch-action: manipulation` or taps get swallowed.**
   The viewport allows zoom (`user-scalable=yes, maximum-scale=5`), so mobile browsers
