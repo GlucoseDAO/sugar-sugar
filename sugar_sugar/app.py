@@ -1358,9 +1358,21 @@ app.layout = html.Div([
     # Mobile /prediction is a single immersive flowpath: clicking the wizard's
     # final Start button enters fullscreen + landscape directly (clientside,
     # below). There is deliberately NO portrait "rotate" nag overlay -- it was
-    # orphaned because it offered a second, non-playable mode. Throwaway sink for
-    # the clientside immersive handler.
+    # orphaned because it offered a second, non-playable mode.
+    #
+    # Persistent "Go fullscreen" button: a gesture-reliable way back into the
+    # immersive view when the Start-button auto-trigger didn't run (e.g. the user
+    # re-entered /prediction from the burger menu). CSS shows it only on mobile
+    # /prediction (prominent in portrait, a small corner button in landscape).
+    html.Button(
+        t("ui.orientation.go_fullscreen", locale="en"),
+        id="prediction-fullscreen-button",
+        className="prediction-fullscreen-button",
+        type="button",
+    ),
+    # Throwaway sinks for the clientside immersive handlers.
     html.Div(id="immersive-sink", style={"display": "none"}),
+    html.Div(id="prediction-fullscreen-sink", style={"display": "none"}),
 ])
 
 
@@ -1566,6 +1578,61 @@ app.clientside_callback(
     Input('start-button', 'n_clicks'),
     prevent_initial_call=True,
 )
+
+
+# Persistent "Go fullscreen" button on /prediction: same fullscreen + landscape
+# lock as the Start-button path, but available any time (gesture-reliable). The
+# button is CSS-hidden off mobile/non-prediction, so this only fires where it
+# should.
+app.clientside_callback(
+    """
+    function(n) {
+        if (!n) { return window.dash_clientside.no_update; }
+        var el = document.documentElement;
+        var requestFullscreen = (
+            el.requestFullscreen ||
+            el.webkitRequestFullscreen ||
+            el.msRequestFullscreen
+        );
+        function lockLandscape() {
+            try {
+                if (screen.orientation && screen.orientation.lock) {
+                    var p = screen.orientation.lock('landscape');
+                    if (p && p.catch) { p.catch(function(){}); }
+                }
+            } catch (e) { /* iOS Safari -- ignore */ }
+            setTimeout(function(){
+                window.dispatchEvent(new Event('resize'));
+                if (window.Plotly) {
+                    document.querySelectorAll('.js-plotly-plot').forEach(function(g){
+                        try { window.Plotly.Plots.resize(g); } catch(e){}
+                    });
+                }
+            }, 400);
+        }
+        if (!requestFullscreen) { lockLandscape(); return window.dash_clientside.no_update; }
+        try {
+            var result = requestFullscreen.call(el);
+            if (result && result.then) { result.then(lockLandscape).catch(lockLandscape); }
+            else { lockLandscape(); }
+        } catch (e) { lockLandscape(); }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output('prediction-fullscreen-sink', 'children'),
+    Input('prediction-fullscreen-button', 'n_clicks'),
+    prevent_initial_call=True,
+)
+
+
+@app.callback(
+    Output('prediction-fullscreen-button', 'children'),
+    [Input('interface-language', 'data')],
+    prevent_initial_call=False,
+)
+def update_fullscreen_button_text(interface_language: Optional[str]) -> str:
+    """Keep the 'Go fullscreen' button translated as the language changes."""
+    return t("ui.orientation.go_fullscreen", locale=normalize_locale(interface_language))
 
 
 @app.callback(
