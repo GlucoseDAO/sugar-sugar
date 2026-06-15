@@ -1129,6 +1129,34 @@ def _staging_display(pathname: str, *, locale: str, glucose_unit: Optional[str])
 
 
 if _is_staging_mode:
+    @server.before_request
+    def _guard_staging_routes() -> Any:
+        """Optional Basic-Auth gate for the /staging/* test routes.
+
+        Activates only when STAGING_AUTH ("user:password") is set, so local
+        `serve --staging` and the screenshot harness stay open, while the public
+        staging origin (vanilla-sugar.glucosedao.org) can lock the test nodes
+        down. Behind a TLS reverse proxy, Basic Auth over HTTPS is sufficient.
+        Read live each request so the credential can be rotated without code
+        changes. The /staging callback content arrives via /_dash-update-component
+        once the browser has authenticated for the realm, so gating the /staging*
+        GETs is enough to keep anonymous users out.
+        """
+        if not flask_request.path.startswith("/staging"):
+            return None
+        credential = os.environ.get("STAGING_AUTH")
+        if not credential:
+            return None  # unconfigured -> open (local dev / harness)
+        from flask import Response
+        auth = flask_request.authorization
+        if auth and f"{auth.username}:{auth.password}" == credential:
+            return None
+        return Response(
+            "Staging area requires authentication.",
+            401,
+            {"WWW-Authenticate": 'Basic realm="sugar-sugar staging"'},
+        )
+
     @server.route("/staging/share")
     def _staging_share_route() -> Any:
         """Generate a synthetic share record and 302-redirect to /share/<id>."""

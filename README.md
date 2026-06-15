@@ -230,9 +230,12 @@ states for remote/visual testing **without a playthrough**. They reuse the real
 page builders with synthetic data and do **not** alter production logic — with
 the flag off the app is byte-identical to plain `uv run serve`. Set
 `DEPLOY_URL=https://vanilla-sugar.glucosedao.org` on the staging host. See
-`docs/share-ops.md` → "Staging Mode" for details. **Note:** `/staging/*` is
-currently unauthenticated — gate it (basic-auth / IP allowlist) if the origin is
-publicly reachable.
+`docs/share-ops.md` → "Staging Mode" for details.
+
+Lock the test routes down on a public origin by setting `STAGING_AUTH="user:password"` —
+all `/staging/*` requests then require HTTP Basic Auth (over HTTPS). When
+`STAGING_AUTH` is unset the routes are open, which keeps local `serve --staging`
+and the screenshot harness working.
 
 ### Quick chart debugging
 

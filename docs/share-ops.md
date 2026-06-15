@@ -257,9 +257,12 @@ Implementation notes:
   consent guard lets the nodes render.
 - The screenshot harness `result` group (`scripts/mobile_shots.py`) uses these same
   nodes to capture `/ending`, `/final`, and `/share` on a phone viewport.
-- **Security:** `/staging/*` is currently unauthenticated. If the staging origin is
-  publicly reachable, put basic-auth or an IP allowlist in front of `/staging/*`
-  (backlog item) so the test nodes aren't world-visible.
+- **Security:** set `STAGING_AUTH="user:password"` on a publicly reachable staging
+  origin to require HTTP Basic Auth (over HTTPS) on every `/staging/*` request. A
+  `before_request` hook (registered only in staging mode) enforces it and reads the
+  credential live, so it can be rotated without a code change. When `STAGING_AUTH`
+  is unset the routes are open — which is what keeps local `serve --staging` and the
+  screenshot harness working. (A reverse-proxy IP allowlist is a fine alternative.)
 - Set `DEPLOY_URL=https://vanilla-sugar.glucosedao.org` on the staging host so share
   URLs, OG tags, and card image URLs resolve to the staging origin.
 
