@@ -318,6 +318,13 @@ en:
     warning: "Please do not start over just because you are unhappy with your predictions — restarting skews the research data and undermines the study results."
     continue_btn: "Continue"
     start_over_btn: "Start Over"
+    your_code: "Your resume code (to continue on another device): %{code}"
+
+  resume_code:
+    landing_prompt: "Continuing on a new device? Enter your resume code:"
+    placeholder: "Resume code"
+    redeem_btn: "Resume"
+    not_found: "We couldn't find a session for that code. Check it and try again."
 
   session_expired:
     title: "Session Expired"

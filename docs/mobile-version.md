@@ -57,7 +57,7 @@ guard lets them through.
 | Scenario | Works? | Why |
 |---|---|---|
 | Share on desktop → open link on mobile (and vice-versa) | **Yes** | `/share/<id>` renders from `data/shares/<id>.json` on disk; responsive CSS; crawler OG via `/share/<id>/og`; the 1200×630 card is device-independent |
-| Resume a game session: mobile → desktop (or vice-versa) | **No** | All session state is `STORAGE_TYPE=local` (localStorage), which is **per-browser/per-device**. Nothing server-side keys the session for cross-device pickup. The on-disk share record is the *only* thing that crosses devices, and it is read-only. A designed fix (server-side resume code) is in the sprint backlog, not yet built. |
+| Resume a game session: mobile → desktop (or vice-versa) | **Yes, via resume code** | Session state is still `STORAGE_TYPE=local` (per-device), but a server-side snapshot (`resume_store.py`, `data/resume/<code>.json`) keyed by a short `resume_code` is auto-saved at every meaningful boundary. Re-enter the code on another device (`?resume=<code>` URL, the landing-page "resume code" box, or read it off the resume dialog) to restore the session. See "Cross-device resume" below. |
 | Same-device, close tab, reopen later | Yes | localStorage persists; `restore_page_on_load` shows the resume dialog |
 
 ### Screenshot coverage matrix (`scripts/mobile_shots.py`)
@@ -70,6 +70,31 @@ guard lets them through.
 
 Together these cover every onboarding, gameplay, result, and share surface in at least
 one form.
+
+### Cross-device resume
+
+localStorage is per-device, so the game does not follow a user to another device on its
+own. `sugar_sugar/resume_store.py` bridges that with a server-side snapshot:
+
+- **Code** — a short, human-typeable `resume_code` (no ambiguous glyphs) is assigned to
+  `user_info` at consent (`handle_landing_continue` desktop, `handle_start_button`
+  mobile).
+- **Auto-save** — `auto_snapshot_session` writes `data/resume/<code>.json` (atomic, like
+  `share_store`) at meaningful boundaries: it triggers on `user-info-store`,
+  `last-visited-page`, `glucose-unit`, `interface-language` changes and pulls the
+  dataframes in via `State`, so it does **not** fire on every in-progress drawline.
+- **Redeem** — three entry points, all calling `_restore_outputs_from_code`:
+  `?resume=<code>` on any URL (the universal link; works on first paint via
+  `initial_duplicate`), the "resume code" box on the landing page (fresh-device entry),
+  and the code displayed on the resume dialog for returning users. After a URL redeem a
+  clientside callback strips `?resume=` from the address bar.
+- **Payload** — `_resume_payload` snapshots `user_info`, `full_df`,
+  `current_window_df`, `events_df`, `last_visited_page`, `glucose_unit`,
+  `interface_language`. Add any new game-state store here AND in
+  `_restore_outputs_from_code`, or it won't transfer.
+
+Treat resume codes as session-transfer tokens (anyone with the code resumes the
+session) — like a login link, not a public id. `data/resume/` is gitignored.
 
 ---
 
@@ -424,11 +449,15 @@ These are the traps that cost the most time. The same list is mirrored in `CLAUD
   user path (chart mode, a staging node, a test), set `consent_completed=True` or the
   guard will bounce it to landing.**
 
-- **localStorage is device-local — there is no cross-device resume.** A session started
-  on a phone cannot be continued on a desktop (and vice-versa): every session store is
-  `STORAGE_TYPE=local`. The only thing that crosses devices is the read-only on-disk
-  share record. Don't file "my game didn't follow me to my laptop" as a bug; it's the
-  architecture. A server-side resume code is the designed solution (backlog).
+- **localStorage is device-local; cross-device resume goes through the resume code.**
+  Every session store is `STORAGE_TYPE=local` (per-device), so nothing follows the user
+  to another device automatically. The bridge is `resume_store.py`: a server-side
+  snapshot keyed by `user_info['resume_code']`, auto-saved at meaningful boundaries
+  (`auto_snapshot_session`, triggered by user_info / navigation / unit / language —
+  **not** every drawline; the dataframes come in via `State`). Redeem on another device
+  via `?resume=<code>`, the landing-page box, or the code shown on the resume dialog.
+  **If you add a new game-state store, add it to the resume payload** (`_resume_payload`
+  / `_restore_outputs_from_code`) or it won't transfer.
 
 - **Screenshot `/ending`, `/final`, `/share` via the staging nodes, not click-through.**
   The harness `result` group runs `uv run start` with `_STAGING_MODE=1` and hits

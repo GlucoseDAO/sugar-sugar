@@ -98,6 +98,40 @@ def consent_controls_children(locale: str) -> list[Any]:
     ]
 
 
+def resume_redeem_box(locale: str = "en") -> html.Div:
+    """A small "enter your resume code" entry so a fresh device can continue a
+    session started elsewhere (cross-device resume). Shared by both landing
+    builders; only one is in the DOM per request, so the ids never collide."""
+    return html.Div(
+        [
+            html.Div(
+                t("ui.resume_code.landing_prompt", locale=locale),
+                style={"fontSize": "14px", "color": "#475569", "marginBottom": "8px"},
+            ),
+            html.Div(
+                [
+                    dcc.Input(
+                        id="resume-redeem-input",
+                        type="text",
+                        placeholder=t("ui.resume_code.placeholder", locale=locale),
+                        style={"flex": "1", "minWidth": "0"},
+                    ),
+                    html.Button(
+                        t("ui.resume_code.redeem_btn", locale=locale),
+                        id="resume-redeem-btn",
+                        className="ui blue button",
+                        style={"whiteSpace": "nowrap"},
+                    ),
+                ],
+                style={"display": "flex", "gap": "8px", "alignItems": "center", "maxWidth": "420px", "margin": "0 auto"},
+            ),
+            html.Div(id="resume-redeem-error", style={"color": "#d32f2f", "fontSize": "13px", "marginTop": "6px"}),
+        ],
+        id="resume-redeem-box",
+        style={"marginTop": "20px", "textAlign": "center"},
+    )
+
+
 class LandingPage(html.Div):
     def __init__(self, *, locale: str = "en") -> None:
         self.component_id: str = "landing-page"
@@ -271,6 +305,7 @@ class LandingPage(html.Div):
                 study_info,
                 html.Div(style={"height": "18px"}),
                 consent_notice_card,
+                resume_redeem_box(locale),
                 dcc.Store(id="consent-scroll-complete", data=False, storage_type=STORAGE_TYPE),
                 dcc.Interval(id="consent-scroll-poll", interval=500, n_intervals=0),
             ],
@@ -399,6 +434,9 @@ class LandingPage(html.Div):
             # /prediction on this flag so direct-URL/burger visits can't bypass
             # the consent gate. See also handle_start_button (mobile wizard).
             info["consent_completed"] = True
+            # Stable cross-device resume code (server-side savegame key).
+            from sugar_sugar import resume_store
+            info["resume_code"] = info.get("resume_code") or resume_store.new_code()
 
             if info.get("number") is None:
                 info["number"] = get_next_study_number()
@@ -512,6 +550,7 @@ class LandingPageMobile(html.Div):
                         hero,
                         study_info,
                         take_me_in,
+                        resume_redeem_box(locale),
                     ],
                 )
             ],

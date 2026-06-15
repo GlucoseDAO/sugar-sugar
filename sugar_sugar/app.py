@@ -99,6 +99,7 @@ from sugar_sugar.components.share import (
     create_share_layout,
 )
 from sugar_sugar import share_store
+from sugar_sugar import resume_store
 from sugar_sugar.generic_sources_metadata import load_generic_sources_metadata
 from sugar_sugar.contact_info import load_contact_info
 from sugar_sugar.static_markdown import static_markdown_autosize_iframe
@@ -1340,6 +1341,13 @@ app.layout = html.Div([
     # Throwaway sink for the per-page viewport / route-class clientside callback
     # (there is no real Dash Output for the <meta viewport> tag or <html> class).
     html.Div(id='viewport-sink', style={'display': 'none'}),
+    # Throwaway sink for the cross-device auto-snapshot callback (writes the live
+    # session to resume_store keyed by user_info['resume_code']).
+    dcc.Store(id='resume-sync', data=None, storage_type='memory'),
+    # One-shot guard so the ?resume=<code> redeem callback acts at most once.
+    dcc.Store(id='resume-redeem-done', data=False, storage_type='memory'),
+    # Throwaway sink for the clientside callback that strips ?resume= from the URL.
+    html.Div(id='resume-clean-sink', style={'display': 'none'}),
 
     html.Div(id='resume-dialog-container', children=[], disable_n_clicks=True),
 
@@ -4012,6 +4020,8 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
         info.update({
             'study_id': study_id,
             'run_id': run_id,
+            # Stable cross-device resume code (server-side savegame key).
+            'resume_code': info.get('resume_code') or resume_store.new_code(),
             'email': email or info.get('email') or '',
             'age': age,
             'gender': gender,
@@ -5007,6 +5017,7 @@ def restore_page_on_load(
             "target": target,
             "current_round": current_round,
             "max_rounds": MAX_ROUNDS,
+            "resume_code": (user_info or {}).get("resume_code"),
         }
         return dialog_data, True, no_update, True
 
@@ -5152,6 +5163,17 @@ def render_resume_dialog(
                 style=warning_style,
                 disable_n_clicks=True,
             ),
+            *([
+                html.Div(
+                    t("ui.resume_dialog.your_code", locale=locale, code=dialog_data.get("resume_code")),
+                    style={
+                        'fontSize': '13px', 'color': '#2b6cb0', 'backgroundColor': '#ebf4ff',
+                        'border': '1px solid #bcd4f0', 'borderRadius': '6px',
+                        'padding': '8px 12px', 'marginBottom': '20px', 'wordBreak': 'break-all',
+                    },
+                    disable_n_clicks=True,
+                )
+            ] if dialog_data.get("resume_code") else []),
             html.Div([
                 html.Button(
                     t("ui.resume_dialog.start_over_btn", locale=locale),
@@ -5240,6 +5262,201 @@ def handle_resume_start_over(
         True,                      # clean-storage-flag (self-resets via clientside callback)
         True,                      # session-active (user made a choice in this tab)
     )
+
+
+# ---------------------------------------------------------------------------
+# Cross-device resume (server-side savegame keyed by a short resume code).
+#
+# localStorage is per-device, so a session started on a phone can't be continued
+# on a desktop. We keep a server-side snapshot of the live session (resume_store)
+# keyed by user_info['resume_code'] and let the user re-enter that code on another
+# device to restore it. Entirely additive: the auto-snapshot only reads stores,
+# and the redeem callbacks are gated on an explicit code so they never perturb the
+# normal in-tab persistence/resume flow.
+# ---------------------------------------------------------------------------
+def _resume_payload(
+    user_info: Optional[Dict[str, Any]],
+    full_df: Optional[Dict],
+    current_df: Optional[Dict],
+    events_df: Optional[Dict],
+    last_page: Optional[str],
+    glucose_unit: Optional[str],
+    interface_language: Optional[str],
+) -> Dict[str, Any]:
+    """Thin JSON-serialisable snapshot of the stores needed to restore a game."""
+    return {
+        "user_info": user_info,
+        "full_df": full_df,
+        "current_window_df": current_df,
+        "events_df": events_df,
+        "last_visited_page": last_page,
+        "glucose_unit": glucose_unit,
+        "interface_language": interface_language,
+    }
+
+
+@app.callback(
+    Output('resume-sync', 'data'),
+    [Input('user-info-store', 'data'),
+     Input('last-visited-page', 'data'),
+     Input('glucose-unit', 'data'),
+     Input('interface-language', 'data')],
+    [State('full-df', 'data'),
+     State('current-window-df', 'data'),
+     State('events-df', 'data')],
+    prevent_initial_call=True,
+)
+def auto_snapshot_session(
+    user_info: Optional[Dict[str, Any]],
+    last_page: Optional[str],
+    glucose_unit: Optional[str],
+    interface_language: Optional[str],
+    full_df: Optional[Dict],
+    current_df: Optional[Dict],
+    events_df: Optional[Dict],
+) -> Any:
+    """Persist the live session to resume_store at meaningful boundaries.
+
+    Triggers on user_info / navigation / unit / language changes (round
+    completions and page moves) and captures the dataframes via State, so it does
+    NOT fire on every in-progress drawline (current-window-df) update. Keyed by
+    user_info['resume_code']; only runs for consented sessions. Reads stores only
+    (the Output is a throwaway sink), so it cannot disturb the in-browser
+    persistence/resume contract.
+    """
+    if not user_info or not user_info.get('consent_completed'):
+        raise PreventUpdate
+    code = user_info.get('resume_code')
+    if not code:
+        raise PreventUpdate
+    resume_store.save_session(
+        code,
+        _resume_payload(user_info, full_df, current_df, events_df, last_page, glucose_unit, interface_language),
+    )
+    return code
+
+
+def _restore_outputs_from_code(code: Optional[str]) -> Optional[tuple]:
+    """Load a session by code and return the store-output tuple, or None if missing.
+
+    Output order matches the redeem callbacks:
+    (pathname, user_info, full_df, current_window_df, events_df, glucose_unit,
+     interface_language, last_visited_page, randomization_initialized,
+     is_example_data, data_source_name, session_active).
+    """
+    payload = resume_store.load_session(code)
+    if not payload:
+        return None
+    user_info = payload.get("user_info") or {}
+    last_page = payload.get("last_visited_page") or "/prediction"
+    return (
+        last_page,
+        user_info,
+        payload.get("full_df"),
+        payload.get("current_window_df"),
+        payload.get("events_df"),
+        payload.get("glucose_unit") or "mg/dL",
+        normalize_locale(payload.get("interface_language")),
+        last_page,
+        True,   # randomization-initialized: data already chosen, don't re-roll
+        bool(user_info.get("is_example_data", True)),
+        str(user_info.get("data_source_name", "example.csv")),
+        True,   # session-active
+    )
+
+
+_RESUME_RESTORE_OUTPUTS = [
+    Output('url', 'pathname', allow_duplicate=True),
+    Output('user-info-store', 'data', allow_duplicate=True),
+    Output('full-df', 'data', allow_duplicate=True),
+    Output('current-window-df', 'data', allow_duplicate=True),
+    Output('events-df', 'data', allow_duplicate=True),
+    Output('glucose-unit', 'data', allow_duplicate=True),
+    Output('interface-language', 'data', allow_duplicate=True),
+    Output('last-visited-page', 'data', allow_duplicate=True),
+    Output('randomization-initialized', 'data', allow_duplicate=True),
+    Output('is-example-data', 'data', allow_duplicate=True),
+    Output('data-source-name', 'data', allow_duplicate=True),
+    Output('session-active', 'data', allow_duplicate=True),
+]
+
+
+@app.callback(
+    [Output('resume-redeem-done', 'data'),
+     *_RESUME_RESTORE_OUTPUTS],
+    [Input('url', 'search')],
+    [State('resume-redeem-done', 'data')],
+    prevent_initial_call='initial_duplicate',
+)
+def redeem_resume_from_url(search: Optional[str], done: Optional[bool]) -> tuple:
+    """Restore a session from a ``?resume=<code>`` URL (universal cross-device entry).
+
+    Runs on the initial load too (``initial_duplicate``) so a fresh device opening
+    ``https://.../?resume=CODE`` restores immediately. The one-shot
+    ``resume-redeem-done`` guard (read via State) stops it re-firing. We route via
+    ``url.pathname`` (a different property from the ``url.search`` Input, so there
+    is no self-cycle); a clientside callback strips the ``?resume=`` query.
+    """
+    if done:
+        raise PreventUpdate
+    code: Optional[str] = None
+    if search:
+        from urllib.parse import parse_qs
+        code = (parse_qs(search.lstrip("?")).get("resume") or [None])[0]
+    if not code:
+        raise PreventUpdate
+    restored = _restore_outputs_from_code(code)
+    if restored is None:
+        # Invalid/expired code: mark done, leave stores alone.
+        return (True, *([no_update] * len(_RESUME_RESTORE_OUTPUTS)))
+    with start_action(action_type=u"redeem_resume_from_url", code=str(code)):
+        pass
+    return (True, *restored)
+
+
+# Strip the ?resume=<code> query from the URL after a successful redeem so the
+# transfer token doesn't linger in the address bar / browser history.
+app.clientside_callback(
+    """
+    function(done) {
+        if (done && window.history && window.location.search.indexOf('resume=') !== -1) {
+            window.history.replaceState({}, '', window.location.pathname);
+        }
+        return '';
+    }
+    """,
+    Output('resume-clean-sink', 'children'),
+    [Input('resume-redeem-done', 'data')],
+    prevent_initial_call=True,
+)
+
+
+@app.callback(
+    [Output('resume-redeem-error', 'children'),
+     *_RESUME_RESTORE_OUTPUTS],
+    [Input('resume-redeem-btn', 'n_clicks')],
+    [State('resume-redeem-input', 'value'),
+     State('interface-language', 'data')],
+    prevent_initial_call=True,
+)
+def redeem_resume_from_input(
+    n_clicks: Optional[int],
+    code: Optional[str],
+    interface_language: Optional[str],
+) -> tuple:
+    """Restore a session from a code typed into the landing-page resume box."""
+    if not n_clicks:
+        raise PreventUpdate
+    locale = normalize_locale(interface_language)
+    restored = _restore_outputs_from_code(code)
+    if restored is None:
+        return (
+            t("ui.resume_code.not_found", locale=locale),
+            *([no_update] * len(_RESUME_RESTORE_OUTPUTS)),
+        )
+    with start_action(action_type=u"redeem_resume_from_input", code=str(code)):
+        pass
+    return ("", *restored)
 
 
 ## Removed URL-based data writer callback to enforce single-writer for data stores
