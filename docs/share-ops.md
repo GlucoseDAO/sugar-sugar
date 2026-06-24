@@ -123,7 +123,7 @@ generic Dash shell instead of the item-specific card.
 The share-page buttons in `sugar_sugar/components/share.py` use platform-specific
 intent URLs:
 
-- X: `https://x.com/intent/post?text=...`
+- X: `https://twitter.com/intent/tweet?text=...&url=...`
 - Facebook: `https://www.facebook.com/sharer/sharer.php?u=...`
 - WhatsApp: `https://api.whatsapp.com/send?text=...`
 - LinkedIn: `https://www.linkedin.com/feed/?shareActive=true&shareUrl=...`
@@ -132,6 +132,70 @@ intent URLs:
 
 LinkedIn intentionally uses `feed/?shareActive=true&shareUrl=` rather than the
 older `sharing/share-offsite/?url=` form, which has been flaky in production.
+
+X intentionally uses the canonical `/intent/tweet` Web Intent path with separate
+`text` and `url` params. Do **not** switch it back to `/intent/post`: that is not
+a real intent path, so on mobile the X app claims the `x.com` universal link,
+fails to resolve `/intent/post` as an in-app route, and bounces straight back out
+("share opens the app and then closes"). See the Twitter/X footguns below.
+
+## Twitter/X OG Footguns
+
+X/Twitter is the strictest and most opaque OG consumer. Every item below has
+bitten this project in production; read it before touching the share card,
+`robots.txt`, the image route, or the X intent URL.
+
+**1. Twitterbot obeys `robots.txt`; most others do not.** `facebookexternalhit`,
+WhatsApp, LinkedIn, and Telegram ignore `robots.txt` for OG fetches, but
+Twitterbot respects it. So `Disallow: /share/*/image.png` makes the card image
+vanish **on X only**, reproducibly, while every other platform looks fine. Never
+disallow the card image. To keep per-share PNGs out of search indexes, use the
+`X-Robots-Tag: noindex` header on the image response instead (permits fetching,
+blocks indexing).
+
+**2. `Content-Disposition: attachment` silently kills the card.** Serving the PNG
+with `as_attachment=True` (a forced download) makes X refuse to render it inline.
+The image route serves **inline** (`as_attachment=False`). The human "Download"
+button still works because it forces the download client-side via the HTML
+`download` attribute, not the disposition header.
+
+**3. Use `/intent/tweet`, never `/intent/post`.** `/intent/post` is not a real
+Web Intent path. Desktop happens to redirect it to the composer, but on mobile
+the installed X app claims the `x.com` universal link, can't resolve
+`/intent/post` in-app, and bounces back out — the user sees the share "open the
+app then close". Canonical: `https://twitter.com/intent/tweet?text=...&url=...`.
+
+**4. X retired the Card Validator (2022). There is no official re-scrape button.**
+Any "card validator" you find today is third-party — it fetches the live tags
+fresh (bypassing both `robots.txt` *and* X's cache), so it can show a green
+preview while real tweets still show nothing. A green third-party validator does
+**not** prove the live card works.
+
+**5. X caches a card per-URL for up to ~7 days.** If X scraped a URL while it was
+broken (e.g. before a fix deployed), it serves that stale "no image" card until
+the cache expires. Because there's no re-scrape tool (#4), the only ways to force
+a fresh card are:
+- **Share a URL X has never seen** — append a throwaway query param to the *page*
+  URL you post: `…/share/<id>?r=1`. X keys its cache on the full URL, so this is a
+  brand-new entry → fresh scrape. The crawler hook matches on the path, so the OG
+  response is byte-identical; only X's cache key changes.
+- Wait out the ~7-day cache on the bare URL.
+
+**6. Newly-generated shares are inherently fresh URLs.** Each share has a unique
+id (`/share/ytTfKQ65Zb` ≠ `/share/bbOyjxLhX8`), so any *new* share scrapes clean
+on its first post — no cache-bust param needed. `SHARE_CARD_IMAGE_VERSION` (baked
+into the image URL as `?v=`) only matters when you **redesign the card art** and
+need *already-posted* URLs to refresh their image; it does nothing for new shares.
+
+**7. The compose/DM inline preview is cached harder than posted tweets.** When
+testing, an actual post (to a throwaway/private account), or a `?r=1` URL, is the
+real test — the draft-composer preview can stay stale even after the live card is
+fixed.
+
+**Diagnosing "image works everywhere except X, reproducibly":** suspect #1
+(robots.txt) or #2 (attachment) first — both are Twitter-specific and systematic.
+**"Third-party validator green but the tweet is blank":** suspect #5 (stale
+per-URL cache) — re-share with `?r=1`.
 
 ## Site-Wide Crawler Metadata
 
@@ -154,7 +218,14 @@ The Flask server also exposes:
 
 These are generated dynamically from the current request base or `DEPLOY_URL`.
 `robots.txt` allows the public site, advertises the sitemap and `llms.txt`, and
-disallows Dash internals plus `/share/*/image.png`.
+disallows Dash internals (`/_dash-`, `/_reload-hash`).
+
+It must **not** disallow `/share/*/image.png`. Twitterbot honors robots.txt, so a
+Disallow there makes X skip the card image entirely (other platforms ignore
+robots.txt for OG fetches, so the failure looks Twitter-specific). The per-share
+PNGs are instead kept out of search indexes via an `X-Robots-Tag: noindex`
+response header on the image route, which permits crawler *fetching* while
+blocking *indexing*. See the Twitter/X footguns below.
 
 ## Canonical URL Resolution
 
@@ -376,7 +447,9 @@ Expected results:
 
 - Bot requests to `/share/<id>` return item-specific OG/Twitter tags.
 - `og:image` points to `/share/<id>/image.png?v=<SHARE_CARD_IMAGE_VERSION>`.
-- Image response is `200`, `Content-Type: image/png`, and not behind auth.
+- Image response is `200`, `Content-Type: image/png`, `Content-Disposition:
+  inline` (NOT `attachment`), `X-Robots-Tag: noindex`, and not behind auth.
+- `robots.txt` does **not** Disallow `/share/*/image.png`.
 - Human requests to `/share/<id>/og` redirect with 302 to `/share/<id>`.
 - `og:image:width` and `og:image:height` match the actual PNG dimensions.
 
@@ -385,7 +458,10 @@ Then force re-scrapes in platform tools:
 - Facebook Sharing Debugger
 - LinkedIn Post Inspector
 - Telegram `@WebpageBot`
-- a fresh X/Twitter draft preview
+- X/Twitter: there is **no** official re-scrape tool (the Card Validator was
+  retired in 2022). Force a fresh scrape by posting the page URL with a throwaway
+  query param (`/share/<id>?r=1`) — see the Twitter/X footguns. Third-party OG
+  previewers show the live tags but cannot clear X's own per-URL cache.
 - a throwaway Discord or Slack channel
 
 Most platforms cache previews for days. If an image changed but the URL did not,
@@ -404,6 +480,12 @@ platform cache is cleared.
 - Do not add meta refresh to crawler OG responses. Redirect humans server-side.
 - Do not share `/share/<id>/image.png` directly. Share `/share/<id>` so crawlers
   can read title, description, and image metadata.
+- Do not `Disallow: /share/*/image.png` in `robots.txt` — it breaks the X card
+  (Twitterbot obeys robots.txt). Use `X-Robots-Tag: noindex` on the image route.
+- Do not serve the card PNG with `Content-Disposition: attachment` — X won't
+  render it. Serve inline; the Download button uses the HTML `download` attribute.
+- Do not use `x.com/intent/post` for the X share button. Use the canonical
+  `twitter.com/intent/tweet?text=...&url=...` (post bounces the mobile X app).
 - Do not assume a downloaded Chrome binary is enough. The host still needs
   Chromium shared libraries.
 - Do not rely on `DASH_DEBUG=True` for production. Use `uv run serve` so the app
@@ -417,8 +499,12 @@ platform cache is cleared.
 3. Run `uv run setup-chrome`.
 4. Start with `uv run serve`.
 5. Generate a test share with real or synthetic data.
-6. Verify `/share/<id>` as a bot and `/share/<id>/image.png` as an image.
+6. Verify `/share/<id>` as a bot and `/share/<id>/image.png` as an image
+   (`200`, `image/png`, `Content-Disposition: inline`, `X-Robots-Tag: noindex`;
+   confirm `robots.txt` does not Disallow the image).
 7. Render locale stress previews if card layout changed.
-8. Bump `SHARE_CARD_IMAGE_VERSION` if the share-card PNG design changed.
-9. Re-scrape in Facebook, LinkedIn, Telegram, X, Discord, and Slack.
+8. Bump `SHARE_CARD_IMAGE_VERSION` if the share-card PNG design changed (this
+   only refreshes *already-posted* URLs; new shares are fresh URLs already).
+9. Re-scrape in Facebook, LinkedIn, Telegram, Discord, and Slack. For X there is
+   no re-scrape tool — test with a fresh `/share/<id>?r=1` URL (see footguns).
 10. Watch `logs/sugar_sugar.log` for Kaleido fallback messages.
