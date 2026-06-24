@@ -447,23 +447,19 @@ class StartupPage(html.Div):
              Input('diabetes-duration-input', 'value'),
              Input('location-input', 'value'),
              Input('user-info-store', 'data'),
-             Input('consent-receive-results', 'value'),
-             Input('consent-keep-updated', 'value'),
              Input('interface-language', 'data')]
         )
         def update_form_validation(
-            email: Optional[str], 
-            age: Optional[int | float], 
-            gender: Optional[str], 
+            email: Optional[str],
+            age: Optional[int | float],
+            gender: Optional[str],
             format_value: Optional[str],
             data_usage_consent: Optional[list[str]],
-            is_diabetic: Optional[bool], 
-            diabetic_type: Optional[str], 
-            diabetes_duration: Optional[int | float], 
+            is_diabetic: Optional[bool],
+            diabetic_type: Optional[str],
+            diabetes_duration: Optional[int | float],
             location: Optional[str],
             user_info: Optional[dict[str, Any]],
-            consent_receive_results: Optional[list[str]],
-            consent_keep_updated: Optional[list[str]],
             interface_language: Optional[str],
         ) -> tuple[
             bool,
@@ -484,11 +480,16 @@ class StartupPage(html.Div):
             required_style = {'color': '#d32f2f', 'fontSize': '24px', 'fontWeight': 'bold'}
 
             info: dict[str, Any] = dict(user_info or {})
+            # Contact-consent checkboxes live on the LANDING page (landing.py), not
+            # in the /startup DOM. handle_landing_continue persists the user's choice
+            # into user-info-store, so derive `wants_contact` from there. Do NOT add
+            # Input('consent-receive-results'/'consent-keep-updated') here: those
+            # components are absent on /startup, and Dash refuses to fire a callback
+            # whose Inputs aren't all in the layout — that left the desktop
+            # start-button stuck disabled (mobile regression, fixed 2026-06).
             wants_contact = bool(
                 info.get('consent_receive_results_later') or
-                info.get('consent_keep_up_to_date') or
-                (consent_receive_results and 'receive_results' in consent_receive_results) or
-                (consent_keep_updated and 'keep_updated' in consent_keep_updated)
+                info.get('consent_keep_up_to_date')
             )
             
             # Check each required field and set asterisk visibility

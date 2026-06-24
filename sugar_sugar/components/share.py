@@ -1404,13 +1404,17 @@ def create_share_layout(
 
     encoded_url: str = urllib.parse.quote(share_url, safe="")
     encoded_text: str = urllib.parse.quote(invite_text, safe="")
-    encoded_x_text: str = urllib.parse.quote(f"{invite_text} {share_url}", safe="")
 
     share_buttons: html.Div = html.Div(
         [
             _share_button(
                 t("ui.share.share_on_x", locale=loc),
-                f"https://x.com/intent/post?text={encoded_x_text}",
+                # Use the canonical /intent/tweet Web Intent with separate text+url
+                # params. Do NOT use /intent/post: it is not a real intent path, so
+                # on mobile the X app claims the x.com universal link, fails to
+                # resolve /intent/post as an in-app route, and bounces straight back
+                # out ("opens then closes"). /intent/tweet is app-recognised.
+                f"https://twitter.com/intent/tweet?text={encoded_text}&url={encoded_url}",
                 color="#000000", icon="fa-x-twitter",
             ),
             _share_button(
