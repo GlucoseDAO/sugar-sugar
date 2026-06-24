@@ -723,7 +723,13 @@ def _build_robots_txt() -> str:
             "Allow: /llms.txt",
             "Disallow: /_dash-",
             "Disallow: /_reload-hash",
-            "Disallow: /share/*/image.png",
+            # NOTE: do NOT Disallow /share/*/image.png here. Twitterbot honors
+            # robots.txt, so a Disallow makes it skip the OG card image entirely
+            # (FB/WhatsApp/LinkedIn/Telegram ignore robots.txt for OG fetches, so
+            # they still showed it -- this is exactly why Twitter alone broke).
+            # Search engines are kept from indexing the per-share PNGs via the
+            # `X-Robots-Tag: noindex` response header on the image route instead,
+            # which permits crawler *fetching* while blocking *indexing*.
             "",
             f"Sitemap: {sitemap_url}",
             f"# LLM-readable overview: {llms_url}",
@@ -892,14 +898,22 @@ def _share_card_png(share_id: str) -> Any:
             seed=share_id,
         )
         _SHARE_PNG_CACHE[cache_key] = cached
+    # Serve INLINE (not as_attachment): a `Content-Disposition: attachment`
+    # makes some social image consumers (Twitter among the pickier ones) refuse
+    # to render the card. The human "Download" button on the share page forces a
+    # download client-side via the HTML `download` attribute, so it doesn't need
+    # the attachment disposition here.
     response = flask_send_file(
         BytesIO(cached),
         mimetype="image/png",
-        as_attachment=True,
+        as_attachment=False,
         download_name=f"sugar-sugar-{share_id}.png",
         max_age=86400,
     )
     response.headers["Cache-Control"] = "public, max-age=86400"
+    # Allow crawlers to FETCH the card (needed for Twitter/X OG) but keep the
+    # per-share PNGs out of search indexes. Pairs with the robots.txt note.
+    response.headers["X-Robots-Tag"] = "noindex"
     return response
 
 
