@@ -4224,28 +4224,27 @@ def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) ->
      State('diabetic-type-dropdown', 'value'),
      State('diabetes-duration-input', 'value'),
      State('location-input', 'value'),
-     State('user-info-store', 'data'),
-     State('consent-acknowledge', 'value'),
-     State('consent-gdpr', 'value'),
-     State('consent-upload-own-data', 'value'),
-     State('consent-play-only', 'value'),
-     State('consent-receive-results', 'value'),
-     State('consent-keep-updated', 'value')],
+     State('user-info-store', 'data')],
     prevent_initial_call=True
 )
-def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Optional[int | float], 
+def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Optional[int | float],
                        gender: Optional[str], uses_cgm: Optional[bool], cgm_duration_years: Optional[float],
                        format_value: Optional[str], data_usage_consent: Optional[list[str]],
-                       diabetic: Optional[bool], diabetic_type: Optional[str], 
+                       diabetic: Optional[bool], diabetic_type: Optional[str],
                        diabetes_duration: Optional[float], location: Optional[str],
-                       existing_user_info: Optional[Dict[str, Any]] = None,
-                       acknowledge_value: Optional[list[str]] = None,
-                       gdpr_value: Optional[list[str]] = None,
-                       upload_own_data_value: Optional[list[str]] = None,
-                       play_only_value: Optional[list[str]] = None,
-                       receive_results_value: Optional[list[str]] = None,
-                       keep_updated_value: Optional[list[str]] = None) -> Tuple[str, Dict[str, Any]]:
-    """Handle start button on startup page"""
+                       existing_user_info: Optional[Dict[str, Any]] = None) -> Tuple[str, Dict[str, Any]]:
+    """Handle start button on startup page.
+
+    Consent is recorded BEFORE this callback runs -- on desktop by
+    handle_landing_continue, on mobile by record_mobile_consent -- and arrives
+    here via `existing_user_info`. This callback must NOT take the landing-only
+    consent components (`consent-acknowledge`, `consent-gdpr`, ...) as State:
+    those components live only in the desktop landing page and the mobile wizard
+    step 0, so they are absent from the *desktop* /startup DOM. Dash refuses to
+    fire a callback whose Input/State components aren't all in the layout, so
+    referencing them left the desktop Start button inert (it activated but
+    navigated nowhere). See record_mobile_consent below for the mobile path.
+    """
     if not n_clicks:
         return no_update, no_update
 
@@ -4260,28 +4259,6 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
         study_id = info.get('study_id') or str(uuid.uuid4())
         run_id = str(uuid.uuid4())
         uses_cgm_bool = bool(uses_cgm) if uses_cgm is not None else False
-        mobile_consent_values = [
-            acknowledge_value,
-            gdpr_value,
-            upload_own_data_value,
-            play_only_value,
-            receive_results_value,
-            keep_updated_value,
-        ]
-        has_mobile_consent = any(value is not None for value in mobile_consent_values)
-        if has_mobile_consent:
-            acknowledged = bool(acknowledge_value and "ack" in acknowledge_value)
-            gdpr_consented = bool(gdpr_value and "gdpr" in gdpr_value)
-            if not acknowledged or not gdpr_consented:
-                return no_update, no_update
-
-            any_selected = bool(play_only_value) or bool(receive_results_value) or bool(keep_updated_value)
-            no_selection = not any_selected
-            upload_own_data = bool(upload_own_data_value and "upload_own_data" in upload_own_data_value)
-            play_only = bool(play_only_value and "play_only" in play_only_value)
-            receive_results = bool(receive_results_value and "receive_results" in receive_results_value)
-            keep_updated = bool(keep_updated_value and "keep_updated" in keep_updated_value)
-            consent_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         info.update({
             'study_id': study_id,
@@ -4310,22 +4287,6 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
             'data_source_name': str(info.get('data_source_name', 'example.csv')),
         })
 
-        if has_mobile_consent:
-            info.update({
-                "consent_gdpr": gdpr_consented,
-                "consent_upload_own_data": upload_own_data,
-                "consent_play_only": play_only,
-                "consent_participate_in_study": (not play_only) and (not no_selection),
-                "consent_receive_results_later": receive_results,
-                "consent_keep_up_to_date": keep_updated,
-                "consent_no_selection": no_selection,
-                "consent_timestamp": consent_timestamp,
-                # Mobile wizard step 0 is the consent gate; reaching here with
-                # acknowledged+gdpr means consent is complete. Mirror the desktop
-                # landing flag so display_page's guard treats both paths alike.
-                "consent_completed": True,
-            })
-
         # Ensure stable "number" across consent + stats + ranking CSVs.
         if info.get("number") is None:
             info["number"] = get_next_study_number()
@@ -4349,20 +4310,97 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
             "study_id": info["study_id"],
             "number": info.get("number", ""),
             "timestamp": info.get("consent_timestamp", ""),
+            "gdpr_consent": bool(info.get("consent_gdpr", False)),
+            "upload_own_data": bool(info.get("consent_upload_own_data", False)),
             "play_only": bool(info.get("consent_play_only", False)),
             "participate_in_study": bool(info.get("consent_participate_in_study", False)),
             "receive_results_later": bool(info.get("consent_receive_results_later", False)),
             "keep_up_to_date": bool(info.get("consent_keep_up_to_date", False)),
             "no_selection": bool(info.get("consent_no_selection", True)),
         }
-        if has_mobile_consent:
-            consent_row.update({
-                "gdpr_consent": gdpr_consented,
-                "upload_own_data": upload_own_data,
-            })
         ensure_consent_agreement_row(consent_row)
         return '/prediction', info
     return no_update, no_update
+
+
+@app.callback(
+    Output('user-info-store', 'data', allow_duplicate=True),
+    [Input('consent-acknowledge', 'value'),
+     Input('consent-gdpr', 'value'),
+     Input('consent-upload-own-data', 'value'),
+     Input('consent-play-only', 'value'),
+     Input('consent-receive-results', 'value'),
+     Input('consent-keep-updated', 'value')],
+    [State('user-info-store', 'data')],
+    prevent_initial_call=True
+)
+def record_mobile_consent(
+    acknowledge_value: Optional[list[str]],
+    gdpr_value: Optional[list[str]],
+    upload_own_data_value: Optional[list[str]],
+    play_only_value: Optional[list[str]],
+    receive_results_value: Optional[list[str]],
+    keep_updated_value: Optional[list[str]],
+    existing_user_info: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Mirror the mobile wizard's consent choices into `user-info-store`.
+
+    On mobile, consent lives in StartupPageMobile wizard step 0 (the consent
+    components are imported from landing.py). Nothing else records consent on
+    mobile before Start, so this callback does it -- writing `consent_completed`
+    once the two mandatory boxes are ticked, exactly like handle_landing_continue
+    does on desktop. That lets handle_start_button read consent from
+    `user-info-store` on BOTH platforms instead of taking these landing-only
+    components as State (which broke desktop -- see that callback).
+
+    The same consent components also render on the desktop landing page, so a
+    UA guard below restricts this callback to mobile; desktop consent stays
+    owned by handle_landing_continue.
+
+    No CSV row is written here (this fires on every checkbox toggle);
+    handle_start_button writes the consent-agreement row once on Start.
+    """
+    from datetime import datetime
+
+    # The consent components also exist on the *desktop* landing page, so this
+    # callback would otherwise fire there too and race handle_landing_continue.
+    # Restrict it to mobile (where it is the only consent recorder); on desktop,
+    # handle_landing_continue owns consent recording untouched.
+    if not _is_mobile_request():
+        raise PreventUpdate
+
+    acknowledged = bool(acknowledge_value and "ack" in acknowledge_value)
+    gdpr_consented = bool(gdpr_value and "gdpr" in gdpr_value)
+    if not (acknowledged and gdpr_consented):
+        # Mandatory consent not yet complete; don't mark it done. The wizard's
+        # gate_mobile_consent_step keeps the Next button disabled until then.
+        raise PreventUpdate
+
+    info: Dict[str, Any] = dict(existing_user_info or {})
+    if not info.get("study_id"):
+        info["study_id"] = str(uuid.uuid4())
+
+    any_selected = bool(play_only_value) or bool(receive_results_value) or bool(keep_updated_value)
+    no_selection = not any_selected
+    upload_own_data = bool(upload_own_data_value and "upload_own_data" in upload_own_data_value)
+    play_only = bool(play_only_value and "play_only" in play_only_value)
+    receive_results = bool(receive_results_value and "receive_results" in receive_results_value)
+    keep_updated = bool(keep_updated_value and "keep_updated" in keep_updated_value)
+
+    info.update({
+        "consent_gdpr": gdpr_consented,
+        "consent_upload_own_data": upload_own_data,
+        "consent_play_only": play_only,
+        "consent_participate_in_study": (not play_only) and (not no_selection),
+        "consent_receive_results_later": receive_results,
+        "consent_keep_up_to_date": keep_updated,
+        "consent_no_selection": no_selection,
+        "consent_timestamp": info.get("consent_timestamp") or datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "consent_completed": True,
+        # Stable cross-device resume code, assigned at consent like on desktop.
+        "resume_code": info.get("resume_code") or resume_store.new_code(),
+    })
+    return info
 
 
 @app.callback(
