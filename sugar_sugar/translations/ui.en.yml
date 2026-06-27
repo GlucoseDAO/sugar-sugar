@@ -47,6 +47,7 @@ en:
     open_consent_form: "Open consent notice"
     consent_required_error: "Please confirm you are 18+ and have read the consent form to continue."
     next_hint: "Next: you'll fill in a short form, then upload CGM data (or use the sample dataset)."
+    take_me_in: "Take me in"
 
   consent_form:
     title: "Consent notice"
@@ -80,7 +81,7 @@ en:
     body: "If you have questions, feedback, or want your data removed, please reach out using the contacts below."
     study_contacts_title: "Study contacts"
     general_email_title: "General team email"
-    social_title: "Social media & community"
+    social_title: "Social media"
     platforms_title: "Website & platforms"
     linkedin_title: "LinkedIn"
     col_name: "Name"
@@ -93,6 +94,7 @@ en:
   demo:
     title: "Demo"
     body: "Try a quick demo of the Sugar Sugar glucose prediction game."
+    fullscreen_video: "Watch fullscreen"
 
   startup:
     fork_me: "Fork me on GitHub"
@@ -129,6 +131,10 @@ en:
     contact_prefs_text: "Email is only required if you asked to receive results later or to be kept up to date."
     just_test_me: "Just Test Me"
     start_prediction: "Start Prediction"
+    wizard_back: "Back"
+    wizard_next: "Next"
+    wizard_step: "Step %{current} of %{total}"
+    consent_gate_hint: "Tick both required boxes above (18+ / read the terms, and data-protection consent) to continue."
     format_label: "Format"
     format_placeholder: "Choose an option"
     format_a_label: "Generic Data"
@@ -190,8 +196,11 @@ en:
     text: "Note: Sugar Sugar is optimised for desktop at the moment. Mobile support is coming soon!"
 
   orientation:
-    title: "FOR BEST RESULTS PLEASE USE LANDSCAPE MODE TO ACCESS THE SITE"
+    # Retired: the portrait rotate-nag overlay was removed (single immersive
+    # landscape flowpath). Keys kept harmless in case other locales still list them.
+    title: "ROTATE YOUR PHONE TO LANDSCAPE TO DRAW"
     subtitle: ""
+    go_fullscreen: "Fullscreen mode"
 
   share:
     button_share: "Share my results"
@@ -313,6 +322,15 @@ en:
     warning: "Please do not start over just because you are unhappy with your predictions — restarting skews the research data and undermines the study results."
     continue_btn: "Continue"
     start_over_btn: "Start Over"
+    your_code: "Your resume code (to continue on another device): %{code}"
+
+  resume_code:
+    landing_prompt: "Continuing on a new device? Enter your resume code:"
+    placeholder: "Resume code"
+    redeem_btn: "Resume"
+    not_found: "We couldn't find a session for that code. Check it and try again."
+    copy_link: "🔗 Copy resume link"
+    copied: "✓ Link copied!"
 
   session_expired:
     title: "Session Expired"

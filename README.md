@@ -39,7 +39,7 @@ The game has up to 12 rounds. Each round takes about 2–3 minutes; a full sessi
 
 ## Screenshots
 
-![Game Interface](images/screenshot.png)
+![Game Interface](assets/images/screenshot.png)
 *sugar-sugar in action — try to predict where that line is going!*
 
 ## Data and privacy
@@ -213,6 +213,30 @@ Serve it behind a TLS reverse proxy such as Caddy or nginx. The app respects
 `X-Forwarded-Host` and `X-Forwarded-Proto` when `DEPLOY_URL` is not set, but
 `DEPLOY_URL` is the preferred production source of truth.
 
+#### Staging mode (`--staging`)
+
+The staging deployment at `https://vanilla-sugar.glucosedao.org/` hosts the dev
+branch. Run it like production but with the prod+ test routes enabled:
+
+```bash
+uv run serve-staging                 # = uv run serve --staging
+uv run serve --staging --workers 2   # equivalent, explicit
+```
+
+`--staging` sets `_STAGING_MODE=1`, which adds gated test routes under
+`/staging/*` (`/staging` index, `/staging/ending`, `/staging/final`,
+`/staging/share`, `/staging/prediction`) that jump straight to prefilled
+states for remote/visual testing **without a playthrough**. They reuse the real
+page builders with synthetic data and do **not** alter production logic — with
+the flag off the app is byte-identical to plain `uv run serve`. Set
+`DEPLOY_URL=https://vanilla-sugar.glucosedao.org` on the staging host. See
+`docs/share-ops.md` → "Staging Mode" for details.
+
+Lock the test routes down on a public origin by setting `STAGING_AUTH="user:password"` —
+all `/staging/*` requests then require HTTP Basic Auth (over HTTPS). When
+`STAGING_AUTH` is unset the routes are open, which keeps local `serve --staging`
+and the screenshot harness working.
+
 ### Quick chart debugging
 
 Skip landing/startup/consent and jump straight to the prediction chart:
@@ -224,6 +248,37 @@ uv run chart --prefill                # pre-fill predictions for testing submit 
 uv run chart --prefill --noise 0.10   # ±10% noise
 uv run chart --unit mmol/L --locale de
 ```
+
+### Mobile screenshot harness
+
+Generate deterministic mobile screenshots for layout review:
+
+```bash
+uv run python scripts/mobile_shots.py
+uv run python scripts/mobile_shots.py --device iphone-se
+uv run python scripts/mobile_shots.py --only chart
+uv run python scripts/mobile_shots.py --language-set babylon
+```
+
+By default, the harness keeps the historic English-only behaviour and writes flat
+PNGs to `data/output/mobile_shots/`, for example
+`prediction-android-narrow-landscape.png`. Use `--language-set babylon`
+(`--variant babylon` also works) to render every supported locale and write one
+folder per language, for example `data/output/mobile_shots/ro/*.png`.
+
+The script starts the app twice: the `entry` group uses `uv run start` for
+landing, consent, startup wizard steps, about, FAQ, contact, and demo pages; the
+`chart` group uses `uv run chart --prefill --no-debug --no-reloader` for the
+prediction page in portrait and landscape. Other useful options:
+
+- `--device android-narrow|iphone-se|iphone-13|pixel-7` changes the viewport preset.
+- `--only entry` or `--only chart` limits the run to one server group.
+- `--out <dir>` changes the output root.
+- `--port <port>` changes the spawned server port.
+- `--base-url http://127.0.0.1:8050` screenshots an already-running server instead of spawning one.
+
+See `docs/mobile-version.md` for the full harness design notes and CDP emulation
+pitfalls.
 
 ### Share page debugging
 

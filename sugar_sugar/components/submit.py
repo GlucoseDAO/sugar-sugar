@@ -6,9 +6,21 @@ from datetime import datetime
 import uuid
 import csv
 from pathlib import Path
+from eliot import start_action
 from sugar_sugar.config import PREDICTION_HOUR_OFFSET, STORAGE_TYPE
 from sugar_sugar.components.metrics import MetricsComponent
 from sugar_sugar.i18n import t, normalize_locale
+
+_MOBILE_UA_KEYWORDS: tuple[str, ...] = (
+    'iphone', 'android', 'ipad', 'mobile', 'mobi', 'opera mini',
+)
+
+
+def _is_mobile_ua(ua: Optional[str]) -> bool:
+    if not ua:
+        return False
+    lc = ua.lower()
+    return any(keyword in lc for keyword in _MOBILE_UA_KEYWORDS)
 
 class SubmitComponent(html.Div):
     def __init__(self, *, locale: str = "en") -> None:
@@ -71,7 +83,7 @@ class SubmitComponent(html.Div):
                 }
             ),
             dcc.Store(id='prediction-stats-store', data=None, storage_type=STORAGE_TYPE)
-        ], style={'display': 'flex', 'flexDirection': 'column', 'justifyContent': 'center', 'alignItems': 'center'})
+        ], id="prediction-actions", style={'display': 'flex', 'flexDirection': 'column', 'justifyContent': 'center', 'alignItems': 'center'})
 
     def _repair_misaligned_csv_rows(self) -> None:
         """Repair CSV rows whose columns were written in desired_fieldnames order instead of
@@ -205,6 +217,19 @@ class SubmitComponent(html.Div):
         This writes a single row for the whole "study entry".
         If `user_info["rounds"]` is present, statistics are aggregated across rounds.
         """
+        # Consent gate (defense-in-depth): never persist study data for a session
+        # that has not completed mandatory consent. The display_page guard already
+        # blocks unconsented navigation to the game, but enforcing it here -- at the
+        # single write boundary -- also protects against a crafted client that
+        # fabricates user_info and triggers a finish callback directly.
+        if not user_info.get('consent_completed'):
+            with start_action(
+                action_type=u"save_statistics_skipped_no_consent",
+                study_id=str(user_info.get('study_id') or ''),
+            ):
+                pass
+            return
+
         csv_file_path = self._stats_csv_path
         
         rounds: list[dict[str, Any]] = user_info.get('rounds') or []
@@ -527,19 +552,27 @@ class SubmitComponent(html.Div):
         
         @app.callback(
             [Output('submit-button', 'disabled'),
+             Output('submit-button', 'children'),
              Output('submit-button', 'style'),
              Output('prediction-progress-label', 'children'),
              Output('prediction-progress-label', 'style')],
             [Input('current-window-df', 'data'),
-             Input('interface-language', 'data')],
+             Input('interface-language', 'data'),
+             Input('user-agent', 'data')],
             prevent_initial_call=False
         )
         def update_submit_button_state(
             df_data: Optional[dict[str, Any]],
             interface_language: Optional[str],
-        ) -> tuple[bool, dict[str, str], str, dict[str, str]]:
+            user_agent: Optional[str],
+        ) -> tuple[bool, str, dict[str, Any], str, dict[str, Any]]:
             """Enable submit button only when there are predictions to the end of the hidden area"""
             locale = normalize_locale(interface_language)
+            ready_text = (
+                f"✓ {t('ui.submit.submit', locale=locale)}"
+                if _is_mobile_ua(user_agent)
+                else t("ui.submit.progress_ready", locale=locale)
+            )
             base_style = {
                 'width': '300px', 
                 'fontSize': '25px', 
@@ -560,7 +593,7 @@ class SubmitComponent(html.Div):
             if not df_data:
                 disabled_style = {**base_style, 'backgroundColor': '#cccccc', 'color': '#666666', 'cursor': 'not-allowed'}
                 label_style = {**base_label_style, 'color': '#6c757d'}
-                return True, disabled_style, t("ui.submit.progress_no_data", locale=locale), label_style
+                return True, t("ui.submit.submit", locale=locale), disabled_style, t("ui.submit.progress_no_data", locale=locale), label_style
             
             # Reconstruct DataFrame to check for predictions
             df = self._reconstruct_dataframe_from_dict(df_data)
@@ -604,8 +637,8 @@ class SubmitComponent(html.Div):
                 
                 if predictions_to_end:
                     enabled_style = {**base_style, 'backgroundColor': '#4CBB17', 'color': 'white', 'cursor': 'pointer'}
-                    label_style = {**base_label_style, 'color': '#3A9B12', 'fontWeight': 'bold'}
-                    return False, enabled_style, t("ui.submit.progress_ready", locale=locale), label_style
+                    label_style = {**base_label_style, 'display': 'none'}
+                    return False, ready_text, enabled_style, "", label_style
                 else:
                     disabled_style = {**base_style, 'backgroundColor': '#999999', 'color': 'white', 'cursor': 'not-allowed'}
                     label_style = {**base_label_style, 'color': '#6c757d'}
@@ -615,11 +648,11 @@ class SubmitComponent(html.Div):
                         done=user_predictions_count,
                         total=required_user_predictions,
                     )
-                    return True, disabled_style, status_text, label_style
+                    return True, t("ui.submit.submit", locale=locale), disabled_style, status_text, label_style
             else:
                 disabled_style = {**base_style, 'backgroundColor': '#cccccc', 'color': '#666666', 'cursor': 'not-allowed'}
                 label_style = {**base_label_style, 'color': '#6c757d'}
-                return True, disabled_style, t("ui.submit.progress_hidden_area", locale=locale), label_style
+                return True, t("ui.submit.submit", locale=locale), disabled_style, t("ui.submit.progress_hidden_area", locale=locale), label_style
 
     def _reconstruct_dataframe_from_dict(self, df_data: dict[str, list[Any]]) -> pl.DataFrame:
         """Reconstruct a Polars DataFrame from stored dictionary data"""

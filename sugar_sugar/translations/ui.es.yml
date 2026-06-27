@@ -49,6 +49,7 @@ es:
     open_consent_form: "Abrir aviso de consentimiento"
     consent_required_error: "Por favor confirma que eres mayor de 18 años y has leído el formulario de consentimiento para continuar."
     next_hint: "Siguiente: completarás un breve formulario y luego subirás tus datos de CGM (o usarás el conjunto de datos de ejemplo)."
+    take_me_in: "Entrar"
 
   consent_form:
     title: "Aviso de consentimiento"
@@ -95,6 +96,7 @@ es:
   demo:
     title: "Demo"
     body: "Prueba una demo rápida del juego de predicción de glucosa Sugar Sugar."
+    fullscreen_video: "Ver en pantalla completa"
 
   startup:
     fork_me: "Hazme un fork en GitHub"
@@ -131,6 +133,9 @@ es:
     contact_prefs_text: "El correo electrónico solo es obligatorio si pediste recibir los resultados más tarde o estar al día."
     just_test_me: "Solo pruébame"
     start_prediction: "Iniciar predicción"
+    wizard_back: "Atrás"
+    wizard_next: "Siguiente"
+    wizard_step: "Paso %{current} de %{total}"
     format_label: "Formato"
     format_placeholder: "Elige una opción"
     format_a_label: "Datos genéricos"
@@ -192,7 +197,7 @@ es:
     text: "Nota: Sugar Sugar está optimizado para escritorio en este momento. ¡El soporte para móviles llegará pronto!"
 
   orientation:
-    title: "PARA OBTENER LOS MEJORES RESULTADOS, USA EL SITIO EN MODO HORIZONTAL"
+    title: "GIRA TU TELÉFONO EN MODO HORIZONTAL PARA DIBUJAR"
     subtitle: ""
 
   share:

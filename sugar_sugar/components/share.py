@@ -1404,18 +1404,28 @@ def create_share_layout(
 
     encoded_url: str = urllib.parse.quote(share_url, safe="")
     encoded_text: str = urllib.parse.quote(invite_text, safe="")
-    encoded_x_text: str = urllib.parse.quote(f"{invite_text} {share_url}", safe="")
 
     share_buttons: html.Div = html.Div(
         [
             _share_button(
                 t("ui.share.share_on_x", locale=loc),
-                f"https://x.com/intent/post?text={encoded_x_text}",
+                # Use the canonical /intent/tweet Web Intent with separate text+url
+                # params. Do NOT use /intent/post: it is not a real intent path, so
+                # on mobile the X app claims the x.com universal link, fails to
+                # resolve /intent/post as an in-app route, and bounces straight back
+                # out ("opens then closes"). /intent/tweet is app-recognised.
+                f"https://twitter.com/intent/tweet?text={encoded_text}&url={encoded_url}",
                 color="#000000", icon="fa-x-twitter",
             ),
             _share_button(
                 t("ui.share.share_on_facebook", locale=loc),
-                f"https://www.facebook.com/sharer/sharer.php?u={encoded_url}",
+                # `quote` is the only text param sharer.php may honour (best-effort:
+                # Facebook removed reliable pre-filled share text years ago for
+                # anti-spam, and often ignores it without a registered app_id). The
+                # message on FB is carried by the OG card (og:title/og:description),
+                # not by pre-filled post text -- unlike Telegram/WhatsApp which honour
+                # `text=`. Harmless if ignored. See docs/share-ops.md.
+                f"https://www.facebook.com/sharer/sharer.php?u={encoded_url}&quote={encoded_text}",
                 color="#1877F2", icon="fa-facebook",
             ),
             _share_button(

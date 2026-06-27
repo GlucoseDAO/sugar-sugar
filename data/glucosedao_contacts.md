@@ -6,6 +6,7 @@
 |------|-------|
 | Livia Zaharia | livia.zaharia@uni-rostock.de |
 | Anton Kulaga | anton.kulaga@uni-rostock.de |
+| Nikolay Usanov | nikolay.usanov@uni-rostock.de |
 
 ---
 
@@ -41,3 +42,4 @@
 |------|------|----------|
 | Livia Zaharia | Founder | [linkedin.com/in/zaharia-livia-4b1425a0](https://www.linkedin.com/in/zaharia-livia-4b1425a0) |
 | Anton Kulaga | Founding Member | [linkedin.com/in/antonkulaga](https://www.linkedin.com/in/antonkulaga) |
+| Nikolay Usanov | Developer / DevOps | [linkedin.com/in/nikolai-usanov](https://www.linkedin.com/in/nikolai-usanov-853b32264) |

@@ -9,6 +9,13 @@ READONLY_GRID_OPTIONS: dict[str, Any] = {
     "domLayout": "autoHeight",
     "suppressCellFocus": True,
     "suppressRowClickSelection": True,
+    # Explicit row height. With domLayout="autoHeight", ag-grid otherwise measures
+    # each row's content height; under the mobile.css cascade (html.mobile-device)
+    # that measurement collapses to ~1px on phones, so only one row paints and the
+    # /final per-round and /ending prediction tables look empty. A fixed rowHeight
+    # makes the grid deterministic on every device (desktop already worked).
+    "rowHeight": 42,
+    "headerHeight": 42,
 }
 
 READONLY_DEFAULT_COL_DEF: dict[str, Any] = {

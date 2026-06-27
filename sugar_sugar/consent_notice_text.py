@@ -729,7 +729,11 @@ def consent_notice_paragraphs(locale: Optional[str]) -> list[str]:
     return translated
 
 
-def consent_notice_children(locale: Optional[str]) -> list[object]:
+def consent_notice_children(
+    locale: Optional[str],
+    *,
+    iframe_style: Optional[dict[str, object]] = None,
+) -> list[object]:
     loc = normalize_locale(locale)
 
     # Prefer locale-specific markdown if it exists.
@@ -866,7 +870,7 @@ def consent_notice_children(locale: Optional[str]) -> list[object]:
         static_markdown_iframe(
             md_text,
             title=t("ui.landing.patient_consent_form_title", locale=loc),
-            iframe_style={"height": "min(55vh, 480px)"},
+            iframe_style=iframe_style or {"height": "min(55vh, 480px)"},
         )
     ]
 

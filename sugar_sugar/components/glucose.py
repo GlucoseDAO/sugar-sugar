@@ -528,17 +528,8 @@ class GlucoseChart(html.Div):
         """Updates the figure layout with axes, margins, and interaction settings."""
         y_range = self._calculate_y_axis_range()
         
-        # Calculate window info for title
-        start_time = self._current_df.get_column("time")[0].strftime('%H:%M')
-        end_time = self._current_df.get_column("time")[-1].strftime('%H:%M')
-        
-        # Create title with source information
-        title_text = t("ui.chart.title", locale=locale, start=start_time, end=end_time)
-        if self._current_source:
-            title_text += t("ui.chart.source_suffix", locale=locale, source=self._current_source)
-        
         figure.update_layout(
-            title=title_text,
+            title="",
             autosize=True,
             xaxis=dict(
                 title=t("ui.chart.x_axis", locale=locale),
@@ -563,12 +554,12 @@ class GlucoseChart(html.Div):
                 showgrid=True,
                 range=y_range
             ),
-            margin=dict(l=50, r=20, t=80, b=50),
+            margin=dict(l=50, r=20, t=36, b=50),
             showlegend=True,
             legend=dict(
                 orientation='h',
-                yanchor='bottom',
-                y=1.02,
+                yanchor='top',
+                y=1.06,
                 xanchor='center',
                 x=0.5,
             ),

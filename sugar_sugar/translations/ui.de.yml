@@ -47,6 +47,7 @@ de:
     open_consent_form: "Einwilligungsformular öffnen"
     consent_required_error: "Bitte bestätige, dass du 18+ bist und das Einwilligungsformular gelesen hast, um fortzufahren."
     next_hint: "Als Nächstes: kurzes Formular ausfüllen und dann CGM‑Daten hochladen (oder Beispieldaten verwenden)."
+    take_me_in: "Los geht's"
 
   about:
     title: "Über Sugar Sugar"
@@ -75,6 +76,7 @@ de:
   demo:
     title: "Demo"
     body: "Probiere eine kurze Demo des Sugar-Sugar-Glukose-Vorhersage-Spiels."
+    fullscreen_video: "Im Vollbild ansehen"
 
   consent_form:
     title: "Einwilligungserklärung"
@@ -130,6 +132,9 @@ de:
     contact_prefs_text: "E‑Mail ist nur erforderlich, wenn du Ergebnisse später erhalten oder über Updates informiert werden möchtest."
     just_test_me: "Nur testen"
     start_prediction: "Vorhersage starten"
+    wizard_back: "Zurück"
+    wizard_next: "Weiter"
+    wizard_step: "Schritt %{current} von %{total}"
     format_label: "Format"
     format_placeholder: "Option auswählen"
     format_a_label: "Generische Daten"
@@ -191,7 +196,7 @@ de:
     text: "Hinweis: Sugar Sugar ist derzeit für Desktop optimiert. Mobile Unterstützung folgt bald!"
 
   orientation:
-    title: "FÜR BESTE ERGEBNISSE BITTE DIE WEBSITE IM QUERFORMAT NUTZEN"
+    title: "DREHE DEIN TELEFON INS QUERFORMAT, UM ZU ZEICHNEN"
     subtitle: ""
 
   share:

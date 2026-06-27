@@ -28,13 +28,117 @@ def _image_data_uri(path: Path) -> Optional[str]:
     return f"data:image/{mime};base64,{b64}"
 
 
+def consent_controls_children(locale: str) -> list[Any]:
+    """The inner children of the ``consent-notice-scroll`` block.
+
+    Shared verbatim between the desktop ``LandingPage`` and the mobile
+    ``LandingPageMobile`` so the consent text + the six consent checklists
+    (with their stable ids the callbacks target) never drift apart.
+    """
+    return [
+        *consent_notice_children(locale),
+        html.Hr(style={"margin": "14px 0"}),
+        html.H4(
+            t("ui.landing.required_consents_title", locale=locale),
+            style={"fontSize": "18px", "fontWeight": "800", "color": "#0f172a", "marginBottom": "8px"},
+        ),
+        dbc.Checklist(
+            id="consent-acknowledge",
+            options=[{"label": f" {t('ui.landing.consent_acknowledge_label', locale=locale)}", "value": "ack"}],
+            value=[],
+            persistence=True,
+            persistence_type=STORAGE_TYPE,
+            style={"fontSize": "16px", "marginBottom": "10px"},
+        ),
+        dbc.Checklist(
+            id="consent-gdpr",
+            options=[{"label": f" {t('ui.landing.consent_gdpr_label', locale=locale)}", "value": "gdpr"}],
+            value=[],
+            persistence=True,
+            persistence_type=STORAGE_TYPE,
+            style={"fontSize": "16px"},
+        ),
+        html.Hr(style={"margin": "14px 0"}),
+        html.H4(
+            t("ui.landing.optional_consents_title", locale=locale),
+            style={"fontSize": "18px", "fontWeight": "800", "color": "#0f172a", "marginBottom": "8px"},
+        ),
+        dbc.Checklist(
+            id="consent-upload-own-data",
+            options=[{"label": f" {t('ui.landing.consent_upload_own_data', locale=locale)}", "value": "upload_own_data"}],
+            value=[],
+            persistence=True,
+            persistence_type=STORAGE_TYPE,
+            style={"fontSize": "16px", "marginBottom": "10px"},
+        ),
+        dbc.Checklist(
+            id="consent-play-only",
+            options=[{"label": f" {t('ui.landing.consent_play_only', locale=locale)}", "value": "play_only"}],
+            value=[],
+            persistence=True,
+            persistence_type=STORAGE_TYPE,
+            style={"fontSize": "16px"},
+        ),
+        dbc.Checklist(
+            id="consent-receive-results",
+            options=[{"label": f" {t('ui.landing.consent_receive_results', locale=locale)}", "value": "receive_results"}],
+            value=[],
+            persistence=True,
+            persistence_type=STORAGE_TYPE,
+            style={"fontSize": "16px", "marginTop": "10px"},
+        ),
+        dbc.Checklist(
+            id="consent-keep-updated",
+            options=[{"label": f" {t('ui.landing.consent_keep_updated', locale=locale)}", "value": "keep_updated"}],
+            value=[],
+            persistence=True,
+            persistence_type=STORAGE_TYPE,
+            style={"fontSize": "16px", "marginTop": "10px"},
+        ),
+    ]
+
+
+def resume_redeem_box(locale: str = "en") -> html.Div:
+    """A small "enter your resume code" entry so a fresh device can continue a
+    session started elsewhere (cross-device resume). Shared by both landing
+    builders; only one is in the DOM per request, so the ids never collide."""
+    return html.Div(
+        [
+            html.Div(
+                t("ui.resume_code.landing_prompt", locale=locale),
+                style={"fontSize": "14px", "color": "#475569", "marginBottom": "8px"},
+            ),
+            html.Div(
+                [
+                    dcc.Input(
+                        id="resume-redeem-input",
+                        type="text",
+                        placeholder=t("ui.resume_code.placeholder", locale=locale),
+                        style={"flex": "1", "minWidth": "0"},
+                    ),
+                    html.Button(
+                        t("ui.resume_code.redeem_btn", locale=locale),
+                        id="resume-redeem-btn",
+                        className="ui blue button",
+                        style={"whiteSpace": "nowrap"},
+                    ),
+                ],
+                style={"display": "flex", "gap": "8px", "alignItems": "center", "maxWidth": "420px", "margin": "0 auto"},
+            ),
+            html.Div(id="resume-redeem-error", style={"color": "#d32f2f", "fontSize": "13px", "marginTop": "6px"}),
+        ],
+        id="resume-redeem-box",
+        style={"marginTop": "20px", "textAlign": "center"},
+    )
+
+
 class LandingPage(html.Div):
     def __init__(self, *, locale: str = "en") -> None:
         self.component_id: str = "landing-page"
         self._locale: str = locale
 
         project_root = Path(__file__).resolve().parents[2]
-        screenshot_path = project_root / "images" / "screenshot.png"
+        screenshot_path = project_root / "assets" / "images" / "screenshot.png"
         screenshot_src = _image_data_uri(screenshot_path)
 
         hero = dbc.Row(
@@ -154,67 +258,7 @@ class LandingPage(html.Div):
                         style={"fontSize": "22px", "fontWeight": "800", "color": "#1565c0", "marginBottom": "10px"},
                     ),
                     html.Div(
-                        [
-                            *consent_notice_children(locale),
-                            html.Hr(style={"margin": "14px 0"}),
-                            html.H4(
-                                t("ui.landing.required_consents_title", locale=locale),
-                                style={"fontSize": "18px", "fontWeight": "800", "color": "#0f172a", "marginBottom": "8px"},
-                            ),
-                            dbc.Checklist(
-                                id="consent-acknowledge",
-                                options=[{"label": f" {t('ui.landing.consent_acknowledge_label', locale=locale)}", "value": "ack"}],
-                                value=[],
-                                persistence=True,
-                                persistence_type=STORAGE_TYPE,
-                                style={"fontSize": "16px", "marginBottom": "10px"},
-                            ),
-                            dbc.Checklist(
-                                id="consent-gdpr",
-                                options=[{"label": f" {t('ui.landing.consent_gdpr_label', locale=locale)}", "value": "gdpr"}],
-                                value=[],
-                                persistence=True,
-                                persistence_type=STORAGE_TYPE,
-                                style={"fontSize": "16px"},
-                            ),
-                            html.Hr(style={"margin": "14px 0"}),
-                            html.H4(
-                                t("ui.landing.optional_consents_title", locale=locale),
-                                style={"fontSize": "18px", "fontWeight": "800", "color": "#0f172a", "marginBottom": "8px"},
-                            ),
-                            dbc.Checklist(
-                                id="consent-upload-own-data",
-                                options=[{"label": f" {t('ui.landing.consent_upload_own_data', locale=locale)}", "value": "upload_own_data"}],
-                                value=[],
-                                persistence=True,
-                                persistence_type=STORAGE_TYPE,
-                                style={"fontSize": "16px", "marginBottom": "10px"},
-                            ),
-                            dbc.Checklist(
-                                id="consent-play-only",
-                                options=[{"label": f" {t('ui.landing.consent_play_only', locale=locale)}", "value": "play_only"}],
-                                value=[],
-                                persistence=True,
-                                persistence_type=STORAGE_TYPE,
-                                style={"fontSize": "16px"},
-                            ),
-                            dbc.Checklist(
-                                id="consent-receive-results",
-                                options=[{"label": f" {t('ui.landing.consent_receive_results', locale=locale)}", "value": "receive_results"}],
-                                value=[],
-                                persistence=True,
-                                persistence_type=STORAGE_TYPE,
-                                style={"fontSize": "16px", "marginTop": "10px"},
-                            ),
-                            dbc.Checklist(
-                                id="consent-keep-updated",
-                                options=[{"label": f" {t('ui.landing.consent_keep_updated', locale=locale)}", "value": "keep_updated"}],
-                                value=[],
-                                persistence=True,
-                                persistence_type=STORAGE_TYPE,
-                                style={"fontSize": "16px", "marginTop": "10px"},
-                            ),
-                        ],
+                        consent_controls_children(locale),
                         style={
                             "paddingRight": "10px",
                         },
@@ -261,6 +305,7 @@ class LandingPage(html.Div):
                 study_info,
                 html.Div(style={"height": "18px"}),
                 consent_notice_card,
+                resume_redeem_box(locale),
                 dcc.Store(id="consent-scroll-complete", data=False, storage_type=STORAGE_TYPE),
                 dcc.Interval(id="consent-scroll-poll", interval=500, n_intervals=0),
             ],
@@ -384,6 +429,14 @@ class LandingPage(html.Div):
             info["consent_keep_up_to_date"] = keep_updated
             info["consent_no_selection"] = no_selection
             info["consent_timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            # Explicit, unambiguous marker that mandatory consent (acknowledge +
+            # GDPR) was completed. `display_page` guards /startup (desktop) and
+            # /prediction on this flag so direct-URL/burger visits can't bypass
+            # the consent gate. See also handle_start_button (mobile wizard).
+            info["consent_completed"] = True
+            # Stable cross-device resume code (server-side savegame key).
+            from sugar_sugar import resume_store
+            info["resume_code"] = info.get("resume_code") or resume_store.new_code()
 
             if info.get("number") is None:
                 info["number"] = get_next_study_number()
@@ -404,4 +457,103 @@ class LandingPage(html.Div):
             )
 
             return "/startup", info, None
+
+
+class LandingPageMobile(html.Div):
+    """Short mobile entry page.
+
+    Mobile consent lives inside ``StartupPageMobile`` as the wizard's first
+    gated step.  Desktop keeps using ``LandingPage`` as the consent gate.
+    """
+
+    def __init__(self, *, locale: str = "en") -> None:
+        self.component_id = "landing-page"
+        self._locale = locale
+
+        hero = html.Div(
+            [
+                html.H1(
+                    t("ui.common.app_title", locale=locale),
+                    style={"fontSize": "32px", "fontWeight": "800", "letterSpacing": "-0.02em", "marginBottom": "8px"},
+                ),
+                html.Div(
+                    t("ui.landing.tagline", locale=locale),
+                    style={"fontSize": "16px", "color": "#334155", "marginBottom": "14px", "lineHeight": "1.4"},
+                ),
+                html.Div(
+                    [
+                        html.H3(
+                            t("ui.landing.how_it_works", locale=locale),
+                            style={"fontSize": "18px", "fontWeight": "800", "color": "#1565c0", "marginBottom": "6px"},
+                        ),
+                        html.Ul(
+                            [html.Li(item) for item in t_list("ui.landing.how_it_works_steps", locale=locale)],
+                            style={"margin": "0", "paddingLeft": "20px", "color": "#334155", "lineHeight": "1.6"},
+                        ),
+                    ],
+                    style={
+                        "background": "rgba(255,255,255,0.75)",
+                        "border": "1px solid rgba(15, 23, 42, 0.10)",
+                        "borderRadius": "14px",
+                        "padding": "12px 14px",
+                    },
+                ),
+            ],
+        )
+
+        study_info = html.Div(
+            [
+                html.H3(
+                    t("ui.landing.about_study_title", locale=locale),
+                    style={"fontSize": "18px", "fontWeight": "800", "color": "#1565c0", "marginBottom": "6px"},
+                ),
+                html.Div(
+                    t("ui.landing.about_study_text", locale=locale),
+                    style={"color": "#334155", "lineHeight": "1.6", "fontSize": "15px"},
+                ),
+            ],
+            style={
+                "background": "rgba(255,255,255,0.9)",
+                "border": "1px solid rgba(15, 23, 42, 0.10)",
+                "borderRadius": "14px",
+                "padding": "14px 16px",
+            },
+        )
+
+        take_me_in = dcc.Link(
+            t("ui.landing.take_me_in", locale=locale),
+            href="/startup",
+            className="ui green button landing-mobile-cta",
+            style={
+                "width": "100%",
+                "fontWeight": "800",
+                "fontSize": "18px",
+                "padding": "16px",
+                "borderRadius": "12px",
+                "textAlign": "center",
+            },
+        )
+
+        super().__init__(
+            children=[
+                html.Div(
+                    className="landing-mobile",
+                    style={
+                        "minHeight": "100vh",
+                        "padding": "16px 12px 32px 12px",
+                        "display": "flex",
+                        "flexDirection": "column",
+                        "gap": "16px",
+                        "background": "linear-gradient(135deg, #eff6ff 0%, #f8fafc 35%, #fff7ed 100%)",
+                    },
+                    children=[
+                        hero,
+                        study_info,
+                        take_me_in,
+                        resume_redeem_box(locale),
+                    ],
+                )
+            ],
+            id=self.component_id,
+        )
 

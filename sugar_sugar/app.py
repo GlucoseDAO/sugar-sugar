@@ -85,20 +85,21 @@ from sugar_sugar.components.glucose import GlucoseChart
 from sugar_sugar.components.metrics import MetricsComponent
 from sugar_sugar.components.predictions import PredictionTableComponent
 from sugar_sugar.components.ag_grid import build_readonly_ag_grid, build_readonly_column_defs
-from sugar_sugar.components.startup import StartupPage
-from sugar_sugar.components.landing import LandingPage
+from sugar_sugar.components.startup import StartupPage, StartupPageMobile
+from sugar_sugar.components.landing import LandingPage, LandingPageMobile
 from sugar_sugar.components.consent_form import ConsentFormPage
 from sugar_sugar.components.submit import SubmitComponent
 from sugar_sugar.encouragement import pick_bracket
 from sugar_sugar.components.header import HeaderComponent
 from sugar_sugar.components.ending import EndingPage
-from sugar_sugar.components.navbar import NavBar
+from sugar_sugar.components.navbar import NavBar, MobileNavBar
 from sugar_sugar.components.share import (
     build_share_card_figure,
     create_expired_layout,
     create_share_layout,
 )
 from sugar_sugar import share_store
+from sugar_sugar import resume_store
 from sugar_sugar.generic_sources_metadata import load_generic_sources_metadata
 from sugar_sugar.contact_info import load_contact_info
 from sugar_sugar.static_markdown import static_markdown_autosize_iframe
@@ -356,6 +357,12 @@ example_initial_slider_value = _init_start
 _is_share_mode = os.environ.get("_SHARE_MODE") == "1"
 _share_mode_id: Optional[str] = None
 
+# Staging mode (prod+): when _STAGING_MODE=1, extra `/staging/*` test routes are
+# exposed that jump straight to prefilled prediction / ending / final / share
+# states for remote testing, without a full playthrough. The flag defaults off,
+# so production is byte-identical. Set by `serve --staging` / `uv run serve-staging`.
+_is_staging_mode = os.environ.get("_STAGING_MODE") == "1"
+
 if _is_share_mode:
     import random as _share_rnd
     _share_rounds_n = int(os.environ.get("_SHARE_ROUNDS", str(SHARE_ROUNDS)))
@@ -562,9 +569,12 @@ if UMAMI_SCRIPT_URL and UMAMI_WEBSITE_ID:
         _umami_script_attrs["data-host-url"] = UMAMI_HOST_URL
     external_scripts.append(_umami_script_attrs)
 
-# Dash defaults to width=device-width, which makes phones use a narrow layout viewport and
-# breaks chart/drawing. A fixed layout width matches what mobile browsers do for "Desktop
-# site": the page is laid out at desktop width and scaled to fit the screen.
+# Mobile-first: the STATIC default viewport is `device-width` so every page is
+# correct in portrait from first paint, with no dependency on a JS reflow.  The
+# ONE exception is `/prediction`, where Plotly drawline needs a wide layout
+# viewport -- a clientside callback (see below) flips the <meta> to this fixed
+# width only on that route.  Desktop browsers ignore the viewport meta entirely,
+# so neither value affects desktop layout.
 _DESKTOP_LAYOUT_VIEWPORT_CSS_PX: int = 1280
 
 app = dash.Dash(
@@ -576,10 +586,7 @@ app = dash.Dash(
     meta_tags=[
         {
             "name": "viewport",
-            "content": (
-                f"width={_DESKTOP_LAYOUT_VIEWPORT_CSS_PX}, "
-                "maximum-scale=5, user-scalable=yes"
-            ),
+            "content": "width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes",
         },
         {"name": "robots", "content": "index, follow"},
         {"name": "description", "content": SITE_DESCRIPTION},
@@ -716,7 +723,13 @@ def _build_robots_txt() -> str:
             "Allow: /llms.txt",
             "Disallow: /_dash-",
             "Disallow: /_reload-hash",
-            "Disallow: /share/*/image.png",
+            # NOTE: do NOT Disallow /share/*/image.png here. Twitterbot honors
+            # robots.txt, so a Disallow makes it skip the OG card image entirely
+            # (FB/WhatsApp/LinkedIn/Telegram ignore robots.txt for OG fetches, so
+            # they still showed it -- this is exactly why Twitter alone broke).
+            # Search engines are kept from indexing the per-share PNGs via the
+            # `X-Robots-Tag: noindex` response header on the image route instead,
+            # which permits crawler *fetching* while blocking *indexing*.
             "",
             f"Sitemap: {sitemap_url}",
             f"# LLM-readable overview: {llms_url}",
@@ -885,14 +898,22 @@ def _share_card_png(share_id: str) -> Any:
             seed=share_id,
         )
         _SHARE_PNG_CACHE[cache_key] = cached
+    # Serve INLINE (not as_attachment): a `Content-Disposition: attachment`
+    # makes some social image consumers (Twitter among the pickier ones) refuse
+    # to render the card. The human "Download" button on the share page forces a
+    # download client-side via the HTML `download` attribute, so it doesn't need
+    # the attachment disposition here.
     response = flask_send_file(
         BytesIO(cached),
         mimetype="image/png",
-        as_attachment=True,
+        as_attachment=False,
         download_name=f"sugar-sugar-{share_id}.png",
         max_age=86400,
     )
     response.headers["Cache-Control"] = "public, max-age=86400"
+    # Allow crawlers to FETCH the card (needed for Twitter/X OG) but keep the
+    # per-share PNGs out of search indexes. Pairs with the robots.txt note.
+    response.headers["X-Robots-Tag"] = "noindex"
     return response
 
 
@@ -905,6 +926,281 @@ def _share_card_og(share_id: str) -> Any:
         return _share_card_og_response(share_id)
     from flask import redirect
     return redirect(_build_share_url(share_id), code=302)
+
+
+# ---------------------------------------------------------------------------
+# Staging mode (prod+): synthetic prefilled nodes for remote testing.
+#
+# Every helper and route below is invoked ONLY when `_is_staging_mode` is True
+# (set by `serve --staging` / `uv run serve-staging`). They are defined at
+# module scope but never run at import time, so when the flag is off the app
+# behaves identically to production. They reuse the real layout builders
+# (create_ending_layout / create_final_layout / create_share_layout) and
+# share_store; only the synthetic *input* data is generated here. This is
+# deliberately additive: no production callback or builder is modified.
+# ---------------------------------------------------------------------------
+_STAGING_NODES: list[tuple[str, str]] = [
+    ("/staging/prediction", "Prefilled prediction chart (rotate to landscape on mobile)"),
+    ("/staging/ending", "Round-ending page with synthetic predictions + metrics"),
+    ("/staging/final", "Final results page with several synthetic rounds"),
+    ("/staging/share", "Generate a synthetic share record and open /share/<id>"),
+]
+
+
+def _staging_prefill_window(full_df: pl.DataFrame, *, noise: float = 0.05) -> tuple[pl.DataFrame, pl.DataFrame, int]:
+    """Pick a random window and fill its hidden region with noisy ground truth.
+
+    Returns ``(full_df_with_predictions, window_df, window_start)``. Mirrors the
+    ``--prefill`` logic used by chart mode at module import (lines ~327-344).
+    """
+    import random as _rnd
+    window_df, start = get_random_data_window(full_df, _chart_points)
+    window_df = window_df.with_columns(pl.lit(0.0).alias("prediction"))
+    n = len(window_df)
+    visible = n - PREDICTION_HOUR_OFFSET
+    gl = window_df.get_column("gl").to_list()
+    preds: list[float] = [0.0] * n
+    for i in range(visible, n):
+        if gl[i] is not None:
+            preds[i] = round(gl[i] * (1.0 + _rnd.uniform(-noise, noise)), 1)
+    window_df = window_df.with_columns(pl.Series("prediction", preds, dtype=pl.Float64))
+    for i in range(n):
+        pv = window_df.get_column("prediction")[i]
+        if pv != 0.0:
+            tv = window_df.get_column("time")[i]
+            full_df = full_df.with_columns(
+                pl.when(pl.col("time") == tv).then(pv).otherwise(pl.col("prediction")).alias("prediction")
+            )
+    return full_df, window_df, start
+
+
+def _staging_ptd_from_window(window_df: pl.DataFrame) -> list[dict[str, str]]:
+    """Build the 4-row ``prediction_table_data`` from a prefilled window.
+
+    Mirrors the table construction in the share-mode block (lines ~398-416).
+    """
+    n = len(window_df)
+    gl = window_df.get_column("gl").to_list()
+    preds = window_df.get_column("prediction").to_list()
+    actual_row: dict[str, str] = {"metric": "Actual Glucose"}
+    pred_row: dict[str, str] = {"metric": "Predicted"}
+    abs_row: dict[str, str] = {"metric": "Absolute Error"}
+    rel_row: dict[str, str] = {"metric": "Relative Error (%)"}
+    for ti in range(n):
+        a = gl[ti]
+        p = preds[ti]
+        actual_row[f"t{ti}"] = "-" if a is None else f"{float(a):.1f}"
+        if not p or a is None:
+            pred_row[f"t{ti}"] = abs_row[f"t{ti}"] = rel_row[f"t{ti}"] = "-"
+        else:
+            pred_row[f"t{ti}"] = f"{p:.1f}"
+            err = abs(float(a) - p)
+            abs_row[f"t{ti}"] = f"{err:.1f}"
+            rel_row[f"t{ti}"] = f"{(err / float(a) * 100):.1f}%" if a != 0 else "-"
+    return [actual_row, pred_row, abs_row, rel_row]
+
+
+def _staging_base_user_info() -> dict[str, Any]:
+    """A synthetic, already-consented user_info for staging nodes."""
+    return {
+        "study_id": str(uuid.uuid4()),
+        "run_id": str(uuid.uuid4()),
+        "email": "staging@vanilla-sugar.local",
+        "age": 30, "gender": "F", "uses_cgm": True, "cgm_duration_years": 2,
+        "format": "A", "run_format": "A",
+        "diabetic": True, "diabetic_type": "Type 1", "diabetes_duration": 6,
+        "location": "Staging",
+        "max_rounds": MAX_ROUNDS, "current_round_number": 1, "statistics_saved": False,
+        "is_example_data": True, "data_source_name": "example.csv",
+        "consent_completed": True, "consent_no_selection": False,
+        "consent_play_only": False, "consent_participate_in_study": True,
+        "consent_receive_results_later": False, "consent_keep_up_to_date": False,
+        "consent_timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "resume_code": resume_store.new_code(),
+    }
+
+
+def _staging_ending_args() -> tuple[dict, dict, dict, dict[str, Any]]:
+    """Build (full_df_store, window_store, events_store, user_info) for /staging/ending."""
+    full_df, events_df = load_glucose_data()
+    full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
+    full_df, window_df, start = _staging_prefill_window(full_df)
+    info = _staging_base_user_info()
+    info.update({
+        "prediction_window_start": start,
+        "prediction_window_size": len(window_df),
+        "prediction_table_data": _staging_ptd_from_window(window_df),
+    })
+    return (
+        dataframe_to_store_dict(full_df),
+        dataframe_to_store_dict(window_df),
+        events_dataframe_to_store_dict(events_df),
+        info,
+    )
+
+
+def _staging_final_user_info(*, rounds_n: int = 3, formats: Optional[list[str]] = None) -> tuple[dict, dict[str, Any]]:
+    """Build (full_df_store, user_info-with-rounds) for /staging/final."""
+    fmts = formats or ["A", "B", "C"]
+    full_df, _events = load_glucose_data()
+    full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
+    rounds: list[dict[str, Any]] = []
+    for ri in range(rounds_n):
+        fmt = fmts[ri % len(fmts)]
+        _f, window_df, start = _staging_prefill_window(full_df.clone())
+        rounds.append({
+            "round_number": ri + 1,
+            "prediction_window_start": start,
+            "prediction_window_size": len(window_df),
+            "prediction_table_data": _staging_ptd_from_window(window_df),
+            "format": fmt,
+            "is_example_data": True,
+            "data_source_name": "example.csv",
+        })
+    info = _staging_base_user_info()
+    info.update({
+        "rounds": rounds,
+        "current_round_number": rounds_n,
+        "format": rounds[-1]["format"] if rounds else "A",
+    })
+    return dataframe_to_store_dict(full_df), info
+
+
+def _staging_build_share_record(*, rounds_n: int = 6, formats: Optional[list[str]] = None, locale: str = "en") -> str:
+    """Generate a synthetic share record on disk and return its share id."""
+    fmts = formats or ["A", "B", "C"]
+    full_df, _events = load_glucose_data()
+    full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
+    rounds: list[dict[str, Any]] = []
+    for ri in range(rounds_n):
+        fmt = fmts[ri % len(fmts)]
+        _f, window_df, start = _staging_prefill_window(full_df.clone())
+        rounds.append({
+            "round_number": ri + 1,
+            "prediction_window_start": start,
+            "prediction_window_size": len(window_df),
+            "prediction_table_data": _staging_ptd_from_window(window_df),
+            "format": fmt,
+            "is_example_data": True,
+            "data_source_name": "example.csv",
+        })
+    played_formats = sorted({r["format"] for r in rounds}, key=lambda x: FORMAT_ORDER.get(str(x), 999))
+    record: dict[str, Any] = {
+        "schema_version": 2,
+        "created_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "locale": normalize_locale(locale),
+        "rounds": rounds,
+        "played_formats": played_formats,
+        "rankings": {"per_format": [], "overall": None},
+        "user_info": {
+            "name": "Staging Tester",
+            "study_id": str(uuid.uuid4()),
+            "format": played_formats[0] if played_formats else "A",
+            "uses_cgm": True,
+            "max_rounds": MAX_ROUNDS,
+        },
+    }
+    return share_store.save_share(record)
+
+
+def _staging_index_layout(*, locale: str) -> html.Div:
+    """A simple index of the available staging test nodes."""
+    return html.Div(
+        [
+            html.H1("Staging test nodes", disable_n_clicks=True),
+            html.P(
+                "Prod+ test routes (active only when _STAGING_MODE=1). Each node "
+                "jumps straight to a prefilled state for remote/visual testing.",
+                disable_n_clicks=True,
+            ),
+            html.Ul(
+                [
+                    html.Li(
+                        [dcc.Link(path, href=path), html.Span(f" — {desc}")],
+                        disable_n_clicks=True,
+                    )
+                    for path, desc in _STAGING_NODES
+                ],
+                disable_n_clicks=True,
+            ),
+        ],
+        className="info-page",
+        disable_n_clicks=True,
+    )
+
+
+def _staging_display(pathname: str, *, locale: str, glucose_unit: Optional[str]) -> Optional[html.Div]:
+    """Render a staging node layout, or None to fall through (e.g. /staging/prediction)."""
+    if pathname in ("/staging", "/staging/"):
+        return _staging_index_layout(locale=locale)
+    if pathname == "/staging/ending":
+        full_store, window_store, events_store, info = _staging_ending_args()
+        return create_ending_layout(full_store, window_store, events_store, info, glucose_unit, locale=locale)
+    if pathname == "/staging/final":
+        full_store, info = _staging_final_user_info()
+        return create_final_layout(full_store, info, glucose_unit, locale=locale)
+    # /staging/prediction is handled by the _staging_seed_prediction callback,
+    # which seeds the stores and redirects to /prediction. Fall through here.
+    return None
+
+
+if _is_staging_mode:
+    @server.before_request
+    def _guard_staging_routes() -> Any:
+        """Optional Basic-Auth gate for the /staging/* test routes.
+
+        Activates only when STAGING_AUTH ("user:password") is set, so local
+        `serve --staging` and the screenshot harness stay open, while the public
+        staging origin (vanilla-sugar.glucosedao.org) can lock the test nodes
+        down. Behind a TLS reverse proxy, Basic Auth over HTTPS is sufficient.
+        Read live each request so the credential can be rotated without code
+        changes. The /staging callback content arrives via /_dash-update-component
+        once the browser has authenticated for the realm, so gating the /staging*
+        GETs is enough to keep anonymous users out.
+        """
+        if not flask_request.path.startswith("/staging"):
+            return None
+        credential = os.environ.get("STAGING_AUTH")
+        if not credential:
+            return None  # unconfigured -> open (local dev / harness)
+        from flask import Response
+        auth = flask_request.authorization
+        if auth and f"{auth.username}:{auth.password}" == credential:
+            return None
+        return Response(
+            "Staging area requires authentication.",
+            401,
+            {"WWW-Authenticate": 'Basic realm="sugar-sugar staging"'},
+        )
+
+    @server.route("/staging/share")
+    def _staging_share_route() -> Any:
+        """Generate a synthetic share record and 302-redirect to /share/<id>."""
+        from flask import redirect, request as flask_req
+        locale = flask_req.args.get("lang") or "en"
+        formats_arg = flask_req.args.get("formats")
+        formats = [f.strip().upper() for f in formats_arg.split(",")] if formats_arg else None
+        share_id = _staging_build_share_record(locale=locale, formats=formats)
+        return redirect(f"/share/{share_id}", code=302)
+
+    @app.callback(
+        [Output('url', 'pathname', allow_duplicate=True),
+         Output('user-info-store', 'data', allow_duplicate=True),
+         Output('full-df', 'data', allow_duplicate=True),
+         Output('current-window-df', 'data', allow_duplicate=True),
+         Output('events-df', 'data', allow_duplicate=True),
+         Output('randomization-initialized', 'data', allow_duplicate=True),
+         Output('is-example-data', 'data', allow_duplicate=True),
+         Output('data-source-name', 'data', allow_duplicate=True)],
+        Input('url', 'pathname'),
+        prevent_initial_call=True,
+    )
+    def _staging_seed_prediction(pathname: Optional[str]) -> tuple[Any, ...]:
+        """Seed the prediction stores with a prefilled window, then route to /prediction."""
+        if pathname != '/staging/prediction':
+            raise PreventUpdate
+        full_store, window_store, events_store, info = _staging_ending_args()
+        return ('/prediction', info, full_store, window_store, events_store, True, True, "example.csv")
 
 app.clientside_callback(
     "function() { return window.navigator.userAgent || ''; }",
@@ -1004,6 +1300,11 @@ if _is_chart_mode:
         "consent_keep_up_to_date": False,
         "consent_no_selection": False,
         "consent_timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        # Synthetic dev session is treated as already-consented so the
+        # display_page consent guard lets chart mode render /prediction.
+        "consent_completed": True,
+        # Resume code so the /ending copy-resume-link button works in dev/testing.
+        "resume_code": resume_store.new_code(),
     }
 else:
     _chart_user_info = None
@@ -1047,9 +1348,23 @@ app.layout = html.Div([
     dcc.Store(id='clean-storage-flag', data=_clean_storage, storage_type='memory'),
     # Holds the target page for the resume dialog; set by restore_page_on_load.
     dcc.Store(id='resume-dialog-target', data=None, storage_type='memory'),
+    # Current step index for the mobile startup wizard (StartupPageMobile).
+    # Memory: wizard position resets per page load, like page-restore-done.
+    dcc.Store(id='startup-step', data=0, storage_type='memory'),
 
     html.Div(id='mobile-warning', style={'display': 'none'}),
     html.Div(id='scroll-to-top-trigger', style={'display': 'none'}),
+    html.Div(id='demo-video-sink', style={'display': 'none'}),
+    # Throwaway sink for the per-page viewport / route-class clientside callback
+    # (there is no real Dash Output for the <meta viewport> tag or <html> class).
+    html.Div(id='viewport-sink', style={'display': 'none'}),
+    # Throwaway sink for the cross-device auto-snapshot callback (writes the live
+    # session to resume_store keyed by user_info['resume_code']).
+    dcc.Store(id='resume-sync', data=None, storage_type='memory'),
+    # One-shot guard so the ?resume=<code> redeem callback acts at most once.
+    dcc.Store(id='resume-redeem-done', data=False, storage_type='memory'),
+    # Throwaway sink for the clientside callback that strips ?resume= from the URL.
+    html.Div(id='resume-clean-sink', style={'display': 'none'}),
 
     html.Div(id='resume-dialog-container', children=[], disable_n_clicks=True),
 
@@ -1057,22 +1372,10 @@ app.layout = html.Div([
 
     html.Div(id='page-content', children=[], disable_n_clicks=True),
 
-    # Portrait-orientation prompt for phones/tablets.  Pure CSS controls
-    # visibility (see assets/orientation.css); callbacks only refresh the
-    # translated text when the interface language changes.
-    html.Div(
-        t("ui.orientation.title", locale="en"),
-        id="orientation-overlay",
-        className="rotate-title",
-        disable_n_clicks=True,
-    ),
-    html.Button(
-        "X",
-        id="orientation-overlay-close",
-        className="orientation-overlay-close",
-        type="button",
-        **{"aria-label": "Close landscape mode notice"},
-    ),
+    # Throwaway sinks for the clientside immersive handlers.
+    html.Div(id="immersive-sink", style={"display": "none"}),
+    html.Div(id="prediction-fullscreen-sink", style={"display": "none"}),
+    html.Div(id="copy-link-sink", style={"display": "none"}),
 ])
 
 
@@ -1118,39 +1421,315 @@ app.clientside_callback(
 )
 
 
+# Per-page layout viewport + route class.  The chart-drawing page keeps a wide
+# layout viewport only in landscape, where drawing is the primary mode.  In
+# portrait it stays mobile-width and CSS puts the wide chart inside a horizontal
+# scroller so the surrounding UI remains readable.
+app.clientside_callback(
+    """
+    function(pathname) {
+        var root = document.documentElement;
+        var isPrediction = (pathname === '/prediction');
+        if (root) {
+            if (isPrediction) { root.classList.add('route-prediction'); }
+            else { root.classList.remove('route-prediction'); }
+        }
+        function scrollPredictionChartToDrawArea() {
+            var scroller = document.getElementById('prediction-glucose-chart-container');
+            if (!scroller) { return; }
+            if (window.matchMedia && window.matchMedia('(orientation: portrait)').matches) {
+                scroller.scrollLeft = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
+            }
+        }
+        function applyViewport() {
+            var m = document.querySelector('meta[name="viewport"]');
+            if (!m) { return; }
+            // ALWAYS device-width on /prediction. We used to force width=1280 in
+            // landscape, but in real fullscreen landscape the browser does NOT
+            // auto-scale the 1280 layout to fit, so the right ~30% (incl. Submit)
+            // overflowed off-screen. The real landscape device-width (~800-900px)
+            // is plenty for drawing, and portrait uses a horizontal-scroll chart.
+            var fluid = 'width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes';
+            m.setAttribute('content', fluid);
+            window.setTimeout(scrollPredictionChartToDrawArea, 250);
+            window.setTimeout(scrollPredictionChartToDrawArea, 900);
+        }
+        applyViewport();
+        if (window.__sugarPredictionViewportHandler) {
+            window.removeEventListener('resize', window.__sugarPredictionViewportHandler);
+            window.removeEventListener('orientationchange', window.__sugarPredictionViewportHandler);
+        }
+        window.__sugarPredictionViewportHandler = applyViewport;
+        window.addEventListener('resize', applyViewport);
+        window.addEventListener('orientationchange', applyViewport);
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output('viewport-sink', 'children'),
+    Input('url', 'pathname'),
+    prevent_initial_call=False,
+)
+
+
+# Mobile burger menu: toggle the nav drawer open/closed.  n_clicks parity is
+# fine because the navbar is re-rendered fresh on every page navigation (which
+# resets n_clicks and closes the drawer).  These ids exist only in MobileNavBar.
+app.clientside_callback(
+    """
+    function(n) {
+        var open = (n || 0) % 2 === 1;
+        return {'display': open ? 'block' : 'none'};
+    }
+    """,
+    Output('mobile-nav-drawer', 'style'),
+    Input('mobile-nav-toggle', 'n_clicks'),
+    prevent_initial_call=True,
+)
+
+
+app.clientside_callback(
+    """
+    function(openClicks, closeClicks, currentStyle) {
+        var ctx = window.dash_clientside.callback_context;
+        if (!ctx || !ctx.triggered || !ctx.triggered.length) {
+            return currentStyle || {'display': 'none'};
+        }
+        var prop = ctx.triggered[0].prop_id || '';
+        if (prop.indexOf('header-how-to-play-close') === 0) {
+            return {'display': 'none'};
+        }
+        if (prop.indexOf('header-how-to-play-toggle') === 0) {
+            var visible = currentStyle && currentStyle.display !== 'none';
+            return {'display': visible ? 'none' : 'block'};
+        }
+        return currentStyle || {'display': 'none'};
+    }
+    """,
+    Output('header-how-to-play-bubble', 'style'),
+    [Input('header-how-to-play-toggle', 'n_clicks'),
+     Input('header-how-to-play-close', 'n_clicks')],
+    [State('header-how-to-play-bubble', 'style')],
+    prevent_initial_call=True,
+)
+
+
+app.clientside_callback(
+    """
+    function(n) {
+        if (!n) {
+            return window.dash_clientside.no_update;
+        }
+
+        var shell = document.getElementById('demo-video-shell');
+        var frame = document.getElementById('demo-video-frame');
+        var youtubeUrl = 'https://www.youtube.com/watch?v=M9JDhLFfFbA';
+
+        function openYoutubeFallback() {
+            window.location.href = youtubeUrl;
+        }
+
+        if (!shell || !frame) {
+            openYoutubeFallback();
+            return window.dash_clientside.no_update;
+        }
+
+        var requestFullscreen = (
+            shell.requestFullscreen ||
+            shell.webkitRequestFullscreen ||
+            shell.msRequestFullscreen
+        );
+
+        if (!requestFullscreen) {
+            openYoutubeFallback();
+            return window.dash_clientside.no_update;
+        }
+
+        shell.classList.add('demo-video-immersive');
+
+        function clearImmersiveClass() {
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                shell.classList.remove('demo-video-immersive');
+                document.removeEventListener('fullscreenchange', clearImmersiveClass);
+                document.removeEventListener('webkitfullscreenchange', clearImmersiveClass);
+            }
+        }
+
+        document.addEventListener('fullscreenchange', clearImmersiveClass);
+        document.addEventListener('webkitfullscreenchange', clearImmersiveClass);
+
+        try {
+            var result = requestFullscreen.call(shell);
+            if (result && result.catch) {
+                result.catch(openYoutubeFallback);
+            }
+        } catch (e) {
+            openYoutubeFallback();
+        }
+
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output('demo-video-sink', 'children'),
+    Input('demo-fullscreen-button', 'n_clicks'),
+    prevent_initial_call=True,
+)
+
+
+# Immersive entry: when the user clicks the wizard's final Start button on a
+# mobile device, request fullscreen on the whole page (the same Fullscreen API
+# the demo video uses successfully) and best-effort lock to landscape, so they
+# land directly in the immersive chart. Triggered by the Start-button gesture so
+# the browser honours requestFullscreen (a route-change callback would lose the
+# user-activation and be rejected). screen.orientation.lock() needs the fullscreen
+# we just entered; it works on Android Chrome/Vivaldi and rejects on iOS Safari
+# (where the user rotates manually -- the immersive landscape CSS still applies).
+# Desktop is excluded via the mobile-device class check.
+app.clientside_callback(
+    """
+    function(n) {
+        if (!n) { return window.dash_clientside.no_update; }
+        if (!document.documentElement.classList.contains('mobile-device')) {
+            return window.dash_clientside.no_update;
+        }
+        var el = document.documentElement;
+        var requestFullscreen = (
+            el.requestFullscreen ||
+            el.webkitRequestFullscreen ||
+            el.msRequestFullscreen
+        );
+        function lockLandscape() {
+            try {
+                if (screen.orientation && screen.orientation.lock) {
+                    var p = screen.orientation.lock('landscape');
+                    if (p && p.catch) { p.catch(function(){}); }
+                }
+            } catch (e) { /* unsupported (iOS Safari) -- ignore */ }
+            setTimeout(function(){
+                window.dispatchEvent(new Event('resize'));
+                if (window.Plotly) {
+                    document.querySelectorAll('.js-plotly-plot').forEach(function(g){
+                        try { window.Plotly.Plots.resize(g); } catch(e){}
+                    });
+                }
+            }, 400);
+        }
+        if (!requestFullscreen) { lockLandscape(); return window.dash_clientside.no_update; }
+        try {
+            var result = requestFullscreen.call(el);
+            if (result && result.then) { result.then(lockLandscape).catch(lockLandscape); }
+            else { lockLandscape(); }
+        } catch (e) { lockLandscape(); }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output('immersive-sink', 'children'),
+    Input('start-button', 'n_clicks'),
+    prevent_initial_call=True,
+)
+
+
+# Persistent "Go fullscreen" button on /prediction: same fullscreen + landscape
+# lock as the Start-button path, but available any time (gesture-reliable). The
+# button is CSS-hidden off mobile/non-prediction, so this only fires where it
+# should.
+app.clientside_callback(
+    """
+    function(n) {
+        if (!n) { return window.dash_clientside.no_update; }
+        var el = document.documentElement;
+        var requestFullscreen = (
+            el.requestFullscreen ||
+            el.webkitRequestFullscreen ||
+            el.msRequestFullscreen
+        );
+        function lockLandscape() {
+            try {
+                if (screen.orientation && screen.orientation.lock) {
+                    var p = screen.orientation.lock('landscape');
+                    if (p && p.catch) { p.catch(function(){}); }
+                }
+            } catch (e) { /* iOS Safari -- ignore */ }
+            setTimeout(function(){
+                window.dispatchEvent(new Event('resize'));
+                if (window.Plotly) {
+                    document.querySelectorAll('.js-plotly-plot').forEach(function(g){
+                        try { window.Plotly.Plots.resize(g); } catch(e){}
+                    });
+                }
+            }, 400);
+        }
+        if (!requestFullscreen) { lockLandscape(); return window.dash_clientside.no_update; }
+        try {
+            var result = requestFullscreen.call(el);
+            if (result && result.then) { result.then(lockLandscape).catch(lockLandscape); }
+            else { lockLandscape(); }
+        } catch (e) { lockLandscape(); }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output('prediction-fullscreen-sink', 'children'),
+    Input('prediction-fullscreen-button', 'n_clicks'),
+    prevent_initial_call=True,
+)
+
+
+# Copy a cross-device resume link (?resume=<code>) to the clipboard from the
+# between-rounds /ending summary (the in-round chart page has no screen budget).
+# The code lives in user-info-store (assigned at consent). Shows transient "copied"
+# feedback in the button text (reverted via setTimeout), localized through the
+# button's data-copied-text attribute. Falls back to execCommand on non-secure
+# contexts where navigator.clipboard is unavailable.
+app.clientside_callback(
+    """
+    function(n, userInfo) {
+        if (!n) { return window.dash_clientside.no_update; }
+        var btn = document.getElementById('ending-copy-link-button');
+        if (!btn) { return window.dash_clientside.no_update; }
+        var code = userInfo && userInfo.resume_code;
+        if (!code) { return window.dash_clientside.no_update; }
+        var url = window.location.origin + '/?resume=' + encodeURIComponent(code);
+        var original = btn.getAttribute('data-label') || btn.textContent;
+        btn.setAttribute('data-label', original);
+        var copiedMsg = btn.getAttribute('data-copied-text') || 'Copied!';
+        function feedback() {
+            btn.textContent = copiedMsg;
+            setTimeout(function(){ btn.textContent = original; }, 2200);
+        }
+        function fallbackCopy() {
+            try {
+                var ta = document.createElement('textarea');
+                ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+                document.body.appendChild(ta); ta.focus(); ta.select();
+                document.execCommand('copy'); document.body.removeChild(ta);
+            } catch (e) {}
+            feedback();
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(feedback).catch(fallbackCopy);
+        } else {
+            fallbackCopy();
+        }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output('copy-link-sink', 'children'),
+    Input('ending-copy-link-button', 'n_clicks'),
+    State('user-info-store', 'data'),
+    prevent_initial_call=True,
+)
+
+
 @app.callback(
-    Output('orientation-overlay', 'children'),
+    Output('prediction-fullscreen-button', 'children'),
     [Input('interface-language', 'data')],
+    [State('url', 'pathname')],
     prevent_initial_call=False,
 )
-def update_orientation_overlay_text(interface_language: Optional[str]) -> str:
-    """Keep the portrait-prompt overlay translated as the language changes."""
-    locale = normalize_locale(interface_language)
-    return t("ui.orientation.title", locale=locale)
-
-
-@app.callback(
-    [Output('orientation-overlay', 'className'),
-     Output('orientation-overlay-close', 'className')],
-    [Input('orientation-overlay-close', 'n_clicks'),
-     Input('url', 'pathname')],
-    prevent_initial_call=False,
-)
-def update_orientation_overlay_visibility(
-    close_clicks: Optional[int],
-    pathname: Optional[str],
-) -> tuple[str, str]:
-    """Dismiss the portrait prompt, but reinstate it for a fresh landing page."""
-    if ctx.triggered_id == 'orientation-overlay-close' and close_clicks:
-        return (
-            'rotate-title orientation-overlay-dismissed',
-            'orientation-overlay-close orientation-overlay-dismissed',
-        )
-
-    if ctx.triggered_id in (None, 'url') and pathname == '/':
-        return 'rotate-title', 'orientation-overlay-close'
-
-    raise PreventUpdate
+def update_fullscreen_button_text(interface_language: Optional[str], pathname: Optional[str]) -> str:
+    """Keep the 'Go fullscreen' button translated as the language changes."""
+    if pathname != '/prediction':
+        raise PreventUpdate
+    return t("ui.orientation.go_fullscreen", locale=normalize_locale(interface_language))
 
 
 @app.callback(
@@ -1265,6 +1844,55 @@ def update_prediction_uploaded_data_consent_ui(
 
 _STATEFUL_PAGES = frozenset({'/prediction', '/ending'})
 
+# Keyword list mirrors the clientside `mobile-device` class setter.  Kept here so
+# the server-side layout branch (display_page / update_on_language_change) can pick
+# the mobile builder for structurally-different pages (startup wizard, landing).
+_MOBILE_UA_KEYWORDS: tuple[str, ...] = (
+    'iphone', 'android', 'ipad', 'mobile', 'mobi', 'opera mini',
+)
+
+
+def _is_mobile_ua(ua: Optional[str]) -> bool:
+    """True if the User-Agent string looks like a phone/tablet.
+
+    We read the live request header (request-scoped, always present) rather than
+    the async-hydrating ``user-agent`` dcc.Store, because the layout branch must
+    be correct on the very first render.  This is intentionally coarse: it only
+    decides *which layout* to serve; the clientside class-setter still owns the
+    finer ``(pointer: coarse)`` CSS gating.
+    """
+    if not ua:
+        return False
+    lc = ua.lower()
+    return any(kw in lc for kw in _MOBILE_UA_KEYWORDS)
+
+
+def _is_mobile_request() -> bool:
+    """Detect a mobile client from the current Flask request's User-Agent."""
+    return _is_mobile_ua(flask_request.headers.get('User-Agent', ''))
+
+
+def _startup_builder(*, locale: str) -> html.Div:
+    """Return the startup page builder appropriate for the requesting device."""
+    if _is_mobile_request():
+        return StartupPageMobile(locale=locale)
+    return StartupPage(locale=locale)
+
+
+def _landing_builder(*, locale: str) -> html.Div:
+    """Return the landing page builder appropriate for the requesting device."""
+    if _is_mobile_request():
+        return LandingPageMobile(locale=locale)
+    return LandingPage(locale=locale)
+
+
+def _navbar(*, locale: str, pathname: Optional[str]) -> html.Div:
+    """Return the compact mobile burger navbar or the desktop tabular menu."""
+    current = pathname or "/"
+    if _is_mobile_request():
+        return MobileNavBar(locale=locale, current_page=current)
+    return NavBar(locale=locale, current_page=current)
+
 
 @app.callback(
     [Output('page-content', 'children', allow_duplicate=True),
@@ -1292,12 +1920,16 @@ def update_on_language_change(
     a navbar refresh -- page content is left untouched via per-element callbacks.
     """
     locale = normalize_locale(interface_language)
-    navbar = NavBar(locale=locale, current_page=pathname or "/")
+    navbar = _navbar(locale=locale, pathname=pathname)
 
     if pathname in _STATEFUL_PAGES:
         return no_update, no_update, navbar
 
     warning_content = render_mobile_warning(user_agent, locale=locale)
+    if _is_staging_mode and pathname and pathname.startswith('/staging'):
+        staging_layout = _staging_display(pathname, locale=locale, glucose_unit=glucose_unit)
+        if staging_layout is not None:
+            return staging_layout, warning_content, navbar
     if pathname == '/final':
         if user_info:
             return create_final_layout(full_df_data, user_info, glucose_unit, locale=locale), warning_content, navbar
@@ -1314,7 +1946,7 @@ def update_on_language_change(
     if pathname == "/consent-form":
         return ConsentFormPage(locale=locale), warning_content, navbar
     if pathname == '/startup':
-        return StartupPage(locale=locale), warning_content, navbar
+        return _startup_builder(locale=locale), warning_content, navbar
     if pathname == '/about':
         return create_about_page(locale=locale), warning_content, navbar
     if pathname == '/contact':
@@ -1324,20 +1956,20 @@ def update_on_language_change(
     if pathname == '/faq':
         return create_faq_page(locale=locale), warning_content, navbar
     # Landing page
-    return LandingPage(locale=locale), warning_content, navbar
+    return _landing_builder(locale=locale), warning_content, navbar
 
 
 @app.callback(
     [Output('header-app-title', 'children'),
      Output('header-description', 'children'),
      Output('header-how-to-play', 'children'),
+     Output('prediction-round-tagline', 'children'),
      Output('header-data-source-label', 'children'),
      Output('header-upload-prompt', 'children'),
      Output('use-example-data-button', 'children'),
      Output('header-time-window-label', 'children'),
      Output('prediction-units-label', 'children'),
      Output('prediction-consent-label', 'children'),
-     Output('submit-button', 'children'),
      Output('finish-study-button', 'children'),
      Output('nightscout-load-button', 'children')],
     [Input('interface-language', 'data')],
@@ -1355,22 +1987,38 @@ def update_prediction_text_on_language_change(
     locale = normalize_locale(interface_language)
     return (
         t("ui.common.app_title", locale=locale),
+        "Prediction" if locale == "en" else t("ui.header.description_1", locale=locale),
         [
-            t("ui.header.description_1", locale=locale) + " ",
-            html.Br(),
-            t("ui.header.description_2", locale=locale) + " ",
-            t("ui.header.description_3", locale=locale),
+            html.Button(
+                t("ui.header.how_to_play", locale=locale),
+                id="header-how-to-play-toggle",
+                className="header-how-to-play-toggle",
+                type="button",
+            ),
+            html.Div(
+                [
+                    html.Button("×", id="header-how-to-play-close", className="header-how-to-play-close", type="button"),
+                    html.Div(
+                        [
+                            t("ui.header.description_2", locale=locale) + " ",
+                            t("ui.header.description_3", locale=locale),
+                            html.Br(),
+                            t("ui.header.how_to_play_1", locale=locale),
+                            html.Br(),
+                            t("ui.header.how_to_play_2", locale=locale),
+                            html.Br(),
+                            t("ui.header.how_to_play_3", locale=locale),
+                        ],
+                        className="header-how-to-play-body",
+                    ),
+                ],
+                id="header-how-to-play-bubble",
+                className="header-how-to-play-bubble",
+                style={"display": "none"},
+            ),
         ],
-        [
-            html.Strong(t("ui.header.how_to_play", locale=locale)),
-            html.Br(),
-            t("ui.header.how_to_play_1", locale=locale),
-            html.Br(),
-            t("ui.header.how_to_play_2", locale=locale),
-            html.Br(),
-            t("ui.header.how_to_play_3", locale=locale),
-        ],
-        t("ui.header.current_data_source", locale=locale),
+        t("ui.header.description_1", locale=locale),
+        "Source:" if locale == "en" else t("ui.header.current_data_source", locale=locale),
         [
             t("ui.header.upload_prompt_1", locale=locale),
             html.A(t("ui.header.upload_prompt_2", locale=locale)),
@@ -1379,7 +2027,6 @@ def update_prediction_text_on_language_change(
         t("ui.header.time_window_label", locale=locale),
         t("ui.prediction.units_label", locale=locale),
         t("ui.startup.data_usage_consent_label", locale=locale),
-        t("ui.submit.submit", locale=locale),
         t("ui.common.finish_exit", locale=locale),
         t("ui.header.nightscout_load_button", locale=locale),
     )
@@ -1529,17 +2176,36 @@ def display_page(
     has_full = bool(full_df_data)
     print(f"DEBUG display_page: pathname={pathname} has_user_info={user_info is not None} has_prediction_table_data={has_ptd} has_full_df={has_full}")
     locale = normalize_locale(interface_language)
-    navbar = NavBar(locale=locale, current_page=pathname or "/")
+    navbar = _navbar(locale=locale, pathname=pathname)
     
     with start_action(action_type=u"display_page", pathname=pathname, locale=locale):
         warning_content = render_mobile_warning(user_agent, locale=locale)
+        if _is_staging_mode and pathname and pathname.startswith('/staging'):
+            staging_layout = _staging_display(pathname, locale=locale, glucose_unit=glucose_unit)
+            if staging_layout is not None:
+                return staging_layout, warning_content, navbar
         if pathname == "/consent-form":
             return ConsentFormPage(locale=locale), warning_content, navbar
+        # Consent guard: mandatory consent (acknowledge + GDPR) must have been
+        # recorded before the game flow is reachable. `consent_completed` is set
+        # by handle_landing_continue (desktop) and the mobile wizard's Start
+        # handler. Without it, a direct-URL / burger-menu visit could otherwise
+        # bypass the consent gate (desktop /startup omits the consent fields, so
+        # handle_start_button would skip its own check).
+        consent_done = bool(user_info and user_info.get('consent_completed'))
         if pathname == '/prediction' and user_info:
+            if not consent_done:
+                # No consent on record -> send the user to the consent entry.
+                return (_landing_builder(locale=locale), warning_content, navbar)
             format_value = str(user_info.get("format") or "A")
             return create_prediction_layout(locale=locale, format_value=format_value, user_info=user_info), warning_content, navbar
         if pathname == '/startup':
-            return (StartupPage(locale=locale), warning_content, navbar)
+            # On mobile, /startup IS the consent entry (wizard step 0), so it
+            # must stay reachable without a prior consent record. On desktop,
+            # consent lives on the landing page, so require it first.
+            if not _is_mobile_request() and not consent_done:
+                return (_landing_builder(locale=locale), warning_content, navbar)
+            return (_startup_builder(locale=locale), warning_content, navbar)
         if pathname == '/ending':
             # Check if we have the required data for ending page
             if not full_df_data or not user_info or 'prediction_table_data' not in user_info:
@@ -1601,7 +2267,7 @@ def display_page(
         if pathname == '/faq':
             return create_faq_page(locale=locale), warning_content, navbar
         # Default route: landing page
-        return (LandingPage(locale=locale), warning_content, navbar)
+        return (_landing_builder(locale=locale), warning_content, navbar)
 
 from dash import html
 
@@ -1790,7 +2456,11 @@ def create_contact_page(*, locale: str) -> html.Div:
     info = load_contact_info()
     page_children: list[Any] = [
         html.H1(t("ui.contact.title", locale=locale)),
-        html.Div(t("ui.contact.body", locale=locale), style={"marginBottom": "14px"}),
+        html.Div(
+            t("ui.contact.body", locale=locale),
+            style={"marginBottom": "14px"},
+            className="contact-intro",
+        ),
     ]
 
     def table_style() -> dict[str, Any]:
@@ -1836,6 +2506,7 @@ def create_contact_page(*, locale: str) -> html.Div:
                         ),
                     ],
                     style=table_style(),
+                    className="contact-table",
                 ),
                 html.Hr(style={"margin": "18px 0"}),
             ]
@@ -1846,7 +2517,12 @@ def create_contact_page(*, locale: str) -> html.Div:
             [
                 html.H2(t("ui.contact.general_email_title", locale=locale)),
                 html.Div(
-                    html.A(info.general_email, href=f"mailto:{info.general_email}", style={"fontWeight": "700"}),
+                    html.A(
+                        info.general_email,
+                        href=f"mailto:{info.general_email}",
+                        style={"fontWeight": "700"},
+                        className="contact-general-email",
+                    ),
                     style={"marginBottom": "18px"},
                 ),
             ]
@@ -1881,6 +2557,7 @@ def create_contact_page(*, locale: str) -> html.Div:
                     ),
                 ],
                 style=table_style(),
+                className="contact-table",
             )
         )
         page_children.append(html.Hr(style={"margin": "18px 0"}))
@@ -1914,6 +2591,7 @@ def create_contact_page(*, locale: str) -> html.Div:
                     ),
                 ],
                 style=table_style(),
+                className="contact-table",
             )
         )
         page_children.append(html.Hr(style={"margin": "18px 0"}))
@@ -1954,10 +2632,11 @@ def create_contact_page(*, locale: str) -> html.Div:
                     ),
                 ],
                 style=table_style(),
+                className="contact-table",
             )
         )
 
-    return html.Div(page_children, className="info-page", disable_n_clicks=True)
+    return html.Div(page_children, className="info-page contact-page", disable_n_clicks=True)
 
 
 def create_demo_page(*, locale: str) -> html.Div:
@@ -1971,10 +2650,11 @@ def create_demo_page(*, locale: str) -> html.Div:
             ),
             html.Div(
                 html.Iframe(
+                    id="demo-video-frame",
                     src="https://www.youtube.com/embed/M9JDhLFfFbA",
                     title=t("ui.common.video_instructions", locale=locale),
                     allow=(
-                        "accelerometer; autoplay; clipboard-write; encrypted-media; "
+                        "accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; "
                         "gyroscope; picture-in-picture; web-share"
                     ),
                     style={
@@ -1986,6 +2666,7 @@ def create_demo_page(*, locale: str) -> html.Div:
                         "border": "0",
                     },
                 ),
+                id="demo-video-shell",
                 style={
                     "position": "relative",
                     "width": "100%",
@@ -1998,8 +2679,15 @@ def create_demo_page(*, locale: str) -> html.Div:
                 },
                 disable_n_clicks=True,
             ),
+            html.Button(
+                t("ui.demo.fullscreen_video", locale=locale),
+                id="demo-fullscreen-button",
+                className="ui blue button demo-fullscreen-button",
+                n_clicks=0,
+                **{"aria-label": t("ui.demo.fullscreen_video", locale=locale)},
+            ),
         ],
-        className="info-page",
+        className="info-page demo-page",
         disable_n_clicks=True,
     )
 
@@ -2021,9 +2709,11 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
             show_time_slider=False,
             show_upload_section=show_upload,
             show_example_button=(format_value == "A"),
+            show_data_source_section=False,
             initial_slider_value=example_initial_slider_value,
             locale=locale,
             data_source_name=data_source_display,
+            className="prediction-header",
         ),
         html.Div(
             [
@@ -2058,13 +2748,25 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
             },
         ),
         html.Div(id="upload-required-alert", style={'margin': '0 auto', 'maxWidth': '900px'}),
-        html.Div(id='round-indicator', style={
-            'textAlign': 'center',
-            'fontSize': '18px',
-            'fontWeight': '600',
-            'color': '#2c5282',
-            'marginBottom': '10px'
-        }),
+        html.Div(
+            [
+                html.Span(
+                    t("ui.common.round_of", locale=locale, current=1, total=user_info.get("max_rounds", MAX_ROUNDS)).replace("Round", "Prediction Round", 1),
+                    id="prediction-round-tagline",
+                    className="prediction-round-tagline",
+                    style={"display": "none"},
+                ),
+                html.Div(id='round-indicator', style={
+                    'textAlign': 'center',
+                    'fontSize': '18px',
+                    'fontWeight': '600',
+                    'color': '#2c5282',
+                    'marginBottom': '10px'
+                }),
+            ],
+            id="prediction-round-summary",
+            disable_n_clicks=True,
+        ),
         html.Div([
             html.Div(t("ui.prediction.units_label", locale=locale), id='prediction-units-label', style={'fontWeight': '600', 'marginRight': '10px'}),
             dbc.RadioItems(
@@ -2082,14 +2784,44 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
             'alignItems': 'center',
             'gap': '10px',
             'marginBottom': '10px'
-        }),
+        }, id='prediction-units-row'),
         html.Div([
             html.Div(
                 GlucoseChart(id='glucose-graph', hide_last_hour=True),
                 id='prediction-glucose-chart-container'
             ),
-            SubmitComponent(locale=locale)
-        ], style={'flex': '1'})
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            html.Label(
+                                "Source:" if locale == "en" else t("ui.header.current_data_source", locale=locale),
+                                id='header-data-source-label',
+                                className="prediction-source-label",
+                            ),
+                            html.Div(id='data-source-display', children=data_source_display, className="prediction-source-name"),
+                            html.Div(id='prediction-chart-meta', className="prediction-source-time"),
+                        ],
+                        className="prediction-source-line",
+                    ),
+                    html.Div(id='generic-source-metadata-display', children="", className="prediction-source-metadata"),
+                ],
+                id="prediction-source-plaque",
+                disable_n_clicks=True,
+            ),
+            html.Div(
+                [
+                    html.Button(
+                        t("ui.orientation.go_fullscreen", locale=locale),
+                        id="prediction-fullscreen-button",
+                        className="prediction-fullscreen-button",
+                        type="button",
+                    ),
+                    SubmitComponent(locale=locale),
+                ],
+                id="prediction-mobile-actions",
+            ),
+        ], id='prediction-chart-submit-wrap', style={'flex': '1'})
     ], style={
         'margin': '0 auto',
         'padding': '0 20px',
@@ -2097,6 +2829,30 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
         'flexDirection': 'column',
         'gap': '20px'
     })
+
+
+@app.callback(
+    Output('prediction-chart-meta', 'children'),
+    [Input('current-window-df', 'data'),
+     Input('data-source-name', 'data')],
+    [State('url', 'pathname')],
+    prevent_initial_call=False
+)
+def update_prediction_chart_meta(
+    current_df_data: Optional[dict[str, Any]],
+    source_name: Optional[str],
+    pathname: Optional[str],
+) -> str:
+    if pathname != '/prediction' or not current_df_data:
+        raise PreventUpdate
+
+    time_values = current_df_data.get('time') or []
+    if not time_values:
+        raise PreventUpdate
+
+    start_time = datetime.fromisoformat(str(time_values[0])).strftime('%H:%M')
+    end_time = datetime.fromisoformat(str(time_values[-1])).strftime('%H:%M')
+    return f"{start_time}-{end_time}"
 
 
 @app.callback(
@@ -2143,10 +2899,16 @@ def sync_glucose_unit_selector(
     Output('round-indicator', 'children'),
     [Input('url', 'pathname'),
      Input('user-info-store', 'data'),
-     Input('interface-language', 'data')],
+     Input('interface-language', 'data'),
+     Input('user-agent', 'data')],
     prevent_initial_call=False
 )
-def update_round_indicator(pathname: Optional[str], user_info: Optional[Dict[str, Any]], interface_language: Optional[str]) -> str:
+def update_round_indicator(
+    pathname: Optional[str],
+    user_info: Optional[Dict[str, Any]],
+    interface_language: Optional[str],
+    user_agent: Optional[str],
+) -> str:
     if pathname != '/prediction':
         raise PreventUpdate
     if not user_info:
@@ -2154,7 +2916,13 @@ def update_round_indicator(pathname: Optional[str], user_info: Optional[Dict[str
     rounds_played = len(user_info.get('rounds') or [])
     current_round = int(user_info.get('current_round_number') or (rounds_played + 1))
     max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS)
-    return t("ui.common.round_of", locale=normalize_locale(interface_language), current=current_round, total=max_rounds)
+    locale = normalize_locale(interface_language)
+    round_text = t("ui.common.round_of", locale=locale, current=current_round, total=max_rounds)
+    if _is_mobile_ua(user_agent):
+        return round_text
+    if locale == "en":
+        return round_text.replace("Round", "Prediction Round", 1)
+    return round_text
 
 
 @app.callback(
@@ -2798,6 +3566,32 @@ def create_ending_layout(
             'marginTop': '20px',
             'padding': '0 10px',
         }),
+        # Cross-device resume: copy a "?resume=<code>" link from the between-rounds
+        # summary (there's screen budget here, unlike the in-round chart page) so
+        # the player can continue this session on another device.
+        html.Div(
+            html.Button(
+                t("ui.resume_code.copy_link", locale=locale),
+                id='ending-copy-link-button',
+                type='button',
+                **{"data-copied-text": t("ui.resume_code.copied", locale=locale)},
+                style={
+                    'backgroundColor': '#ffffff',
+                    'color': '#2185d0',
+                    'padding': 'clamp(10px, 1.6vw, 14px) clamp(16px, 2.4vw, 22px)',
+                    'border': '1px solid #2185d0',
+                    'borderRadius': '8px',
+                    'fontSize': 'clamp(14px, 2vw, 18px)',
+                    'fontWeight': '700',
+                    'cursor': 'pointer',
+                    'maxWidth': '400px',
+                    'width': '100%',
+                },
+            ),
+            id='ending-copy-link-row',
+            disable_n_clicks=True,
+            style={'display': 'flex', 'justifyContent': 'center', 'marginTop': '12px', 'padding': '0 10px'},
+        ),
         html.Div(
             [
                 html.H3(
@@ -3433,13 +4227,24 @@ def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) ->
      State('user-info-store', 'data')],
     prevent_initial_call=True
 )
-def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Optional[int | float], 
+def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Optional[int | float],
                        gender: Optional[str], uses_cgm: Optional[bool], cgm_duration_years: Optional[float],
                        format_value: Optional[str], data_usage_consent: Optional[list[str]],
-                       diabetic: Optional[bool], diabetic_type: Optional[str], 
+                       diabetic: Optional[bool], diabetic_type: Optional[str],
                        diabetes_duration: Optional[float], location: Optional[str],
                        existing_user_info: Optional[Dict[str, Any]] = None) -> Tuple[str, Dict[str, Any]]:
-    """Handle start button on startup page"""
+    """Handle start button on startup page.
+
+    Consent is recorded BEFORE this callback runs -- on desktop by
+    handle_landing_continue, on mobile by record_mobile_consent -- and arrives
+    here via `existing_user_info`. This callback must NOT take the landing-only
+    consent components (`consent-acknowledge`, `consent-gdpr`, ...) as State:
+    those components live only in the desktop landing page and the mobile wizard
+    step 0, so they are absent from the *desktop* /startup DOM. Dash refuses to
+    fire a callback whose Input/State components aren't all in the layout, so
+    referencing them left the desktop Start button inert (it activated but
+    navigated nowhere). See record_mobile_consent below for the mobile path.
+    """
     if not n_clicks:
         return no_update, no_update
 
@@ -3458,6 +4263,8 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
         info.update({
             'study_id': study_id,
             'run_id': run_id,
+            # Stable cross-device resume code (server-side savegame key).
+            'resume_code': info.get('resume_code') or resume_store.new_code(),
             'email': email or info.get('email') or '',
             'age': age,
             'gender': gender,
@@ -3499,20 +4306,101 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
             info["consent_timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # Ensure consent CSV always has a row for this study_id (even when users bypass landing).
-        ensure_consent_agreement_row(
-            {
-                "study_id": info["study_id"],
-                "number": info.get("number", ""),
-                "timestamp": info.get("consent_timestamp", ""),
-                "play_only": bool(info.get("consent_play_only", False)),
-                "participate_in_study": bool(info.get("consent_participate_in_study", False)),
-                "receive_results_later": bool(info.get("consent_receive_results_later", False)),
-                "keep_up_to_date": bool(info.get("consent_keep_up_to_date", False)),
-                "no_selection": bool(info.get("consent_no_selection", True)),
-            }
-        )
+        consent_row: Dict[str, Any] = {
+            "study_id": info["study_id"],
+            "number": info.get("number", ""),
+            "timestamp": info.get("consent_timestamp", ""),
+            "gdpr_consent": bool(info.get("consent_gdpr", False)),
+            "upload_own_data": bool(info.get("consent_upload_own_data", False)),
+            "play_only": bool(info.get("consent_play_only", False)),
+            "participate_in_study": bool(info.get("consent_participate_in_study", False)),
+            "receive_results_later": bool(info.get("consent_receive_results_later", False)),
+            "keep_up_to_date": bool(info.get("consent_keep_up_to_date", False)),
+            "no_selection": bool(info.get("consent_no_selection", True)),
+        }
+        ensure_consent_agreement_row(consent_row)
         return '/prediction', info
     return no_update, no_update
+
+
+@app.callback(
+    Output('user-info-store', 'data', allow_duplicate=True),
+    [Input('consent-acknowledge', 'value'),
+     Input('consent-gdpr', 'value'),
+     Input('consent-upload-own-data', 'value'),
+     Input('consent-play-only', 'value'),
+     Input('consent-receive-results', 'value'),
+     Input('consent-keep-updated', 'value')],
+    [State('user-info-store', 'data')],
+    prevent_initial_call=True
+)
+def record_mobile_consent(
+    acknowledge_value: Optional[list[str]],
+    gdpr_value: Optional[list[str]],
+    upload_own_data_value: Optional[list[str]],
+    play_only_value: Optional[list[str]],
+    receive_results_value: Optional[list[str]],
+    keep_updated_value: Optional[list[str]],
+    existing_user_info: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Mirror the mobile wizard's consent choices into `user-info-store`.
+
+    On mobile, consent lives in StartupPageMobile wizard step 0 (the consent
+    components are imported from landing.py). Nothing else records consent on
+    mobile before Start, so this callback does it -- writing `consent_completed`
+    once the two mandatory boxes are ticked, exactly like handle_landing_continue
+    does on desktop. That lets handle_start_button read consent from
+    `user-info-store` on BOTH platforms instead of taking these landing-only
+    components as State (which broke desktop -- see that callback).
+
+    The same consent components also render on the desktop landing page, so a
+    UA guard below restricts this callback to mobile; desktop consent stays
+    owned by handle_landing_continue.
+
+    No CSV row is written here (this fires on every checkbox toggle);
+    handle_start_button writes the consent-agreement row once on Start.
+    """
+    from datetime import datetime
+
+    # The consent components also exist on the *desktop* landing page, so this
+    # callback would otherwise fire there too and race handle_landing_continue.
+    # Restrict it to mobile (where it is the only consent recorder); on desktop,
+    # handle_landing_continue owns consent recording untouched.
+    if not _is_mobile_request():
+        raise PreventUpdate
+
+    acknowledged = bool(acknowledge_value and "ack" in acknowledge_value)
+    gdpr_consented = bool(gdpr_value and "gdpr" in gdpr_value)
+    if not (acknowledged and gdpr_consented):
+        # Mandatory consent not yet complete; don't mark it done. The wizard's
+        # gate_mobile_consent_step keeps the Next button disabled until then.
+        raise PreventUpdate
+
+    info: Dict[str, Any] = dict(existing_user_info or {})
+    if not info.get("study_id"):
+        info["study_id"] = str(uuid.uuid4())
+
+    any_selected = bool(play_only_value) or bool(receive_results_value) or bool(keep_updated_value)
+    no_selection = not any_selected
+    upload_own_data = bool(upload_own_data_value and "upload_own_data" in upload_own_data_value)
+    play_only = bool(play_only_value and "play_only" in play_only_value)
+    receive_results = bool(receive_results_value and "receive_results" in receive_results_value)
+    keep_updated = bool(keep_updated_value and "keep_updated" in keep_updated_value)
+
+    info.update({
+        "consent_gdpr": gdpr_consented,
+        "consent_upload_own_data": upload_own_data,
+        "consent_play_only": play_only,
+        "consent_participate_in_study": (not play_only) and (not no_selection),
+        "consent_receive_results_later": receive_results,
+        "consent_keep_up_to_date": keep_updated,
+        "consent_no_selection": no_selection,
+        "consent_timestamp": info.get("consent_timestamp") or datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "consent_completed": True,
+        # Stable cross-device resume code, assigned at consent like on desktop.
+        "resume_code": info.get("resume_code") or resume_store.new_code(),
+    })
+    return info
 
 
 @app.callback(
@@ -4433,6 +5321,7 @@ def restore_page_on_load(
             "target": target,
             "current_round": current_round,
             "max_rounds": MAX_ROUNDS,
+            "resume_code": (user_info or {}).get("resume_code"),
         }
         return dialog_data, True, no_update, True
 
@@ -4578,6 +5467,17 @@ def render_resume_dialog(
                 style=warning_style,
                 disable_n_clicks=True,
             ),
+            *([
+                html.Div(
+                    t("ui.resume_dialog.your_code", locale=locale, code=dialog_data.get("resume_code")),
+                    style={
+                        'fontSize': '13px', 'color': '#2b6cb0', 'backgroundColor': '#ebf4ff',
+                        'border': '1px solid #bcd4f0', 'borderRadius': '6px',
+                        'padding': '8px 12px', 'marginBottom': '20px', 'wordBreak': 'break-all',
+                    },
+                    disable_n_clicks=True,
+                )
+            ] if dialog_data.get("resume_code") else []),
             html.Div([
                 html.Button(
                     t("ui.resume_dialog.start_over_btn", locale=locale),
@@ -4666,6 +5566,201 @@ def handle_resume_start_over(
         True,                      # clean-storage-flag (self-resets via clientside callback)
         True,                      # session-active (user made a choice in this tab)
     )
+
+
+# ---------------------------------------------------------------------------
+# Cross-device resume (server-side savegame keyed by a short resume code).
+#
+# localStorage is per-device, so a session started on a phone can't be continued
+# on a desktop. We keep a server-side snapshot of the live session (resume_store)
+# keyed by user_info['resume_code'] and let the user re-enter that code on another
+# device to restore it. Entirely additive: the auto-snapshot only reads stores,
+# and the redeem callbacks are gated on an explicit code so they never perturb the
+# normal in-tab persistence/resume flow.
+# ---------------------------------------------------------------------------
+def _resume_payload(
+    user_info: Optional[Dict[str, Any]],
+    full_df: Optional[Dict],
+    current_df: Optional[Dict],
+    events_df: Optional[Dict],
+    last_page: Optional[str],
+    glucose_unit: Optional[str],
+    interface_language: Optional[str],
+) -> Dict[str, Any]:
+    """Thin JSON-serialisable snapshot of the stores needed to restore a game."""
+    return {
+        "user_info": user_info,
+        "full_df": full_df,
+        "current_window_df": current_df,
+        "events_df": events_df,
+        "last_visited_page": last_page,
+        "glucose_unit": glucose_unit,
+        "interface_language": interface_language,
+    }
+
+
+@app.callback(
+    Output('resume-sync', 'data'),
+    [Input('user-info-store', 'data'),
+     Input('last-visited-page', 'data'),
+     Input('glucose-unit', 'data'),
+     Input('interface-language', 'data')],
+    [State('full-df', 'data'),
+     State('current-window-df', 'data'),
+     State('events-df', 'data')],
+    prevent_initial_call=True,
+)
+def auto_snapshot_session(
+    user_info: Optional[Dict[str, Any]],
+    last_page: Optional[str],
+    glucose_unit: Optional[str],
+    interface_language: Optional[str],
+    full_df: Optional[Dict],
+    current_df: Optional[Dict],
+    events_df: Optional[Dict],
+) -> Any:
+    """Persist the live session to resume_store at meaningful boundaries.
+
+    Triggers on user_info / navigation / unit / language changes (round
+    completions and page moves) and captures the dataframes via State, so it does
+    NOT fire on every in-progress drawline (current-window-df) update. Keyed by
+    user_info['resume_code']; only runs for consented sessions. Reads stores only
+    (the Output is a throwaway sink), so it cannot disturb the in-browser
+    persistence/resume contract.
+    """
+    if not user_info or not user_info.get('consent_completed'):
+        raise PreventUpdate
+    code = user_info.get('resume_code')
+    if not code:
+        raise PreventUpdate
+    resume_store.save_session(
+        code,
+        _resume_payload(user_info, full_df, current_df, events_df, last_page, glucose_unit, interface_language),
+    )
+    return code
+
+
+def _restore_outputs_from_code(code: Optional[str]) -> Optional[tuple]:
+    """Load a session by code and return the store-output tuple, or None if missing.
+
+    Output order matches the redeem callbacks:
+    (pathname, user_info, full_df, current_window_df, events_df, glucose_unit,
+     interface_language, last_visited_page, randomization_initialized,
+     is_example_data, data_source_name, session_active).
+    """
+    payload = resume_store.load_session(code)
+    if not payload:
+        return None
+    user_info = payload.get("user_info") or {}
+    last_page = payload.get("last_visited_page") or "/prediction"
+    return (
+        last_page,
+        user_info,
+        payload.get("full_df"),
+        payload.get("current_window_df"),
+        payload.get("events_df"),
+        payload.get("glucose_unit") or "mg/dL",
+        normalize_locale(payload.get("interface_language")),
+        last_page,
+        True,   # randomization-initialized: data already chosen, don't re-roll
+        bool(user_info.get("is_example_data", True)),
+        str(user_info.get("data_source_name", "example.csv")),
+        True,   # session-active
+    )
+
+
+_RESUME_RESTORE_OUTPUTS = [
+    Output('url', 'pathname', allow_duplicate=True),
+    Output('user-info-store', 'data', allow_duplicate=True),
+    Output('full-df', 'data', allow_duplicate=True),
+    Output('current-window-df', 'data', allow_duplicate=True),
+    Output('events-df', 'data', allow_duplicate=True),
+    Output('glucose-unit', 'data', allow_duplicate=True),
+    Output('interface-language', 'data', allow_duplicate=True),
+    Output('last-visited-page', 'data', allow_duplicate=True),
+    Output('randomization-initialized', 'data', allow_duplicate=True),
+    Output('is-example-data', 'data', allow_duplicate=True),
+    Output('data-source-name', 'data', allow_duplicate=True),
+    Output('session-active', 'data', allow_duplicate=True),
+]
+
+
+@app.callback(
+    [Output('resume-redeem-done', 'data'),
+     *_RESUME_RESTORE_OUTPUTS],
+    [Input('url', 'search')],
+    [State('resume-redeem-done', 'data')],
+    prevent_initial_call='initial_duplicate',
+)
+def redeem_resume_from_url(search: Optional[str], done: Optional[bool]) -> tuple:
+    """Restore a session from a ``?resume=<code>`` URL (universal cross-device entry).
+
+    Runs on the initial load too (``initial_duplicate``) so a fresh device opening
+    ``https://.../?resume=CODE`` restores immediately. The one-shot
+    ``resume-redeem-done`` guard (read via State) stops it re-firing. We route via
+    ``url.pathname`` (a different property from the ``url.search`` Input, so there
+    is no self-cycle); a clientside callback strips the ``?resume=`` query.
+    """
+    if done:
+        raise PreventUpdate
+    code: Optional[str] = None
+    if search:
+        from urllib.parse import parse_qs
+        code = (parse_qs(search.lstrip("?")).get("resume") or [None])[0]
+    if not code:
+        raise PreventUpdate
+    restored = _restore_outputs_from_code(code)
+    if restored is None:
+        # Invalid/expired code: mark done, leave stores alone.
+        return (True, *([no_update] * len(_RESUME_RESTORE_OUTPUTS)))
+    with start_action(action_type=u"redeem_resume_from_url", code=str(code)):
+        pass
+    return (True, *restored)
+
+
+# Strip the ?resume=<code> query from the URL after a successful redeem so the
+# transfer token doesn't linger in the address bar / browser history.
+app.clientside_callback(
+    """
+    function(done) {
+        if (done && window.history && window.location.search.indexOf('resume=') !== -1) {
+            window.history.replaceState({}, '', window.location.pathname);
+        }
+        return '';
+    }
+    """,
+    Output('resume-clean-sink', 'children'),
+    [Input('resume-redeem-done', 'data')],
+    prevent_initial_call=True,
+)
+
+
+@app.callback(
+    [Output('resume-redeem-error', 'children'),
+     *_RESUME_RESTORE_OUTPUTS],
+    [Input('resume-redeem-btn', 'n_clicks')],
+    [State('resume-redeem-input', 'value'),
+     State('interface-language', 'data')],
+    prevent_initial_call=True,
+)
+def redeem_resume_from_input(
+    n_clicks: Optional[int],
+    code: Optional[str],
+    interface_language: Optional[str],
+) -> tuple:
+    """Restore a session from a code typed into the landing-page resume box."""
+    if not n_clicks:
+        raise PreventUpdate
+    locale = normalize_locale(interface_language)
+    restored = _restore_outputs_from_code(code)
+    if restored is None:
+        return (
+            t("ui.resume_code.not_found", locale=locale),
+            *([no_update] * len(_RESUME_RESTORE_OUTPUTS)),
+        )
+    with start_action(action_type=u"redeem_resume_from_input", code=str(code)):
+        pass
+    return ("", *restored)
 
 
 ## Removed URL-based data writer callback to enforce single-writer for data stores
@@ -5110,23 +6205,35 @@ def handle_time_slider(
 # Separate callback for glucose graph interactions (only active on prediction page)
 @app.callback(
     [Output('last-click-time', 'data', allow_duplicate=True),
-     Output('full-df', 'data', allow_duplicate=True),
      Output('current-window-df', 'data', allow_duplicate=True)],
     [Input('glucose-graph-graph', 'clickData'),
      Input('glucose-graph-graph', 'relayoutData')],
     [State('last-click-time', 'data'),
-     State('full-df', 'data'),
      State('current-window-df', 'data'),
      State('glucose-unit', 'data')],
     prevent_initial_call=True
 )
 def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optional[Dict],
-                            last_click_time: int, full_df_data: Optional[Dict], 
-                            current_df_data: Optional[Dict], glucose_unit: Optional[str]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]]]:
-    """Handle glucose graph click and draw interactions"""
-    if not full_df_data or not current_df_data:
-        return no_update, no_update, no_update
-    
+                            last_click_time: int,
+                            current_df_data: Optional[Dict], glucose_unit: Optional[str]) -> Tuple[int, Dict[str, List[Any]]]:
+    """Handle glucose graph click and draw interactions.
+
+    PERFORMANCE: predictions are a property of the CURRENT WINDOW only, so this
+    hot-path callback (fires on every click / drawline stroke) updates ONLY
+    `current-window-df` (~tens of rows). It deliberately does NOT touch
+    `full-df`. For an uploaded multi-month CGM export full-df is tens of
+    thousands of rows; reconstructing it from JSON and re-serialising it back on
+    every stroke (the old behaviour) made Plotly resolve each drawn line after a
+    long lag -- the reported "background hog". This is safe because full-df's
+    prediction column is never consumed: save_statistics derives predictions
+    from `prediction_table_data` (built from the window) and uses full-df only
+    for window times + age/user_id; the chart figure renders from
+    current-window-df; and the window is re-sliced from full-df only by the
+    hidden, round-start-only time slider (when predictions are legitimately 0).
+    """
+    if not current_df_data:
+        return no_update, no_update
+
     unit = glucose_unit if glucose_unit in ('mg/dL', 'mmol/L') else 'mg/dL'
 
     def to_mgdl(y_value: float) -> float:
@@ -5135,12 +6242,11 @@ def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optiona
         return float(y_value)
 
     current_time = int(time.time() * 1000)
-    full_df = reconstruct_dataframe_from_dict(full_df_data)
     df = reconstruct_dataframe_from_dict(current_df_data)
     predictions_values = df.get_column("prediction").to_list()
     visible_points = len(df) - PREDICTION_HOUR_OFFSET
-    
-    
+
+
     def snap_index(x_value: Optional[float]) -> Optional[int]:
         """Snap a drawn x-coordinate to the nearest data index while respecting prediction bounds."""
         if x_value is None:
@@ -5150,24 +6256,20 @@ def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optiona
         if snapped_idx < visible_points and predictions_values[snapped_idx] == 0.0:
             return None
         return snapped_idx
-    
+
     if click_data:
         if current_time - last_click_time <= DOUBLE_CLICK_THRESHOLD:
-            full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
             df = df.with_columns(pl.lit(0.0).alias("prediction"))
-            
-            return (current_time,
-                   convert_df_to_dict(full_df),
-                   convert_df_to_dict(df))
-        
+            return current_time, convert_df_to_dict(df)
+
         point_data = click_data['points'][0]
         click_x = point_data['x']
         click_y = point_data['y']
         snapped_idx = snap_index(float(click_x))
         if snapped_idx is None:
-            return no_update, no_update, no_update
+            return no_update, no_update
         nearest_time = df.get_column("time")[snapped_idx]
-        
+
         # Check if this is the first prediction point at the boundary - snap to ground truth
         prediction_y = to_mgdl(float(click_y))
         if snapped_idx == visible_points:  # First point in hidden area
@@ -5176,46 +6278,34 @@ def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optiona
             if existing_predictions == 0:  # No existing predictions, snap to ground truth
                 ground_truth_y = df.get_column("gl")[snapped_idx]
                 prediction_y = ground_truth_y
-        
-        full_df = full_df.with_columns(
-            pl.when(pl.col("time") == nearest_time)
-            .then(prediction_y)
-            .otherwise(pl.col("prediction"))
-            .alias("prediction")
-        )
+
         df = df.with_columns(
             pl.when(pl.col("time") == nearest_time)
             .then(prediction_y)
             .otherwise(pl.col("prediction"))
             .alias("prediction")
         )
-        
-        return (current_time,
-               convert_df_to_dict(full_df),
-               convert_df_to_dict(df))
-    
+
+        return current_time, convert_df_to_dict(df)
+
     elif relayout_data and 'shapes' in relayout_data:
         shapes = relayout_data['shapes']
         if shapes and len(shapes) > 0:
             latest_shape = shapes[-1]
-            
+
             start_x = latest_shape.get('x0')
             end_x = latest_shape.get('x1')
             start_y = latest_shape.get('y0')
             end_y = latest_shape.get('y1')
-            
+
             if all(v is not None for v in [start_x, end_x, start_y, end_y]):
                 start_idx = snap_index(float(start_x))
                 end_idx = snap_index(float(end_x))
                 if start_idx is None or end_idx is None:
-                    return (
-                        last_click_time,
-                        convert_df_to_dict(full_df),
-                        convert_df_to_dict(df)
-                    )
-                
+                    return last_click_time, convert_df_to_dict(df)
+
                 start_time = df.get_column("time")[start_idx]
-                
+
                 # Check if this is the first prediction starting at the boundary - snap to ground truth
                 actual_start_y = to_mgdl(float(start_y))
                 if start_idx == visible_points:  # Starting at first point in hidden area
@@ -5224,46 +6314,27 @@ def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optiona
                     if existing_predictions == 0:  # No existing predictions, snap to ground truth
                         ground_truth_y = df.get_column("gl")[start_idx]
                         actual_start_y = ground_truth_y
-                
+
                 # Use the full extent of the drawn line (end_idx already snapped above)
                 actual_end_y = to_mgdl(float(end_y))
                 end_time = df.get_column("time")[end_idx]
 
                 # Get intermediate prediction points for every grid point along the line
                 intermediate_points = create_intermediate_predictions(start_time, end_time, float(actual_start_y), float(actual_end_y), df)
-                
+
                 # Collect all times that need prediction values
                 all_prediction_times = [start_time, end_time]
                 all_prediction_values = [float(actual_start_y), float(actual_end_y)]
-                
+
                 # Add intermediate points
                 for time_point, glucose_value in intermediate_points:
                     all_prediction_times.append(time_point)
                     all_prediction_values.append(glucose_value)
-                
+
                 # Create a mapping for the predictions
                 time_to_value = dict(zip(all_prediction_times, all_prediction_values))
-                
-                # Update both DataFrames with all prediction points
-                full_df = full_df.with_columns(
-                    pl.when(pl.col("time").is_in(all_prediction_times))
-                    .then(
-                        # Use a series of when conditions to map each time to its value
-                        pl.when(pl.col("time") == start_time)
-                        .then(float(actual_start_y))
-                        .when(pl.col("time") == end_time)
-                        .then(float(actual_end_y))
-                        .otherwise(
-                            # For intermediate points, we need to match them individually
-                            pl.col("time").map_elements(
-                                lambda x: time_to_value.get(x, 0.0),
-                                return_dtype=pl.Float64
-                            )
-                        )
-                    )
-                    .otherwise(pl.col("prediction"))
-                    .alias("prediction")
-                )
+
+                # Update the window DataFrame with all prediction points
                 df = df.with_columns(
                     pl.when(pl.col("time").is_in(all_prediction_times))
                     .then(
@@ -5283,12 +6354,10 @@ def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optiona
                     .otherwise(pl.col("prediction"))
                     .alias("prediction")
                 )
-                
-                return (current_time,
-                       convert_df_to_dict(full_df),
-                       convert_df_to_dict(df))
-    
-    return no_update, no_update, no_update
+
+                return current_time, convert_df_to_dict(df)
+
+    return no_update, no_update
 
 @app.callback(
     Output('data-source-display', 'children'),
@@ -5344,10 +6413,19 @@ def update_generic_source_metadata_display(
     else:
         gender_display = meta.gender
 
+    age_display = (
+        str(meta.age)
+        .replace("years old", "")
+        .replace("year old", "")
+        .strip()
+    )
+    weight_display = str(meta.weight).replace(" ", "")
+    if locale == "en":
+        return f"{age_display} yr old {gender_display}, weight {weight_display}"
+
     return (
-        f"{t('ui.startup.age_label', locale=locale)}: {meta.age} · "
-        f"{t('ui.startup.gender_label', locale=locale)}: {gender_display} · "
-        f"{t('ui.header.weight_label', locale=locale)}: {meta.weight}"
+        f"{age_display} · {gender_display} · "
+        f"{t('ui.header.weight_label', locale=locale)} {weight_display}"
     )
 
 # Add callback for random slider initialization when prediction page components are ready
@@ -5572,7 +6650,6 @@ def bootstrap_wsgi_application() -> Any:
     of how the app is launched.
     """
     _register_all_callbacks()
-    app.layout.children[-1].children = [landing_page]
     _ensure_chrome()
     return server
 
@@ -5629,6 +6706,71 @@ def _find_free_port(host: str, preferred: int, max_tries: int = 20) -> int:
 # routes to the ``chart`` subcommand via its own entrypoint.
 cli = typer.Typer(invoke_without_command=True)
 
+
+def _arg_value(argv: list[str], *names: str) -> Optional[str]:
+    """Return the value for a CLI option without fully invoking Typer."""
+    for index, arg in enumerate(argv):
+        for name in names:
+            if arg == name and index + 1 < len(argv):
+                return argv[index + 1]
+            prefix = f"{name}="
+            if arg.startswith(prefix):
+                return arg[len(prefix):]
+    return None
+
+
+def _arg_present(argv: list[str], *names: str) -> bool:
+    """Check whether any CLI flag is present."""
+    return any(arg in names for arg in argv)
+
+
+def _seed_chart_env_from_argv(argv: list[str], env: Dict[str, str]) -> None:
+    """Seed chart-mode env vars before the Dash app module is imported.
+
+    Python console-script entry points import this module before Typer dispatches
+    to ``chart()``.  Re-execing with these values already in the environment
+    lets module-level layout/store initialization see chart mode immediately.
+    """
+    env["_CHART_MODE"] = "1"
+
+    file_arg = _arg_value(argv, "--file", "-f")
+    if file_arg:
+        env["_CHART_FILE"] = file_arg
+        env["_CHART_SOURCE"] = Path(file_arg).name
+    else:
+        env.pop("_CHART_FILE", None)
+        env["_CHART_SOURCE"] = "example.csv"
+
+    env["_CHART_POINTS"] = _arg_value(argv, "--points", "-p") or str(DEFAULT_POINTS)
+
+    start_arg = _arg_value(argv, "--start", "-s")
+    if start_arg is not None:
+        env["_CHART_START"] = start_arg
+    else:
+        env.pop("_CHART_START", None)
+
+    unit_arg = _arg_value(argv, "--unit", "-u")
+    env["_CHART_UNIT"] = unit_arg if unit_arg in ("mg/dL", "mmol/L") else "mg/dL"
+    env["_CHART_LOCALE"] = normalize_locale(_arg_value(argv, "--locale", "-l") or "en")
+
+    if _arg_present(argv, "--prefill"):
+        env["_CHART_PREFILL"] = "1"
+        env["_CHART_NOISE"] = _arg_value(argv, "--noise") or "0.05"
+    else:
+        env.pop("_CHART_PREFILL", None)
+        env.pop("_CHART_NOISE", None)
+
+    if _arg_present(argv, "--clean"):
+        env["_CLEAN_STORAGE"] = "1"
+
+    if _arg_present(argv, "--debug"):
+        env["DASH_DEBUG"] = "1"
+        env["DEBUG_MODE"] = "1"
+    if _arg_present(argv, "--no-debug"):
+        env["DASH_DEBUG"] = "0"
+        env["DEBUG_MODE"] = "0"
+
+
 @cli.callback(invoke_without_command=True)
 def main(
     typer_ctx: typer.Context,
@@ -5662,7 +6804,6 @@ def main(
         sugar_sugar_config.DEBUG_MODE = debug
 
     _register_all_callbacks()
-    app.layout.children[-1].children = [landing_page]
 
     with start_action(
         action_type=u"start_dash_server",
@@ -5683,6 +6824,8 @@ def chart(
     prefill: bool = typer.Option(False, "--prefill", help="Pre-fill predictions with noisy ground truth so submit/ending can be tested immediately"),
     noise: float = typer.Option(0.05, "--noise", help="Noise level for --prefill (fraction of gl value, e.g. 0.05 = +/-5%%)"),
     clean: bool = typer.Option(False, "--clean", help="Clear browser localStorage on first connect so the session starts fresh"),
+    debug: Optional[bool] = typer.Option(None, "--debug/--no-debug", help="Override Dash debug mode for this chart server"),
+    reloader: bool = typer.Option(False, "--reloader/--no-reloader", help="Enable Werkzeug's debug reloader. Disabled by default so chart-mode stores are deterministic."),
     host: Optional[str] = typer.Option(None, "--host", help="Host to run the server on"),
     port: Optional[int] = typer.Option(None, "--port", help="Port to run the server on"),
 ) -> None:
@@ -5718,7 +6861,8 @@ def chart(
                 child.data = True
                 break
 
-    sugar_sugar_config.DEBUG_MODE = True
+    dash_debug = (os.getenv("DASH_DEBUG", "").lower() not in ("0", "false", "no")) if debug is None else debug
+    sugar_sugar_config.DEBUG_MODE = dash_debug
 
     _ensure_chrome()
     _register_all_callbacks()
@@ -5733,8 +6877,10 @@ def chart(
         prefill=prefill,
         host=dash_host,
         port=dash_port,
+        debug=dash_debug,
+        reloader=reloader,
     ):
-        app.run(host=dash_host, port=dash_port, debug=True)
+        app.run(host=dash_host, port=dash_port, debug=dash_debug, use_reloader=dash_debug and reloader)
 
 
 @cli.command()
@@ -5792,8 +6938,12 @@ def serve(
     port: Optional[int] = typer.Option(None, "--port", help="Port gunicorn should bind"),
     workers: Optional[int] = typer.Option(None, "--workers", "-w", help="Gunicorn worker count"),
     timeout: Optional[int] = typer.Option(None, "--timeout", help="Gunicorn worker timeout in seconds"),
+    staging: bool = typer.Option(False, "--staging", help="Enable prod+ staging test routes under /staging/*"),
 ) -> None:
     """Run the Dash app with gunicorn for production/staging deployments."""
+    if staging:
+        # Set before exec so every gunicorn worker re-reads it at import.
+        os.environ["_STAGING_MODE"] = "1"
     _ensure_chrome()
     bind_host: str = DASH_HOST if host is None else (host or DASH_HOST)
     bind_port: int = DASH_PORT if port is None else port
@@ -5833,7 +6983,17 @@ def cli_main() -> None:
 
 def chart_main() -> None:
     """CLI entry point that defaults to the ``chart`` command."""
-    cli(["chart"] + sys.argv[1:])
+    argv = sys.argv[1:]
+    if os.environ.get("_CHART_REEXECED") != "1":
+        env = {**os.environ}
+        _seed_chart_env_from_argv(argv, env)
+        env["_CHART_REEXECED"] = "1"
+        os.execvpe(
+            sys.executable,
+            [sys.executable, "-m", "sugar_sugar.app", "chart", *argv],
+            env,
+        )
+    cli(["chart"] + argv)
 
 
 def share_main() -> None:
@@ -5843,6 +7003,19 @@ def share_main() -> None:
 
 def serve_main() -> None:
     """CLI entry point that defaults to the ``serve`` command."""
+    typer.run(serve)
+
+
+def serve_staging_main() -> None:
+    """CLI entry point: ``serve`` with the staging test routes enabled.
+
+    Equivalent to ``uv run serve --staging`` but available as its own command so
+    the staging deployment (https://vanilla-sugar.glucosedao.org/) can run the
+    dev branch with prod+ test nodes without remembering the flag.
+    """
+    os.environ["_STAGING_MODE"] = "1"
+    if "--staging" not in sys.argv:
+        sys.argv.append("--staging")
     typer.run(serve)
 
 

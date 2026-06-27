@@ -158,7 +158,10 @@ def _assert_static_chart(window_df: pl.DataFrame, events_df: pl.DataFrame, sourc
     assert len(mgdl_figure.data) > 0
     assert mgdl_figure.layout.xaxis.title.text
     assert mgdl_figure.layout.yaxis.title.text
-    assert mgdl_figure.layout.title.text
+    # The static/immersive chart intentionally has NO chart title ("Glucose
+    # Levels" was removed in the mobile redesign to reclaim vertical space; the
+    # source/round info lives in the source plaque instead). So title.text is "".
+    assert (mgdl_figure.layout.title.text or "") == ""
 
     mgdl_glucose_values = _trace_y_values(mgdl_figure.data[0])
     assert min(mgdl_glucose_values) >= CGM_MIN_MGDL
@@ -216,6 +219,9 @@ def _assert_statistics_saved(
         "gender": "test",
         "diabetic": "test",
         "location": "test",
+        # save_statistics refuses to persist study data without consent
+        # (defense-in-depth guard); this test exercises the consented save path.
+        "consent_completed": True,
         "prediction_table_data": table_data,
     }
 
