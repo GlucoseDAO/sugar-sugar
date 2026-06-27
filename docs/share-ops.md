@@ -124,7 +124,7 @@ The share-page buttons in `sugar_sugar/components/share.py` use platform-specifi
 intent URLs:
 
 - X: `https://twitter.com/intent/tweet?text=...&url=...`
-- Facebook: `https://www.facebook.com/sharer/sharer.php?u=...`
+- Facebook: `https://www.facebook.com/sharer/sharer.php?u=...&quote=...`
 - WhatsApp: `https://api.whatsapp.com/send?text=...`
 - LinkedIn: `https://www.linkedin.com/feed/?shareActive=true&shareUrl=...`
 - Telegram: `https://t.me/share/url?url=...&text=...`
@@ -132,6 +132,22 @@ intent URLs:
 
 LinkedIn intentionally uses `feed/?shareActive=true&shareUrl=` rather than the
 older `sharing/share-offsite/?url=` form, which has been flaky in production.
+
+### Pre-filled share TEXT support is platform-specific (not a bug)
+
+Only some platforms let a share URL pre-fill the user's message text:
+
+- **Telegram & WhatsApp** honour `text=` → the composer opens with the invite
+  text **and** the link. Working as intended.
+- **Facebook & LinkedIn** strip pre-filled share text by design (an anti-spam
+  decision both made years ago). `sharer.php` only reliably consumes `u=`;
+  LinkedIn's feed share only consumes the URL. We pass `&quote=` to Facebook as a
+  best-effort (it *may* surface the text in some surfaces, but FB usually ignores
+  it without a registered `app_id` + the JS Share Dialog). **On FB/LinkedIn the
+  message is carried by the OG card (`og:title` / `og:description`), not by
+  pre-filled post text** — so "no text in the FB/LinkedIn composer" is expected,
+  not a regression. The only way to truly pre-fill FB text is the JS SDK Share
+  Dialog with an app_id (out of scope; not worth a Facebook app registration).
 
 X intentionally uses the canonical `/intent/tweet` Web Intent path with separate
 `text` and `url` params. Do **not** switch it back to `/intent/post`: that is not

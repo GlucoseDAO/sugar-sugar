@@ -6205,23 +6205,35 @@ def handle_time_slider(
 # Separate callback for glucose graph interactions (only active on prediction page)
 @app.callback(
     [Output('last-click-time', 'data', allow_duplicate=True),
-     Output('full-df', 'data', allow_duplicate=True),
      Output('current-window-df', 'data', allow_duplicate=True)],
     [Input('glucose-graph-graph', 'clickData'),
      Input('glucose-graph-graph', 'relayoutData')],
     [State('last-click-time', 'data'),
-     State('full-df', 'data'),
      State('current-window-df', 'data'),
      State('glucose-unit', 'data')],
     prevent_initial_call=True
 )
 def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optional[Dict],
-                            last_click_time: int, full_df_data: Optional[Dict], 
-                            current_df_data: Optional[Dict], glucose_unit: Optional[str]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]]]:
-    """Handle glucose graph click and draw interactions"""
-    if not full_df_data or not current_df_data:
-        return no_update, no_update, no_update
-    
+                            last_click_time: int,
+                            current_df_data: Optional[Dict], glucose_unit: Optional[str]) -> Tuple[int, Dict[str, List[Any]]]:
+    """Handle glucose graph click and draw interactions.
+
+    PERFORMANCE: predictions are a property of the CURRENT WINDOW only, so this
+    hot-path callback (fires on every click / drawline stroke) updates ONLY
+    `current-window-df` (~tens of rows). It deliberately does NOT touch
+    `full-df`. For an uploaded multi-month CGM export full-df is tens of
+    thousands of rows; reconstructing it from JSON and re-serialising it back on
+    every stroke (the old behaviour) made Plotly resolve each drawn line after a
+    long lag -- the reported "background hog". This is safe because full-df's
+    prediction column is never consumed: save_statistics derives predictions
+    from `prediction_table_data` (built from the window) and uses full-df only
+    for window times + age/user_id; the chart figure renders from
+    current-window-df; and the window is re-sliced from full-df only by the
+    hidden, round-start-only time slider (when predictions are legitimately 0).
+    """
+    if not current_df_data:
+        return no_update, no_update
+
     unit = glucose_unit if glucose_unit in ('mg/dL', 'mmol/L') else 'mg/dL'
 
     def to_mgdl(y_value: float) -> float:
@@ -6230,12 +6242,11 @@ def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optiona
         return float(y_value)
 
     current_time = int(time.time() * 1000)
-    full_df = reconstruct_dataframe_from_dict(full_df_data)
     df = reconstruct_dataframe_from_dict(current_df_data)
     predictions_values = df.get_column("prediction").to_list()
     visible_points = len(df) - PREDICTION_HOUR_OFFSET
-    
-    
+
+
     def snap_index(x_value: Optional[float]) -> Optional[int]:
         """Snap a drawn x-coordinate to the nearest data index while respecting prediction bounds."""
         if x_value is None:
@@ -6245,24 +6256,20 @@ def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optiona
         if snapped_idx < visible_points and predictions_values[snapped_idx] == 0.0:
             return None
         return snapped_idx
-    
+
     if click_data:
         if current_time - last_click_time <= DOUBLE_CLICK_THRESHOLD:
-            full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
             df = df.with_columns(pl.lit(0.0).alias("prediction"))
-            
-            return (current_time,
-                   convert_df_to_dict(full_df),
-                   convert_df_to_dict(df))
-        
+            return current_time, convert_df_to_dict(df)
+
         point_data = click_data['points'][0]
         click_x = point_data['x']
         click_y = point_data['y']
         snapped_idx = snap_index(float(click_x))
         if snapped_idx is None:
-            return no_update, no_update, no_update
+            return no_update, no_update
         nearest_time = df.get_column("time")[snapped_idx]
-        
+
         # Check if this is the first prediction point at the boundary - snap to ground truth
         prediction_y = to_mgdl(float(click_y))
         if snapped_idx == visible_points:  # First point in hidden area
@@ -6271,46 +6278,34 @@ def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optiona
             if existing_predictions == 0:  # No existing predictions, snap to ground truth
                 ground_truth_y = df.get_column("gl")[snapped_idx]
                 prediction_y = ground_truth_y
-        
-        full_df = full_df.with_columns(
-            pl.when(pl.col("time") == nearest_time)
-            .then(prediction_y)
-            .otherwise(pl.col("prediction"))
-            .alias("prediction")
-        )
+
         df = df.with_columns(
             pl.when(pl.col("time") == nearest_time)
             .then(prediction_y)
             .otherwise(pl.col("prediction"))
             .alias("prediction")
         )
-        
-        return (current_time,
-               convert_df_to_dict(full_df),
-               convert_df_to_dict(df))
-    
+
+        return current_time, convert_df_to_dict(df)
+
     elif relayout_data and 'shapes' in relayout_data:
         shapes = relayout_data['shapes']
         if shapes and len(shapes) > 0:
             latest_shape = shapes[-1]
-            
+
             start_x = latest_shape.get('x0')
             end_x = latest_shape.get('x1')
             start_y = latest_shape.get('y0')
             end_y = latest_shape.get('y1')
-            
+
             if all(v is not None for v in [start_x, end_x, start_y, end_y]):
                 start_idx = snap_index(float(start_x))
                 end_idx = snap_index(float(end_x))
                 if start_idx is None or end_idx is None:
-                    return (
-                        last_click_time,
-                        convert_df_to_dict(full_df),
-                        convert_df_to_dict(df)
-                    )
-                
+                    return last_click_time, convert_df_to_dict(df)
+
                 start_time = df.get_column("time")[start_idx]
-                
+
                 # Check if this is the first prediction starting at the boundary - snap to ground truth
                 actual_start_y = to_mgdl(float(start_y))
                 if start_idx == visible_points:  # Starting at first point in hidden area
@@ -6319,46 +6314,27 @@ def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optiona
                     if existing_predictions == 0:  # No existing predictions, snap to ground truth
                         ground_truth_y = df.get_column("gl")[start_idx]
                         actual_start_y = ground_truth_y
-                
+
                 # Use the full extent of the drawn line (end_idx already snapped above)
                 actual_end_y = to_mgdl(float(end_y))
                 end_time = df.get_column("time")[end_idx]
 
                 # Get intermediate prediction points for every grid point along the line
                 intermediate_points = create_intermediate_predictions(start_time, end_time, float(actual_start_y), float(actual_end_y), df)
-                
+
                 # Collect all times that need prediction values
                 all_prediction_times = [start_time, end_time]
                 all_prediction_values = [float(actual_start_y), float(actual_end_y)]
-                
+
                 # Add intermediate points
                 for time_point, glucose_value in intermediate_points:
                     all_prediction_times.append(time_point)
                     all_prediction_values.append(glucose_value)
-                
+
                 # Create a mapping for the predictions
                 time_to_value = dict(zip(all_prediction_times, all_prediction_values))
-                
-                # Update both DataFrames with all prediction points
-                full_df = full_df.with_columns(
-                    pl.when(pl.col("time").is_in(all_prediction_times))
-                    .then(
-                        # Use a series of when conditions to map each time to its value
-                        pl.when(pl.col("time") == start_time)
-                        .then(float(actual_start_y))
-                        .when(pl.col("time") == end_time)
-                        .then(float(actual_end_y))
-                        .otherwise(
-                            # For intermediate points, we need to match them individually
-                            pl.col("time").map_elements(
-                                lambda x: time_to_value.get(x, 0.0),
-                                return_dtype=pl.Float64
-                            )
-                        )
-                    )
-                    .otherwise(pl.col("prediction"))
-                    .alias("prediction")
-                )
+
+                # Update the window DataFrame with all prediction points
                 df = df.with_columns(
                     pl.when(pl.col("time").is_in(all_prediction_times))
                     .then(
@@ -6378,12 +6354,10 @@ def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optiona
                     .otherwise(pl.col("prediction"))
                     .alias("prediction")
                 )
-                
-                return (current_time,
-                       convert_df_to_dict(full_df),
-                       convert_df_to_dict(df))
-    
-    return no_update, no_update, no_update
+
+                return current_time, convert_df_to_dict(df)
+
+    return no_update, no_update
 
 @app.callback(
     Output('data-source-display', 'children'),

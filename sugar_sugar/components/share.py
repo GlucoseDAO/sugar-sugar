@@ -1419,7 +1419,13 @@ def create_share_layout(
             ),
             _share_button(
                 t("ui.share.share_on_facebook", locale=loc),
-                f"https://www.facebook.com/sharer/sharer.php?u={encoded_url}",
+                # `quote` is the only text param sharer.php may honour (best-effort:
+                # Facebook removed reliable pre-filled share text years ago for
+                # anti-spam, and often ignores it without a registered app_id). The
+                # message on FB is carried by the OG card (og:title/og:description),
+                # not by pre-filled post text -- unlike Telegram/WhatsApp which honour
+                # `text=`. Harmless if ignored. See docs/share-ops.md.
+                f"https://www.facebook.com/sharer/sharer.php?u={encoded_url}&quote={encoded_text}",
                 color="#1877F2", icon="fa-facebook",
             ),
             _share_button(
