@@ -408,7 +408,6 @@ if _chart_prefill:
                 pl.when(pl.col("time") == _tv).then(_pv).otherwise(pl.col("prediction")).alias("prediction")
             )
 
-example_full_df_store = dataframe_to_store_dict(_init_full_df)
 example_initial_df_store = dataframe_to_store_dict(_init_window_df)
 example_events_df_store = events_dataframe_to_store_dict(_init_events_df)
 example_initial_slider_value = _init_start
@@ -1391,7 +1390,11 @@ app.layout = html.Div([
     dcc.Store(id='_build', data=DEPLOY_BUILD),
     dcc.Store(id='consent-scroll-request', data=0),
     dcc.Store(id='current-window-df', data=example_initial_df_store, storage_type=STORAGE_TYPE),
-    dcc.Store(id='full-df', data=example_full_df_store, storage_type=STORAGE_TYPE),
+    # NOTE: there is intentionally no 'full-df' client store. The full dataset is
+    # never shipped to the browser -- it is loaded server-side on demand from its
+    # on-disk path (see load_dataset / resolve_dataset_identity) and only the small
+    # current-window-df is kept client-side. This removes the per-interaction
+    # whole-dataset round-trip (lag) and the localStorage-quota risk.
     dcc.Store(id='events-df', data=example_events_df_store, storage_type=STORAGE_TYPE),
     dcc.Store(id='is-example-data', data=_chart_is_example, storage_type=STORAGE_TYPE),
     dcc.Store(id='data-source-name', data=_chart_source if _is_chart_mode else "example.csv", storage_type=STORAGE_TYPE),
