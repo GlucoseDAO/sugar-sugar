@@ -9,7 +9,11 @@ from pathlib import Path
 from eliot import start_action
 from sugar_sugar.config import PREDICTION_HOUR_OFFSET, STORAGE_TYPE
 from sugar_sugar.components.metrics import MetricsComponent
+from sugar_sugar.data import load_glucose_data
 from sugar_sugar.i18n import t, normalize_locale
+
+# Dataset used for the example/generic format and the format-C even rounds.
+_EXAMPLE_DATASET_PATH: Path = Path("data/example.csv")
 
 _MOBILE_UA_KEYWORDS: tuple[str, ...] = (
     'iphone', 'android', 'ipad', 'mobile', 'mobi', 'opera mini',
@@ -211,11 +215,17 @@ class SubmitComponent(html.Div):
         except Exception:
             return 0
 
-    def save_statistics(self, df: pl.DataFrame, user_info: dict[str, Any]) -> None:
+    def save_statistics(self, user_info: dict[str, Any]) -> None:
         """Save prediction statistics to CSV file.
 
         This writes a single row for the whole "study entry".
         If `user_info["rounds"]` is present, statistics are aggregated across rounds.
+
+        The full dataset is NOT passed in (it no longer lives in a client store).
+        Per-round prediction times come from `round_info['window_times']` captured
+        at submit; for legacy rounds missing that, the dataset is reloaded
+        server-side by the round's own identity and sliced. age/user_id come from
+        `user_info` (age) and the fixed adapter default (user_id=1).
         """
         # Consent gate (defense-in-depth): never persist study data for a session
         # that has not completed mandatory consent. The display_page guard already
@@ -288,6 +298,22 @@ class SubmitComponent(html.Div):
                 return [str(t) for t in time_col.to_list()]
             return time_col.dt.strftime('%Y-%m-%d %H:%M:%S').to_list()
 
+        def _resolve_round_times(round_info: dict[str, Any], window_size: int) -> list[str]:
+            """Window times for a round: prefer the times captured at submit time
+            (`window_times`); fall back to reloading the round's own dataset and
+            slicing it (legacy rounds saved before window_times existed)."""
+            stored = round_info.get('window_times')
+            if stored:
+                return [str(t) for t in stored]
+            window_start = int(round_info.get('prediction_window_start') or 0)
+            is_example = bool(round_info.get('is_example_data', user_info.get('is_example_data', True)))
+            uploaded = user_info.get('uploaded_data_path')
+            path = _EXAMPLE_DATASET_PATH if (is_example or not uploaded) else Path(str(uploaded))
+            if not path.exists():
+                return []
+            glucose_df, _ = load_glucose_data(path)
+            return _time_list(glucose_df.slice(max(0, window_start), window_size))
+
         # Per-round + overall metrics (computed in mg/dL, regardless of UI unit)
         per_round_metrics: list[dict[str, Any]] = []
         if rounds:
@@ -323,18 +349,13 @@ class SubmitComponent(html.Div):
                 if len(table_data) < 2:
                     continue
 
-                window_start = int(round_info.get('prediction_window_start') or 0)
                 window_size = int(round_info.get('prediction_window_size') or 0)
                 if window_size <= 0:
                     continue
 
-                max_start = max(0, len(df) - window_size)
-                safe_start = max(0, min(window_start, max_start))
-                window_df = df.slice(safe_start, window_size)
-
                 actual_row = table_data[0]
                 prediction_row = table_data[1]
-                times = _time_list(window_df)
+                times = _resolve_round_times(round_info, window_size)
 
                 for i in range(window_size):
                     time_key = f"t{i}"
@@ -350,9 +371,12 @@ class SubmitComponent(html.Div):
             if len(table_data) >= 2:
                 actual_row = table_data[0]
                 prediction_row = table_data[1]
-                times = _time_list(df)
+                single_size = int(user_info.get('prediction_window_size') or 0)
+                times = _resolve_round_times(user_info, single_size) if single_size else [
+                    str(t) for t in (user_info.get('window_times') or [])
+                ]
 
-                for i in range(len(df)):
+                for i in range(max(single_size, len(times))):
                     time_key = f"t{i}"
                     pred_str = prediction_row.get(time_key, "-")
                     act_str = actual_row.get(time_key, "-")
@@ -360,10 +384,10 @@ class SubmitComponent(html.Div):
                         parameters.append({"version": version, "round": 1, "value": pred_str})
                         actual_values.append({"version": version, "round": 1, "value": act_str})
                         prediction_times.append({"version": version, "round": 1, "value": times[i]})
-        
-        # Get age and user_id from DataFrame
-        age = df.get_column('age')[0] if 'age' in df.columns else 0
-        user_id = df.get_column('user_id')[0] if 'user_id' in df.columns else 1
+
+        # age comes from user_info; user_id matches the adapter default (data.py).
+        age = int(user_info.get('age') or 0)
+        user_id = 1
         
         # Prepare the data dictionary
         rounds_played = len(rounds) if rounds else 1
@@ -543,9 +567,6 @@ class SubmitComponent(html.Div):
             overall_ranking_row,
             legacy_to_new={},
         )
-
-        # Reset the prediction
-        df = df.with_columns(pl.lit(0.0).alias("prediction"))
 
     def register_callbacks(self, app: Dash) -> None:
         """Register callbacks for the submit component"""
