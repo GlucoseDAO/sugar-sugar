@@ -206,6 +206,9 @@ def _assert_statistics_saved(
     }
 
     table_data = _prediction_table_data(window_df)
+    # save_statistics no longer receives the full dataset; per-window times come
+    # from `window_times` captured at submit (here derived from the window df).
+    window_times = window_df.get_column("time").dt.strftime("%Y-%m-%d %H:%M:%S").to_list()
     user_info: dict[str, Any] = {
         "study_id": f"integration-{source_name}",
         "run_id": f"run-{source_name}",
@@ -223,9 +226,11 @@ def _assert_statistics_saved(
         # (defense-in-depth guard); this test exercises the consented save path.
         "consent_completed": True,
         "prediction_table_data": table_data,
+        "prediction_window_size": len(window_df),
+        "window_times": window_times,
     }
 
-    submit.save_statistics(full_df, user_info)
+    submit.save_statistics(user_info)
 
     assert submit._stats_csv_path.exists()
     assert submit._ranking_csv_path.exists()

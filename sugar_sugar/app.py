@@ -300,6 +300,70 @@ def get_random_data_window(
     windowed_df = full_df.slice(random_start, points)
     return windowed_df, random_start
 
+
+# ---------------------------------------------------------------------------
+# Server-side dataset access.
+#
+# The full CGM dataset is NOT shipped to the browser. Instead it is loaded from
+# its on-disk path on the server and cached per-worker; callbacks slice the small
+# window they need. Every dataset has a stable file: the example ships in the
+# repo (`data/example.csv`), uploads/nightscout are saved under
+# `data/input/users/` and their path is kept in `user_info['uploaded_data_path']`.
+# See docs / the "stop hauling the whole dataset" refactor.
+# ---------------------------------------------------------------------------
+EXAMPLE_DATASET_PATH: Path = Path("data/example.csv")
+
+
+def _dataset_path_for(is_example: bool, uploaded_path: Optional[str]) -> Path:
+    """Pick the on-disk dataset path for the example vs an uploaded file."""
+    if is_example or not uploaded_path:
+        return EXAMPLE_DATASET_PATH
+    return Path(str(uploaded_path))
+
+
+def resolve_dataset_identity(
+    user_info: Optional[Dict[str, Any]], *, round_number: Optional[int] = None
+) -> Path:
+    """Resolve which on-disk dataset a session (or a specific round) uses.
+
+    Without ``round_number`` this returns the *current window's* dataset, trusting
+    the per-round ``is_example_data`` flag in ``user_info`` (set by
+    ``handle_next_round_button`` / format switches). With ``round_number`` it
+    mirrors ``handle_next_round_button``'s per-format choice so per-round stats can
+    resolve the correct dataset even for format C (which alternates datasets).
+    """
+    info = user_info or {}
+    fmt = str(info.get("format") or "A")
+    uploaded = info.get("uploaded_data_path")
+    if round_number is not None:
+        if fmt == "B":
+            return _dataset_path_for(False, uploaded)
+        if fmt == "C":
+            # Mirror handle_next_round_button: even round -> example, odd -> uploaded.
+            return _dataset_path_for(round_number % 2 == 0, uploaded)
+        return EXAMPLE_DATASET_PATH  # format A
+    return _dataset_path_for(bool(info.get("is_example_data", True)), uploaded)
+
+
+@lru_cache(maxsize=32)
+def _load_dataset_cached(path_str: str) -> Tuple[pl.DataFrame, pl.DataFrame]:
+    glucose_df, events_df = load_glucose_data(Path(path_str))
+    # Match the store schema callers expect (they all reset predictions to 0.0
+    # right after loading). The cached frame is treated as immutable: callers
+    # only `.slice(...)` it and add predictions to the *window*, never here.
+    glucose_df = glucose_df.with_columns(pl.lit(0.0).alias("prediction"))
+    return glucose_df, events_df
+
+
+def load_dataset(path: Path) -> Tuple[pl.DataFrame, pl.DataFrame]:
+    """Load + adapt a dataset by path, cached per-worker. Returns (glucose, events).
+
+    Files are immutable (the example is in the repo; uploads have timestamped
+    names), so the resolved absolute path is a safe cache key with no mtime check.
+    """
+    return _load_dataset_cached(str(Path(path).resolve()))
+
+
 # Load initial data for session storage.
 # When ``_CHART_FILE`` env var is set (by the ``chart`` CLI command), load from
 # that file and optionally prefill predictions so the debug reloader preserves
@@ -2207,8 +2271,11 @@ def display_page(
                 return (_landing_builder(locale=locale), warning_content, navbar)
             return (_startup_builder(locale=locale), warning_content, navbar)
         if pathname == '/ending':
-            # Check if we have the required data for ending page
-            if not full_df_data or not user_info or 'prediction_table_data' not in user_info:
+            # Check if we have the required data for ending page. Keyed on the
+            # small window store (full-df is no longer shipped to the client);
+            # create_ending_layout reloads the dataset server-side if it needs a
+            # fallback window.
+            if not current_df_data or not user_info or 'prediction_table_data' not in user_info:
                 return html.Div([
                     html.H2(t("ui.session_expired.title", locale=locale), style={'textAlign': 'center', 'marginTop': '50px'}),
                     html.P(t("ui.session_expired.text", locale=locale), style={'textAlign': 'center', 'marginBottom': '30px'}),
@@ -3178,23 +3245,28 @@ def create_ending_layout(
     locale: str,
 ) -> html.Div:
     """Create the ending page layout"""
-    if not full_df_data:
-        print("DEBUG: No data available for ending page")
-        return html.Div("No data available", style={'textAlign': 'center', 'padding': '50px'})
-    
     print("DEBUG: Creating ending page with stored data")
-    
-    # Reconstruct DataFrames from stored data
-    full_df = reconstruct_dataframe_from_dict(full_df_data)
-    events_df = reconstruct_events_dataframe_from_dict(events_df_data) if events_df_data else pl.DataFrame(
-        {
-            'time': [],
-            'event_type': [],
-            'event_subtype': [],
-            'insulin_value': []
-        }
-    )
-    
+
+    # The full dataset is NOT shipped to the client. Load it server-side lazily,
+    # only as a fallback window source when current-window-df is absent.
+    _full_df_cache: list[pl.DataFrame] = []
+    def _ending_full_df() -> pl.DataFrame:
+        if not _full_df_cache:
+            glucose_df, _ = load_dataset(resolve_dataset_identity(user_info))
+            _full_df_cache.append(glucose_df)
+        return _full_df_cache[0]
+
+    # Events for the markers: prefer the small events store; else load from the
+    # dataset server-side (the chart filters events to the window anyway).
+    if events_df_data:
+        events_df = reconstruct_events_dataframe_from_dict(events_df_data)
+    elif user_info:
+        _, events_df = load_dataset(resolve_dataset_identity(user_info))
+    else:
+        events_df = pl.DataFrame(
+            {'time': [], 'event_type': [], 'event_subtype': [], 'insulin_value': []}
+        )
+
     # Check if we have stored prediction data from the submit button
     if user_info and 'prediction_table_data' in user_info:
         print("DEBUG: Using stored prediction table data from submit button")
@@ -3220,6 +3292,7 @@ def create_ending_layout(
             df = reconstruct_dataframe_from_dict(current_df_data)
             print(f"DEBUG: Using current-window-df for ending chart (points={len(df)})")
         elif user_info and 'prediction_window_start' in user_info and 'prediction_window_size' in user_info:
+            full_df = _ending_full_df()
             window_start = user_info['prediction_window_start']
             window_size = user_info['prediction_window_size']
             # Ensure we don't go beyond the available data
@@ -3230,7 +3303,7 @@ def create_ending_layout(
             print(f"DEBUG: Using prediction window starting at {safe_start} with size {window_size}")
         else:
             # Fallback to first DEFAULT_POINTS for display
-            df = full_df.slice(0, DEFAULT_POINTS)
+            df = _ending_full_df().slice(0, DEFAULT_POINTS)
             print("DEBUG: No prediction window info found, using default first 24 points")
     else:
         print("DEBUG: No stored prediction data found")
@@ -4454,18 +4527,17 @@ def handle_submit_button(
     if pending_round_number == last_submit_round_number and int(n_clicks) <= last_submit_n_clicks:
         return no_update, no_update, no_update, no_update
 
-    if full_df_data and current_df_data:
+    if current_df_data:
         print("DEBUG: Submit button clicked")
-        
-        # Reconstruct DataFrames from session storage
-        current_full_df = reconstruct_dataframe_from_dict(full_df_data)
+
+        # Only the small window is needed here; the full dataset is no longer
+        # round-tripped through the client (it lives server-side, sliced on demand).
         current_df = reconstruct_dataframe_from_dict(current_df_data)
-        
-        # Update age and user_id from user_info
+
+        # Update age from user_info on the window.
         if user_info and 'age' in user_info:
-            current_full_df = current_full_df.with_columns(pl.lit(int(user_info['age'])).alias("age"))
             current_df = current_df.with_columns(pl.lit(int(user_info['age'])).alias("age"))
-        
+
         # Generate prediction table data directly from DataFrame instead of relying on component
         if user_info is None:
             user_info = {}
@@ -4488,11 +4560,17 @@ def handle_submit_button(
         user_info['prediction_table_data'] = prediction_table_data
         user_info['current_round_number'] = round_number
 
+        # Capture the window's absolute times now (the window df is in hand) so
+        # save_statistics never needs the full dataset to recover per-round times.
+        window_times = current_df.get_column('time').dt.strftime('%Y-%m-%d %H:%M:%S').to_list()
+        user_info['window_times'] = window_times
+
         round_info: dict[str, Any] = {
             'round_number': round_number,
             'prediction_window_start': user_info['prediction_window_start'],
             'prediction_window_size': user_info['prediction_window_size'],
             'prediction_table_data': prediction_table_data,
+            'window_times': window_times,
             'format': str(user_info.get('format') or ''),
             'is_example_data': bool(user_info.get('is_example_data', True)),
             'data_source_name': str(user_info.get('data_source_name', 'example.csv')),
@@ -4508,7 +4586,7 @@ def handle_submit_button(
         # Save exactly once when finishing the study (round 12 or user exits early)
         play_only = bool(user_info.get('consent_play_only'))
         if (not play_only) and round_number >= max_rounds and not bool(user_info.get('statistics_saved')):
-            submit_component.save_statistics(current_full_df, user_info)
+            submit_component.save_statistics(user_info)
             user_info['statistics_saved'] = True
         
         # Update chart mode to show ground truth and return the full window with ground truth
@@ -4654,10 +4732,9 @@ def handle_finish_study_from_prediction(
         return '/final', user_info, {'hide_last_hour': True}
 
     play_only = bool(user_info.get('consent_play_only')) if user_info else False
-    if full_df_data and (not play_only) and not bool(user_info.get('statistics_saved')):
+    if (not play_only) and not bool(user_info.get('statistics_saved')):
         with start_action(action_type=u"handle_finish_study_from_prediction"):
-            full_df = reconstruct_dataframe_from_dict(full_df_data)
-            submit_component.save_statistics(full_df, user_info)
+            submit_component.save_statistics(user_info)
             user_info['statistics_saved'] = True
 
     return '/final', user_info, {'hide_last_hour': False}
@@ -4692,10 +4769,9 @@ def handle_finish_study_from_ending(
         return '/final', user_info, {'hide_last_hour': True}
 
     play_only = bool(user_info.get('consent_play_only')) if user_info else False
-    if full_df_data and (not play_only) and not bool(user_info.get('statistics_saved')):
+    if (not play_only) and not bool(user_info.get('statistics_saved')):
         with start_action(action_type=u"handle_finish_study_from_ending"):
-            full_df = reconstruct_dataframe_from_dict(full_df_data)
-            submit_component.save_statistics(full_df, user_info)
+            submit_component.save_statistics(user_info)
             user_info['statistics_saved'] = True
 
     return '/final', user_info, {'hide_last_hour': False}
