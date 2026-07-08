@@ -1325,6 +1325,12 @@ app.layout = html.Div([
     dcc.Store(id='_build', data=DEPLOY_BUILD),
     dcc.Store(id='consent-scroll-request', data=0),
     dcc.Store(id='current-window-df', data=example_initial_df_store, storage_type=STORAGE_TYPE),
+    dcc.Store(id='ai-prediction-store', data={
+    "glumind": {
+        "predictions": [140, 138, 135, 130, 128, 125, 122, 120, 118, 115, 113, 110],
+        "ready": True
+        }
+    }, storage_type=STORAGE_TYPE),
     dcc.Store(id='full-df', data=example_full_df_store, storage_type=STORAGE_TYPE),
     dcc.Store(id='events-df', data=example_events_df_store, storage_type=STORAGE_TYPE),
     dcc.Store(id='is-example-data', data=_chart_is_example, storage_type=STORAGE_TYPE),
@@ -2159,7 +2165,8 @@ def update_ending_text_on_language_change(
      State('current-window-df', 'data'),
      State('events-df', 'data'),
      State('glucose-unit', 'data'),
-     State('user-agent', 'data')],
+     State('user-agent', 'data'),
+     State('ai-prediction-store', 'data')],
     prevent_initial_call=False
 )
 def display_page(
@@ -2171,6 +2178,7 @@ def display_page(
     events_df_data: Optional[Dict],
     glucose_unit: Optional[str],
     user_agent: Optional[str],
+    ai_data: Optional[str],
 ) -> tuple[html.Div, Optional[html.Div], html.Div]:
     has_ptd = bool(user_info and 'prediction_table_data' in user_info) if user_info else False
     has_full = bool(full_df_data)
@@ -2227,7 +2235,7 @@ def display_page(
                         )
                     ], style={'textAlign': 'center'})
                 ]), warning_content, navbar
-            return create_ending_layout(full_df_data, current_df_data, events_df_data, user_info, glucose_unit, locale=locale), warning_content, navbar
+            return create_ending_layout(full_df_data, current_df_data, events_df_data, user_info, glucose_unit, ai_data, locale=locale), warning_content, navbar
         if pathname == '/final':
             if not user_info:
                 return html.Div([
@@ -3174,6 +3182,7 @@ def create_ending_layout(
     events_df_data: Optional[Dict],
     user_info: Optional[Dict] = None,
     glucose_unit: Optional[str] = None,
+    ai_data: Optional[Dict] = None,
     *,
     locale: str,
 ) -> html.Div:
@@ -3258,6 +3267,85 @@ def create_ending_layout(
         new_row = dict(row)
         new_row["metric"] = _translate_metric_label(metric_val)
         prediction_table_data_display.append(new_row)
+
+    
+    # --- AI comparison (only when the user chose "Human vs AI" mode) ---
+    ai_predicted_row: Optional[dict[str, str]] = None
+    ai_metrics_display: list = []
+
+    is_vs_ai_mode = bool(user_info and user_info.get("mode") == "vs_ai")
+    glumind_data = (ai_data or {}).get("glumind") if ai_data else None
+
+    if is_vs_ai_mode and glumind_data and glumind_data.get("ready"):
+        ai_predictions = glumind_data["predictions"]
+        actual_row = prediction_table_data[0]
+        predicted_om_row = prediction_table_data[1]
+
+        # Build the AI row using the same t0..t11 keys as the human row.
+        # AI predictions only cover the hidden hour, so we align them to the
+        # last len(ai_predictions) keys of the table.
+        value_keys = [k for k in actual_row if k != "metric"]
+        ai_value_keys = value_keys[-len(ai_predictions):]
+
+        ai_predicted_row = {"metric": "Predicted (AI)"}
+        ai_abs_error_row = {"metric": "Absolute Error (AI)"}
+        ai_rel_error_row = {"metric": "Relative Error (AI) (%)"}
+
+        for key, value in zip(ai_value_keys, ai_predictions):
+            actual_str = actual_row.get(key, "-")
+            ai_predicted_row[key] = f"{value:.1f}"
+            if actual_str != "-":
+                actual_val = float(actual_str)
+                err = abs(actual_val - value)
+                ai_abs_error_row[key] = f"{err:.1f}"
+                ai_rel_error_row[key] = f"{(err / actual_val * 100):.1f}%" if actual_val != 0 else "-"
+            else:
+                ai_abs_error_row[key] = "-"
+                ai_rel_error_row[key] = "-"
+
+        for key in value_keys:
+            if key not in ai_predicted_row:
+                ai_predicted_row[key] = "-"
+                ai_abs_error_row[key] = "-"
+                ai_rel_error_row[key] = "-"
+
+        # Add all three AI rows to the display table.
+        prediction_table_data_display.append(dict(ai_predicted_row))
+        prediction_table_data_display.append(dict(ai_abs_error_row))
+        prediction_table_data_display.append(dict(ai_rel_error_row))
+
+        # Three metric comparisons, reusing the existing calculation function.
+        ai_vs_reality = metrics_component_ending._calculate_metrics_from_table_data(
+            [actual_row, ai_predicted_row]
+        )
+        ai_vs_human = metrics_component_ending._calculate_metrics_from_table_data(
+            [predicted_om_row, ai_predicted_row]
+        )
+
+        if ai_vs_reality:
+            ai_metrics_display.append(
+                html.H3("Accuracy Metrics - AI", style={
+                    'textAlign': 'center',
+                    'fontSize': 'clamp(20px, 3vw, 28px)',
+                    'marginTop': '20px',
+                    'marginBottom': 'clamp(10px, 2vh, 20px)'
+                })
+            )
+            ai_metrics_display.extend(
+                MetricsComponent.create_ending_metrics_display(ai_vs_reality, locale=locale)[1:]
+            )
+        if ai_vs_human:
+            ai_metrics_display.append(
+                html.H3("Accuracy Metrics - Human vs AI", style={
+                    'textAlign': 'center',
+                    'fontSize': 'clamp(20px, 3vw, 28px)',
+                    'marginTop': '20px',
+                    'marginBottom': 'clamp(10px, 2vh, 20px)'
+                })
+            )
+            ai_metrics_display.extend(
+                MetricsComponent.create_ending_metrics_display(ai_vs_human, locale=locale)[1:]
+            )
 
     # Create metrics display directly
     metrics_display = MetricsComponent.create_ending_metrics_display(stored_metrics, locale=locale) if stored_metrics else [
@@ -3484,7 +3572,7 @@ def create_ending_layout(
             'overflowX': 'auto'
         }),
         html.Div(
-            metrics_display,
+            metrics_display + ai_metrics_display,
             id='ending-metrics-container',
             disable_n_clicks=True,
             style={
@@ -4212,7 +4300,8 @@ def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) ->
 @app.callback(
     [Output('url', 'pathname'),
      Output('user-info-store', 'data')],
-    [Input('start-button', 'n_clicks')],
+    [Input('start-button', 'n_clicks'),
+    Input('start-vs-ai-button', 'n_clicks')],
     [State('email-input', 'value'),
      State('age-input', 'value'),
      State('gender-dropdown', 'value'),
@@ -4227,7 +4316,7 @@ def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) ->
      State('user-info-store', 'data')],
     prevent_initial_call=True
 )
-def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Optional[int | float],
+def handle_start_button(n_clicks: Optional[int], n_clicks_vs_ai: Optional[int], email: Optional[str], age: Optional[int | float],
                        gender: Optional[str], uses_cgm: Optional[bool], cgm_duration_years: Optional[float],
                        format_value: Optional[str], data_usage_consent: Optional[list[str]],
                        diabetic: Optional[bool], diabetic_type: Optional[str],
@@ -4245,8 +4334,11 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
     referencing them left the desktop Start button inert (it activated but
     navigated nowhere). See record_mobile_consent below for the mobile path.
     """
-    if not n_clicks:
+    if not n_clicks and not n_clicks_vs_ai:
         return no_update, no_update
+
+    triggered_id = ctx.triggered_id
+    selected_mode = "vs_ai" if triggered_id == "start-vs-ai-button" else "solo"
 
     is_adult = (age is not None) and (float(age) >= 18)
     has_data_consent = bool(data_usage_consent and "agree" in data_usage_consent)
@@ -4272,6 +4364,7 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
             'cgm_duration_years': cgm_duration_years,
             'format': format_value,
             'run_format': format_value,
+            'mode': selected_mode,
             # Optional consent for uploaded CGM data usage in study.
             # Only meaningful for B/C, but we store an explicit boolean for all formats.
             'consent_use_uploaded_data': bool(has_data_consent) if format_value in ("B", "C") else False,
