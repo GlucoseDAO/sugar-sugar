@@ -3506,6 +3506,7 @@ def create_ending_layout(
                         df,
                         events_df,
                         str(user_info.get('data_source_name') or '') if user_info else None,
+                        ai_data if is_vs_ai_mode else None,
                         unit=unit,
                         locale=locale,
                         prediction_boundary=len(df) - PREDICTION_HOUR_OFFSET,

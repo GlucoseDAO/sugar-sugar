@@ -368,6 +368,8 @@ class GlucoseChart(html.Div):
 
     def _add_ai_prediction_trace(self, figure: go.Figure, ai_data: Optional[dict[str, Any]], *, locale: str) -> None:
         """Adds the AI model's predicted glucose line, if available."""
+        if self.hide_last_hour:
+            return  # Don't reveal the AI's prediction while the human is still drawing.
         if not ai_data or not ai_data.get("glumind", {}).get("ready"):
             return
 
@@ -495,6 +497,7 @@ class GlucoseChart(html.Div):
         df: "pl.DataFrame",
         events_df: "pl.DataFrame",
         source_name: Optional[str] = None,
+        ai_data: Optional[dict[str, Any]] = None,
         *,
         unit: str = "mg/dL",
         locale: str = "en",
@@ -519,7 +522,7 @@ class GlucoseChart(html.Div):
         instance._current_df = df
         instance._current_events = events_df
         instance._current_source = source_name
-        figure = instance._build_figure(df, events_df, source_name, locale=locale)
+        figure = instance._build_figure(df, events_df, source_name, ai_data, locale=locale)
 
         if prediction_boundary is not None and 0 <= prediction_boundary <= len(df):
             x_pos = float(prediction_boundary)
