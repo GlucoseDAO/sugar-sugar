@@ -3559,6 +3559,7 @@ def create_ending_layout(
                     'overflowX': 'auto',
                 },
                 highlight_first_two_rows=True,
+                has_ai_rows=is_vs_ai_mode,
             )
         ], style={
             'marginBottom': '20px',

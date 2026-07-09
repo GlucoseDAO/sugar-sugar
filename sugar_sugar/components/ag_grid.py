@@ -26,16 +26,34 @@ READONLY_DEFAULT_COL_DEF: dict[str, Any] = {
     "suppressMovable": True,
 }
 
-RESULT_ROW_STYLE: dict[str, str] = {
-    "function": (
-        "if (params.node.rowIndex === 0) { "
-        "return {backgroundColor: 'rgba(200, 240, 200, 0.5)'}; "
-        "} "
-        "if (params.node.rowIndex === 1) { "
-        "return {backgroundColor: 'rgba(255, 200, 200, 0.5)'}; "
-        "} "
-        "return {};"
-    )
+RESULT_ROW_STYLE: dict[str, Any] = {
+    "styleConditions": [
+        {
+            "condition": "params.node.rowIndex === 0",
+            "style": {"backgroundColor": "rgba(200, 240, 200, 0.5)"},
+        },
+        {
+            "condition": "params.node.rowIndex === 1",
+            "style": {"backgroundColor": "rgba(255, 200, 200, 0.5)"},
+        },
+    ]
+}
+
+RESULT_ROW_STYLE_WITH_AI: dict[str, Any] = {
+    "styleConditions": [
+        {
+            "condition": "params.node.rowIndex === 0",
+            "style": {"backgroundColor": "rgba(200, 240, 200, 0.5)"},
+        },
+        {
+            "condition": "params.node.rowIndex === 1",
+            "style": {"backgroundColor": "rgba(255, 200, 200, 0.5)"},
+        },
+        {
+            "condition": "params.node.rowIndex >= 4",
+            "style": {"backgroundColor": "rgba(200, 220, 255, 0.5)"},
+        },
+    ]
 }
 
 
@@ -84,11 +102,19 @@ def build_readonly_ag_grid(
     column_defs: list[dict[str, Any]],
     style: Optional[dict[str, Any]] = None,
     highlight_first_two_rows: bool = False,
+    has_ai_rows: bool = False,
 ) -> dag.AgGrid:
     """Create a non-editable AG Grid for display-only result tables."""
     grid_style: dict[str, Any] = {"width": "100%"}
     if style:
         grid_style.update(style)
+
+    if has_ai_rows:
+        row_style = RESULT_ROW_STYLE_WITH_AI
+    elif highlight_first_two_rows:
+        row_style = RESULT_ROW_STYLE
+    else:
+        row_style = None
 
     return dag.AgGrid(
         id=table_id,
@@ -96,9 +122,8 @@ def build_readonly_ag_grid(
         columnDefs=column_defs,
         defaultColDef=READONLY_DEFAULT_COL_DEF,
         dashGridOptions=READONLY_GRID_OPTIONS,
-        getRowStyle=RESULT_ROW_STYLE if highlight_first_two_rows else None,
-        dangerously_allow_code=highlight_first_two_rows
-        or any("valueFormatter" in column_def for column_def in column_defs),
+        getRowStyle=row_style,
+        dangerously_allow_code=any("valueFormatter" in column_def for column_def in column_defs),
         className="ag-theme-alpine",
         style=grid_style,
     )
