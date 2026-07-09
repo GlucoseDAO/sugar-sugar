@@ -24,12 +24,17 @@ class GlucoseChart(html.Div):
         'Carbohydrates': {'symbol': 'square', 'color': 'green', 'size': 20}
     }
 
+    # Cycled through in registry order so each Chronos checkpoint gets a
+    # stable, visually distinct line when several models are drawn at once.
+    AI_MODEL_COLORS = ['#7B2FF7', '#00A6A6', '#E07A00', '#D63384', '#20C997', '#4363D8']
+
     def __init__(self, id: str = 'glucose-chart', hide_last_hour: bool = False) -> None:
         super().__init__(
             [
                 dcc.Store(id=f"{id}-df-store", data=None, storage_type=STORAGE_TYPE),
                 dcc.Store(id=f"{id}-events-store", data=None, storage_type=STORAGE_TYPE),
                 dcc.Store(id=f"{id}-source-store", data=None, storage_type=STORAGE_TYPE),
+                dcc.Store(id=f"{id}-ai-store", data=None, storage_type=STORAGE_TYPE),
                 dcc.Graph(
                     id=f"{id}-graph",
                     figure=self._create_empty_figure(),
@@ -88,18 +93,21 @@ class GlucoseChart(html.Div):
         @app.callback(
             [Output(f'{self.id}-df-store', 'data'),
              Output(f'{self.id}-events-store', 'data'),
-             Output(f'{self.id}-source-store', 'data')],
+             Output(f'{self.id}-source-store', 'data'),
+             Output(f'{self.id}-ai-store', 'data')],
             [Input('current-window-df', 'data'),
              Input('events-df', 'data'),
-             Input('data-source-name', 'data')],
+             Input('data-source-name', 'data'),
+             Input('ai-predictions-store', 'data')],
             [State('url', 'pathname')]
         )
         def store_chart_data(
             df_data: Optional[dict[str, Any]],
             events_data: Optional[dict[str, Any]],
             source_name: Optional[str],
+            ai_predictions_data: Optional[dict[str, Any]],
             pathname: Optional[str],
-        ) -> tuple[Optional[dict[str, Any]], Optional[dict[str, Any]], Optional[str]]:
+        ) -> tuple[Optional[dict[str, Any]], Optional[dict[str, Any]], Optional[str], Optional[dict[str, Any]]]:
             """Store the current DataFrame and events data when they change"""
             if pathname != '/prediction':
                 raise PreventUpdate
@@ -107,13 +115,14 @@ class GlucoseChart(html.Div):
                 action_type=u"glucose_store_chart_data",
                 source=source_name
             ):
-                return df_data, events_data, source_name
+                return df_data, events_data, source_name, ai_predictions_data
 
         @app.callback(
             Output(f'{self.id}-graph', 'figure'),
             [Input(f'{self.id}-df-store', 'data'),
              Input(f'{self.id}-events-store', 'data'),
              Input(f'{self.id}-source-store', 'data'),
+             Input(f'{self.id}-ai-store', 'data'),
              Input('glucose-chart-mode', 'data'),
              Input('glucose-unit', 'data'),
              Input('interface-language', 'data')],
@@ -123,6 +132,7 @@ class GlucoseChart(html.Div):
             df_data: Optional[dict[str, Any]],
             events_data: Optional[dict[str, Any]],
             source_name: Optional[str],
+            ai_predictions_data: Optional[dict[str, Any]],
             mode_data: Optional[dict[str, Any]],
             glucose_unit: Optional[str],
             interface_language: Optional[str],
@@ -153,7 +163,7 @@ class GlucoseChart(html.Div):
                 hide_last_hour=hide_last_hour_flag
             ):
                 # Create the figure with source information
-                return self._build_figure(df, events_df, source_name, locale=locale)
+                return self._build_figure(df, events_df, source_name, locale=locale, ai_predictions=ai_predictions_data)
 
     def _reconstruct_dataframe_from_dict(self, df_data: dict[str, list[Any]]) -> pl.DataFrame:
         """Reconstruct a Polars DataFrame from stored dictionary data"""
@@ -175,7 +185,15 @@ class GlucoseChart(html.Div):
             'insulin_value': pl.Series(events_data['insulin_value'], dtype=pl.Float64, strict=False)
         })
 
-    def _build_figure(self, df: pl.DataFrame, events_df: pl.DataFrame, source_name: Optional[str] = None, *, locale: str = "en") -> go.Figure:
+    def _build_figure(
+        self,
+        df: pl.DataFrame,
+        events_df: pl.DataFrame,
+        source_name: Optional[str] = None,
+        *,
+        locale: str = "en",
+        ai_predictions: Optional[dict[str, Any]] = None,
+    ) -> go.Figure:
         """Build complete figure with all components"""
         figure = go.Figure()
         
@@ -183,11 +201,13 @@ class GlucoseChart(html.Div):
         self._current_df = df
         self._current_events = events_df
         self._current_source = source_name
+        self._current_ai_predictions = ai_predictions or {}
         
         # Build all components
         self._add_range_rectangles(figure)
         self._add_glucose_trace(figure, locale=locale)
         self._add_prediction_traces(figure, locale=locale)
+        self._add_ai_model_traces(figure, locale=locale)
         self._add_event_markers(figure, locale=locale)
         self._update_layout(figure, locale=locale)
         
@@ -239,6 +259,14 @@ class GlucoseChart(html.Div):
         if line_points.height > 0:
             pred_max = float(line_points.get_column("prediction").max()) * f
             data_max = max(data_max, pred_max)
+
+        # Include AI model forecasts too, once revealed post-submit
+        for payload in (self._current_ai_predictions or {}).values():
+            values = payload.get("values") if isinstance(payload, dict) else None
+            if values:
+                scaled = [float(v) * f for v in values]
+                data_max = max(data_max, max(scaled))
+                data_min = min(data_min, min(scaled))
         
         # Set bounds with some padding
         lower_bound = min(STANDARD_MIN, max(0, data_min * 0.9))
@@ -358,6 +386,61 @@ class GlucoseChart(html.Div):
                             hoverinfo='skip'
                         ))
 
+    def _add_ai_model_traces(self, figure: go.Figure, *, locale: str) -> None:
+        """Draws one dashed line per AI model (Play vs AI mode).
+
+        `self._current_ai_predictions` is `{model_id: {"label": str, "values":
+        [float, ...]}}`, populated only at submit time (see handle_submit_button
+        in app.py) with one forecast array per registered Chronos checkpoint,
+        each `PREDICTION_HOUR_OFFSET` points long and aligned to the round's
+        hidden area. Before submit this is empty, so nothing is drawn - the
+        opponent's guesses only appear once the round is revealed.
+        """
+        ai_predictions = self._current_ai_predictions or {}
+        if not ai_predictions:
+            return
+
+        f = self._display_factor
+        horizon = PREDICTION_HOUR_OFFSET
+        total_points = len(self._current_df)
+        start_idx = max(0, total_points - horizon)
+
+        # Anchor point: the last actually-known glucose reading, one index
+        # before the hidden area starts. Prepending it to every model's line
+        # makes each dashed forecast visually continue from where the real
+        # curve stopped, instead of starting from an unrelated y-value -
+        # mirroring how the human's own line auto-snaps its first point.
+        anchor_idx = start_idx - 1
+        anchor_y: Optional[float] = None
+        if 0 <= anchor_idx < total_points:
+            anchor_y = float(self._current_df.get_column("gl")[anchor_idx]) * f
+
+        for i, model_id in enumerate(sorted(ai_predictions.keys())):
+            payload = ai_predictions.get(model_id) or {}
+            values = payload.get("values") or []
+            if not values:
+                continue
+            label = payload.get("label") or model_id
+            color = self.AI_MODEL_COLORS[i % len(self.AI_MODEL_COLORS)]
+
+            x_positions = list(range(start_idx, start_idx + len(values)))
+            y_values = [float(v) * f for v in values]
+
+            if anchor_y is not None:
+                x_positions = [anchor_idx] + x_positions
+                y_values = [anchor_y] + y_values
+
+            figure.add_trace(go.Scatter(
+                x=x_positions,
+                y=y_values,
+                mode='lines+markers',
+                name=label,
+                line=dict(color=color, width=2, dash='dash'),
+                marker=dict(color=color, size=7, symbol='diamond'),
+                hoverinfo='x+y',
+                hoverlabel=dict(bgcolor='white'),
+            ))
+
     def _add_event_markers(self, figure: go.Figure, *, locale: str) -> None:
         """Adds event markers (insulin, exercise, carbs) to the figure."""
         if self._current_events.height == 0:
@@ -470,6 +553,7 @@ class GlucoseChart(html.Div):
         unit: str = "mg/dL",
         locale: str = "en",
         prediction_boundary: Optional[int] = None,
+        ai_predictions: Optional[dict[str, Any]] = None,
     ) -> go.Figure:
         """Build a complete figure from given data without touching any instance state.
 
@@ -482,6 +566,8 @@ class GlucoseChart(html.Div):
             prediction_boundary: Index of the first *predicted* point. When
                 supplied a vertical dashed line is drawn there and both regions
                 are labelled.
+            ai_predictions: Optional ``{model_id: {"label": str, "values": [...]}}``
+                to draw each Chronos checkpoint's forecast (Play vs AI mode).
         """
         instance = cls.__new__(cls)
         instance.hide_last_hour = False
@@ -490,7 +576,8 @@ class GlucoseChart(html.Div):
         instance._current_df = df
         instance._current_events = events_df
         instance._current_source = source_name
-        figure = instance._build_figure(df, events_df, source_name, locale=locale)
+        instance._current_ai_predictions = ai_predictions or {}
+        figure = instance._build_figure(df, events_df, source_name, locale=locale, ai_predictions=ai_predictions)
 
         if prediction_boundary is not None and 0 <= prediction_boundary <= len(df):
             x_pos = float(prediction_boundary)
@@ -568,4 +655,3 @@ class GlucoseChart(html.Div):
             plot_bgcolor='white',
             paper_bgcolor='white'
         )
-

@@ -1327,6 +1327,9 @@ app.layout = html.Div([
     dcc.Store(id='current-window-df', data=example_initial_df_store, storage_type=STORAGE_TYPE),
     dcc.Store(id='full-df', data=example_full_df_store, storage_type=STORAGE_TYPE),
     dcc.Store(id='events-df', data=example_events_df_store, storage_type=STORAGE_TYPE),
+    # Play vs AI: {model_id: {"label": str, "values": [float, ...]}}, populated
+    # at submit time (handle_submit_button) and cleared when a new round starts.
+    dcc.Store(id='ai-predictions-store', data=None, storage_type=STORAGE_TYPE),
     dcc.Store(id='is-example-data', data=_chart_is_example, storage_type=STORAGE_TYPE),
     dcc.Store(id='data-source-name', data=_chart_source if _is_chart_mode else "example.csv", storage_type=STORAGE_TYPE),
     dcc.Store(id='randomization-initialized', data=_is_chart_mode, storage_type=STORAGE_TYPE),
@@ -3219,19 +3222,41 @@ def create_ending_layout(
         if current_df_data:
             df = reconstruct_dataframe_from_dict(current_df_data)
             print(f"DEBUG: Using current-window-df for ending chart (points={len(df)})")
-        elif user_info and 'prediction_window_start' in user_info and 'prediction_window_size' in user_info:
-            window_start = user_info['prediction_window_start']
-            window_size = user_info['prediction_window_size']
-            # Ensure we don't go beyond the available data
-            max_start = len(full_df) - window_size
-            safe_start = min(window_start, max_start)
-            safe_start = max(0, safe_start)
-            df = full_df.slice(safe_start, window_size)
-            print(f"DEBUG: Using prediction window starting at {safe_start} with size {window_size}")
         else:
-            # Fallback to first DEFAULT_POINTS for display
-            df = full_df.slice(0, DEFAULT_POINTS)
-            print("DEBUG: No prediction window info found, using default first 24 points")
+            if user_info and 'prediction_window_start' in user_info and 'prediction_window_size' in user_info:
+                window_start = user_info['prediction_window_start']
+                window_size = user_info['prediction_window_size']
+                # Ensure we don't go beyond the available data
+                max_start = len(full_df) - window_size
+                safe_start = min(window_start, max_start)
+                safe_start = max(0, safe_start)
+                df = full_df.slice(safe_start, window_size)
+                print(f"DEBUG: Using prediction window starting at {safe_start} with size {window_size}")
+            else:
+                # Fallback to first DEFAULT_POINTS for display
+                df = full_df.slice(0, DEFAULT_POINTS)
+                print("DEBUG: No prediction window info found, using default first 24 points")
+
+            # current-window-df wasn't available (e.g. the store didn't survive
+            # the /prediction -> /ending navigation), so `df` above came from
+            # full_df, whose `prediction` column is always reset to 0.0 at the
+            # start of every round (see handle_next_round_button). Left as-is,
+            # the human's own red prediction line would be missing from this
+            # chart even though the round genuinely has predictions - recover
+            # them from prediction_table_data (raw mg/dL, written at submit
+            # time onto user_info, so it survives regardless of store timing).
+            raw_table = (user_info or {}).get('prediction_table_data') or []
+            if len(raw_table) >= 2 and len(df) > 0:
+                predicted_row = raw_table[1]  # 'Predicted' row, see PredictionTableComponent._generate_table_data
+                recovered: list[float] = []
+                for i in range(len(df)):
+                    raw_val = predicted_row.get(f't{i}', '-')
+                    try:
+                        recovered.append(float(raw_val))
+                    except (TypeError, ValueError):
+                        recovered.append(0.0)
+                df = df.with_columns(pl.Series('prediction', recovered, dtype=pl.Float64))
+                print(f"DEBUG: Recovered {sum(1 for v in recovered if v != 0.0)} prediction points from prediction_table_data")
     else:
         print("DEBUG: No stored prediction data found")
         return html.Div("No predictions to display", style={'textAlign': 'center', 'padding': '50px'})
@@ -3421,6 +3446,7 @@ def create_ending_layout(
                         unit=unit,
                         locale=locale,
                         prediction_boundary=len(df) - PREDICTION_HOUR_OFFSET,
+                        ai_predictions=(user_info or {}).get('ai_predictions'),
                     ),
                     config={
                         'displayModeBar': False,
@@ -4211,8 +4237,10 @@ def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) ->
 
 @app.callback(
     [Output('url', 'pathname'),
-     Output('user-info-store', 'data')],
-    [Input('start-button', 'n_clicks')],
+     Output('user-info-store', 'data'),
+     Output('ai-predictions-store', 'data', allow_duplicate=True)],
+    [Input('start-button', 'n_clicks'),
+     Input('start-button-ai', 'n_clicks')],
     [State('email-input', 'value'),
      State('age-input', 'value'),
      State('gender-dropdown', 'value'),
@@ -4224,16 +4252,24 @@ def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) ->
      State('diabetic-type-dropdown', 'value'),
      State('diabetes-duration-input', 'value'),
      State('location-input', 'value'),
-     State('user-info-store', 'data')],
+     State('user-info-store', 'data'),
+     State('current-window-df', 'data'),
+     State('events-df', 'data')],
     prevent_initial_call=True
 )
-def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Optional[int | float],
+def handle_start_button(n_clicks: Optional[int], n_clicks_ai: Optional[int], email: Optional[str], age: Optional[int | float],
                        gender: Optional[str], uses_cgm: Optional[bool], cgm_duration_years: Optional[float],
                        format_value: Optional[str], data_usage_consent: Optional[list[str]],
                        diabetic: Optional[bool], diabetic_type: Optional[str],
                        diabetes_duration: Optional[float], location: Optional[str],
-                       existing_user_info: Optional[Dict[str, Any]] = None) -> Tuple[str, Dict[str, Any]]:
-    """Handle start button on startup page.
+                       existing_user_info: Optional[Dict[str, Any]] = None,
+                       current_window_df_data: Optional[Dict] = None,
+                       events_df_data: Optional[Dict] = None) -> Tuple[str, Dict[str, Any], Optional[Dict[str, Any]]]:
+    """Handle both start buttons ("Start Prediction" and "Play vs AI") on the
+    startup page. They share every field/consent requirement, differing only
+    in which game mode gets recorded (see `game_mode` below) -- everything
+    downstream (round data, storage) reads that flag rather than caring which
+    button was clicked.
 
     Consent is recorded BEFORE this callback runs -- on desktop by
     handle_landing_continue, on mobile by record_mobile_consent -- and arrives
@@ -4245,8 +4281,15 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
     referencing them left the desktop Start button inert (it activated but
     navigated nowhere). See record_mobile_consent below for the mobile path.
     """
-    if not n_clicks:
-        return no_update, no_update
+    triggered = ctx.triggered_id
+    if triggered == 'start-button-ai':
+        if not n_clicks_ai:
+            return no_update, no_update, no_update
+        game_mode = 'vs_ai'
+    else:
+        if not n_clicks:
+            return no_update, no_update, no_update
+        game_mode = 'solo'
 
     is_adult = (age is not None) and (float(age) >= 18)
     has_data_consent = bool(data_usage_consent and "agree" in data_usage_consent)
@@ -4261,6 +4304,7 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
         uses_cgm_bool = bool(uses_cgm) if uses_cgm is not None else False
 
         info.update({
+            'game_mode': game_mode,
             'study_id': study_id,
             'run_id': run_id,
             # Stable cross-device resume code (server-side savegame key).
@@ -4319,8 +4363,45 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
             "no_selection": bool(info.get("consent_no_selection", True)),
         }
         ensure_consent_agreement_row(consent_row)
-        return '/prediction', info
-    return no_update, no_update
+
+        # Play vs AI: kick off inference for every registered Chronos
+        # checkpoint the moment the run starts, using whatever window is
+        # already sitting in current-window-df (example data / uploaded CSV
+        # was already loaded during the startup wizard). This hides the
+        # model-load + inference latency behind the human's own think time -
+        # handle_submit_button collects the results later, falling back to a
+        # synchronous run if they're not ready yet.
+        ai_predictions_reset: Optional[Dict[str, Any]] = None
+        if game_mode == 'vs_ai' and current_window_df_data:
+            try:
+                from sugar_sugar.models import PredictionRequest
+                from sugar_sugar.models.inflight import start_prediction
+
+                horizon = PREDICTION_HOUR_OFFSET
+                window_df = reconstruct_dataframe_from_dict(current_window_df_data)
+                if len(window_df) > horizon:
+                    history = window_df.slice(0, len(window_df) - horizon).select(["time", "gl"])
+                    round_events = (
+                        reconstruct_events_dataframe_from_dict(events_df_data)
+                        if events_df_data
+                        else pl.DataFrame()
+                    )
+                    last_t = history.get_column("time").max()
+                    first_t = history.get_column("time").min()
+                    request_events = (
+                        round_events.filter(
+                            (pl.col("time") >= first_t) & (pl.col("time") <= last_t)
+                        )
+                        if round_events.height > 0
+                        else round_events
+                    )
+                    request = PredictionRequest(history=history, events=request_events, horizon=horizon)
+                    start_prediction(f"{run_id}:1", request)  # model_ids=None -> every registered model
+            except Exception as exc:  # noqa: BLE001 - a failed early-start must not block starting the round
+                print(f"DEBUG: handle_start_button - AI early-start failed: {type(exc).__name__}: {exc}")
+
+        return '/prediction', info, ai_predictions_reset
+    return no_update, no_update, no_update
 
 
 @app.callback(
@@ -4425,11 +4506,13 @@ def sync_data_source_into_user_info(
     [Output('url', 'pathname', allow_duplicate=True),
      Output('user-info-store', 'data', allow_duplicate=True),
      Output('glucose-chart-mode', 'data', allow_duplicate=True),
-     Output('current-window-df', 'data', allow_duplicate=True)],
+     Output('current-window-df', 'data', allow_duplicate=True),
+     Output('ai-predictions-store', 'data', allow_duplicate=True)],
     [Input('submit-button', 'n_clicks')],
     [State('user-info-store', 'data'),
      State('full-df', 'data'),
      State('current-window-df', 'data'),
+     State('events-df', 'data'),
      State('time-slider', 'value')],
     prevent_initial_call=True
 )
@@ -4438,21 +4521,22 @@ def handle_submit_button(
     user_info: Optional[Dict[str, Any]],
     full_df_data: Optional[Dict],
     current_df_data: Optional[Dict],
+    events_data: Optional[Dict],
     slider_value: Optional[int],
-) -> Tuple[str, Optional[Dict[str, Any]], Dict[str, bool], Dict[str, List[Any]]]:
+) -> Tuple[str, Optional[Dict[str, Any]], Dict[str, bool], Dict[str, List[Any]], Optional[Dict[str, Any]]]:
     """Handle submit button on prediction page"""
     print(f"DEBUG handle_submit_button FIRED: n_clicks={n_clicks}")
     # NOTE: Dash can re-trigger callbacks when components are re-mounted across pages.
     # Guard so we only process a *new* submit for the current round.
     if not n_clicks:
-        return no_update, no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update, no_update
     info_guard: Dict[str, Any] = dict(user_info or {})
     rounds_guard: list[dict[str, Any]] = info_guard.get('rounds') or []
     pending_round_number = int(len(rounds_guard) + 1)
     last_submit_round_number = int(info_guard.get("last_submit_round_number") or 0)
     last_submit_n_clicks = int(info_guard.get("last_submit_n_clicks") or 0)
     if pending_round_number == last_submit_round_number and int(n_clicks) <= last_submit_n_clicks:
-        return no_update, no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update, no_update
 
     if full_df_data and current_df_data:
         print("DEBUG: Submit button clicked")
@@ -4505,6 +4589,64 @@ def handle_submit_button(
         print(f"DEBUG: Submit button - Found {prediction_count} predictions in current_df")
         print(f"DEBUG: Submit button - Sample predictions: {current_df.filter(pl.col('prediction') != 0.0).select(['time', 'prediction']).head(5).to_dicts()}")
 
+        # Play vs AI: collect every registered model's forecast (kicked off
+        # early by start_prediction when the round began, or run
+        # synchronously here as a fallback) and hand them all to the chart -
+        # each Chronos checkpoint draws as its own dashed line against the
+        # human's line. This never touches `prediction` - that column is the
+        # human's own line and gates submit/scoring elsewhere.
+        ai_predictions: Optional[Dict[str, Any]] = None
+        print(f"DEBUG: Submit button - game_mode={user_info.get('game_mode')!r} round_number={round_number} run_id={user_info.get('run_id')!r}")
+        if user_info.get('game_mode') == 'vs_ai':
+            try:
+                from sugar_sugar.models import PredictionRequest
+                from sugar_sugar.models.inflight import collect_predictions
+
+                horizon = PREDICTION_HOUR_OFFSET
+                history = current_df.slice(0, len(current_df) - horizon).select(["time", "gl"])
+                round_events = (
+                    reconstruct_events_dataframe_from_dict(events_data)
+                    if events_data
+                    else pl.DataFrame()
+                )
+                last_t = history.get_column("time").max()
+                first_t = history.get_column("time").min()
+                request_events = (
+                    round_events.filter(
+                        (pl.col("time") >= first_t) & (pl.col("time") <= last_t)
+                    )
+                    if round_events.height > 0
+                    else round_events
+                )
+                request = PredictionRequest(history=history, events=request_events, horizon=horizon)
+                round_key = f"{user_info.get('run_id')}:{round_number}"
+                print(f"DEBUG: Submit button - collecting AI predictions for round_key={round_key!r}")
+                # 60s covers a cold-start HF download of all three checkpoints
+                # (~300MB total) on a slow connection; once cached, this
+                # resolves in well under a second regardless of the timeout.
+                results = collect_predictions(round_key, request=request, timeout=60.0)
+                for model_id, result in results.items():
+                    if result.ok:
+                        print(f"DEBUG: Submit button - AI model '{model_id}' ok ({result.elapsed_seconds:.2f}s)")
+                    else:
+                        print(f"DEBUG: Submit button - AI model '{model_id}' failed: {result.error}")
+                ai_predictions = {
+                    model_id: {
+                        "label": result.label,
+                        "values": [float(v) for v in result.prediction],
+                    }
+                    for model_id, result in results.items()
+                    if result.ok and result.prediction is not None
+                }
+                if not ai_predictions:
+                    ai_predictions = None
+            except Exception as exc:  # noqa: BLE001 - AI opponent must never block a real submit
+                print(f"DEBUG: Submit button - AI prediction failed: {type(exc).__name__}: {exc}")
+        # Kept on user_info (not just the store) so the /ending page - which
+        # renders from session state, not live store Inputs - can draw the
+        # same lines even on a hard refresh.
+        user_info['ai_predictions'] = ai_predictions
+
         # Save exactly once when finishing the study (round 12 or user exits early)
         play_only = bool(user_info.get('consent_play_only'))
         if (not play_only) and round_number >= max_rounds and not bool(user_info.get('statistics_saved')):
@@ -4524,9 +4666,9 @@ def handle_submit_button(
                 'user_id': df_in.get_column('user_id').to_list()
             }
         
-        return '/ending', user_info, chart_mode, convert_df_to_dict(current_df)
+        return '/ending', user_info, chart_mode, convert_df_to_dict(current_df), ai_predictions
 
-    return no_update, no_update, no_update, no_update
+    return no_update, no_update, no_update, no_update, no_update
 
 
 @app.callback(
@@ -4539,7 +4681,8 @@ def handle_submit_button(
      Output('is-example-data', 'data', allow_duplicate=True),
      Output('data-source-name', 'data', allow_duplicate=True),
      Output('randomization-initialized', 'data', allow_duplicate=True),
-     Output('initial-slider-value', 'data', allow_duplicate=True)],
+     Output('initial-slider-value', 'data', allow_duplicate=True),
+     Output('ai-predictions-store', 'data', allow_duplicate=True)],
     [Input('next-round-button', 'n_clicks')],
     [State('user-info-store', 'data'),
      State('full-df', 'data')],
@@ -4549,16 +4692,16 @@ def handle_next_round_button(
     n_clicks: Optional[int],
     user_info: Optional[Dict[str, Any]],
     full_df_data: Optional[Dict]
-) -> Tuple[str, Dict[str, Any], Dict[str, bool], Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int]:
+) -> Tuple[str, Dict[str, Any], Dict[str, bool], Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int, Optional[Dict[str, Any]]]:
     print(f"DEBUG handle_next_round_button FIRED: n_clicks={n_clicks}")
     if not n_clicks or not user_info:
-        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
 
     rounds: list[dict[str, Any]] = user_info.get('rounds') or []
     max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS)
     next_round_number = len(rounds) + 1
     if next_round_number > max_rounds:
-        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
 
     with start_action(action_type=u"handle_next_round_button", next_round=next_round_number):
         fmt = str(user_info.get("format") or "A")
@@ -4576,7 +4719,7 @@ def handle_next_round_button(
             uploaded_path = user_info.get("uploaded_data_path")
             if not uploaded_path:
                 # Should not happen in normal flow, but keep safe empty state.
-                return '/prediction', user_info, {'hide_last_hour': True}, no_update, no_update, no_update, False, "", False, 0
+                return '/prediction', user_info, {'hide_last_hour': True}, no_update, no_update, no_update, False, "", False, 0, None
             full_df, events_df = load_glucose_data(Path(str(uploaded_path)))
             is_example = False
             source_name = str(user_info.get("uploaded_data_filename") or user_info.get("data_source_name") or "uploaded.csv")
@@ -4584,7 +4727,7 @@ def handle_next_round_button(
             # Format C: alternate between uploaded (odd rounds) and example (even rounds)
             uploaded_path = user_info.get("uploaded_data_path")
             if not uploaded_path:
-                return '/prediction', user_info, {'hide_last_hour': True}, no_update, no_update, no_update, False, "", False, 0
+                return '/prediction', user_info, {'hide_last_hour': True}, no_update, no_update, no_update, False, "", False, 0, None
             use_example = (next_round_number % 2 == 0)
             if use_example:
                 full_df, events_df = load_glucose_data()
@@ -4611,6 +4754,30 @@ def handle_next_round_button(
         user_info['data_source_name'] = source_name
         chart_mode = {'hide_last_hour': True}
 
+        # Play vs AI: kick off inference for every registered model as soon
+        # as this round's window is known, so it's ready (or close to it) by
+        # the time the human submits. handle_submit_button collects the
+        # result and falls back to a synchronous run if it's not done yet.
+        print(f"DEBUG: handle_next_round_button - game_mode={user_info.get('game_mode')!r} next_round_number={next_round_number} run_id={user_info.get('run_id')!r}")
+        if user_info.get('game_mode') == 'vs_ai':
+            try:
+                from sugar_sugar.models import PredictionRequest
+                from sugar_sugar.models.inflight import start_prediction
+
+                horizon = PREDICTION_HOUR_OFFSET
+                history = new_df.slice(0, len(new_df) - horizon).select(["time", "gl"])
+                last_t = history.get_column("time").max()
+                first_t = history.get_column("time").min()
+                request_events = events_df.filter(
+                    (pl.col("time") >= first_t) & (pl.col("time") <= last_t)
+                )
+                request = PredictionRequest(history=history, events=request_events, horizon=horizon)
+                round_key = f"{user_info.get('run_id')}:{next_round_number}"
+                print(f"DEBUG: handle_next_round_button - starting AI inference for round_key={round_key!r}")
+                start_prediction(round_key, request)
+            except Exception as exc:  # noqa: BLE001 - a failed early-start must not block the next round
+                print(f"DEBUG: handle_next_round_button - AI early-start failed: {type(exc).__name__}: {exc}")
+
         return (
             '/prediction',
             user_info,
@@ -4621,7 +4788,8 @@ def handle_next_round_button(
             is_example,
             source_name,
             False,  # let slider init set it from initial-slider-value
-            random_start
+            random_start,
+            None,  # clear last round's AI lines until this round is submitted
         )
 
 

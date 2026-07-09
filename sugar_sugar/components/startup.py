@@ -303,28 +303,58 @@ class StartupPage(html.Div):
                     # <!-- END INSERTION: Just Test Me Button (Debug Mode Only) -->
                     
                     html.Div([
-                        html.Button(
-                            t("ui.startup.start_prediction", locale=locale),
-                            id='start-button',
-                            className="ui green button",
-                            disabled=True,  # Initially disabled until consent is given
-                            style={
-                                'backgroundColor': '#cccccc',  # Gray when disabled
-                                'color': 'white',
-                                'padding': '20px 30px',
-                                'border': 'none',
-                                'borderRadius': '5px',
-                                'fontSize': '24px',
-                                'cursor': 'not-allowed',  # Show not-allowed cursor when disabled
-                                'width': '100%',
-                                'height': '80px',
-                                'display': 'flex',
-                                'alignItems': 'center',
-                                'justifyContent': 'center',
-                                'lineHeight': '1.2'
-                            }
-                        )
-                    ], style={'textAlign': 'center', 'marginBottom': '30px'}),
+                        html.Div([
+                            html.Button(
+                                t("Start Prediction", locale=locale),
+                                id='start-button',
+                                className="ui green button",
+                                disabled=True,  # Initially disabled until consent is given
+                                style={
+                                    'backgroundColor': '#cccccc',  # Gray when disabled
+                                    'color': 'white',
+                                    'padding': '20px 15px',
+                                    'border': 'none',
+                                    'borderRadius': '5px',
+                                    'fontSize': '20px',
+                                    'cursor': 'not-allowed',  # Show not-allowed cursor when disabled
+                                    'width': '100%',
+                                    'height': '80px',
+                                    'display': 'flex',
+                                    'alignItems': 'center',
+                                    'justifyContent': 'center',
+                                    'lineHeight': '1.2'
+                                }
+                            )
+                        ], style={'flex': '1'}),
+                        html.Div([
+                            html.Button(
+                                t("Play vs AI", locale=locale),
+                                id='start-button-ai',
+                                className="ui grey button",
+                                disabled=True,  # Initially disabled until consent is given (see update_form_validation)
+                                style={
+                                    'backgroundColor': '#cccccc',  # Gray when disabled
+                                    'color': 'white',
+                                    'padding': '20px 15px',
+                                    'border': 'none',
+                                    'borderRadius': '5px',
+                                    'fontSize': '20px',
+                                    'cursor': 'not-allowed',
+                                    'width': '100%',
+                                    'height': '80px',
+                                    'display': 'flex',
+                                    'alignItems': 'center',
+                                    'justifyContent': 'center',
+                                    'lineHeight': '1.2'
+                                }
+                            )
+                        ], style={'flex': '1'}),
+                    ], style={
+                        'display': 'flex',
+                        'flexDirection': 'row',
+                        'gap': '15px',
+                        'marginBottom': '30px',
+                    }),
                     
 
                 ], style={'maxWidth': '600px', 'margin': '0 auto', 'padding': '20px'})
@@ -427,6 +457,8 @@ class StartupPage(html.Div):
         @app.callback(
             [Output('start-button', 'disabled'),
              Output('start-button', 'style'),
+             Output('start-button-ai', 'disabled'),
+             Output('start-button-ai', 'style'),
              Output('email-required', 'style'),
              Output('age-required', 'style'),
              Output('gender-required', 'style'),
@@ -462,6 +494,8 @@ class StartupPage(html.Div):
             user_info: Optional[dict[str, Any]],
             interface_language: Optional[str],
         ) -> tuple[
+            bool,
+            dict[str, str | int],
             bool,
             dict[str, str | int],
             dict[str, str | int],
@@ -538,9 +572,15 @@ class StartupPage(html.Div):
                     'justifyContent': 'center',
                     'lineHeight': '1.2'
                 }
+                # "Play vs AI" shares the same validity gate as "Start Prediction" -
+                # a distinct blue (rather than green) keeps the two visually
+                # distinguishable while both read as "enabled, click me".
+                ai_button_style = {**button_style, 'backgroundColor': '#1E88E5'}
                 return (
                     False,
                     button_style,
+                    False,
+                    ai_button_style,
                     email_asterisk,
                     age_asterisk,
                     gender_asterisk,
@@ -569,6 +609,8 @@ class StartupPage(html.Div):
                     'lineHeight': '1.2'
                 }
                 return (
+                    True,
+                    button_style,
                     True,
                     button_style,
                     email_asterisk,
@@ -969,17 +1011,34 @@ class StartupPageMobile(html.Div):
                     'display': 'block' if self._get_debug_mode() else 'none',
                 },
             ),
-            html.Button(
-                t("ui.startup.start_prediction", locale=locale),
-                id='start-button',
-                className="ui green button",
-                disabled=True,
-                style={
-                    'backgroundColor': '#cccccc', 'color': 'white', 'padding': '18px',
-                    'border': 'none', 'borderRadius': '8px', 'fontSize': '20px',
-                    'cursor': 'not-allowed', 'width': '100%',
-                },
-            ),
+            html.Div([
+                html.Div([
+                    html.Button(
+                        t("Start Prediction", locale=locale),
+                        id='start-button',
+                        className="ui green button",
+                        disabled=True,
+                        style={
+                            'backgroundColor': '#cccccc', 'color': 'white', 'padding': '18px',
+                            'border': 'none', 'borderRadius': '8px', 'fontSize': '16px',
+                            'cursor': 'not-allowed', 'width': '100%',
+                        },
+                    ),
+                ], style={'flex': '1'}),
+                html.Div([
+                    html.Button(
+                        t("Play vs AI", locale=locale),
+                        id='start-button-ai',
+                        className="ui grey button",
+                        disabled=True,  # Initially disabled until consent is given (see update_form_validation)
+                        style={
+                            'backgroundColor': '#cccccc', 'color': 'white', 'padding': '18px',
+                            'border': 'none', 'borderRadius': '8px', 'fontSize': '16px',
+                            'cursor': 'not-allowed', 'width': '100%',
+                        },
+                    ),
+                ], style={'flex': '1'}),
+            ], style={'display': 'flex', 'flexDirection': 'row', 'gap': '10px'}),
         ]
 
         steps = [step_consent, step0, step1, step2, step3, step4]
@@ -1049,5 +1108,3 @@ class StartupPageMobile(html.Div):
             return DEBUG_MODE
         except ImportError:
             return False
-
- 

@@ -31,6 +31,7 @@ dependencies = [
     "cgm-format[cli]>=0.8.2",
     "gunicorn>=26.0.0",
     "dash-ag-grid>=35.2.0",
+    "httpx>=0.27.0"
 ]
 
 [project.scripts]
