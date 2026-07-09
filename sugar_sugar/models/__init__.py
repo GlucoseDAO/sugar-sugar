@@ -1,4 +1,5 @@
 from sugar_sugar.models.base import GlucosePredictor, PredictionRequest
+from sugar_sugar.models.remote import RemoteChronosPredictor
 from sugar_sugar.models.inflight import (
     collect_predictions,
     discard_prediction,
@@ -20,6 +21,7 @@ from sugar_sugar.models.registry import (
 __all__ = [
     "GlucosePredictor",
     "PredictionRequest",
+    "RemoteChronosPredictor",
     "DEFAULT_MODEL_ID",
     "MODEL_REGISTRY",
     "get_model",

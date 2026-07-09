@@ -1,33 +1,53 @@
-"""Central place to register every pluggable prediction model.
+"""Central place to register the prediction models the app can play against.
 
-To add a new model:
-  1. Implement (or reuse) a `GlucosePredictor` subclass.
-  2. Add one entry to the list below.
-That's it - the model picker UI and callbacks read from `MODEL_REGISTRY`
-and `model_dropdown_options()`, and never need to change.
+CPU/GPU split: these are `RemoteChronosPredictor`s. The actual Chronos
+checkpoints live in the separate `chronos-service` project on the GPU box;
+here we just register thin HTTP clients that call it. torch / chronos are NOT
+importable from the app, by design.
+
+The model ids/labels below MUST match the service's registry (see
+chronos_service/registry.py). They're intentionally kept as a static list so
+the app starts fine even when the endpoint is momentarily down - it only talks
+to the service when a prediction is actually requested. If you'd rather
+discover them dynamically, GET {CHRONOS_SERVICE_URL}/models returns the same
+{id, label} list.
+
+To add a checkpoint: add it in the service registry, then mirror its id+label
+here. Nothing else in the app (callbacks, UI, multi.py, inflight.py) changes.
 """
 from __future__ import annotations
 
+import os
 from typing import Optional
 
 from sugar_sugar.models.base import GlucosePredictor
-from sugar_sugar.models.chronos_model import ChronosPredictor
+from sugar_sugar.models.remote import RemoteChronosPredictor
+
+# Where the GPU inference endpoint lives. Override per-environment, e.g.
+#   CHRONOS_SERVICE_URL=http://gpu-box.internal:8500
+_SERVICE_URL = os.getenv("CHRONOS_SERVICE_URL", "http://localhost:8500")
+# Per-request HTTP timeout (seconds). collect_predictions() also applies its
+# own outer timeout on the background job; keep this comfortably below that.
+_SERVICE_TIMEOUT = float(os.getenv("CHRONOS_SERVICE_TIMEOUT", "30"))
 
 _MODELS: list[GlucosePredictor] = [
-    ChronosPredictor(
+    RemoteChronosPredictor(
         id="chronos-bolt-tiny",
         label="Chronos Bolt Tiny",
-        model_name="amazon/chronos-bolt-tiny",
+        base_url=_SERVICE_URL,
+        timeout=_SERVICE_TIMEOUT,
     ),
-    ChronosPredictor(
+    RemoteChronosPredictor(
         id="chronos-bolt-mini",
         label="Chronos Bolt Mini",
-        model_name="amazon/chronos-bolt-mini",
+        base_url=_SERVICE_URL,
+        timeout=_SERVICE_TIMEOUT,
     ),
-    ChronosPredictor(
+    RemoteChronosPredictor(
         id="chronos-bolt-small",
         label="Chronos Bolt Small",
-        model_name="amazon/chronos-bolt-small",
+        base_url=_SERVICE_URL,
+        timeout=_SERVICE_TIMEOUT,
     ),
 ]
 
