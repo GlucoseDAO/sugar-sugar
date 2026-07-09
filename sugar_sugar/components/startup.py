@@ -331,11 +331,10 @@ class StartupPage(html.Div):
                                 t("Play vs AI", locale=locale),
                                 id='start-button-ai',
                                 className="ui grey button",
-                                disabled=True,  # WIP: feature not implemented yet
-                                title=t("Play vs AI - coming soon", locale=locale),
+                                disabled=True,  # Initially disabled until consent is given (see update_form_validation)
                                 style={
-                                    'backgroundColor': '#e2e2e2',
-                                    'color': '#888888',
+                                    'backgroundColor': '#cccccc',  # Gray when disabled
+                                    'color': 'white',
                                     'padding': '20px 15px',
                                     'border': 'none',
                                     'borderRadius': '5px',
@@ -458,6 +457,8 @@ class StartupPage(html.Div):
         @app.callback(
             [Output('start-button', 'disabled'),
              Output('start-button', 'style'),
+             Output('start-button-ai', 'disabled'),
+             Output('start-button-ai', 'style'),
              Output('email-required', 'style'),
              Output('age-required', 'style'),
              Output('gender-required', 'style'),
@@ -493,6 +494,8 @@ class StartupPage(html.Div):
             user_info: Optional[dict[str, Any]],
             interface_language: Optional[str],
         ) -> tuple[
+            bool,
+            dict[str, str | int],
             bool,
             dict[str, str | int],
             dict[str, str | int],
@@ -569,9 +572,15 @@ class StartupPage(html.Div):
                     'justifyContent': 'center',
                     'lineHeight': '1.2'
                 }
+                # "Play vs AI" shares the same validity gate as "Start Prediction" -
+                # a distinct blue (rather than green) keeps the two visually
+                # distinguishable while both read as "enabled, click me".
+                ai_button_style = {**button_style, 'backgroundColor': '#1E88E5'}
                 return (
                     False,
                     button_style,
+                    False,
+                    ai_button_style,
                     email_asterisk,
                     age_asterisk,
                     gender_asterisk,
@@ -600,6 +609,8 @@ class StartupPage(html.Div):
                     'lineHeight': '1.2'
                 }
                 return (
+                    True,
+                    button_style,
                     True,
                     button_style,
                     email_asterisk,
@@ -1019,10 +1030,9 @@ class StartupPageMobile(html.Div):
                         t("Play vs AI", locale=locale),
                         id='start-button-ai',
                         className="ui grey button",
-                        disabled=True,  # WIP: feature not implemented yet
-                        title=t("Play vs AI - coming soon", locale=locale),
+                        disabled=True,  # Initially disabled until consent is given (see update_form_validation)
                         style={
-                            'backgroundColor': '#e2e2e2', 'color': '#888888', 'padding': '18px',
+                            'backgroundColor': '#cccccc', 'color': 'white', 'padding': '18px',
                             'border': 'none', 'borderRadius': '8px', 'fontSize': '16px',
                             'cursor': 'not-allowed', 'width': '100%',
                         },
