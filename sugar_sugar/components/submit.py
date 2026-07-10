@@ -316,6 +316,84 @@ class SubmitComponent(html.Div):
         overall_table_data = _build_aggregate_table_data(rounds) if rounds else (user_info.get('prediction_table_data', []) or [])
         overall = _metrics_from_table(overall_table_data)
 
+        # --- Human vs AI (issue #49): store AI predictions/metrics alongside
+        # the human ones, using the same row/column pattern so this goes
+        # through the same CSV-upgrade path as everything else. ---
+        ai_parameters: list[dict[str, Any]] = []
+        ai_model_names: set[str] = set()
+        has_ai_data = False
+
+        def _build_ai_aggregate_table_data(rounds_in: list[dict[str, Any]]) -> list[dict[str, str]]:
+            actual_row: dict[str, str] = {'metric': 'Actual Glucose'}
+            ai_row: dict[str, str] = {'metric': 'Predicted (AI)'}
+            out_idx = 0
+            for round_info in rounds_in:
+                table_data = round_info.get('prediction_table_data') or []
+                ai_pred_row = round_info.get('ai_predicted_row')
+                if len(table_data) < 1 or not ai_pred_row:
+                    continue
+                round_actual = table_data[0]
+                i = 0
+                while True:
+                    key = f"t{i}"
+                    if key not in round_actual or key not in ai_pred_row:
+                        break
+                    av = round_actual.get(key, "-")
+                    pv = ai_pred_row.get(key, "-")
+                    if av != "-" and pv != "-":
+                        actual_row[f"t{out_idx}"] = av
+                        ai_row[f"t{out_idx}"] = pv
+                        out_idx += 1
+                    i += 1
+            return [actual_row, ai_row]
+
+        if rounds:
+            for round_idx, round_info in enumerate(rounds, start=1):
+                ai_pred_row = round_info.get('ai_predicted_row')
+                if not ai_pred_row:
+                    continue
+                has_ai_data = True
+                ai_model_names.add(
+                    str(ai_pred_row.get('metric', 'AI')).replace('Predicted (', '').replace(')', '')
+                )
+                table_data = round_info.get('prediction_table_data') or []
+                if not table_data:
+                    continue
+                actual_row = table_data[0]
+                window_start = int(round_info.get('prediction_window_start') or 0)
+                window_size = int(round_info.get('prediction_window_size') or 0)
+                if window_size <= 0:
+                    continue
+                max_start = max(0, len(df) - window_size)
+                safe_start = max(0, min(window_start, max_start))
+                window_df = df.slice(safe_start, window_size)
+                times = _time_list(window_df)
+                for i in range(window_size):
+                    time_key = f"t{i}"
+                    ai_str = ai_pred_row.get(time_key, "-")
+                    act_str = actual_row.get(time_key, "-")
+                    if ai_str != "-" and act_str != "-" and i < len(times):
+                        ai_parameters.append({"version": version, "round": round_idx, "value": ai_str})
+
+        overall_ai_vs_reality = {'mae': None, 'mse': None, 'rmse': None, 'mape': None}
+        overall_ai_vs_human = {'mae': None, 'mse': None, 'rmse': None, 'mape': None}
+        if has_ai_data:
+            ai_aggregate_table = _build_ai_aggregate_table_data(rounds)
+            overall_ai_vs_reality = _metrics_from_table(ai_aggregate_table)
+
+            vs_human_values: dict[str, list[float]] = {'mae': [], 'mse': [], 'rmse': [], 'mape': []}
+            for round_info in rounds:
+                comp = (round_info.get('ai_comparison') or {}).get('glumind') or {}
+                vs_human = comp.get('vs_human') or {}
+                for key in vs_human_values:
+                    val = vs_human.get(key.upper())
+                    if val is not None:
+                        vs_human_values[key].append(float(val))
+            overall_ai_vs_human = {
+                key: (sum(vals) / len(vals) if vals else None)
+                for key, vals in vs_human_values.items()
+            }
+
         if rounds:
             # Aggregate across played rounds
             for round_idx, round_info in enumerate(rounds, start=1):
@@ -400,6 +478,16 @@ class SubmitComponent(html.Div):
             'overall_rmse_mgdl': overall['rmse'],
             'overall_mape_pct': overall['mape'],
             'per_round_metrics': str(per_round_metrics),
+            'ai_model': ", ".join(sorted(ai_model_names)) if ai_model_names else "",
+            'ai_predicted_values': str(ai_parameters),
+            'overall_ai_mae_mgdl': overall_ai_vs_reality['mae'],
+            'overall_ai_mse_mgdl': overall_ai_vs_reality['mse'],
+            'overall_ai_rmse_mgdl': overall_ai_vs_reality['rmse'],
+            'overall_ai_mape_pct': overall_ai_vs_reality['mape'],
+            'overall_human_vs_ai_mae_mgdl': overall_ai_vs_human['mae'],
+            'overall_human_vs_ai_mse_mgdl': overall_ai_vs_human['mse'],
+            'overall_human_vs_ai_rmse_mgdl': overall_ai_vs_human['rmse'],
+            'overall_human_vs_ai_mape_pct': overall_ai_vs_human['mape'],
         }
         
         def _upgrade_and_append_csv(
