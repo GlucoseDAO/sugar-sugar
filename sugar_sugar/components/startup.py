@@ -323,7 +323,11 @@ class StartupPage(html.Div):
                                 'justifyContent': 'center',
                                 'lineHeight': '1.2'
                             }
-                        )
+                        ),
+                        html.P(
+                            "Test yourself against real glucose data",
+                            style={'fontSize': '14px', 'color': '#666', 'marginTop': '8px', 'textAlign': 'center'}
+                        ),
                     ], style={'textAlign': 'center', 'marginBottom': '30px'}),
 
 
@@ -352,7 +356,8 @@ class StartupPage(html.Div):
                         html.P(
                             "Compare your predictions against an AI model",
                             style={'fontSize': '14px', 'color': '#666', 'marginTop': '8px', 'textAlign': 'center'}
-                        )
+                        ),
+                        
                     ], style={'textAlign': 'center', 'marginBottom': '30px'}),
 
                     
