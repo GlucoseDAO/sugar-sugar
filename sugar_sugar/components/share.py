@@ -312,6 +312,31 @@ def _percent_error_series_for_round(
             out.append((p - a) / a * 100.0)
     return out
 
+def _ai_percent_error_series_for_round(
+    r: dict[str, Any], hour_range: tuple[int, int]
+) -> list[Optional[float]]:
+    """Same as ``_percent_error_series_for_round`` but for the AI prediction,
+    using ``r["ai_predicted_row"]`` instead of the human's row. Returns an
+    empty list for rounds that weren't played in "vs_ai" mode.
+    """
+    start, end = hour_range
+    table: list[Any] = list(r.get("prediction_table_data") or [])
+    ai_row: Optional[dict[str, Any]] = r.get("ai_predicted_row")
+    if len(table) < 1 or not ai_row:
+        return []
+    actual_row: dict[str, Any] = table[0] or {}
+    out: list[Optional[float]] = []
+    for i in range(start, end):
+        key: str = f"t{i}"
+        a = _parse_float(actual_row.get(key))
+        p = _parse_float(ai_row.get(key))
+        if i == start and p is None and a is not None and a != 0.0:
+            p = a
+        if a is None or p is None or a == 0.0:
+            out.append(None)
+        else:
+            out.append((p - a) / a * 100.0)
+    return out
 
 def _max_abs_percent_for_format(rounds_f: list[dict[str, Any]]) -> float:
     """Largest |percent error| across all rounds in this format row (for colour scale)."""
@@ -847,6 +872,34 @@ def build_synthesis_figure(
                         opacity=0.7,
                         row=row_idx, col=1,
                     )
+
+        # 4) AI prediction line (thin, dashed, single distinct colour per row —
+        # not blended with the human error-severity palette, so it reads as a
+        # separate signal rather than "more/less human error").
+        for r in rounds_f:
+            ws4: int = _window_size_for_round(r)
+            h4: Optional[tuple[int, int]] = _prediction_next_hour_range(ws4)
+            if h4 is None:
+                continue
+            y_ai: list[Optional[float]] = _ai_percent_error_series_for_round(r, h4)
+            if not y_ai or not any(x is not None for x in y_ai):
+                continue
+            n4: int = len(y_ai)
+            x4: list[int] = _minutes_tickvals(n4)
+            fig.add_trace(
+                go.Scatter(
+                    x=x4,
+                    y=y_ai,
+                    mode="lines",
+                    line=dict(color="#16a34a", width=1.5, dash="dot"),
+                    connectgaps=True,
+                    legendgroup="ai",
+                    showlegend=(show_legend_in_figure and row_idx == 1),
+                    name=t("ui.share.synthesis.legend_ai", locale=loc),
+                    hoverinfo="skip",
+                ),
+                row=row_idx, col=1,
+        )
 
     x_title: str = t("ui.share.synthesis.x_axis_time", locale=loc)
     y_name: str = t("ui.share.synthesis.y_axis_short", locale=loc)

@@ -274,6 +274,7 @@ de:
       y_axis_short: "Fehler"
       legend_zero: "Keine Abweichung"
       legend_variability: "Variationslinie"
+      legend_ai: "KI-Vorhersage"
       legend_error: "Fehler vs. Istwert, eine Linie pro Runde"
       round_hover: "Runde"
       caption: "Jede Zeile ist eine genutzte Datenquelle. Zeit = volle nächste Stunde (alle 5-Min-Schritte). Y ist prozentual zum Istwert. Die Fläche zwischen Linie und Null zeigt die Runde."

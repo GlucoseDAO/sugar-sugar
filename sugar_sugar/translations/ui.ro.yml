@@ -274,6 +274,7 @@ ro:
       y_axis_short: "Eroare"
       legend_zero: "Fără abatere"
       legend_variability: "Linie de variabilitate"
+      legend_ai: "Predicție AI"
       legend_error: "Eroare față de valoarea reală, o linie per rundă"
       round_hover: "Rundă"
       caption: "Fiecare rând este o sursă de date pe care ai folosit-o. Timpul este ora următoare completă (toți pașii de 5 minute). Y este procentul de abatere față de valoarea reală. Zona umbrită dintre linie și zero arată acea rundă."
