@@ -273,6 +273,7 @@ zh:
       y_axis_short: "误差"
       legend_zero: "无偏差"
       legend_variability: "波动线"
+      legend_ai: "AI 预测"
       legend_error: "相对实际值的误差，每轮一条线"
       round_hover: "轮次"
       caption: "每一行对应你使用过的一种数据源。时间轴覆盖整段下一小时（每 5 分钟一个点）。纵轴为相对实际值的误差百分比。折线与零线之间的阴影区域表示该轮的表现。"

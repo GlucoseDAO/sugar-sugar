@@ -277,6 +277,7 @@ en:
       y_axis_short: "Error"
       legend_zero: "No deviation"
       legend_variability: "Variability line"
+      legend_ai: "AI prediction"
       legend_error: "Error vs actual, one line per round"
       round_hover: "Round"
       caption: "Each row is a data source you used. Time is the full next hour (all 5-minute steps). Y is percent off actual. The shaded area between the line and zero shows that run."

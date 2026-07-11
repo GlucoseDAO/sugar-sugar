@@ -275,6 +275,7 @@ es:
       y_axis_short: "Error"
       legend_zero: "Sin desviación"
       legend_variability: "Línea de variabilidad"
+      legend_ai: "Predicción de IA"
       legend_error: "Error vs real, una línea por ronda"
       round_hover: "Ronda"
       caption: "Cada fila es una fuente que usaste. Tiempo = la hora siguiente completa (todos los pasos de 5 min). Y = porcentaje del real. El área entre la línea y cero muestra esa ronda."

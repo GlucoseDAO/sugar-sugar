@@ -30,6 +30,7 @@ class GlucoseChart(html.Div):
                 dcc.Store(id=f"{id}-df-store", data=None, storage_type=STORAGE_TYPE),
                 dcc.Store(id=f"{id}-events-store", data=None, storage_type=STORAGE_TYPE),
                 dcc.Store(id=f"{id}-source-store", data=None, storage_type=STORAGE_TYPE),
+                dcc.Store(id=f"{id}-ai-store", data=None, storage_type=STORAGE_TYPE),
                 dcc.Graph(
                     id=f"{id}-graph",
                     figure=self._create_empty_figure(),
@@ -88,16 +89,19 @@ class GlucoseChart(html.Div):
         @app.callback(
             [Output(f'{self.id}-df-store', 'data'),
              Output(f'{self.id}-events-store', 'data'),
-             Output(f'{self.id}-source-store', 'data')],
+             Output(f'{self.id}-source-store', 'data'),
+             Output(f'{self.id}-ai-store', 'data')],
             [Input('current-window-df', 'data'),
              Input('events-df', 'data'),
-             Input('data-source-name', 'data')],
+             Input('data-source-name', 'data'),
+             Input('ai-prediction-store', 'data')],
             [State('url', 'pathname')]
         )
         def store_chart_data(
             df_data: Optional[dict[str, Any]],
             events_data: Optional[dict[str, Any]],
             source_name: Optional[str],
+            ai_data: Optional[dict[str, Any]],
             pathname: Optional[str],
         ) -> tuple[Optional[dict[str, Any]], Optional[dict[str, Any]], Optional[str]]:
             """Store the current DataFrame and events data when they change"""
@@ -107,13 +111,14 @@ class GlucoseChart(html.Div):
                 action_type=u"glucose_store_chart_data",
                 source=source_name
             ):
-                return df_data, events_data, source_name
+                return df_data, events_data, source_name, ai_data
 
         @app.callback(
             Output(f'{self.id}-graph', 'figure'),
             [Input(f'{self.id}-df-store', 'data'),
              Input(f'{self.id}-events-store', 'data'),
              Input(f'{self.id}-source-store', 'data'),
+             Input(f'{self.id}-ai-store', 'data'),
              Input('glucose-chart-mode', 'data'),
              Input('glucose-unit', 'data'),
              Input('interface-language', 'data')],
@@ -123,6 +128,7 @@ class GlucoseChart(html.Div):
             df_data: Optional[dict[str, Any]],
             events_data: Optional[dict[str, Any]],
             source_name: Optional[str],
+            ai_data: Optional[dict[str, Any]],
             mode_data: Optional[dict[str, Any]],
             glucose_unit: Optional[str],
             interface_language: Optional[str],
@@ -153,7 +159,7 @@ class GlucoseChart(html.Div):
                 hide_last_hour=hide_last_hour_flag
             ):
                 # Create the figure with source information
-                return self._build_figure(df, events_df, source_name, locale=locale)
+                return self._build_figure(df, events_df, source_name, ai_data, locale=locale)
 
     def _reconstruct_dataframe_from_dict(self, df_data: dict[str, list[Any]]) -> pl.DataFrame:
         """Reconstruct a Polars DataFrame from stored dictionary data"""
@@ -175,7 +181,7 @@ class GlucoseChart(html.Div):
             'insulin_value': pl.Series(events_data['insulin_value'], dtype=pl.Float64, strict=False)
         })
 
-    def _build_figure(self, df: pl.DataFrame, events_df: pl.DataFrame, source_name: Optional[str] = None, *, locale: str = "en") -> go.Figure:
+    def _build_figure(self, df: pl.DataFrame, events_df: pl.DataFrame, source_name: Optional[str] = None, ai_data=None, *, locale: str = "en") -> go.Figure:
         """Build complete figure with all components"""
         figure = go.Figure()
         
@@ -188,6 +194,7 @@ class GlucoseChart(html.Div):
         self._add_range_rectangles(figure)
         self._add_glucose_trace(figure, locale=locale)
         self._add_prediction_traces(figure, locale=locale)
+        self._add_ai_prediction_trace(figure, ai_data, locale=locale)
         self._add_event_markers(figure, locale=locale)
         self._update_layout(figure, locale=locale)
         
@@ -358,6 +365,30 @@ class GlucoseChart(html.Div):
                             hoverinfo='skip'
                         ))
 
+
+    def _add_ai_prediction_trace(self, figure: go.Figure, ai_data: Optional[dict[str, Any]], *, locale: str) -> None:
+        """Adds the AI model's predicted glucose line, if available."""
+        if self.hide_last_hour:
+            return  # Don't reveal the AI's prediction while the human is still drawing.
+        if not ai_data or not ai_data.get("glumind", {}).get("ready"):
+            return
+
+        predictions = ai_data["glumind"]["predictions"]
+        f = self._display_factor
+
+        visible_points = len(self._current_df) - PREDICTION_HOUR_OFFSET
+        x_positions = list(range(visible_points, visible_points + len(predictions)))
+        y_values = [float(p) * f for p in predictions]
+
+        figure.add_trace(go.Scatter(
+            x=x_positions,
+            y=y_values,
+            mode='lines+markers',
+            name="AI Prediction",
+            line=dict(color='green', dash='dot'),
+            marker=dict(color='green', size=6, symbol='diamond'),
+        ))
+
     def _add_event_markers(self, figure: go.Figure, *, locale: str) -> None:
         """Adds event markers (insulin, exercise, carbs) to the figure."""
         if self._current_events.height == 0:
@@ -466,6 +497,7 @@ class GlucoseChart(html.Div):
         df: "pl.DataFrame",
         events_df: "pl.DataFrame",
         source_name: Optional[str] = None,
+        ai_data: Optional[dict[str, Any]] = None,
         *,
         unit: str = "mg/dL",
         locale: str = "en",
@@ -490,7 +522,7 @@ class GlucoseChart(html.Div):
         instance._current_df = df
         instance._current_events = events_df
         instance._current_source = source_name
-        figure = instance._build_figure(df, events_df, source_name, locale=locale)
+        figure = instance._build_figure(df, events_df, source_name, ai_data, locale=locale)
 
         if prediction_boundary is not None and 0 <= prediction_boundary <= len(df):
             x_pos = float(prediction_boundary)

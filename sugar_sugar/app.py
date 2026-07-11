@@ -112,6 +112,127 @@ GLUCOSE_MGDL_PER_MMOLL: float = 18.0
 
 FORMAT_ORDER: dict[str, int] = {"C": 0, "B": 1, "A": 2}
 GENERIC_SOURCES_METADATA = load_generic_sources_metadata()
+from sugar_sugar.ai_models.registry import get_model
+
+def _compute_ai_forecast_if_needed(window_store: dict, user_info: dict) -> dict:
+    """
+    Verifică dacă utilizatorul joacă în modul VS AI și rulează 
+    modelul GluMind pe baza istoricului glicemic vizibil.
+    """
+    if not user_info or user_info.get("mode") != "vs_ai":
+        return {"glumind": {"predictions": [], "ready": False}}
+        
+    gl_values = window_store.get("gl", [])
+    offset = PREDICTION_HOUR_OFFSET
+        
+    visible_cutoff = len(gl_values) - offset
+    if visible_cutoff <= 0:
+        return {"glumind": {"predictions": [], "ready": False}}
+        
+    # Extrage doar valorile din trecut, vizibile omului
+    history = [g for g in gl_values[:visible_cutoff] if g is not None]
+    
+    try:
+        model = get_model("glumind")
+        preds = model.predict(history, prediction_steps=offset)
+        return {
+            "glumind": {
+                "predictions": preds,
+                "ready": True
+            }
+        }
+    except Exception as e:
+        # Failsafe în caz de eroare structurală
+        fallback_val = history[-1] if history else 100.0
+        return {
+            "glumind": {
+                "predictions": [round(fallback_val, 1)] * offset,
+                "ready": True,
+                "error": str(e)
+            }
+        }
+
+
+def _build_ai_table_rows(
+    gl_values: list,
+    ai_predictions: list,
+    offset: int,
+) -> list[dict[str, str]]:
+    n = len(gl_values)
+    visible_cutoff = n - offset
+    pred_row: dict[str, str] = {"metric": "Predicted (AI)"}
+    abs_row: dict[str, str] = {"metric": "Absolute Error (AI)"}
+    rel_row: dict[str, str] = {"metric": "Relative Error (AI) (%)"}
+
+    for ti in range(n):
+        idx_in_pred = ti - visible_cutoff
+        a = gl_values[ti] if ti < len(gl_values) else None
+        if idx_in_pred < 0 or idx_in_pred >= len(ai_predictions) or a is None:
+            pred_row[f"t{ti}"] = abs_row[f"t{ti}"] = rel_row[f"t{ti}"] = "-"
+            continue
+        p = float(ai_predictions[idx_in_pred])
+        pred_row[f"t{ti}"] = f"{p:.1f}"
+        err = abs(float(a) - p)
+        abs_row[f"t{ti}"] = f"{err:.1f}"
+        rel_row[f"t{ti}"] = f"{(err / float(a) * 100):.1f}%" if a != 0 else "-"
+
+    return [pred_row, abs_row, rel_row]
+
+
+def _extract_metric_values(metrics_dict: Optional[dict]) -> dict[str, Optional[float]]:
+    """Aduce {'MAE': {...,'value':x}, ...} la {'MAE': x, ...} simplu de salvat/serializat."""
+    out: dict[str, Optional[float]] = {}
+    for name in ("MAE", "MSE", "RMSE", "MAPE"):
+        entry = (metrics_dict or {}).get(name)
+        val = entry.get("value") if entry else None
+        out[name] = float(val) if val is not None else None
+    return out
+
+
+def _compute_ai_comparison_scores(
+    gl_values: list,
+    human_predictions: list,
+    ai_predictions: list,
+    offset: int,
+) -> dict[str, dict[str, Optional[float]]]:
+    """Calculează cele 2 seturi de scoruri pentru GluMind: vs_reality și vs_human.
+
+    Refolosește ``MetricsComponent()._calculate_metrics_from_table_data``, aceeași
+    funcție folosită deja pentru scorurile omului (ending/final), construind un
+    tabel temporar de 2 rânduri ("Actual Glucose" / "Predicted") de fiecare dată:
+      - vs_reality: glicemia reală  vs  predicția AI
+      - vs_human:   predicția omului  vs  predicția AI (cât de departe e AI de om)
+    """
+    n = len(gl_values)
+    visible_cutoff = n - offset
+    metrics_comp = MetricsComponent()
+
+    def _table_for(reference_values: list) -> list[dict[str, str]]:
+        actual_row: dict[str, str] = {"metric": "Actual Glucose"}
+        pred_row: dict[str, str] = {"metric": "Predicted"}
+        for ti in range(offset):
+            src_idx = visible_cutoff + ti
+            ref = reference_values[src_idx] if 0 <= src_idx < len(reference_values) else None
+            p = ai_predictions[ti] if ti < len(ai_predictions) else None
+            if ref is None or p is None:
+                actual_row[f"t{ti}"] = pred_row[f"t{ti}"] = "-"
+            else:
+                actual_row[f"t{ti}"] = f"{float(ref):.1f}"
+                pred_row[f"t{ti}"] = f"{float(p):.1f}"
+        return [actual_row, pred_row]
+
+    if visible_cutoff <= 0 or not ai_predictions:
+        empty = {"MAE": None, "MSE": None, "RMSE": None, "MAPE": None}
+        return {"vs_reality": dict(empty), "vs_human": dict(empty)}
+
+    vs_reality_table = _table_for(gl_values)
+    vs_human_table = _table_for(human_predictions)
+
+    vs_reality = _extract_metric_values(metrics_comp._calculate_metrics_from_table_data(vs_reality_table))
+    vs_human = _extract_metric_values(metrics_comp._calculate_metrics_from_table_data(vs_human_table))
+
+    return {"vs_reality": vs_reality, "vs_human": vs_human}
+
 
 SITE_TITLE: str = "Sugar Sugar"
 SITE_DESCRIPTION: str = (
@@ -1310,6 +1431,9 @@ else:
     _chart_user_info = None
 
 app.layout = html.Div([
+    dcc.Store(id='ai-prediction-store', data={"glumind": {"predictions": [], "ready": False}}, storage_type='session'),
+    dcc.Store(id='session-store', storage_type=STORAGE_TYPE),
+    dcc.Store(id='window-store', storage_type='session'),
     dcc.Location(id='url', refresh=False, **(
         {'pathname': f'/share/{_share_mode_id}'} if _is_share_mode and _share_mode_id
         else {'pathname': '/prediction'} if _is_chart_mode
@@ -2159,7 +2283,8 @@ def update_ending_text_on_language_change(
      State('current-window-df', 'data'),
      State('events-df', 'data'),
      State('glucose-unit', 'data'),
-     State('user-agent', 'data')],
+     State('user-agent', 'data'),
+     State('ai-prediction-store', 'data')],
     prevent_initial_call=False
 )
 def display_page(
@@ -2171,6 +2296,7 @@ def display_page(
     events_df_data: Optional[Dict],
     glucose_unit: Optional[str],
     user_agent: Optional[str],
+    ai_data: Optional[str],
 ) -> tuple[html.Div, Optional[html.Div], html.Div]:
     has_ptd = bool(user_info and 'prediction_table_data' in user_info) if user_info else False
     has_full = bool(full_df_data)
@@ -2227,7 +2353,7 @@ def display_page(
                         )
                     ], style={'textAlign': 'center'})
                 ]), warning_content, navbar
-            return create_ending_layout(full_df_data, current_df_data, events_df_data, user_info, glucose_unit, locale=locale), warning_content, navbar
+            return create_ending_layout(full_df_data, current_df_data, events_df_data, user_info, glucose_unit, ai_data, locale=locale), warning_content, navbar
         if pathname == '/final':
             if not user_info:
                 return html.Div([
@@ -3174,6 +3300,7 @@ def create_ending_layout(
     events_df_data: Optional[Dict],
     user_info: Optional[Dict] = None,
     glucose_unit: Optional[str] = None,
+    ai_data: Optional[Dict] = None,
     *,
     locale: str,
 ) -> html.Div:
@@ -3258,6 +3385,80 @@ def create_ending_layout(
         new_row = dict(row)
         new_row["metric"] = _translate_metric_label(metric_val)
         prediction_table_data_display.append(new_row)
+
+    
+    # --- AI comparison (only when the user chose "Human vs AI" mode) ---
+    ai_predicted_row: Optional[dict[str, str]] = None
+    ai_metrics_display: list = []
+
+    is_vs_ai_mode = bool(user_info and user_info.get("mode") == "vs_ai")
+    glumind_data = (ai_data or {}).get("glumind") if ai_data else None
+
+    if is_vs_ai_mode and glumind_data and glumind_data.get("ready"):
+        ai_predictions = glumind_data["predictions"]
+        actual_row = prediction_table_data[0]
+        predicted_om_row = prediction_table_data[1]
+
+        # Build the AI row using the same t0..t11 keys as the human row.
+        # AI predictions only cover the hidden hour, so we align them to the
+        # last len(ai_predictions) keys of the table.
+        value_keys = [k for k in actual_row if k != "metric"]
+        ai_value_keys = value_keys[-len(ai_predictions):]
+
+        ai_predicted_row = {"metric": "Predicted (AI)"}
+        ai_abs_error_row = {"metric": "Absolute Error (AI)"}
+        ai_rel_error_row = {"metric": "Relative Error (AI) (%)"}
+
+        for key, value in zip(ai_value_keys, ai_predictions):
+            actual_str = actual_row.get(key, "-")
+            ai_predicted_row[key] = f"{value:.1f}"
+            if actual_str != "-":
+                actual_val = float(actual_str)
+                err = abs(actual_val - value)
+                ai_abs_error_row[key] = f"{err:.1f}"
+                ai_rel_error_row[key] = f"{(err / actual_val * 100):.1f}%" if actual_val != 0 else "-"
+            else:
+                ai_abs_error_row[key] = "-"
+                ai_rel_error_row[key] = "-"
+
+        for key in value_keys:
+            if key not in ai_predicted_row:
+                ai_predicted_row[key] = "-"
+                ai_abs_error_row[key] = "-"
+                ai_rel_error_row[key] = "-"
+
+        # Three metric comparisons, reusing the existing calculation function.
+        ai_vs_reality = metrics_component_ending._calculate_metrics_from_table_data(
+            [actual_row, ai_predicted_row]
+        )
+        ai_vs_human = metrics_component_ending._calculate_metrics_from_table_data(
+            [predicted_om_row, ai_predicted_row]
+        )
+
+        if ai_vs_reality:
+            ai_metrics_display.append(
+                html.H3("Accuracy Metrics - AI", style={
+                    'textAlign': 'center',
+                    'fontSize': 'clamp(20px, 3vw, 28px)',
+                    'marginTop': '20px',
+                    'marginBottom': 'clamp(10px, 2vh, 20px)'
+                })
+            )
+            ai_metrics_display.extend(
+                MetricsComponent.create_ending_metrics_display(ai_vs_reality, locale=locale)[1:]
+            )
+        if ai_vs_human:
+            ai_metrics_display.append(
+                html.H3("Accuracy Metrics - Human vs AI", style={
+                    'textAlign': 'center',
+                    'fontSize': 'clamp(20px, 3vw, 28px)',
+                    'marginTop': '20px',
+                    'marginBottom': 'clamp(10px, 2vh, 20px)'
+                })
+            )
+            ai_metrics_display.extend(
+                MetricsComponent.create_ending_metrics_display(ai_vs_human, locale=locale)[1:]
+            )
 
     # Create metrics display directly
     metrics_display = MetricsComponent.create_ending_metrics_display(stored_metrics, locale=locale) if stored_metrics else [
@@ -3418,6 +3619,7 @@ def create_ending_layout(
                         df,
                         events_df,
                         str(user_info.get('data_source_name') or '') if user_info else None,
+                        ai_data if is_vs_ai_mode else None,
                         unit=unit,
                         locale=locale,
                         prediction_boundary=len(df) - PREDICTION_HOUR_OFFSET,
@@ -3470,6 +3672,7 @@ def create_ending_layout(
                     'overflowX': 'auto',
                 },
                 highlight_first_two_rows=True,
+                has_ai_rows=is_vs_ai_mode,
             )
         ], style={
             'marginBottom': '20px',
@@ -3484,7 +3687,7 @@ def create_ending_layout(
             'overflowX': 'auto'
         }),
         html.Div(
-            metrics_display,
+            metrics_display + ai_metrics_display,
             id='ending-metrics-container',
             disable_n_clicks=True,
             style={
@@ -3756,6 +3959,80 @@ def _build_aggregate_table_data(rounds: list[dict[str, Any]]) -> list[dict[str, 
     return [actual_row, prediction_row]
 
 
+def _build_ai_aggregate_table_data(rounds: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Build a synthetic table_data for aggregated AI metrics across rounds.
+
+    Mirrors ``_build_aggregate_table_data`` above, but stitches together the
+    "Actual Glucose" values against the AI's ``ai_predicted_row`` (saved per
+    round by ``handle_submit_button`` when the round was played in "vs_ai"
+    mode). Rounds without an AI prediction (e.g. played in "solo" mode) are
+    skipped, so mixed-mode sessions only aggregate the rounds that actually
+    have an AI comparison.
+    """
+    actual_row: dict[str, str] = {'metric': 'Actual Glucose'}
+    ai_row: dict[str, str] = {'metric': 'Predicted (AI)'}
+    out_idx = 0
+
+    for round_info in rounds:
+        table_data = round_info.get('prediction_table_data') or []
+        ai_pred_row = round_info.get('ai_predicted_row')
+        if len(table_data) < 1 or not ai_pred_row:
+            continue
+
+        round_actual = table_data[0]
+
+        i = 0
+        while True:
+            key = f"t{i}"
+            if key not in round_actual or key not in ai_pred_row:
+                break
+            av = round_actual.get(key, "-")
+            pv = ai_pred_row.get(key, "-")
+            if av != "-" and pv != "-":
+                actual_row[f"t{out_idx}"] = av
+                ai_row[f"t{out_idx}"] = pv
+                out_idx += 1
+            i += 1
+
+    return [actual_row, ai_row]
+
+
+def _average_ai_comparison_scores(rounds: list[dict[str, Any]]) -> Optional[dict[str, dict[str, Optional[float]]]]:
+    """Average the per-round ``ai_comparison`` (vs_reality / vs_human) scores.
+
+    Each round that was played in "vs_ai" mode already carries its own set of
+    computed metrics (see ``_compute_ai_comparison_scores`` in
+    ``handle_submit_button``), rather than raw point-by-point predictions for
+    ``vs_human`` -- the human's drawn predictions aren't preserved per-round in
+    a form we can re-aggregate directly. So instead of recomputing MAE/MSE/
+    RMSE/MAPE from scratch (like the human's own aggregate does), we average
+    the metric values already stored per round. This is a reasonable
+    approximation across rounds of equal length (fixed 12-point horizon), and
+    keeps the "AI vs Human" comparison consistent with what was shown on each
+    round's own /ending page.
+    """
+    per_round: list[dict[str, dict[str, Optional[float]]]] = [
+        r["ai_comparison"]["glumind"]
+        for r in rounds
+        if r.get("ai_comparison", {}).get("glumind")
+    ]
+    if not per_round:
+        return None
+
+    def _avg(kind: str) -> dict[str, Optional[float]]:
+        out: dict[str, Optional[float]] = {}
+        for metric_name in ("MAE", "MSE", "RMSE", "MAPE"):
+            values = [
+                r[kind][metric_name]
+                for r in per_round
+                if r.get(kind, {}).get(metric_name) is not None
+            ]
+            out[metric_name] = (sum(values) / len(values)) if values else None
+        return out
+
+    return {"vs_reality": _avg("vs_reality"), "vs_human": _avg("vs_human")}
+
+
 def create_final_layout(full_df_data: Optional[Dict], user_info: Dict[str, Any], glucose_unit: Optional[str], *, locale: str) -> html.Div:
     rounds: list[dict[str, Any]] = user_info.get('rounds') or []
     # If current rounds are empty (e.g. user just switched format), fall back to the
@@ -3882,6 +4159,59 @@ def create_final_layout(full_df_data: Optional[Dict], user_info: Dict[str, Any],
         )
     ]
 
+    # --- Human vs AI (issue #49) — aggregated across all rounds played in
+    # "vs_ai" mode, mirroring the 3-set layout already on /ending (Livia's
+    # feedback: "on the final page is a bit weird to have only one set of
+    # accuracy when on every in between page i had the whole 3 sets"). ---
+    is_vs_ai_session = any(r.get("ai_comparison", {}).get("glumind") for r in rounds)
+    ai_final_metrics_display: list = []
+
+    if is_vs_ai_session:
+        # AI vs reality: same aggregate-then-score approach as the human's
+        # own overall metrics above, reusing the same calculation function.
+        ai_aggregate_table_data = _convert_table_data_units(_build_ai_aggregate_table_data(rounds), unit)
+        ai_vs_reality_overall = metrics_component_final._calculate_metrics_from_table_data(ai_aggregate_table_data)
+
+        # AI vs human: point-by-point human predictions aren't retained per
+        # round, so we average the per-round vs_human scores instead (see
+        # docstring on _average_ai_comparison_scores for why).
+        averaged = _average_ai_comparison_scores(rounds)
+
+        def _as_metrics_dict(values: Optional[dict[str, Optional[float]]]) -> Optional[dict[str, Any]]:
+            if not values or all(v is None for v in values.values()):
+                return None
+            return {name: {"value": val, "description": ""} for name, val in values.items() if val is not None}
+
+        ai_vs_reality_display_metrics = ai_vs_reality_overall or _as_metrics_dict(
+            (averaged or {}).get("vs_reality")
+        )
+        ai_vs_human_display_metrics = _as_metrics_dict((averaged or {}).get("vs_human"))
+
+        if ai_vs_reality_display_metrics:
+            ai_final_metrics_display.append(
+                html.H3("Accuracy Metrics - AI", style={
+                    'textAlign': 'center',
+                    'fontSize': 'clamp(20px, 3vw, 28px)',
+                    'marginTop': '20px',
+                    'marginBottom': 'clamp(10px, 2vh, 20px)',
+                })
+            )
+            ai_final_metrics_display.extend(
+                MetricsComponent.create_ending_metrics_display(ai_vs_reality_display_metrics, locale=locale)[1:]
+            )
+        if ai_vs_human_display_metrics:
+            ai_final_metrics_display.append(
+                html.H3("Accuracy Metrics - Human vs AI", style={
+                    'textAlign': 'center',
+                    'fontSize': 'clamp(20px, 3vw, 28px)',
+                    'marginTop': '20px',
+                    'marginBottom': 'clamp(10px, 2vh, 20px)',
+                })
+            )
+            ai_final_metrics_display.extend(
+                MetricsComponent.create_ending_metrics_display(ai_vs_human_display_metrics, locale=locale)[1:]
+            )
+
     round_rows: list[dict[str, Any]] = []
     for round_info in rounds:
         round_number = int(round_info.get('round_number') or (len(round_rows) + 1))
@@ -3979,7 +4309,7 @@ def create_final_layout(full_df_data: Optional[Dict], user_info: Dict[str, Any],
             },
         ),
         html.Div(
-            overall_metrics_display,
+            overall_metrics_display + ai_final_metrics_display,
             id='final-overall-metrics-container',
             disable_n_clicks=True,
             style={
@@ -4212,7 +4542,8 @@ def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) ->
 @app.callback(
     [Output('url', 'pathname'),
      Output('user-info-store', 'data')],
-    [Input('start-button', 'n_clicks')],
+    [Input('start-button', 'n_clicks'),
+    Input('start-vs-ai-button', 'n_clicks')],
     [State('email-input', 'value'),
      State('age-input', 'value'),
      State('gender-dropdown', 'value'),
@@ -4227,7 +4558,7 @@ def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) ->
      State('user-info-store', 'data')],
     prevent_initial_call=True
 )
-def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Optional[int | float],
+def handle_start_button(n_clicks: Optional[int], n_clicks_vs_ai: Optional[int], email: Optional[str], age: Optional[int | float],
                        gender: Optional[str], uses_cgm: Optional[bool], cgm_duration_years: Optional[float],
                        format_value: Optional[str], data_usage_consent: Optional[list[str]],
                        diabetic: Optional[bool], diabetic_type: Optional[str],
@@ -4245,8 +4576,11 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
     referencing them left the desktop Start button inert (it activated but
     navigated nowhere). See record_mobile_consent below for the mobile path.
     """
-    if not n_clicks:
+    if not n_clicks and not n_clicks_vs_ai:
         return no_update, no_update
+
+    triggered_id = ctx.triggered_id
+    selected_mode = "vs_ai" if triggered_id == "start-vs-ai-button" else "solo"
 
     is_adult = (age is not None) and (float(age) >= 18)
     has_data_consent = bool(data_usage_consent and "agree" in data_usage_consent)
@@ -4272,6 +4606,7 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
             'cgm_duration_years': cgm_duration_years,
             'format': format_value,
             'run_format': format_value,
+            'mode': selected_mode,
             # Optional consent for uploaded CGM data usage in study.
             # Only meaningful for B/C, but we store an explicit boolean for all formats.
             'consent_use_uploaded_data': bool(has_data_consent) if format_value in ("B", "C") else False,
@@ -4430,7 +4765,8 @@ def sync_data_source_into_user_info(
     [State('user-info-store', 'data'),
      State('full-df', 'data'),
      State('current-window-df', 'data'),
-     State('time-slider', 'value')],
+     State('time-slider', 'value'),
+     State('ai-prediction-store', 'data')],
     prevent_initial_call=True
 )
 def handle_submit_button(
@@ -4439,6 +4775,7 @@ def handle_submit_button(
     full_df_data: Optional[Dict],
     current_df_data: Optional[Dict],
     slider_value: Optional[int],
+    ai_prediction_data: Optional[Dict[str, Any]],
 ) -> Tuple[str, Optional[Dict[str, Any]], Dict[str, bool], Dict[str, List[Any]]]:
     """Handle submit button on prediction page"""
     print(f"DEBUG handle_submit_button FIRED: n_clicks={n_clicks}")
@@ -4485,18 +4822,68 @@ def handle_submit_button(
         # Create a temporary prediction table component to generate the table data
         temp_prediction_table = PredictionTableComponent()
         prediction_table_data = temp_prediction_table._generate_table_data(current_df)
+
+        # --- Human vs AI (issue #49) — Persoana A: backend/AI ---
+        # Dacă runda a fost jucată în modul "vs_ai" și predicția GluMind e gata
+        # în ai-prediction-store (pornită încă de la începutul rundei, vezi cele
+        # 3 locuri unde se generează fereastra), adăugăm rândurile GluMind în
+        # tabel și calculăm cele 2 seturi de scoruri (vs_reality, vs_human).
+        ai_comparison_round: dict[str, Any] = {}
+        # Rândul brut de predicție AI, salvat separat lângă restul rundei, ca să
+        # poată fi reagregat pe /final la fel cum se agregă rândul omului (vezi
+        # _build_ai_aggregate_table_data mai jos în fișier) — ai_comparison
+        # ține doar scorurile deja calculate, nu și predicțiile punct-cu-punct.
+        ai_predicted_row_for_round: Optional[dict[str, str]] = None
+        if user_info.get("mode") == "vs_ai":
+            glumind_data = (ai_prediction_data or {}).get("glumind") or {}
+            ai_predictions = glumind_data.get("predictions") or []
+            ai_ready = bool(glumind_data.get("ready")) and bool(ai_predictions)
+
+            if not ai_ready:
+                # Contract-ul cu Persoana B: dacă modelul n-a apucat să răspundă
+                # până la submit, recalculăm sincron aici ca fallback, ca omul
+                # să nu rămână fără comparație doar din cauza unei curse cu UI-ul.
+                fallback = _compute_ai_forecast_if_needed(convert_df_to_dict(current_df), user_info)
+                glumind_data = fallback.get("glumind") or {}
+                ai_predictions = glumind_data.get("predictions") or []
+                ai_ready = bool(glumind_data.get("ready")) and bool(ai_predictions)
+
+            if ai_ready:
+                gl_values = current_df.get_column("gl").to_list()
+                human_predictions = current_df.get_column("prediction").to_list()
+                offset = PREDICTION_HOUR_OFFSET
+
+                ai_rows = _build_ai_table_rows(gl_values, ai_predictions, offset)
+                prediction_table_data = prediction_table_data + ai_rows
+                ai_predicted_row_for_round = ai_rows[0]  # "Predicted (GluMind)" row
+
+                ai_comparison_round = {
+                    "glumind": _compute_ai_comparison_scores(
+                        gl_values, human_predictions, ai_predictions, offset
+                    )
+                }
+
         user_info['prediction_table_data'] = prediction_table_data
         user_info['current_round_number'] = round_number
+        if ai_comparison_round:
+            user_info['ai_comparison'] = ai_comparison_round
 
         round_info: dict[str, Any] = {
             'round_number': round_number,
             'prediction_window_start': user_info['prediction_window_start'],
             'prediction_window_size': user_info['prediction_window_size'],
             'prediction_table_data': prediction_table_data,
+            'ai_predicted_row': ai_predicted_row_for_round,
             'format': str(user_info.get('format') or ''),
             'is_example_data': bool(user_info.get('is_example_data', True)),
             'data_source_name': str(user_info.get('data_source_name', 'example.csv')),
         }
+        if ai_comparison_round:
+            # Salvate per rundă, lângă restul rezultatelor rundei — folosesc
+            # exact același loc/format de fișier unde se salvează deja rundele
+            # omului (submit_component.save_statistics(...) mai jos serializează
+            # tot user_info/rounds, deci intră automat în același sistem).
+            round_info['ai_comparison'] = ai_comparison_round
         rounds.append(round_info)
         user_info['rounds'] = rounds
         
@@ -4539,7 +4926,8 @@ def handle_submit_button(
      Output('is-example-data', 'data', allow_duplicate=True),
      Output('data-source-name', 'data', allow_duplicate=True),
      Output('randomization-initialized', 'data', allow_duplicate=True),
-     Output('initial-slider-value', 'data', allow_duplicate=True)],
+     Output('initial-slider-value', 'data', allow_duplicate=True),
+     Output('ai-prediction-store', 'data', allow_duplicate=True)],
     [Input('next-round-button', 'n_clicks')],
     [State('user-info-store', 'data'),
      State('full-df', 'data')],
@@ -4549,16 +4937,16 @@ def handle_next_round_button(
     n_clicks: Optional[int],
     user_info: Optional[Dict[str, Any]],
     full_df_data: Optional[Dict]
-) -> Tuple[str, Dict[str, Any], Dict[str, bool], Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int]:
+) -> Tuple[str, Dict[str, Any], Dict[str, bool], Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int, Dict[str, Any]]:
     print(f"DEBUG handle_next_round_button FIRED: n_clicks={n_clicks}")
     if not n_clicks or not user_info:
-        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
 
     rounds: list[dict[str, Any]] = user_info.get('rounds') or []
     max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS)
     next_round_number = len(rounds) + 1
     if next_round_number > max_rounds:
-        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
 
     with start_action(action_type=u"handle_next_round_button", next_round=next_round_number):
         fmt = str(user_info.get("format") or "A")
@@ -4576,7 +4964,7 @@ def handle_next_round_button(
             uploaded_path = user_info.get("uploaded_data_path")
             if not uploaded_path:
                 # Should not happen in normal flow, but keep safe empty state.
-                return '/prediction', user_info, {'hide_last_hour': True}, no_update, no_update, no_update, False, "", False, 0
+                return '/prediction', user_info, {'hide_last_hour': True}, no_update, no_update, no_update, False, "", False, 0, no_update
             full_df, events_df = load_glucose_data(Path(str(uploaded_path)))
             is_example = False
             source_name = str(user_info.get("uploaded_data_filename") or user_info.get("data_source_name") or "uploaded.csv")
@@ -4584,7 +4972,7 @@ def handle_next_round_button(
             # Format C: alternate between uploaded (odd rounds) and example (even rounds)
             uploaded_path = user_info.get("uploaded_data_path")
             if not uploaded_path:
-                return '/prediction', user_info, {'hide_last_hour': True}, no_update, no_update, no_update, False, "", False, 0
+                return '/prediction', user_info, {'hide_last_hour': True}, no_update, no_update, no_update, False, "", False, 0, no_update
             use_example = (next_round_number % 2 == 0)
             if use_example:
                 full_df, events_df = load_glucose_data()
@@ -4611,17 +4999,23 @@ def handle_next_round_button(
         user_info['data_source_name'] = source_name
         chart_mode = {'hide_last_hour': True}
 
+        # 3rd of the 3 places a fresh window is generated: kick off GluMind
+        # for this new round right away, in parallel with the human playing.
+        new_window_dict = convert_df_to_dict(new_df)
+        ai_forecast_data = _compute_ai_forecast_if_needed(new_window_dict, user_info)
+
         return (
             '/prediction',
             user_info,
             chart_mode,
             convert_df_to_dict(full_df),
-            convert_df_to_dict(new_df),
+            new_window_dict,
             convert_events_df_to_dict(events_df),
             is_example,
             source_name,
             False,  # let slider init set it from initial-slider-value
-            random_start
+            random_start,
+            ai_forecast_data,
         )
 
 
@@ -4975,6 +5369,7 @@ app.clientside_callback(
         Output('randomization-initialized', 'data', allow_duplicate=True),
         Output('initial-slider-value', 'data', allow_duplicate=True),
         Output('switch-format-error', 'children', allow_duplicate=True),
+        Output('ai-prediction-store', 'data', allow_duplicate=True),
     ],
     [
         Input('switch-format-a', 'n_clicks'),
@@ -5005,6 +5400,7 @@ def handle_switch_format(
     bool,
     int,
     Optional[Any],
+    Optional[Dict[str, Any]],
 ]:
     print(f"DEBUG handle_switch_format FIRED: n_a={n_a} n_b={n_b} n_c={n_c} triggered={ctx.triggered_id}")
     triggered = ctx.triggered_id
@@ -5034,6 +5430,7 @@ def handle_switch_format(
             no_update,
             no_update,
             dbc.Alert(t("ui.switch_format.not_eligible_no_cgm", locale=locale), color="warning"),
+            no_update,
         )
 
     def _archive_current_run(info_in: Dict[str, Any]) -> None:
@@ -5091,18 +5488,23 @@ def handle_switch_format(
             new_df = new_df.with_columns(pl.lit(0.0).alias("prediction"))
             info["is_example_data"] = True
             info["data_source_name"] = "example.csv"
+            # Same as the other 2 window-generation sites: kick off GluMind for
+            # this freshly-switched round right away, so it's ready by submit.
+            new_window_dict = convert_df_to_dict(new_df)
+            ai_forecast_data = _compute_ai_forecast_if_needed(new_window_dict, info)
             return (
                 "/prediction",
                 info,
                 chart_mode,
                 convert_df_to_dict(full_df),
-                convert_df_to_dict(new_df),
+                new_window_dict,
                 convert_events_df_to_dict(events_df),
                 True,
                 "example.csv",
                 False,
                 random_start,
                 None,
+                ai_forecast_data,
             )
 
         if target_format in ("B", "C") and uploaded_path:
@@ -5113,18 +5515,21 @@ def handle_switch_format(
             source_name = str(info.get("uploaded_data_filename") or info.get("data_source_name") or "uploaded.csv")
             info["is_example_data"] = False
             info["data_source_name"] = source_name
+            new_window_dict = convert_df_to_dict(new_df)
+            ai_forecast_data = _compute_ai_forecast_if_needed(new_window_dict, info)
             return (
                 "/prediction",
                 info,
                 chart_mode,
                 convert_df_to_dict(full_df),
-                convert_df_to_dict(new_df),
+                new_window_dict,
                 convert_events_df_to_dict(events_df),
                 False,
                 source_name,
                 False,
                 random_start,
                 None,
+                ai_forecast_data,
             )
 
         # Upload-required empty state for B/C.
@@ -5142,6 +5547,7 @@ def handle_switch_format(
             False,
             0,
             None,
+            no_update,
         )
 
 # Add client-side callback to scroll to top when ending page loads
@@ -5767,22 +6173,29 @@ def redeem_resume_from_input(
 
 # Data initialization callback (URL-based only)
 @app.callback(
-    [Output('full-df', 'data', allow_duplicate=True),
-     Output('current-window-df', 'data', allow_duplicate=True),
-     Output('events-df', 'data', allow_duplicate=True),
-     Output('is-example-data', 'data', allow_duplicate=True),
-     Output('data-source-name', 'data', allow_duplicate=True),
-     Output('randomization-initialized', 'data', allow_duplicate=True),
-     Output('initial-slider-value', 'data', allow_duplicate=True)],
+    [
+        Output('full-df', 'data', allow_duplicate=True),
+        Output('current-window-df', 'data', allow_duplicate=True),
+        Output('events-df', 'data', allow_duplicate=True),
+        Output('is-example-data', 'data', allow_duplicate=True),
+        Output('data-source-name', 'data', allow_duplicate=True),
+        Output('randomization-initialized', 'data', allow_duplicate=True),
+        Output('initial-slider-value', 'data', allow_duplicate=True),
+        Output('ai-prediction-store', 'data'),  # <-- 1. Adăugat corect în lista de Outputs
+    ],
     [Input('url', 'pathname')],
-    [State('full-df', 'data'),
-     State('user-info-store', 'data')],
-    prevent_initial_call=True
+    [
+        State('full-df', 'data'),
+        State('user-info-store', 'data'),
+        State('session-store', 'data'),          # <-- 2. Adăugat corect în lista de States
+    ],
+    prevent_initial_call=True,
 )
 def initialize_data_on_url_change(
     pathname: Optional[str],
     full_df_data: Optional[Dict],
     user_info: Optional[Dict[str, Any]],
+    session_store_data: Optional[Dict[str, Any]],
 ) -> Tuple[
     Optional[Dict[str, List[Any]]],
     Optional[Dict[str, List[Any]]],
@@ -5791,14 +6204,21 @@ def initialize_data_on_url_change(
     str,
     bool,
     int,
+    Dict[str, Any],
 ]:
     """Initialize data when URL changes to /prediction without existing data.
 
     Only loads fresh example data when navigating to /prediction and no data
     exists yet.  All other pages are left alone so that persisted localStorage
     stores are never overwritten (critical for the resume flow).
+
+    Also the 1st of the 3 places where a fresh window is generated: as soon as
+    the round starts, we kick off the GluMind forecast (if the user picked
+    "Human vs AI") so it's ready in ``ai-prediction-store`` by the time they
+    submit, instead of waiting until submit to compute it.
     """
-    _no_change = (no_update, no_update, no_update, no_update, no_update, no_update, no_update)
+    _no_ai_default = {"glumind": {"predictions": [], "ready": False}}
+    _no_change = (no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update)
 
     if pathname != '/prediction':
         return _no_change
@@ -5807,7 +6227,7 @@ def initialize_data_on_url_change(
     fmt = str((user_info or {}).get("format") or "A")
     uploaded_path = (user_info or {}).get("uploaded_data_path")
     if fmt in ("B", "C") and not uploaded_path:
-        return None, None, None, False, "", False, 0
+        return None, None, None, False, "", False, 0, _no_ai_default
 
     # Data already present — preserve (handles resume and round transitions).
     if full_df_data is not None:
@@ -5822,14 +6242,18 @@ def initialize_data_on_url_change(
     with start_action(action_type=u"initialize_data_on_url_change") as action:
         action.log(message_type="new_random_start", random_start=random_start)
 
+    window_dict = convert_df_to_dict(df)
+    ai_forecast_data = _compute_ai_forecast_if_needed(window_dict, user_info)
+
     return (
         convert_df_to_dict(full_df),
-        convert_df_to_dict(df),
+        window_dict,
         convert_events_df_to_dict(events_df),
         True,
         'example.csv',
         False,
         random_start,
+        ai_forecast_data,
     )
 
 # Separate callback for file upload handling
@@ -5843,19 +6267,22 @@ def initialize_data_on_url_change(
      Output('randomization-initialized', 'data', allow_duplicate=True),
      Output('initial-slider-value', 'data', allow_duplicate=True),
      Output('user-info-store', 'data', allow_duplicate=True),
-     Output('consent-scroll-request', 'data')],
+     Output('consent-scroll-request', 'data'),
+     Output('ai-prediction-store', 'data', allow_duplicate=True)],
     [Input('upload-data', 'contents'),
      Input('prediction-data-usage-consent', 'value')],
     [State('upload-data', 'filename'),
-     State('user-info-store', 'data')],
-    prevent_initial_call=True
+     State('user-info-store', 'data'),
+     State('session-store', 'data')],
+    prevent_initial_call=True,
 )
 def handle_file_upload(
     upload_contents: Optional[str],
     consent_value: Optional[list[str]],
     filename: Optional[str],
     user_info: Optional[Dict[str, Any]],
-) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int, Dict[str, Any], int]:
+    session_store_data: Optional[Dict[str, Any]],
+) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int, Dict[str, Any], int, Dict[str, Any]]:
     """Handle file upload and data loading"""
     triggered = ctx.triggered_id
     if triggered not in ("upload-data", "prediction-data-usage-consent"):
@@ -5918,6 +6345,7 @@ def handle_file_upload(
                     no_update,
                     info_pre,
                     current_time,
+                    no_update,
                 )
 
             # Process cached upload (browser may not re-fire upload for same file).
@@ -5925,7 +6353,7 @@ def handle_file_upload(
             filename = str(info_pre.get("pending_upload_filename") or filename or "")
 
         if not upload_contents:
-            return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+            return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
     
         consent_ok = bool(info_pre.get("consent_use_uploaded_data", False)) or bool(consent_value and "agree" in consent_value)
         if fmt in ("B", "C") and not consent_ok:
@@ -5945,6 +6373,7 @@ def handle_file_upload(
                 no_update,
                 info_pre,
                 no_update,
+                no_update,
             )
         
         # Parse upload contents
@@ -5960,6 +6389,7 @@ def handle_file_upload(
                 no_update,
                 no_update,
                 dict(user_info or {}),
+                no_update,
                 no_update,
             )
         
@@ -6000,10 +6430,15 @@ def handle_file_upload(
         info.pop("pending_upload_contents", None)
         info.pop("pending_upload_filename", None)
 
+        # 2nd of the 3 places a fresh window is generated: kick off GluMind
+        # here too, so it's ready by the time the user submits this round.
+        new_window_dict = convert_df_to_dict(new_df)
+        ai_forecast_data = _compute_ai_forecast_if_needed(new_window_dict, info)
+
         return (
             current_time,
             convert_df_to_dict(new_full_df),
-            convert_df_to_dict(new_df),
+            new_window_dict,
             convert_events_df_to_dict(new_events_df),
             False,  # is_example_data = False for uploaded files
             str(filename or ""),  # store the original filename
@@ -6011,6 +6446,7 @@ def handle_file_upload(
             random_start,  # Update initial slider value
             info,
             current_time if triggered == "prediction-data-usage-consent" else no_update,
+            ai_forecast_data,
         )
 
 

@@ -323,8 +323,43 @@ class StartupPage(html.Div):
                                 'justifyContent': 'center',
                                 'lineHeight': '1.2'
                             }
-                        )
+                        ),
+                        html.P(
+                            "Test yourself against real glucose data",
+                            style={'fontSize': '14px', 'color': '#666', 'marginTop': '8px', 'textAlign': 'center'}
+                        ),
                     ], style={'textAlign': 'center', 'marginBottom': '30px'}),
+
+
+                    html.Div([
+                        html.Button(
+                            "Human vs AI",
+                            id='start-vs-ai-button',
+                            className="ui blue button",
+                            disabled=True,
+                            style={
+                                'backgroundColor': '#cccccc',
+                                'color': 'white',
+                                'padding': '20px 30px',
+                                'border': 'none',
+                                'borderRadius': '5px',
+                                'fontSize': '24px',
+                                'cursor': 'not-allowed',
+                                'width': '100%',
+                                'height': '80px',
+                                'display': 'flex',
+                                'alignItems': 'center',
+                                'justifyContent': 'center',
+                                'lineHeight': '1.2'
+                            }
+                        ),
+                        html.P(
+                            "Compare your predictions against an AI model",
+                            style={'fontSize': '14px', 'color': '#666', 'marginTop': '8px', 'textAlign': 'center'}
+                        ),
+                        
+                    ], style={'textAlign': 'center', 'marginBottom': '30px'}),
+
                     
 
                 ], style={'maxWidth': '600px', 'margin': '0 auto', 'padding': '20px'})
@@ -427,6 +462,8 @@ class StartupPage(html.Div):
         @app.callback(
             [Output('start-button', 'disabled'),
              Output('start-button', 'style'),
+             Output('start-vs-ai-button', 'disabled'),
+             Output('start-vs-ai-button', 'style'),
              Output('email-required', 'style'),
              Output('age-required', 'style'),
              Output('gender-required', 'style'),
@@ -538,9 +575,28 @@ class StartupPage(html.Div):
                     'justifyContent': 'center',
                     'lineHeight': '1.2'
                 }
+
+                vs_ai_button_style = {
+                    'backgroundColor': '#2185d0',
+                    'color': 'white',
+                    'padding': '20px 30px',
+                    'border': 'none',
+                    'borderRadius': '5px',
+                    'fontSize': '24px',
+                    'cursor': 'pointer',
+                    'width': '100%',
+                    'height': '80px',
+                    'display': 'flex',
+                    'alignItems': 'center',
+                    'justifyContent': 'center',
+                    'lineHeight': '1.2'
+}
+                
                 return (
                     False,
                     button_style,
+                    False,
+                    vs_ai_button_style,
                     email_asterisk,
                     age_asterisk,
                     gender_asterisk,
@@ -569,6 +625,8 @@ class StartupPage(html.Div):
                     'lineHeight': '1.2'
                 }
                 return (
+                    True,
+                    button_style,
                     True,
                     button_style,
                     email_asterisk,

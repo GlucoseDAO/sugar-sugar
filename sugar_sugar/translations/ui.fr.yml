@@ -275,6 +275,7 @@ fr:
       y_axis_short: "Écart"
       legend_zero: "Aucun écart"
       legend_variability: "Courbe de variabilité"
+      legend_ai: "Prédiction IA"
       legend_error: "Écart vs mesuré, une courbe par manche"
       round_hover: "Manche"
       caption: "Chaque ligne est une source utilisée. Temps = heure suivante entière (tous les pas de 5 min). Y = pourcentage par rapport au mesuré. L’aire entre la courbe et zéro représente la manche."
