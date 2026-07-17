@@ -264,6 +264,27 @@ def _server_groups(port: int, *, locale: str) -> list[ServerGroup]:
                 Shot("prediction-b", "/prediction", landscape=True, settle_s=3.0, landscape_widths=(1280, 1920)),
             ],
         ),
+        ServerGroup(
+            name="consent-startup",
+            # Mobile startup wizard, format step (mobile-step-4 = "Step 5 of 6").
+            # Walk to it, then select format B via set_props so the data-usage
+            # consent gate (data-usage-consent-container) reveals, and capture the
+            # full page so the checkbox is visible.
+            cmd=base + ["start", "--port", str(port)],
+            shots=[
+                Shot(
+                    "startup-format-consent-b",
+                    "/startup",
+                    pre_click_js=accept_mobile_consent_js,
+                    clicks=("startup-next",) * 4,
+                    pre_capture_js=(
+                        "(function(){if(window.dash_clientside&&window.dash_clientside.set_props)"
+                        "{window.dash_clientside.set_props('format-dropdown',{value:'B'});}})()"
+                    ),
+                    settle_s=2.0,
+                ),
+            ],
+        ),
     ]
 
 
