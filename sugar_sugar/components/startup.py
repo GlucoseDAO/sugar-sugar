@@ -2,11 +2,277 @@ from dash import html, dcc
 from dash.dependencies import Input, Output, State
 from dash import no_update
 import dash
+from dataclasses import dataclass
 from typing import Any, Optional
 # DEBUG_MODE will be imported dynamically to get the latest value
 from sugar_sugar.components.landing import consent_controls_children
+from sugar_sugar.components.submit import _is_mobile_ua
 from sugar_sugar.i18n import t
 from sugar_sugar.config import STORAGE_TYPE
+from flask import has_request_context, request as flask_request
+
+MAX_AGE: int = 130
+MIN_AGE: int = 18
+
+_MISSING_FIELDS_STYLE: dict[str, str] = {
+    'color': '#d32f2f',
+    'fontSize': '14px',
+    'marginTop': '8px',
+    'marginBottom': '8px',
+    'lineHeight': '1.4',
+}
+
+
+@dataclass(frozen=True)
+class StartupValidationResult:
+    """Outcome of startup-form field checks for one wizard step or the full form."""
+
+    age_error: str
+    diabetes_duration_error: str
+    cgm_duration_error: str
+    data_usage_error: str
+    missing_label_keys: tuple[str, ...]
+    has_range_errors: bool
+    step_complete: bool
+    form_complete: bool
+    _locale: Optional[str] = None
+
+    @property
+    def missing_fields_message(self) -> str:
+        if not self.missing_label_keys:
+            return ""
+        labels = [t(key, locale=self._locale) for key in self.missing_label_keys]
+        return t("ui.startup.missing_fields", locale=self._locale, fields=", ".join(labels))
+
+    @property
+    def hint_message(self) -> str:
+        parts: list[str] = []
+        missing = self.missing_fields_message
+        if missing:
+            parts.append(missing)
+        if self.has_range_errors:
+            parts.append(t("ui.startup.values_check_warning", locale=self._locale))
+        return "\n".join(parts)
+
+    def hint_children(self) -> Any:
+        """Dash-friendly children for the missing-fields / values-check hint."""
+        text = self.hint_message
+        if not text:
+            return ""
+        lines = [line for line in text.split("\n") if line]
+        if len(lines) == 1:
+            return lines[0]
+        return [html.Div(line, style={'marginBottom': '4px'}) for line in lines]
+
+
+def _wants_contact_from_user_info(user_info: Optional[dict[str, Any]]) -> bool:
+    info: dict[str, Any] = dict(user_info or {})
+    return bool(
+        info.get('consent_receive_results_later') or
+        info.get('consent_keep_up_to_date')
+    )
+
+
+def _age_field_errors(age: Optional[int | float], locale: Optional[str]) -> tuple[str, bool]:
+    if age is None:
+        return "", False
+    age_f = float(age)
+    if age_f < MIN_AGE:
+        return t("ui.startup.age_must_be_18_error", locale=locale), True
+    if age_f > MAX_AGE:
+        return t("ui.startup.age_max_error", locale=locale, max_age=MAX_AGE), True
+    return "", True
+
+
+def _duration_exceeds_age(
+    duration: Optional[int | float],
+    age: Optional[int | float],
+) -> bool:
+    if duration is None or age is None:
+        return False
+    return float(duration) > float(age)
+
+
+def validate_startup_form(
+    *,
+    email: Optional[str],
+    age: Optional[int | float],
+    gender: Optional[str],
+    format_value: Optional[str],
+    data_usage_consent: Optional[list[str]],
+    is_diabetic: Optional[bool],
+    diabetic_type: Optional[str],
+    diabetes_duration: Optional[int | float],
+    location: Optional[str],
+    uses_cgm: Optional[bool],
+    cgm_duration: Optional[int | float],
+    wants_contact: bool,
+    locale: Optional[str],
+    wizard_step: Optional[int] = None,
+) -> StartupValidationResult:
+    """Validate startup fields for a wizard step (0-5) or the full form (``wizard_step=None``)."""
+    age_error, age_in_range = _age_field_errors(age, locale)
+    diabetes_duration_error = (
+        t("ui.startup.diabetes_duration_exceeds_age_error", locale=locale)
+        if _duration_exceeds_age(diabetes_duration, age)
+        else ""
+    )
+    cgm_duration_error = (
+        t("ui.startup.cgm_duration_exceeds_age_error", locale=locale)
+        if uses_cgm is True and _duration_exceeds_age(cgm_duration, age)
+        else ""
+    )
+
+    needs_data_consent = format_value in ("B", "C")
+    has_data_consent = bool(data_usage_consent and "agree" in data_usage_consent)
+    data_usage_error = (
+        t("ui.startup.data_usage_consent_required", locale=locale)
+        if needs_data_consent and not has_data_consent
+        else ""
+    )
+
+    has_range_errors = bool(
+        age_error or diabetes_duration_error or cgm_duration_error
+    )
+
+    missing: list[str] = []
+
+    def _identity_missing() -> None:
+        if wants_contact and not email:
+            missing.append("ui.startup.email_label")
+        if not age:
+            missing.append("ui.startup.age_label")
+        if not gender:
+            missing.append("ui.startup.gender_label")
+        if not location:
+            missing.append("ui.startup.location_label")
+
+    def _cgm_missing() -> None:
+        if uses_cgm is None:
+            missing.append("ui.startup.cgm_label")
+        elif uses_cgm is True and cgm_duration is None:
+            missing.append("ui.startup.cgm_duration_label")
+
+    def _diabetes_missing() -> None:
+        if is_diabetic is None:
+            missing.append("ui.startup.diabetic_label")
+        elif is_diabetic:
+            if not diabetic_type:
+                missing.append("ui.startup.diabetes_type_label")
+            if diabetes_duration is None:
+                missing.append("ui.startup.diabetes_duration_label")
+
+    def _format_missing() -> None:
+        if not format_value:
+            missing.append("ui.startup.format_label")
+        if needs_data_consent and not has_data_consent:
+            missing.append("ui.startup.data_usage_consent_label")
+
+    if wizard_step is None:
+        _identity_missing()
+        _cgm_missing()
+        _diabetes_missing()
+        _format_missing()
+    elif wizard_step == 1:
+        _identity_missing()
+    elif wizard_step == 2:
+        _cgm_missing()
+    elif wizard_step == 3:
+        _diabetes_missing()
+    elif wizard_step == 4:
+        _format_missing()
+
+    step_range_ok = True
+    if wizard_step in (None, 1):
+        step_range_ok = step_range_ok and age_in_range and not age_error
+    if wizard_step in (None, 2) and uses_cgm is True:
+        step_range_ok = step_range_ok and not cgm_duration_error
+    if wizard_step in (None, 3) and is_diabetic:
+        step_range_ok = step_range_ok and not diabetes_duration_error
+
+    step_complete = not missing and step_range_ok
+    if wizard_step == 4:
+        step_complete = step_complete and not data_usage_error
+
+    is_adult = (age is not None) and (float(age) >= MIN_AGE) and (float(age) <= MAX_AGE)
+    form_complete = (
+        not missing
+        and is_adult
+        and not has_range_errors
+        and format_value
+        and is_diabetic is not None
+        and location
+        and (email if wants_contact else True)
+        and uses_cgm is not None
+        and (not uses_cgm or cgm_duration is not None)
+        and (not is_diabetic or (diabetic_type and diabetes_duration is not None))
+        and (not needs_data_consent or has_data_consent)
+    )
+
+    return StartupValidationResult(
+        age_error=age_error,
+        diabetes_duration_error=diabetes_duration_error,
+        cgm_duration_error=cgm_duration_error,
+        data_usage_error=data_usage_error,
+        missing_label_keys=tuple(missing),
+        has_range_errors=has_range_errors,
+        step_complete=step_complete,
+        form_complete=form_complete,
+        _locale=locale,
+    )
+
+
+def _step_hint_children(
+    *,
+    email: Optional[str],
+    age: Optional[int | float],
+    gender: Optional[str],
+    format_value: Optional[str],
+    data_usage_consent: Optional[list[str]],
+    is_diabetic: Optional[bool],
+    diabetic_type: Optional[str],
+    diabetes_duration: Optional[int | float],
+    location: Optional[str],
+    uses_cgm: Optional[bool],
+    cgm_duration: Optional[int | float],
+    wants_contact: bool,
+    locale: Optional[str],
+    current_step: int,
+) -> Any:
+    if 1 <= current_step <= 4:
+        return validate_startup_form(
+            email=email,
+            age=age,
+            gender=gender,
+            format_value=format_value,
+            data_usage_consent=data_usage_consent,
+            is_diabetic=is_diabetic,
+            diabetic_type=diabetic_type,
+            diabetes_duration=diabetes_duration,
+            location=location,
+            uses_cgm=uses_cgm,
+            cgm_duration=cgm_duration,
+            wants_contact=wants_contact,
+            locale=locale,
+            wizard_step=current_step,
+        ).hint_children()
+    if current_step == 0:
+        return ""
+    return validate_startup_form(
+        email=email,
+        age=age,
+        gender=gender,
+        format_value=format_value,
+        data_usage_consent=data_usage_consent,
+        is_diabetic=is_diabetic,
+        diabetic_type=diabetic_type,
+        diabetes_duration=diabetes_duration,
+        location=location,
+        uses_cgm=uses_cgm,
+        cgm_duration=cgm_duration,
+        wants_contact=wants_contact,
+        locale=locale,
+    ).hint_children()
 
 
 
@@ -94,7 +360,7 @@ class StartupPage(html.Div):
                         type='number',
                         placeholder=t("ui.startup.age_placeholder", locale=locale),
                         min=0,
-                        max=120,
+                        max=130,
                         persistence=True,
                         persistence_type=STORAGE_TYPE,
                         style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
@@ -142,10 +408,15 @@ class StartupPage(html.Div):
                             type='number',
                             placeholder=t("ui.startup.cgm_duration_placeholder", locale=locale),
                             min=0,
-                            max=100,
+                            max=130,
                             persistence=True,
                             persistence_type=STORAGE_TYPE,
-                            style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
+                            style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '8px'}
+                        ),
+                        html.Div(
+                            id='cgm-duration-error',
+                            children='',
+                            style={'color': '#d32f2f', 'fontSize': '16px', 'marginBottom': '20px'}
                         )
                     ]),
 
@@ -238,10 +509,15 @@ class StartupPage(html.Div):
                             type='number',
                             placeholder=t("ui.startup.diabetes_duration_placeholder", locale=locale),
                             min=0,
-                            max=100,
+                            max=130,
                             persistence=True,
                             persistence_type=STORAGE_TYPE,
-                            style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
+                            style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '8px'}
+                        ),
+                        html.Div(
+                            id='diabetes-duration-error',
+                            children='',
+                            style={'color': '#d32f2f', 'fontSize': '16px', 'marginBottom': '20px'}
                         )
                     ]),
                     
@@ -302,6 +578,11 @@ class StartupPage(html.Div):
                     }),
                     # <!-- END INSERTION: Just Test Me Button (Debug Mode Only) -->
                     
+                    html.Div(
+                        id='startup-missing-fields',
+                        children='',
+                        style={**_MISSING_FIELDS_STYLE, 'display': 'none', 'textAlign': 'center'},
+                    ),
                     html.Div([
                         html.Button(
                             t("ui.startup.start_prediction", locale=locale),
@@ -436,10 +717,16 @@ class StartupPage(html.Div):
              Output('location-required', 'style'),
              Output('format-required', 'style'),
              Output('age-error', 'children'),
-             Output('data-usage-error', 'children')],
+             Output('diabetes-duration-error', 'children'),
+             Output('cgm-duration-error', 'children'),
+             Output('data-usage-error', 'children'),
+             Output('startup-missing-fields', 'children'),
+             Output('startup-missing-fields', 'style')],
             [Input('email-input', 'value'),
              Input('age-input', 'value'),
              Input('gender-dropdown', 'value'),
+             Input('cgm-dropdown', 'value'),
+             Input('cgm-duration-input', 'value'),
              Input('format-dropdown', 'value'),
              Input('data-usage-consent', 'value'),
              Input('diabetic-dropdown', 'value'),
@@ -447,12 +734,15 @@ class StartupPage(html.Div):
              Input('diabetes-duration-input', 'value'),
              Input('location-input', 'value'),
              Input('user-info-store', 'data'),
-             Input('interface-language', 'data')]
+             Input('interface-language', 'data'),
+             Input('startup-step', 'data')]
         )
         def update_form_validation(
             email: Optional[str],
             age: Optional[int | float],
             gender: Optional[str],
+            uses_cgm: Optional[bool],
+            cgm_duration: Optional[int | float],
             format_value: Optional[str],
             data_usage_consent: Optional[list[str]],
             is_diabetic: Optional[bool],
@@ -461,68 +751,76 @@ class StartupPage(html.Div):
             location: Optional[str],
             user_info: Optional[dict[str, Any]],
             interface_language: Optional[str],
-        ) -> tuple[
-            bool,
-            dict[str, str | int],
-            dict[str, str | int],
-            dict[str, str | int],
-            dict[str, str | int],
-            dict[str, str | int],
-            dict[str, str | int],
-            dict[str, str | int],
-            dict[str, str | int],
-            dict[str, str | int],
-            str,
-            str
-        ]:
-            # Base asterisk style (hidden when field is filled, red when empty)
+            startup_step: Optional[int],
+        ) -> tuple[Any, ...]:
             hidden_style = {'display': 'none'}
             required_style = {'color': '#d32f2f', 'fontSize': '24px', 'fontWeight': 'bold'}
 
-            info: dict[str, Any] = dict(user_info or {})
-            # Contact-consent checkboxes live on the LANDING page (landing.py), not
-            # in the /startup DOM. handle_landing_continue persists the user's choice
-            # into user-info-store, so derive `wants_contact` from there. Do NOT add
-            # Input('consent-receive-results'/'consent-keep-updated') here: those
-            # components are absent on /startup, and Dash refuses to fire a callback
-            # whose Inputs aren't all in the layout — that left the desktop
-            # start-button stuck disabled (mobile regression, fixed 2026-06).
-            wants_contact = bool(
-                info.get('consent_receive_results_later') or
-                info.get('consent_keep_up_to_date')
+            wants_contact = _wants_contact_from_user_info(user_info)
+            current_step = int(startup_step or 0)
+            is_mobile = _is_mobile_ua(
+                flask_request.headers.get('User-Agent') if has_request_context() else None
             )
-            
-            # Check each required field and set asterisk visibility
+            full_validation = validate_startup_form(
+                email=email,
+                age=age,
+                gender=gender,
+                format_value=format_value,
+                data_usage_consent=data_usage_consent,
+                is_diabetic=is_diabetic,
+                diabetic_type=diabetic_type,
+                diabetes_duration=diabetes_duration,
+                location=location,
+                uses_cgm=uses_cgm,
+                cgm_duration=cgm_duration,
+                wants_contact=wants_contact,
+                locale=interface_language,
+            )
+            if is_mobile:
+                if 1 <= current_step <= 4:
+                    hint = _step_hint_children(
+                        email=email,
+                        age=age,
+                        gender=gender,
+                        format_value=format_value,
+                        data_usage_consent=data_usage_consent,
+                        is_diabetic=is_diabetic,
+                        diabetic_type=diabetic_type,
+                        diabetes_duration=diabetes_duration,
+                        location=location,
+                        uses_cgm=uses_cgm,
+                        cgm_duration=cgm_duration,
+                        wants_contact=wants_contact,
+                        locale=interface_language,
+                        current_step=current_step,
+                    )
+                elif current_step == 0:
+                    hint = ""
+                else:
+                    hint = full_validation.hint_children()
+            else:
+                hint = full_validation.hint_children()
+            validation = full_validation
+
             email_asterisk = hidden_style if (not wants_contact or email) else required_style
             age_asterisk = hidden_style if age else required_style
             gender_asterisk = hidden_style if gender else required_style
             format_asterisk = hidden_style if format_value else required_style
             diabetic_asterisk = hidden_style if is_diabetic is not None else required_style
             diabetic_type_asterisk = hidden_style if (not is_diabetic or diabetic_type) else required_style
-            diabetes_duration_asterisk = hidden_style if (not is_diabetic or diabetes_duration is not None) else required_style
+            diabetes_duration_asterisk = (
+                hidden_style if (not is_diabetic or diabetes_duration is not None) else required_style
+            )
             location_asterisk = hidden_style if location else required_style
 
-            is_adult = (age is not None) and (float(age) >= 18)
-            age_error = t("ui.startup.age_must_be_18_error", locale=interface_language) if (age is not None and not is_adult) else ""
+            hint_visible = bool(hint) if isinstance(hint, str) else bool(hint)
+            missing_style = {
+                **_MISSING_FIELDS_STYLE,
+                'display': 'block' if hint_visible else 'none',
+                'textAlign': 'center',
+            }
 
-            needs_data_consent = format_value in ("B", "C")
-            has_data_consent = bool(data_usage_consent and "agree" in data_usage_consent)
-            data_usage_error = (
-                t("ui.startup.data_usage_consent_required", locale=interface_language)
-                if (needs_data_consent and not has_data_consent)
-                else ""
-            )
-            
-            # Check if all required fields are filled
-            all_required_filled = (
-                (email if wants_contact else True) and
-                age and is_adult and gender and format_value and is_diabetic is not None and location and
-                (not needs_data_consent or has_data_consent) and
-                (not is_diabetic or (diabetic_type and diabetes_duration is not None))
-            )
-            
-            # Enable button only if all required fields are filled
-            if all_required_filled:
+            if full_validation.form_complete:
                 button_style = {
                     'backgroundColor': '#4CBB17',
                     'color': 'white',
@@ -536,7 +834,7 @@ class StartupPage(html.Div):
                     'display': 'flex',
                     'alignItems': 'center',
                     'justifyContent': 'center',
-                    'lineHeight': '1.2'
+                    'lineHeight': '1.2',
                 }
                 return (
                     False,
@@ -549,39 +847,47 @@ class StartupPage(html.Div):
                     diabetes_duration_asterisk,
                     location_asterisk,
                     format_asterisk,
-                    age_error,
-                    data_usage_error,
+                    validation.age_error,
+                    validation.diabetes_duration_error,
+                    validation.cgm_duration_error,
+                    validation.data_usage_error,
+                    hint,
+                    missing_style,
                 )
-            else:
-                button_style = {
-                    'backgroundColor': '#555555',
-                    'color': 'white',
-                    'padding': '20px 30px',
-                    'border': 'none',
-                    'borderRadius': '5px',
-                    'fontSize': '24px',
-                    'cursor': 'not-allowed',
-                    'width': '100%',
-                    'height': '80px',
-                    'display': 'flex',
-                    'alignItems': 'center',
-                    'justifyContent': 'center',
-                    'lineHeight': '1.2'
-                }
-                return (
-                    True,
-                    button_style,
-                    email_asterisk,
-                    age_asterisk,
-                    gender_asterisk,
-                    diabetic_asterisk,
-                    diabetic_type_asterisk,
-                    diabetes_duration_asterisk,
-                    location_asterisk,
-                    format_asterisk,
-                    age_error,
-                    data_usage_error,
-                )
+
+            button_style = {
+                'backgroundColor': '#555555',
+                'color': 'white',
+                'padding': '20px 30px',
+                'border': 'none',
+                'borderRadius': '5px',
+                'fontSize': '24px',
+                'cursor': 'not-allowed',
+                'width': '100%',
+                'height': '80px',
+                'display': 'flex',
+                'alignItems': 'center',
+                'justifyContent': 'center',
+                'lineHeight': '1.2',
+            }
+            return (
+                True,
+                button_style,
+                email_asterisk,
+                age_asterisk,
+                gender_asterisk,
+                diabetic_asterisk,
+                diabetic_type_asterisk,
+                diabetes_duration_asterisk,
+                location_asterisk,
+                format_asterisk,
+                validation.age_error,
+                validation.diabetes_duration_error,
+                validation.cgm_duration_error,
+                validation.data_usage_error,
+                hint,
+                missing_style,
+            )
 
         # <!-- START INSERTION: Test Me Button Callback -->
         # Callback for "Just Test Me" button
@@ -665,39 +971,76 @@ class StartupPage(html.Div):
              Output('startup-consent-hint', 'style')],
             [Input('consent-acknowledge', 'value'),
              Input('consent-gdpr', 'value'),
-             Input('startup-step', 'data')],
+             Input('startup-step', 'data'),
+             Input('email-input', 'value'),
+             Input('age-input', 'value'),
+             Input('gender-dropdown', 'value'),
+             Input('cgm-dropdown', 'value'),
+             Input('cgm-duration-input', 'value'),
+             Input('diabetic-dropdown', 'value'),
+             Input('diabetic-type-dropdown', 'value'),
+             Input('diabetes-duration-input', 'value'),
+             Input('location-input', 'value'),
+             Input('format-dropdown', 'value'),
+             Input('data-usage-consent', 'value'),
+             Input('user-info-store', 'data'),
+             Input('interface-language', 'data')],
             prevent_initial_call=False,
         )
         def gate_mobile_consent_step(
             acknowledge_value: Optional[list[str]],
             gdpr_value: Optional[list[str]],
             current_step: Optional[int],
+            email: Optional[str],
+            age: Optional[int | float],
+            gender: Optional[str],
+            uses_cgm: Optional[bool],
+            cgm_duration: Optional[int | float],
+            is_diabetic: Optional[bool],
+            diabetic_type: Optional[str],
+            diabetes_duration: Optional[int | float],
+            location: Optional[str],
+            format_value: Optional[str],
+            data_usage_consent: Optional[list[str]],
+            user_info: Optional[dict[str, Any]],
+            interface_language: Optional[str],
         ) -> tuple[bool, str, dict[str, str]]:
-            # The mobile wizard's Step 1 (consent) Next button is gated on the two
-            # mandatory consent checkboxes only. We deliberately do NOT gate on
-            # `consent-scroll-complete` here: the scroll-to-end detection watches the
-            # outer #consent-notice-scroll div, but on real mobile browsers the user
-            # scrolls the inner consent iframe instead, so the div's scroll position
-            # never reaches the end and the user gets hard-locked with a dead Next
-            # button even after ticking both boxes (reported on Vivaldi Android). The
-            # consent text is fully present in the (scrollable) iframe and the
-            # "I have read the terms" + GDPR checkboxes are the meaningful gate.
             step = int(current_step or 0)
             hint_hidden = {'display': 'none'}
             hint_shown = {
                 'display': 'block', 'marginTop': '10px', 'fontSize': '14px',
                 'color': '#b45309', 'textAlign': 'center',
             }
-            if step != 0:
-                # Not the consent step: Next is always enabled and blue.
+            if step == 0:
+                blocked = not (
+                    bool(acknowledge_value and 'ack' in acknowledge_value) and
+                    bool(gdpr_value and 'gdpr' in gdpr_value)
+                )
+                if blocked:
+                    return True, "ui button startup-next-disabled", hint_shown
                 return False, "ui blue button", hint_hidden
-            blocked = not (
-                bool(acknowledge_value and 'ack' in acknowledge_value) and
-                bool(gdpr_value and 'gdpr' in gdpr_value)
-            )
-            if blocked:
-                # Grey, clearly-disabled button + an explanation of why.
-                return True, "ui button startup-next-disabled", hint_shown
+
+            if 1 <= step <= 4:
+                wants_contact = _wants_contact_from_user_info(user_info)
+                step_validation = validate_startup_form(
+                    email=email,
+                    age=age,
+                    gender=gender,
+                    format_value=format_value,
+                    data_usage_consent=data_usage_consent,
+                    is_diabetic=is_diabetic,
+                    diabetic_type=diabetic_type,
+                    diabetes_duration=diabetes_duration,
+                    location=location,
+                    uses_cgm=uses_cgm,
+                    cgm_duration=cgm_duration,
+                    wants_contact=wants_contact,
+                    locale=interface_language,
+                    wizard_step=step,
+                )
+                if not step_validation.step_complete:
+                    return True, "ui button startup-next-disabled", hint_hidden
+
             return False, "ui blue button", hint_hidden
 
 
@@ -829,7 +1172,7 @@ class StartupPageMobile(html.Div):
             dcc.Input(
                 id='age-input', type='number',
                 placeholder=t("ui.startup.age_placeholder", locale=locale),
-                min=0, max=120, persistence=True, persistence_type=STORAGE_TYPE, style=_M_INPUT,
+                min=0, max=130, persistence=True, persistence_type=STORAGE_TYPE, style=_M_INPUT,
             ),
             html.Div(id='age-error', children='', style=_M_ERROR, disable_n_clicks=True),
             _m_label(t("ui.startup.gender_label", locale=locale), 'gender-required'),
@@ -870,8 +1213,9 @@ class StartupPageMobile(html.Div):
                 dcc.Input(
                     id='cgm-duration-input', type='number',
                     placeholder=t("ui.startup.cgm_duration_placeholder", locale=locale),
-                    min=0, max=100, persistence=True, persistence_type=STORAGE_TYPE, style=_M_INPUT,
+                    min=0, max=130, persistence=True, persistence_type=STORAGE_TYPE, style=_M_INPUT,
                 ),
+                html.Div(id='cgm-duration-error', children='', style=_M_ERROR, disable_n_clicks=True),
             ]),
         ]
 
@@ -907,8 +1251,9 @@ class StartupPageMobile(html.Div):
                 dcc.Input(
                     id='diabetes-duration-input', type='number',
                     placeholder=t("ui.startup.diabetes_duration_placeholder", locale=locale),
-                    min=0, max=100, persistence=True, persistence_type=STORAGE_TYPE, style=_M_INPUT,
+                    min=0, max=130, persistence=True, persistence_type=STORAGE_TYPE, style=_M_INPUT,
                 ),
+                html.Div(id='diabetes-duration-error', children='', style=_M_ERROR, disable_n_clicks=True),
             ]),
         ]
 
@@ -1027,6 +1372,12 @@ class StartupPageMobile(html.Div):
                     disable_n_clicks=True,
                 ),
                 *step_divs,
+                html.Div(
+                    id='startup-missing-fields',
+                    children='',
+                    style={**_MISSING_FIELDS_STYLE, 'display': 'none', 'textAlign': 'center'},
+                    disable_n_clicks=True,
+                ),
                 nav,
             ],
             style={

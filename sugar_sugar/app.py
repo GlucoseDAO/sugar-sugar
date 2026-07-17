@@ -4248,13 +4248,35 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
     if not n_clicks:
         return no_update, no_update
 
-    is_adult = (age is not None) and (float(age) >= 18)
-    has_data_consent = bool(data_usage_consent and "agree" in data_usage_consent)
+    from sugar_sugar.components.startup import (
+        _wants_contact_from_user_info,
+        validate_startup_form,
+    )
 
-    if age and gender and diabetic is not None and location and format_value and is_adult:
+    wants_contact = _wants_contact_from_user_info(existing_user_info)
+    validation = validate_startup_form(
+        email=email,
+        age=age,
+        gender=gender,
+        format_value=format_value,
+        data_usage_consent=data_usage_consent,
+        is_diabetic=diabetic,
+        diabetic_type=diabetic_type,
+        diabetes_duration=diabetes_duration,
+        location=location,
+        uses_cgm=uses_cgm,
+        cgm_duration=cgm_duration_years,
+        wants_contact=wants_contact,
+        locale=None,
+    )
+    if not validation.form_complete:
+        return no_update, no_update
+
+    if age and gender and diabetic is not None and location and format_value:
         from datetime import datetime
         from sugar_sugar.consent import ensure_consent_agreement_row, get_next_study_number
 
+        has_data_consent = bool(data_usage_consent and "agree" in data_usage_consent)
         info: Dict[str, Any] = dict(existing_user_info or {})
         study_id = info.get('study_id') or str(uuid.uuid4())
         run_id = str(uuid.uuid4())

@@ -3,7 +3,7 @@
 
 document.addEventListener('DOMContentLoaded', function() {
   // Target specific number inputs by ID
-  const numberInputIds = ['age-input', 'cgm-duration-input'];
+  const numberInputIds = ['age-input', 'cgm-duration-input', 'diabetes-duration-input'];
   
   numberInputIds.forEach(inputId => {
     const input = document.getElementById(inputId);
@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Also handle dynamically created or re-rendered inputs (for Dash updates)
 const observer = new MutationObserver(function() {
-  const numberInputIds = ['age-input', 'cgm-duration-input'];
+  const numberInputIds = ['age-input', 'cgm-duration-input', 'diabetes-duration-input'];
   
   numberInputIds.forEach(inputId => {
     const input = document.getElementById(inputId);
