@@ -159,6 +159,7 @@ ro:
     time_window_label: "Poziția ferestrei de timp:"
     upload_prompt_1: "Trage și plasează sau "
     upload_prompt_2: "încarcă datele aici"
+    upload_button: "Încarcă"
     use_example_data: "Folosește date exemplu"
     upload_required: "Este necesară încărcarea"
     upload_success: "Datele din %{filename} au fost încărcate cu succes. Aceste date vor fi folosite pentru predicții."
@@ -187,6 +188,7 @@ ro:
   prediction:
     units_label: "Unități:"
     upload_required_alert: "Acest format necesită propriile date CGM. Te rugăm să încarci un fișier CSV pentru a începe."
+    upload_only_gate: "Ai ales să joci doar cu propriile date. Pentru a începe, apasă butonul Încarcă și selectează fișierul tău."
     upload_consent_recorded: "Consimțământ înregistrat. Acum poți încărca și folosi datele CGM în această sesiune."
     no_upload_back_to_final: "Nu ai date CGM de încărcat? Vezi rezultatele din rundele anterioare"
 

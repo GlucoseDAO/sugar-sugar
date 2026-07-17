@@ -98,6 +98,14 @@ class Shot:
     # Grow the viewport height to the page scrollHeight before capturing.
     # Disable for viewport-sized pages (consent reader, chart).
     grow_height: bool = True
+    # Landscape /prediction only: pin the LAYOUT viewport to each of these fixed
+    # widths and emit one PNG per width. The app serves a responsive
+    # `width=device-width` meta (correct for real devices), so to inspect the
+    # immersive landscape chart at a representative desktop-ish width we drive the
+    # CDP device metrics to a fixed width instead of the phone's ~800px. 1280
+    # reproduces the historically-correct scale; 1920 shows how it scales wider.
+    # Empty tuple -> use the device's own rotated landscape size.
+    landscape_widths: tuple[int, ...] = ()
 
 
 @dataclass
@@ -184,9 +192,14 @@ def _server_groups(port: int, *, locale: str) -> list[ServerGroup]:
             # --no-debug/--no-reloader keeps the harness independent of
             # Werkzeug's debug fork while chart-mode env is still seeded by the
             # chart entry point before app import.
+            # --format C ("mixed"): the prediction page shows the relocated Upload
+            # button (left of Submit) that formats B/C use -- so the default
+            # prediction shots now exercise that control.
             cmd=base + [
                 "chart",
                 "--prefill",
+                "--format",
+                "C",
                 "--no-debug",
                 "--no-reloader",
                 "--locale",
@@ -197,15 +210,58 @@ def _server_groups(port: int, *, locale: str) -> list[ServerGroup]:
             shots=[
                 # Capture both closed and open How-to-play states in portrait
                 # and landscape; the same Shot with landscape=True writes both
-                # orientation PNGs.
-                Shot("prediction", "/prediction", landscape=True, settle_s=3.0),
+                # orientation PNGs. Landscape is pinned to 1280 (primary, matches
+                # the historically-correct scale) and 1920 (wide, to see scaling).
+                Shot("prediction", "/prediction", landscape=True, settle_s=3.0, landscape_widths=(1280, 1920)),
                 Shot(
                     "prediction-help-open",
                     "/prediction",
                     landscape=True,
                     settle_s=3.0,
                     clicks=("header-how-to-play-toggle",),
+                    landscape_widths=(1280, 1920),
                 ),
+            ],
+        ),
+        ServerGroup(
+            name="chart-a",
+            # --format A ("generic"): no upload button -- the action strip keeps the
+            # original Fullscreen(2x) + Submit/Finish layout. Captured so that
+            # layout is validated to stay unchanged by the B/C button rework.
+            cmd=base + [
+                "chart",
+                "--prefill",
+                "--format",
+                "A",
+                "--no-debug",
+                "--no-reloader",
+                "--locale",
+                locale,
+                "--port",
+                str(port),
+            ],
+            shots=[
+                Shot("prediction-a", "/prediction", landscape=True, settle_s=3.0, landscape_widths=(1280, 1920)),
+            ],
+        ),
+        ServerGroup(
+            name="chart-b",
+            # --format B ("my data only"): no data is loaded until the user uploads,
+            # so /prediction renders the upload gate (message + Upload button) in
+            # place of the chart. No --prefill (nothing to fill without a dataset).
+            cmd=base + [
+                "chart",
+                "--format",
+                "B",
+                "--no-debug",
+                "--no-reloader",
+                "--locale",
+                locale,
+                "--port",
+                str(port),
+            ],
+            shots=[
+                Shot("prediction-b", "/prediction", landscape=True, settle_s=3.0, landscape_widths=(1280, 1920)),
             ],
         ),
     ]
@@ -270,47 +326,46 @@ async def _capture(
     out_dir: Path,
     landscape: bool,
     locale: str,
+    landscape_layout_width: Optional[int] = None,
+    suffix: str = "portrait",
 ) -> Path:
     """Emulate the device, navigate, and write a full-page PNG."""
-    if landscape:
+    if landscape and landscape_layout_width:
+        # Pin the LAYOUT viewport to a fixed width (e.g. 1280 / 1920). The height
+        # keeps the phone's rotated aspect so the immersive 100dvh chart still
+        # reads as a landscape phone. scale=1 keeps the output width == layout
+        # width (no 2x blow-up at these already-wide sizes).
+        w = landscape_layout_width
+        h = max(1, round(landscape_layout_width * device.width / device.height))
+        scale = 1
+    elif landscape:
         w, h = device.height, device.width
-        suffix = "landscape"
+        scale = device.scale
     else:
         w, h = device.width, device.height
-        suffix = "portrait"
+        scale = device.scale
 
     await tab.send_command(
         "Emulation.setTouchEmulationEnabled", {"enabled": True, "maxTouchPoints": 5}
     )
     await tab.send_command("Emulation.setUserAgentOverride", {"userAgent": _IPHONE_UA})
 
-    # NOTE: mobile=False.  With mobile emulation ON, Chromium honours the page's
-    # <meta viewport> and -- crucially -- expands the layout viewport to fit any
-    # transiently-overflowing content, zooming the page out to ~1280 and making
-    # captures flaky/non-mobile.  With mobile=False the metrics width IS the
-    # layout viewport (deterministic device-width), which is exactly the
-    # mobile-first rendering we want to inspect.  We still send a phone
-    # User-Agent (so the server returns the mobile builders) and enable touch
-    # (so `pointer: coarse` media queries match).
-    # /prediction is intentionally a wide (1280) layout on mobile (the user
-    # rotates to landscape to draw); emulate it like a real phone (mobile=True
-    # honours the page's <meta viewport> -> 1280, scaled to the device) so the
-    # capture matches reality.  Every other page is mobile-first device-width,
-    # for which mobile=False gives a deterministic, non-zoomed capture.
-    # NOTE on the landscape chart: device-width must stay <=1024 so the
-    # immersive landscape CSS (gated on `max-device-width: 1024px`) applies;
-    # mobile=True keeps screenWidth=740 while the <meta> forces the LAYOUT
-    # viewport to 1280.  The catch is that the meta switch happens client-side
-    # AFTER first paint, and under a CDP override Chromium does not re-fit the
-    # page scale, so the capture shows the unscaled top-left slice and crops the
-    # chart's bottom.  We fix that below by re-applying the metrics once the
-    # meta has switched (see `_refit_chart_landscape`).
+    # NOTE: mobile=False everywhere.  The app now serves a responsive
+    # `width=device-width` viewport meta on EVERY route (including /prediction --
+    # it no longer force-switches to width=1280).  With mobile=False the CDP
+    # metrics width IS the layout viewport (deterministic), so pinning width to
+    # 360/740/1280/1920 renders the page at exactly that CSS width -- which is
+    # precisely how we want to inspect the responsive layout.  With mobile=True
+    # Chromium would instead honour the meta and expand/zoom to fit overflowing
+    # content, which made landscape /prediction captures flaky.  We still send a
+    # phone User-Agent (so the server returns the mobile builders) and enable
+    # touch (so `pointer: coarse` / immersive-landscape media queries match).
     is_chart = shot.path == "/prediction"
     metrics = {
         "width": w,
         "height": h,
-        "deviceScaleFactor": device.scale,
-        "mobile": is_chart and landscape,
+        "deviceScaleFactor": scale,
+        "mobile": False,
         "screenWidth": w,
         "screenHeight": h,
     }
@@ -351,22 +406,9 @@ async def _capture(
         )
         await asyncio.sleep(0.4)
 
-    # Landscape chart only: the /prediction page swaps its <meta viewport> to
-    # width=1280 client-side AFTER first paint.  Under a CDP metrics override
-    # Chromium does not re-fit the page scale on that swap, so it renders the
-    # unscaled top-left 740px slice of the 1280 layout and crops the chart.
-    # Clearing + re-applying the override forces a full re-emulation that
-    # re-reads the (now 1280) meta and scales the whole layout into the device
-    # viewport -- exactly what a real phone shows.
-    if is_chart and landscape:
-        await tab.send_command("Emulation.clearDeviceMetricsOverride")
-        await asyncio.sleep(0.15)
-        await tab.send_command("Emulation.setDeviceMetricsOverride", metrics)
-        await asyncio.sleep(0.5)
-
     # Plotly only re-fits its SVG on a window `resize` event, not on a
     # CSS-driven container resize (the clientside route-prediction class +
-    # 1280 viewport switch reshape the chart container after Plotly's first
+    # immersive-landscape CSS reshape the chart container after Plotly's first
     # render).  A bare window-resize event races the layout, so also call
     # Plotly.Plots.resize() on every plot directly -- without this the
     # landscape chart keeps its initial, oversized height and the x-axis +
@@ -437,8 +479,17 @@ async def _run_group(
         await tab.send_command("Page.enable")
         await tab.send_command("Runtime.enable")
         for shot in group.shots:
-            orientations = [False] + ([True] if shot.landscape else [])
-            for landscape in orientations:
+            # (suffix, is_landscape, pinned_layout_width). Portrait always; then
+            # one landscape capture per pinned width (first width keeps the plain
+            # "landscape" suffix; extras get "-{width}").
+            specs: list[tuple[str, bool, Optional[int]]] = [("portrait", False, None)]
+            if shot.landscape:
+                if shot.landscape_widths:
+                    for i, lw in enumerate(shot.landscape_widths):
+                        specs.append(("landscape" if i == 0 else f"landscape-{lw}", True, lw))
+                else:
+                    specs.append(("landscape", True, None))
+            for suffix, is_landscape, layout_width in specs:
                 try:
                     p = await _capture(
                         tab,
@@ -446,13 +497,15 @@ async def _run_group(
                         shot=shot,
                         device=device,
                         out_dir=out_dir,
-                        landscape=landscape,
+                        landscape=is_landscape,
                         locale=locale,
+                        landscape_layout_width=layout_width,
+                        suffix=suffix,
                     )
                     written.append(p)
                     typer.echo(f"  ✓ {p.name}")
                 except Exception as exc:  # keep going; one bad page shouldn't abort
-                    typer.echo(f"  ✗ {shot.label} ({'landscape' if landscape else 'portrait'}): {exc}")
+                    typer.echo(f"  ✗ {shot.label} ({suffix}): {exc}")
     return written
 
 

@@ -90,7 +90,7 @@ from sugar_sugar.components.landing import LandingPage, LandingPageMobile
 from sugar_sugar.components.consent_form import ConsentFormPage
 from sugar_sugar.components.submit import SubmitComponent
 from sugar_sugar.encouragement import pick_bracket
-from sugar_sugar.components.header import HeaderComponent
+from sugar_sugar.components.header import HeaderComponent, make_csv_upload
 from sugar_sugar.components.ending import EndingPage
 from sugar_sugar.components.navbar import NavBar, MobileNavBar
 from sugar_sugar.components.share import (
@@ -340,7 +340,8 @@ def resolve_dataset_identity(
             return _dataset_path_for(False, uploaded)
         if fmt == "C":
             # Mirror handle_next_round_button: even round -> example, odd -> uploaded.
-            return _dataset_path_for(round_number % 2 == 0, uploaded)
+            # Before any upload, C is playable on generic data (falls back below).
+            return _dataset_path_for(round_number % 2 == 0 or not uploaded, uploaded)
         return EXAMPLE_DATASET_PATH  # format A
     return _dataset_path_for(bool(info.get("is_example_data", True)), uploaded)
 
@@ -1337,6 +1338,11 @@ _chart_source = os.environ.get("_CHART_SOURCE", "example.csv")
 _chart_is_example = _chart_file_env is None
 _chart_unit = os.environ.get("_CHART_UNIT", "mg/dL")
 _chart_locale = os.environ.get("_CHART_LOCALE", "en")
+# Data-source format for chart mode (A=generic, B=own only, C=mixed). Lets the
+# screenshot harness render the B upload-gate and the C prediction page.
+_chart_format = os.environ.get("_CHART_FORMAT", "A")
+if _chart_format not in ("A", "B", "C"):
+    _chart_format = "A"
 
 if _is_chart_mode:
     _chart_user_info: Optional[Dict[str, Any]] = {
@@ -1346,9 +1352,11 @@ if _is_chart_mode:
         "gender": "F",
         "uses_cgm": True,
         "cgm_duration_years": 1,
-        "format": "A",
-        "run_format": "A",
-        "consent_use_uploaded_data": False,
+        "format": _chart_format,
+        "run_format": _chart_format,
+        # B/C in the real flow always reach /prediction already data-consented
+        # (update_form_validation gates Start on it), so mirror that here.
+        "consent_use_uploaded_data": _chart_format in ("B", "C"),
         "diabetic": True,
         "diabetic_type": "Type 1",
         "diabetes_duration": 5,
@@ -1358,7 +1366,8 @@ if _is_chart_mode:
         "current_round_number": 1,
         "statistics_saved": False,
         "is_example_data": _chart_is_example,
-        "data_source_name": _chart_source,
+        # Format B starts with no data (upload gate); keep Source empty until upload.
+        "data_source_name": "" if _chart_format == "B" else _chart_source,
         "consent_play_only": True,
         "consent_participate_in_study": False,
         "consent_receive_results_later": False,
@@ -1397,7 +1406,7 @@ app.layout = html.Div([
     # whole-dataset round-trip (lag) and the localStorage-quota risk.
     dcc.Store(id='events-df', data=example_events_df_store, storage_type=STORAGE_TYPE),
     dcc.Store(id='is-example-data', data=_chart_is_example, storage_type=STORAGE_TYPE),
-    dcc.Store(id='data-source-name', data=_chart_source if _is_chart_mode else "example.csv", storage_type=STORAGE_TYPE),
+    dcc.Store(id='data-source-name', data=("" if _chart_format == "B" else _chart_source) if _is_chart_mode else "example.csv", storage_type=STORAGE_TYPE),
     dcc.Store(id='randomization-initialized', data=_is_chart_mode, storage_type=STORAGE_TYPE),
     dcc.Store(id='glucose-chart-mode', data={'hide_last_hour': True}, storage_type='memory'),
     dcc.Store(id='glucose-unit', data=_chart_unit if _is_chart_mode else 'mg/dL', storage_type=STORAGE_TYPE),
@@ -1796,11 +1805,11 @@ app.clientside_callback(
     [State('url', 'pathname')],
     prevent_initial_call=False,
 )
-def update_fullscreen_button_text(interface_language: Optional[str], pathname: Optional[str]) -> str:
-    """Keep the 'Go fullscreen' button translated as the language changes."""
+def update_fullscreen_button_text(interface_language: Optional[str], pathname: Optional[str]) -> Any:
+    """Keep the 'Go fullscreen' button (expand icon + label) translated."""
     if pathname != '/prediction':
         raise PreventUpdate
-    return t("ui.orientation.go_fullscreen", locale=normalize_locale(interface_language))
+    return _fullscreen_button_children(normalize_locale(interface_language))
 
 
 @app.callback(
@@ -2088,10 +2097,7 @@ def update_prediction_text_on_language_change(
         ],
         t("ui.header.description_1", locale=locale),
         "Source:" if locale == "en" else t("ui.header.current_data_source", locale=locale),
-        [
-            t("ui.header.upload_prompt_1", locale=locale),
-            html.A(t("ui.header.upload_prompt_2", locale=locale)),
-        ],
+        t("ui.header.upload_button", locale=locale),
         t("ui.header.use_example_data", locale=locale),
         t("ui.header.time_window_label", locale=locale),
         t("ui.prediction.units_label", locale=locale),
@@ -2761,24 +2767,40 @@ def create_demo_page(*, locale: str) -> html.Div:
     )
 
 
+def _fullscreen_button_children(locale: str) -> list[Any]:
+    """Fullscreen button content: FontAwesome four-corners expand icon + label."""
+    return [
+        html.I(className="fas fa-expand", style={"marginRight": "8px"}),
+        t("ui.orientation.go_fullscreen", locale=locale),
+    ]
+
+
 def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[str, Any]) -> html.Div:
     """Create the prediction page layout"""
     show_upload = format_value in ("B", "C")
+    uploaded = bool(user_info.get("uploaded_data_path"))
+    # Format B is gated on the upload until a file arrives.
+    b_gated = (format_value == "B") and not uploaded
     consent_given = bool(user_info.get("consent_use_uploaded_data", False))
     consent_value = ['agree'] if consent_given else []
     data_source_name = str(user_info.get("data_source_name") or "")
     if data_source_name:
         data_source_display = data_source_name
-    elif format_value in ("B", "C"):
-        data_source_display = t("ui.header.upload_required", locale=locale)
+    elif format_value == "B":
+        # "My data only": keep the Source blank until the user uploads their file.
+        data_source_display = ""
     else:
+        # A / C start on the generic example.
         data_source_display = "example.csv"
     return html.Div([
         HeaderComponent(
             show_time_slider=False,
-            show_upload_section=show_upload,
+            # The CSV upload now lives in the always-visible action strip (so it is
+            # reachable in landscape for B/C); the header no longer renders it.
+            show_upload_section=False,
             show_example_button=(format_value == "A"),
             show_data_source_section=False,
+            render_csv_upload=(format_value == "A"),
             initial_slider_value=example_initial_slider_value,
             locale=locale,
             data_source_name=data_source_display,
@@ -2813,7 +2835,11 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
                 'borderRadius': '10px',
                 'boxShadow': '0 2px 4px rgba(0,0,0,0.06)',
                 'border': '1px solid #e5e7eb',
-                'display': 'block' if show_upload else 'none',
+                # Consent is mandatory at startup for B/C, so it is normally already
+                # recorded here -- only surface this in-page consent fallback when it
+                # is somehow missing. Kept in the DOM (display:none) so
+                # handle_file_upload's Input('prediction-data-usage-consent') stays wired.
+                'display': 'block' if (show_upload and not consent_given) else 'none',
             },
         ),
         html.Div(id="upload-required-alert", style={'margin': '0 auto', 'maxWidth': '900px'}),
@@ -2857,7 +2883,18 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
         html.Div([
             html.Div(
                 GlucoseChart(id='glucose-graph', hide_last_hour=True),
-                id='prediction-glucose-chart-container'
+                id='prediction-glucose-chart-container',
+                style={'display': 'none'} if b_gated else None,
+            ),
+            # Format B upload gate: shown in place of the chart until the user
+            # uploads their file. The Upload button itself lives in the action strip
+            # below (reachable in both portrait and landscape).
+            html.Div(
+                t("ui.prediction.upload_only_gate", locale=locale),
+                id="prediction-upload-gate",
+                className="prediction-upload-gate",
+                disable_n_clicks=True,
+                style={'display': 'block'} if b_gated else {'display': 'none'},
             ),
             html.Div(
                 [
@@ -2881,14 +2918,25 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
             html.Div(
                 [
                     html.Button(
-                        t("ui.orientation.go_fullscreen", locale=locale),
+                        _fullscreen_button_children(locale),
                         id="prediction-fullscreen-button",
                         className="prediction-fullscreen-button",
                         type="button",
                     ),
+                    # B/C only: relocated CSV upload, styled as a button. It is a
+                    # DIRECT child of the action strip (not nested in SubmitComponent)
+                    # so CSS can lay Fullscreen/Upload/Submit/Finish out as uniformly
+                    # sized siblings -- `display:contents` on #prediction-actions (see
+                    # .has-upload rules in mobile.css) promotes Submit/Finish up to
+                    # this container. Kept out of the header so it stays reachable in
+                    # immersive landscape (where the header is hidden).
+                    make_csv_upload(
+                        locale, style={}, className="prediction-upload-button"
+                    ) if show_upload else None,
                     SubmitComponent(locale=locale),
                 ],
                 id="prediction-mobile-actions",
+                className="has-upload" if show_upload else "",
             ),
         ], id='prediction-chart-submit-wrap', style={'flex': '1'})
     ], style={
@@ -3011,7 +3059,9 @@ def show_upload_required_alert(
     if pathname != "/prediction":
         return None
     fmt = str((user_info or {}).get("format") or "A")
-    if fmt not in ("B", "C"):
+    # Format B has its own dedicated upload gate (prediction-upload-gate); format C
+    # is always playable on generic data. So this legacy alert no longer applies.
+    if fmt != "C":
         return None
     if current_df_data:
         return None
@@ -3035,6 +3085,78 @@ def show_upload_required_alert(
             ),
         ]
     return dbc.Alert(children, color="info", style={"marginBottom": "10px"})
+
+
+@app.callback(
+    [Output('prediction-glucose-chart-container', 'style', allow_duplicate=True),
+     Output('prediction-upload-gate', 'style'),
+     Output('prediction-upload-gate', 'children'),
+     Output('prediction-chart-submit-wrap', 'className')],
+    [Input('url', 'pathname'),
+     Input('user-info-store', 'data'),
+     Input('interface-language', 'data')],
+    prevent_initial_call='initial_duplicate',
+)
+def toggle_upload_gate(
+    pathname: Optional[str],
+    user_info: Optional[Dict[str, Any]],
+    interface_language: Optional[str],
+) -> Tuple[Dict[str, str], Dict[str, str], Any, str]:
+    """Show the format-B upload gate (and hide the chart) until a file is uploaded.
+
+    Runs on load as well as navigation so it also catches direct loads / resumes
+    onto /prediction, where the persisted example window would otherwise leak a
+    playable generic chart into a "my data only" session. Keyed on user_info (not
+    the window store) so it never clobbers a just-uploaded window and never loops.
+
+    The ``b-gated`` class on the chart/submit wrapper lets CSS force-hide the
+    Source plaque (whose time/metadata reflect the stale example seed) even in
+    immersive landscape, where the plaque style is otherwise re-shown with
+    ``!important`` and would beat an inline ``display:none``.
+    """
+    if pathname != '/prediction':
+        raise PreventUpdate
+    fmt = str((user_info or {}).get("format") or "A")
+    uploaded = bool((user_info or {}).get("uploaded_data_path"))
+    locale = normalize_locale(interface_language)
+    if fmt == "B" and not uploaded:
+        return (
+            {'display': 'none'},
+            {'display': 'block'},
+            t("ui.prediction.upload_only_gate", locale=locale),
+            'b-gated',
+        )
+    return (
+        {'display': 'block'},
+        {'display': 'none'},
+        no_update,
+        '',
+    )
+
+
+@app.callback(
+    Output('startup-step', 'data', allow_duplicate=True),
+    Input('url', 'pathname'),
+    State('startup-step', 'data'),
+    prevent_initial_call=True,
+)
+def reset_startup_wizard_step(pathname: Optional[str], current_step: Optional[int]) -> Any:
+    """Reset the mobile startup wizard to step 0 whenever /startup is (re)entered.
+
+    `startup-step` is a memory store that survives client-side (SPA) navigation --
+    it is only reset by a full browser reload, and nothing else resets it on
+    arrival. So after leaving mid-wizard and returning (resume "Continue",
+    tab-switch, or a play-again reset that routes through /), the store kept a
+    stale index while the layout re-baked step 0 visible; the next Back/Next then
+    jumped several steps in (surfaced as "resumed at Step 5 of 6"). Snapping it
+    back to 0 on entry keeps the store in sync with the freshly rendered layout.
+    """
+    if pathname != '/startup':
+        raise PreventUpdate
+    if int(current_step or 0) == 0:
+        raise PreventUpdate
+    return 0
+
 
 def _compute_round_mae(prediction_table_data: list[dict[str, str]]) -> Optional[float]:
     """Extract MAE from raw prediction table data (always in mg/dL)."""
@@ -4380,7 +4502,9 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
             'current_round_number': int(info.get('current_round_number') or 1),
             'statistics_saved': bool(info.get('statistics_saved') or False),
             'is_example_data': bool(info.get('is_example_data', True)),
-            'data_source_name': str(info.get('data_source_name', 'example.csv')),
+            # Format B ("my data only") has no data until the user uploads, so keep
+            # the Source blank; A and C start on the generic example.
+            'data_source_name': "" if format_value == "B" else str(info.get('data_source_name', 'example.csv')),
         })
 
         # Ensure stable "number" across consent + stats + ranking CSVs.
@@ -4677,11 +4801,11 @@ def handle_next_round_button(
             is_example = False
             source_name = str(user_info.get("uploaded_data_filename") or user_info.get("data_source_name") or "uploaded.csv")
         else:
-            # Format C: alternate between uploaded (odd rounds) and example (even rounds)
+            # Format C ("mixed"): interleave uploaded (odd rounds) and example (even
+            # rounds). Always playable -- before the user uploads, the "own data"
+            # rounds fall back to generic so the game never blocks.
             uploaded_path = user_info.get("uploaded_data_path")
-            if not uploaded_path:
-                return '/prediction', user_info, {'hide_last_hour': True}, no_update, no_update, False, "", False, 0
-            use_example = (next_round_number % 2 == 0)
+            use_example = (next_round_number % 2 == 0) or not uploaded_path
             if use_example:
                 full_df, events_df = load_glucose_data()
                 is_example = True
@@ -5882,10 +6006,13 @@ def initialize_data_on_url_change(
     if pathname != '/prediction':
         return _no_change
 
-    # For format B/C: require upload, don't auto-load example dataset.
+    # Format B ("my data only"): require an upload before anything loads -- never
+    # auto-load the generic example. Format C ("mixed") is playable immediately on
+    # generic data and switches to the user's data once they upload, so it falls
+    # through to the example-loading path below.
     fmt = str((user_info or {}).get("format") or "A")
     uploaded_path = (user_info or {}).get("uploaded_data_path")
-    if fmt in ("B", "C") and not uploaded_path:
+    if fmt == "B" and not uploaded_path:
         return None, None, False, "", False, 0
 
     # Window already present — preserve (handles resume and round transitions).
@@ -6245,14 +6372,27 @@ def handle_example_data_button(example_button_clicks: Optional[int]) -> Tuple[in
     [Output('last-click-time', 'data', allow_duplicate=True),
      Output('current-window-df', 'data', allow_duplicate=True)],
     [Input('time-slider', 'value')],
-    [State('user-info-store', 'data')],
+    [State('user-info-store', 'data'),
+     State('current-window-df', 'data')],
     prevent_initial_call=True
 )
 def handle_time_slider(
     slider_value: Optional[int],
     user_info: Optional[Dict[str, Any]],
+    current_df_data: Optional[Dict[str, List[Any]]],
 ) -> Tuple[int, Dict[str, List[Any]]]:
-    """Handle time slider changes (slices the window server-side from the dataset)."""
+    """Handle time slider changes (slices the window server-side from the dataset).
+
+    The re-slice comes from ``load_dataset`` which zeroes the ``prediction`` column
+    (datasets are immutable; predictions live only in the window). The slider is
+    ``persistence=True`` and always mounted, so it re-fires on every layout rebuild
+    (page nav, resume, language change) with its persisted value -- which re-slices
+    the SAME window and would overwrite ``current-window-df``, wiping any
+    predictions already there (a resumed in-progress round, or the ``--prefill``
+    seed). Guard: if the freshly-sliced window covers the same timestamps as the
+    current one, no-op so those predictions survive. A genuine move to a different
+    window still returns a fresh (legitimately zeroed) window.
+    """
     if slider_value is None or not user_info:
         return no_update, no_update
 
@@ -6268,8 +6408,14 @@ def handle_time_slider(
         safe_slider_value = max(0, safe_slider_value)
 
         new_df = full_df.slice(safe_slider_value, points)
+        new_dict = convert_df_to_dict(new_df)
 
-        return current_time, convert_df_to_dict(new_df)
+        # Same window as already displayed (slider mount / persistence re-fire) ->
+        # preserve the current window (and its predictions) instead of clobbering.
+        if current_df_data and current_df_data.get('time') == new_dict.get('time'):
+            return no_update, no_update
+
+        return current_time, new_dict
 
 # Separate callback for glucose graph interactions (only active on prediction page)
 @app.callback(
@@ -6448,8 +6594,10 @@ def update_data_source_display(
     if source_name:
         return source_name
     fmt = str((user_info or {}).get("format") or "A")
-    if fmt in ("B", "C"):
-        return t("ui.header.upload_required", locale=normalize_locale(interface_language))
+    # Format B: keep the Source blank until the user uploads their file.
+    if fmt == "B":
+        return ""
+    # Format C plays generic until an upload arrives.
     return "example.csv"
 
 
@@ -6821,6 +6969,9 @@ def _seed_chart_env_from_argv(argv: list[str], env: Dict[str, str]) -> None:
     env["_CHART_UNIT"] = unit_arg if unit_arg in ("mg/dL", "mmol/L") else "mg/dL"
     env["_CHART_LOCALE"] = normalize_locale(_arg_value(argv, "--locale", "-l") or "en")
 
+    format_arg = _arg_value(argv, "--format")
+    env["_CHART_FORMAT"] = format_arg if format_arg in ("A", "B", "C") else "A"
+
     if _arg_present(argv, "--prefill"):
         env["_CHART_PREFILL"] = "1"
         env["_CHART_NOISE"] = _arg_value(argv, "--noise") or "0.05"
@@ -6889,6 +7040,7 @@ def chart(
     start: Optional[int] = typer.Option(None, "--start", "-s", help="Start index for the data window (default: random)"),
     unit: str = typer.Option("mg/dL", "--unit", "-u", help="Glucose unit: mg/dL or mmol/L"),
     locale: str = typer.Option("en", "--locale", "-l", help="UI locale (en, de, uk, ro)"),
+    format: str = typer.Option("A", "--format", help="Data-source format: A=generic, B=my data only (upload gate), C=mixed"),
     prefill: bool = typer.Option(False, "--prefill", help="Pre-fill predictions with noisy ground truth so submit/ending can be tested immediately"),
     noise: float = typer.Option(0.05, "--noise", help="Noise level for --prefill (fraction of gl value, e.g. 0.05 = +/-5%%)"),
     clean: bool = typer.Option(False, "--clean", help="Clear browser localStorage on first connect so the session starts fresh"),
@@ -6917,6 +7069,7 @@ def chart(
         os.environ["_CHART_START"] = str(start)
     os.environ["_CHART_UNIT"] = unit if unit in ("mg/dL", "mmol/L") else "mg/dL"
     os.environ["_CHART_LOCALE"] = normalize_locale(locale)
+    os.environ["_CHART_FORMAT"] = format if format in ("A", "B", "C") else "A"
     os.environ["_CHART_SOURCE"] = file.name if file else "example.csv"
     if prefill:
         os.environ["_CHART_PREFILL"] = "1"
