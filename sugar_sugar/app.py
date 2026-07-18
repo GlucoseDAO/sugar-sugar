@@ -55,7 +55,7 @@ _configure_eliot_logging()
 from sugar_sugar.i18n import setup_i18n, normalize_locale, t, t_list, t_raw
 setup_i18n()
 
-from sugar_sugar.data import load_glucose_data, load_glucose_data_from_nightscout
+from sugar_sugar.data import load_glucose_data, load_glucose_data_from_nightscout, decode_upload_bytes
 from sugar_sugar.config import (
     DEFAULT_POINTS,
     MIN_POINTS,
@@ -1429,6 +1429,10 @@ app.layout = html.Div([
     # every reconnecting browser to do a full reload and pick up the new JS.
     dcc.Store(id='_build', data=DEPLOY_BUILD),
     dcc.Store(id='consent-scroll-request', data=0),
+    # Client-compressed upload payloads (a clientside callback gzips dcc.Upload
+    # contents into these so large CGM files survive the mobile upload path).
+    dcc.Store(id='upload-data-payload', storage_type='memory'),
+    dcc.Store(id='startup-upload-payload', storage_type='memory'),
     dcc.Store(id='current-window-df', data=example_initial_df_store, storage_type=STORAGE_TYPE),
     # NOTE: there is intentionally no 'full-df' client store. The full dataset is
     # never shipped to the browser -- it is loaded server-side on demand from its
@@ -6072,6 +6076,53 @@ def initialize_data_on_url_change(
         random_start,
     )
 
+# Client-side upload compression. dcc.Upload hands us the file as a base64 data
+# URL; we gzip it in the browser (CompressionStream, Safari 16.4+/Chrome/Firefox)
+# and hand a "gzip:<base64>" string to the server store instead. A ~2.4 MB CSV
+# shrinks to ~300-400 KB, well under whatever ceiling the mobile browser hits.
+# Any failure (no CompressionStream, exception) returns the original contents so
+# the server's data-URL path still works -- desktop behaviour is unchanged.
+_UPLOAD_COMPRESS_JS = """
+async function(contents, filename) {
+    if (!contents) { return window.dash_clientside.no_update; }
+    try {
+        if (typeof CompressionStream === 'undefined') { return contents; }
+        var comma = contents.indexOf(',');
+        if (comma < 0) { return contents; }
+        var b64 = contents.slice(comma + 1);
+        var raw = Uint8Array.from(atob(b64), function(c){ return c.charCodeAt(0); });
+        var cs = new CompressionStream('gzip');
+        var buf = await new Response(new Blob([raw]).stream().pipeThrough(cs)).arrayBuffer();
+        var comp = new Uint8Array(buf);
+        var bin = '';
+        var CH = 0x8000;
+        for (var i = 0; i < comp.length; i += CH) {
+            bin += String.fromCharCode.apply(null, comp.subarray(i, i + CH));
+        }
+        return 'gzip:' + btoa(bin);
+    } catch (e) {
+        return contents;
+    }
+}
+"""
+
+app.clientside_callback(
+    _UPLOAD_COMPRESS_JS,
+    Output('upload-data-payload', 'data'),
+    Input('upload-data', 'contents'),
+    State('upload-data', 'filename'),
+    prevent_initial_call=True,
+)
+
+app.clientside_callback(
+    _UPLOAD_COMPRESS_JS,
+    Output('startup-upload-payload', 'data'),
+    Input('startup-upload-data', 'contents'),
+    State('startup-upload-data', 'filename'),
+    prevent_initial_call=True,
+)
+
+
 # Separate callback for file upload handling
 @app.callback(
     [Output('last-click-time', 'data'),
@@ -6083,7 +6134,7 @@ def initialize_data_on_url_change(
      Output('initial-slider-value', 'data', allow_duplicate=True),
      Output('user-info-store', 'data', allow_duplicate=True),
      Output('consent-scroll-request', 'data')],
-    [Input('upload-data', 'contents'),
+    [Input('upload-data-payload', 'data'),
      Input('prediction-data-usage-consent', 'value')],
     [State('upload-data', 'filename'),
      State('user-info-store', 'data')],
@@ -6097,7 +6148,7 @@ def handle_file_upload(
 ) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int, Dict[str, Any], int]:
     """Handle file upload and data loading"""
     triggered = ctx.triggered_id
-    if triggered not in ("upload-data", "prediction-data-usage-consent"):
+    if triggered not in ("upload-data-payload", "prediction-data-usage-consent"):
         raise PreventUpdate
 
     info_pre: Dict[str, Any] = dict(user_info or {})
@@ -6185,8 +6236,9 @@ def handle_file_upload(
                 no_update,
             )
         
-        # Parse upload contents
-        if ',' not in upload_contents:
+        # Parse upload contents (gzip-compressed by the client, or a raw data URL)
+        decoded = decode_upload_bytes(upload_contents)
+        if decoded is None:
             print(f"ERROR: Invalid upload format for file {filename}")
             return (
                 current_time,
@@ -6199,10 +6251,7 @@ def handle_file_upload(
                 dict(user_info or {}),
                 no_update,
             )
-        
-        content_type, content_string = upload_contents.split(',', 1)
-        decoded = base64.b64decode(content_string)
-        
+
         # Ensure user data directory exists under data/input/users
         users_data_dir = project_root / 'data' / 'input' / 'users'
         users_data_dir.mkdir(parents=True, exist_ok=True)

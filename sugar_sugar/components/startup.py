@@ -757,7 +757,7 @@ class StartupPage(html.Div):
         @app.callback(
             [Output('user-info-store', 'data', allow_duplicate=True),
              Output('startup-import-status', 'children', allow_duplicate=True)],
-            [Input('startup-upload-data', 'contents')],
+            [Input('startup-upload-payload', 'data')],
             [State('startup-upload-data', 'filename'),
              State('user-info-store', 'data'),
              State('format-dropdown', 'value'),
@@ -773,24 +773,22 @@ class StartupPage(html.Div):
             consent_value: Optional[list[str]],
             interface_language: Optional[str],
         ) -> tuple[Any, Any]:
-            import base64
             from datetime import datetime
             from pathlib import Path
             from sugar_sugar.i18n import normalize_locale
-            from sugar_sugar.data import load_glucose_data
+            from sugar_sugar.data import load_glucose_data, decode_upload_bytes
 
             if not contents:
                 raise dash.exceptions.PreventUpdate
             locale = normalize_locale(interface_language)
             if not _consent_ok(format_value, consent_value):
                 return no_update, _import_status_msg(t("ui.startup.import_needs_consent", locale=locale), ok=False)
-            if ',' not in contents:
+            decoded = decode_upload_bytes(contents)
+            if decoded is None:
                 return no_update, _import_status_msg(t("ui.startup.import_bad_file", locale=locale), ok=False)
 
             # Parse/save is fully guarded: a malformed file must never 500 the app.
             try:
-                _header, b64 = contents.split(',', 1)
-                decoded = base64.b64decode(b64)
                 users_dir = Path('data/input/users')
                 users_dir.mkdir(parents=True, exist_ok=True)
                 safe = (filename or 'uploaded').replace(' ', '_').replace('/', '_')
