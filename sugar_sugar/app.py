@@ -1351,6 +1351,8 @@ app.layout = html.Div([
     # Current step index for the mobile startup wizard (StartupPageMobile).
     # Memory: wizard position resets per page load, like page-restore-done.
     dcc.Store(id='startup-step', data=0, storage_type='memory'),
+    # Clientside location-autocomplete init ping (see assets/location-autocomplete.js).
+    dcc.Store(id='location-autocomplete-ping', data=0, storage_type='memory'),
 
     html.Div(id='mobile-warning', style={'display': 'none'}),
     html.Div(id='scroll-to-top-trigger', style={'display': 'none'}),

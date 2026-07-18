@@ -525,13 +525,17 @@ class StartupPage(html.Div):
                         html.Label(t("ui.startup.location_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a', 'display': 'inline-block'}),
                         html.Span(id='location-required', children=' *', style={'color': '#d32f2f', 'fontSize': '22px', 'fontWeight': 'bold'})
                     ], style={'marginBottom': '10px'}),
-                    dcc.Input(
-                        id='location-input',
-                        type='text',
-                        placeholder=t("ui.startup.location_placeholder", locale=locale),
-                        persistence=True,
-                        persistence_type=STORAGE_TYPE,
-                        style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
+                    html.Div(
+                        dcc.Input(
+                            id='location-input',
+                            type='text',
+                            placeholder=t("ui.startup.location_placeholder", locale=locale),
+                            persistence=True,
+                            persistence_type=STORAGE_TYPE,
+                            style={'width': '100%', 'padding': '10px', 'fontSize': '20px'}
+                        ),
+                        className='location-autocomplete-host',
+                        style={'marginBottom': '20px'},
                     ),
                     
                     html.Div(
@@ -1043,6 +1047,20 @@ class StartupPage(html.Div):
 
             return False, "ui blue button", hint_hidden
 
+        app.clientside_callback(
+            """
+            function(pathname) {
+                if (window.sugarSugarLocationAutocomplete && window.sugarSugarLocationAutocomplete.refresh) {
+                    window.sugarSugarLocationAutocomplete.refresh(pathname);
+                }
+                return Date.now();
+            }
+            """,
+            Output('location-autocomplete-ping', 'data'),
+            Input('url', 'pathname'),
+            prevent_initial_call=False,
+        )
+
 
 # ---------------------------------------------------------------------------
 # Mobile startup wizard (StartupPageMobile)
@@ -1188,10 +1206,13 @@ class StartupPageMobile(html.Div):
             ),
             html.Div(style={'height': '12px'}, disable_n_clicks=True),
             _m_label(t("ui.startup.location_label", locale=locale), 'location-required'),
-            dcc.Input(
-                id='location-input', type='text',
-                placeholder=t("ui.startup.location_placeholder", locale=locale),
-                persistence=True, persistence_type=STORAGE_TYPE, style=_M_INPUT,
+            html.Div(
+                dcc.Input(
+                    id='location-input', type='text',
+                    placeholder=t("ui.startup.location_placeholder", locale=locale),
+                    persistence=True, persistence_type=STORAGE_TYPE, style=_M_INPUT,
+                ),
+                className='location-autocomplete-host',
             ),
         ]
 

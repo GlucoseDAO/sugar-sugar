@@ -348,6 +348,12 @@ uv run start --clean   # clears localStorage on every page load
 
 ## Technical architecture
 
+Maintainer deep dives (by page/layer, commands, troubleshooting):
+
+- **[Technical specification](docs/technical-specification.md)** — startup location autocomplete, asset regeneration, session/navigation notes, command cheat sheet
+- **[Mobile version](docs/mobile-version.md)** — mobile-first layout, landscape chart, screenshot harness
+- **[Share operations](docs/share-ops.md)** — share records, OG/Twitter cards, kaleido, staging share routes
+
 ```
 sugar_sugar/
 ├── app.py                  # Main application and routing logic
