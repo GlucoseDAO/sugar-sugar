@@ -176,6 +176,7 @@ de:
     nightscout_consent_required: "Bitte erteile die Einwilligung zur Datennutzung, bevor du Nightscout-Daten lädst."
     current_data_source: "Aktuelle Datenquelle:"
     weight_label: "Gewicht"
+    no_carbs_note: "Dieses Mahlzeitenfenster enthält keine protokollierten Kohlenhydratdaten."
     description_1: "Teste deine Glukose‑Vorhersage!"
     description_2: "Klicke im Chart oder zeichne Linien, um zukünftige Glukosewerte vorherzusagen."
     description_3: "Das Spiel zeigt dir, wie genau deine Vorhersagen im Vergleich zu den Messwerten sind."

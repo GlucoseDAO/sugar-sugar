@@ -1,0 +1,71 @@
+{
+  "holdouts": [
+    "556",
+    "730",
+    "1082"
+  ],
+  "test_extra": [
+    "467",
+    "745",
+    "590",
+    "758"
+  ],
+  "users": [
+    {
+      "user_id": "556",
+      "folder": "data/subjects/loop_556",
+      "role": "quality_holdout_not_in_joined2",
+      "n_rows": 40317,
+      "csv": "data/subjects/loop_556/loop_556_chronological.csv",
+      "info": "data/subjects/loop_556/info.txt"
+    },
+    {
+      "user_id": "730",
+      "folder": "data/subjects/loop_730",
+      "role": "quality_holdout_not_in_joined2",
+      "n_rows": 36851,
+      "csv": "data/subjects/loop_730/loop_730_chronological.csv",
+      "info": "data/subjects/loop_730/info.txt"
+    },
+    {
+      "user_id": "1082",
+      "folder": "data/subjects/loop_1082",
+      "role": "quality_holdout_not_in_joined2",
+      "n_rows": 15128,
+      "csv": "data/subjects/loop_1082/loop_1082_chronological.csv",
+      "info": "data/subjects/loop_1082/info.txt"
+    },
+    {
+      "user_id": "467",
+      "folder": "data/subjects/loop_467",
+      "role": "joined2_test_split",
+      "n_rows": 150512,
+      "csv": "data/subjects/loop_467/loop_467_chronological.csv",
+      "info": "data/subjects/loop_467/info.txt"
+    },
+    {
+      "user_id": "745",
+      "folder": "data/subjects/loop_745",
+      "role": "joined2_test_split",
+      "n_rows": 143299,
+      "csv": "data/subjects/loop_745/loop_745_chronological.csv",
+      "info": "data/subjects/loop_745/info.txt"
+    },
+    {
+      "user_id": "590",
+      "folder": "data/subjects/loop_590",
+      "role": "joined2_test_split",
+      "n_rows": 132321,
+      "csv": "data/subjects/loop_590/loop_590_chronological.csv",
+      "info": "data/subjects/loop_590/info.txt"
+    },
+    {
+      "user_id": "758",
+      "folder": "data/subjects/loop_758",
+      "role": "joined2_test_split",
+      "n_rows": 118264,
+      "csv": "data/subjects/loop_758/loop_758_chronological.csv",
+      "info": "data/subjects/loop_758/info.txt"
+    }
+  ]
+}

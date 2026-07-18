@@ -1,0 +1,40 @@
+User ID: 1082
+Subject folder: loop_1082
+Role: quality_holdout_not_in_joined2
+Source preprocessed CSV: data/loop_and_ai_ready/loop.csv
+Global joined2 split: not in loop_ai_ready_joined2 (quality holdout)
+
+=== Personalization split (chronological) ===
+train: n_rows=9644  2018-04-12 18:05:00 -> 2018-05-20 04:23:00
+val: n_rows=1702  2018-05-20 04:28:00 -> 2018-05-26 05:38:00
+test: n_rows=3782  2018-05-26 05:43:00 -> 2018-06-11 12:41:00
+Total rows: 15128
+
+=== PtRoster ===
+PtID: 1082
+EnrollDt: 6/5/2018
+VisitSchedStartDt: 6/5/2018
+PtStatus: Dropped
+PtCohort: B
+AgeAtEnrollment: 29
+LoopUseTimeAtEnroll: 6 - 12 months
+PtTimezoneOffset: -5
+PrefContactMethod: Email and Text
+
+=== Surveys (Baseline demographics / clinical) ===
+(no baseline survey)
+
+=== SampleResults (lab) ===
+(none)
+
+=== gluIndices (CGM summary metrics) ===
+(none)
+
+=== LOOPPtFinalStatus (withdrawal) ===
+WithdrawDt: 7/10/2018
+WithdrawBy: Jaeb
+WithdrawReas: Timed out/No response
+WithdrawLastSurv: No
+
+Demographic source: D:\dev\glucose_data_processing\data\loop\Data Tables
+Study: LOOP Observational Study (NCT03838900), Jaeb Center for Health Research

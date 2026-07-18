@@ -176,6 +176,7 @@ ro:
     nightscout_consent_required: "Te rugăm să acorzi consimțământul pentru utilizarea datelor înainte de a încărca date din Nightscout."
     current_data_source: "Sursa curentă de date:"
     weight_label: "Greutate"
+    no_carbs_note: "Această fereastră de masă nu include date de carbohidrați înregistrate."
     description_1: "Testează-ți abilitățile de predicție a glucozei!"
     description_2: "Fă clic pe grafic sau desenează linii pentru a prezice valorile viitoare ale glucozei."
     description_3: "Jocul îți va arăta cât de precise sunt predicțiile tale comparativ cu măsurătorile reale."
