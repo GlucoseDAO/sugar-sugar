@@ -47,6 +47,12 @@ _IPHONE_UA: str = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
     "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
 )
+# Desktop UA so the server returns the desktop (non-wizard) builders.
+_DESKTOP_UA: str = (
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+)
+_DESKTOP_VIEWPORT: tuple[int, int] = (1280, 1000)
 
 
 @dataclass(frozen=True)
@@ -106,6 +112,11 @@ class Shot:
     # reproduces the historically-correct scale; 1920 shows how it scales wider.
     # Empty tuple -> use the device's own rotated landscape size.
     landscape_widths: tuple[int, ...] = ()
+    # Optional pre-navigation seeding: load `seed_path` first, run `seed_js` (e.g.
+    # set user-info-store consent so desktop /startup renders instead of redirecting
+    # to landing), then navigate to `path`.
+    seed_path: str = "/"
+    seed_js: Optional[str] = None
 
 
 @dataclass
@@ -116,21 +127,35 @@ class ServerGroup:
     cmd: list[str]
     env: dict[str, str] = field(default_factory=dict)
     shots: list[Shot] = field(default_factory=list)
+    # Render with a desktop UA + wide viewport (the non-wizard desktop builders)
+    # instead of the phone emulation. Landscape variants are skipped for desktop.
+    desktop: bool = False
+
+
+def _show_mobile_step_js(step: int, fmt: Optional[str] = None) -> str:
+    """JS to reveal one mobile wizard step directly (bypassing the per-step Next
+    gate, which blocks blind click-through) and optionally select a data format
+    (B/C reveals the data-usage consent + import block)."""
+    set_fmt = ""
+    if fmt:
+        set_fmt = (
+            "if(window.dash_clientside&&window.dash_clientside.set_props){"
+            f"window.dash_clientside.set_props('format-dropdown',{{value:'{fmt}'}});}}"
+        )
+    return (
+        "(function(){for(var k=0;k<6;k++){var d=document.getElementById('mobile-step-'+k);"
+        f"if(d){{d.style.display=(k==={step}?'block':'none');}}}}" + set_fmt + "})()"
+    )
 
 
 def _server_groups(port: int, *, locale: str) -> list[ServerGroup]:
     """Define which routes are captured under which server invocation."""
     base = ["uv", "run"]
-    accept_mobile_consent_js = (
-        "(function(){"
-        "var scroll=document.getElementById('consent-notice-scroll');"
-        "if(scroll){scroll.scrollTop=scroll.scrollHeight;}"
-        "['consent-acknowledge','consent-gdpr'].forEach(function(id){"
-        "var root=document.getElementById(id);"
-        "var input=root && root.querySelector('input');"
-        "if(input && !input.checked){input.click();}"
-        "});"
-        "})()"
+    # Seed consent so the DESKTOP /startup renders (it redirects to landing without
+    # it; mobile /startup is exempt as the consent entry point).
+    seed_desktop_consent = (
+        "window.dash_clientside.set_props('user-info-store',"
+        "{data:{consent_completed:true,consent_no_selection:true,study_id:'shot'}})"
     )
     return [
         ServerGroup(
@@ -154,13 +179,18 @@ def _server_groups(port: int, *, locale: str) -> list[ServerGroup]:
                         "el.scrollTop=el.scrollHeight;}})()"
                     ),
                 ),
-                # Walk every step of the mobile startup wizard for validation.
-                Shot("startup", "/startup"),
-                Shot("startup-step2", "/startup", pre_click_js=accept_mobile_consent_js, clicks=("startup-next",)),
-                Shot("startup-step3", "/startup", pre_click_js=accept_mobile_consent_js, clicks=("startup-next",) * 2),
-                Shot("startup-step4", "/startup", pre_click_js=accept_mobile_consent_js, clicks=("startup-next",) * 3),
-                Shot("startup-step5", "/startup", pre_click_js=accept_mobile_consent_js, clicks=("startup-next",) * 4),
-                Shot("startup-step6", "/startup", pre_click_js=accept_mobile_consent_js, clicks=("startup-next",) * 5),
+                # Mobile startup wizard. Per-step Next-gating blocks blind
+                # click-through, so each step is revealed directly for a layout shot.
+                # Format A = the full wizard (all 6 steps, no upload gate); B/C only
+                # need the format step, where the data-usage consent + import block
+                # (upload + Nightscout) appear.
+                Shot("startup-a-step1-consent", "/startup", pre_capture_js=_show_mobile_step_js(0)),
+                Shot("startup-a-step2-identity", "/startup", pre_capture_js=_show_mobile_step_js(1)),
+                Shot("startup-a-step3-cgm", "/startup", pre_capture_js=_show_mobile_step_js(2)),
+                Shot("startup-a-step4-diabetes", "/startup", pre_capture_js=_show_mobile_step_js(3)),
+                Shot("startup-a-step5-format", "/startup", pre_capture_js=_show_mobile_step_js(4, 'A')),
+                Shot("startup-a-step6-contact", "/startup", pre_capture_js=_show_mobile_step_js(5)),
+                Shot("startup-bc-step5-format-import", "/startup", pre_capture_js=_show_mobile_step_js(4, 'B')),
                 Shot("about", "/about"),
                 Shot("faq", "/faq"),
                 Shot("contact", "/contact"),
@@ -265,23 +295,24 @@ def _server_groups(port: int, *, locale: str) -> list[ServerGroup]:
             ],
         ),
         ServerGroup(
-            name="consent-startup",
-            # Mobile startup wizard, format step (mobile-step-4 = "Step 5 of 6").
-            # Walk to it, then select format B via set_props so the data-usage
-            # consent gate (data-usage-consent-container) reveals, and capture the
-            # full page so the checkbox is visible.
+            name="desktop",
+            # Desktop (non-wizard) builders: the whole startup form on one page,
+            # which is where the roomy CGM import block lives. Consent is seeded so
+            # /startup renders (it redirects to landing without it on desktop).
             cmd=base + ["start", "--port", str(port)],
+            desktop=True,
             shots=[
+                Shot("desktop-landing", "/", settle_s=2.0),
                 Shot(
-                    "startup-format-consent-b",
+                    "desktop-startup-import",
                     "/startup",
-                    pre_click_js=accept_mobile_consent_js,
-                    clicks=("startup-next",) * 4,
-                    pre_capture_js=(
-                        "(function(){if(window.dash_clientside&&window.dash_clientside.set_props)"
-                        "{window.dash_clientside.set_props('format-dropdown',{value:'B'});}})()"
-                    ),
+                    seed_js=seed_desktop_consent,
                     settle_s=2.0,
+                    pre_capture_js=(
+                        "(function(){if(window.dash_clientside&&window.dash_clientside.set_props){"
+                        "window.dash_clientside.set_props('format-dropdown',{value:'B'});"
+                        "window.dash_clientside.set_props('data-usage-consent',{value:['agree']});}})()"
+                    ),
                 ),
             ],
         ),
@@ -349,9 +380,14 @@ async def _capture(
     locale: str,
     landscape_layout_width: Optional[int] = None,
     suffix: str = "portrait",
+    desktop: bool = False,
 ) -> Path:
     """Emulate the device, navigate, and write a full-page PNG."""
-    if landscape and landscape_layout_width:
+    ua = _DESKTOP_UA if desktop else _IPHONE_UA
+    if desktop:
+        w, h = _DESKTOP_VIEWPORT
+        scale = 1
+    elif landscape and landscape_layout_width:
         # Pin the LAYOUT viewport to a fixed width (e.g. 1280 / 1920). The height
         # keeps the phone's rotated aspect so the immersive 100dvh chart still
         # reads as a landscape phone. scale=1 keeps the output width == layout
@@ -369,7 +405,7 @@ async def _capture(
     await tab.send_command(
         "Emulation.setTouchEmulationEnabled", {"enabled": True, "maxTouchPoints": 5}
     )
-    await tab.send_command("Emulation.setUserAgentOverride", {"userAgent": _IPHONE_UA})
+    await tab.send_command("Emulation.setUserAgentOverride", {"userAgent": ua})
 
     # NOTE: mobile=False everywhere.  The app now serves a responsive
     # `width=device-width` viewport meta on EVERY route (including /prediction --
@@ -391,6 +427,13 @@ async def _capture(
         "screenHeight": h,
     }
     await tab.send_command("Emulation.setDeviceMetricsOverride", metrics)
+    # Optional pre-navigation seeding (e.g. set consent so desktop /startup renders).
+    if shot.seed_js:
+        await tab.send_command("Page.navigate", {"url": base_url.rstrip("/") + shot.seed_path})
+        await _hydrate_wait(tab)
+        await asyncio.sleep(1.0)
+        await tab.send_command("Runtime.evaluate", {"expression": shot.seed_js, "returnByValue": True})
+        await asyncio.sleep(1.0)
     url = base_url.rstrip("/") + shot.path
     await tab.send_command("Page.navigate", {"url": url})
     await _hydrate_wait(tab)
@@ -503,8 +546,10 @@ async def _run_group(
             # (suffix, is_landscape, pinned_layout_width). Portrait always; then
             # one landscape capture per pinned width (first width keeps the plain
             # "landscape" suffix; extras get "-{width}").
-            specs: list[tuple[str, bool, Optional[int]]] = [("portrait", False, None)]
-            if shot.landscape:
+            suffix0 = "desktop" if group.desktop else "portrait"
+            specs: list[tuple[str, bool, Optional[int]]] = [(suffix0, False, None)]
+            # Landscape variants are mobile-only (desktop is a single wide capture).
+            if shot.landscape and not group.desktop:
                 if shot.landscape_widths:
                     for i, lw in enumerate(shot.landscape_widths):
                         specs.append(("landscape" if i == 0 else f"landscape-{lw}", True, lw))
@@ -522,6 +567,7 @@ async def _run_group(
                         locale=locale,
                         landscape_layout_width=layout_width,
                         suffix=suffix,
+                        desktop=group.desktop,
                     )
                     written.append(p)
                     typer.echo(f"  ✓ {p.name}")
