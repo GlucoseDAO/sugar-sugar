@@ -57,9 +57,12 @@ def test_resolve_dataset_identity_by_format() -> None:
     info_a = {"format": "A", "uploaded_data_path": uploaded}
     assert resolve_dataset_identity(info_a, round_number=1) == example
 
+    # Format C: round 1 is the generic warm-up, then own/generic alternate
+    # (ODD round -> generic example, EVEN round -> uploaded own data).
     info_c = {"format": "C", "uploaded_data_path": uploaded}
-    assert resolve_dataset_identity(info_c, round_number=2) == example  # even -> example
-    assert resolve_dataset_identity(info_c, round_number=1) == Path(uploaded)  # odd -> uploaded
+    assert resolve_dataset_identity(info_c, round_number=1) == example  # odd -> example (warm-up)
+    assert resolve_dataset_identity(info_c, round_number=2) == Path(uploaded)  # even -> uploaded
+    assert resolve_dataset_identity(info_c, round_number=3) == example  # odd -> example
 
 
 def _window_with_predictions() -> pl.DataFrame:

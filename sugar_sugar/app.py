@@ -4510,11 +4510,23 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
             'max_rounds': int(info.get('max_rounds') or MAX_ROUNDS),
             'current_round_number': int(info.get('current_round_number') or 1),
             'statistics_saved': bool(info.get('statistics_saved') or False),
-            'is_example_data': bool(info.get('is_example_data', True)),
-            # Format B ("my data only") has no data until the user uploads, so keep
-            # the Source blank; A and C start on the generic example.
-            'data_source_name': "" if format_value == "B" else str(info.get('data_source_name', 'example.csv')),
         })
+
+        # Round-1 data-source identity, accounting for a file imported at startup
+        # (uploaded_data_path set by handle_startup_csv_upload / _nightscout_import):
+        #  - B with an import -> round 1 is the user's own data.
+        #  - B without an import -> gated on /prediction (blank Source until upload).
+        #  - A / C -> round 1 is always the generic warm-up.
+        _startup_uploaded = info.get('uploaded_data_path')
+        if format_value == "B" and _startup_uploaded:
+            info['is_example_data'] = False
+            info['data_source_name'] = str(info.get('uploaded_data_filename') or 'uploaded.csv')
+        elif format_value == "B":
+            info['is_example_data'] = True
+            info['data_source_name'] = ""
+        else:  # A / C -> generic warm-up
+            info['is_example_data'] = True
+            info['data_source_name'] = "example.csv"
 
         # Ensure stable "number" across consent + stats + ranking CSVs.
         if info.get("number") is None:
@@ -6032,19 +6044,30 @@ def initialize_data_on_url_change(
     if current_df_data is not None:
         return _no_change
 
-    # First visit to /prediction with no window: load a fresh example window.
-    full_df, events_df = load_glucose_data()
+    # First visit to /prediction with no window: load the round-1 dataset. This
+    # respects a file imported at startup -- for format B with an uploaded path the
+    # current window is the user's own data (is_example_data=False); A / C round 1
+    # resolve to the generic example. resolve_dataset_identity reads is_example_data
+    # (set by handle_start_button), so the right dataset loads on the first render.
+    ds_path = resolve_dataset_identity(user_info)
+    full_df, events_df = load_dataset(ds_path)
+    is_example = (ds_path == EXAMPLE_DATASET_PATH)
+    source_name = (
+        "example.csv" if is_example
+        else str((user_info or {}).get("uploaded_data_filename")
+                 or (user_info or {}).get("data_source_name") or "uploaded.csv")
+    )
     df, random_start = get_random_data_window(full_df, DEFAULT_POINTS)
     df = df.with_columns(pl.lit(0.0).alias('prediction'))
 
     with start_action(action_type=u"initialize_data_on_url_change") as action:
-        action.log(message_type="new_random_start", random_start=random_start)
+        action.log(message_type="new_random_start", random_start=random_start, is_example=is_example)
 
     return (
         convert_df_to_dict(df),
         convert_events_df_to_dict(events_df),
-        True,
-        'example.csv',
+        is_example,
+        source_name,
         False,
         random_start,
     )
