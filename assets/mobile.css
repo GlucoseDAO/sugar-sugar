@@ -2058,6 +2058,18 @@ html.route-prediction.mobile-device #submit-button {
   white-space: nowrap;
 }
 #upload-data:active { transform: scale(0.97); }
+/* Hitbox fix: the real dcc.Upload dropzone is the inner .prediction-upload-button
+   (it holds the hidden <input type=file>), which otherwise shrinks to the text
+   (~64x20) so only the label was clickable -- the rest of the blue rectangle did
+   nothing. Make the dropzone fill #upload-data so the WHOLE button opens the file
+   dialog. The absolutely-positioned inner <input> (inset:0) then covers it too. */
+#upload-data > .prediction-upload-button {
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
 /* The label text lives in #header-upload-prompt (a nested element), which the
    broad `body :not(...) { font-size:18px !important }` rule shrinks -- making
    "Upload" thinner/smaller than the Fomantic buttons. Two IDs beat that rule, so

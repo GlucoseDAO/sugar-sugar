@@ -189,6 +189,7 @@ en:
     units_label: "Units:"
     upload_required_alert: "This format requires your own CGM data. Please upload a CSV file to start."
     upload_only_gate: "You chose to play with your own data only. To start playing, press the Upload button and select your file."
+    upload_mixed_gate: "You chose the mixed mode (generic + your own data). To continue, press the Upload button and select your CGM file — rounds then alternate between generic and your data."
     upload_consent_recorded: "Consent recorded. You can now upload and use your CGM data in this session."
     no_upload_back_to_final: "No CGM data to upload? View your results from previous rounds"
 

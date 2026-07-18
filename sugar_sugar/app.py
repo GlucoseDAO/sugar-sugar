@@ -339,11 +339,42 @@ def resolve_dataset_identity(
         if fmt == "B":
             return _dataset_path_for(False, uploaded)
         if fmt == "C":
-            # Mirror handle_next_round_button: even round -> example, odd -> uploaded.
-            # Before any upload, C is playable on generic data (falls back below).
-            return _dataset_path_for(round_number % 2 == 0 or not uploaded, uploaded)
+            # Mirror handle_next_round_button: ODD round -> example (generic),
+            # EVEN round -> uploaded. Round 1 is always the generic warm-up; from
+            # round 2 an upload is required (see _is_upload_gated), so they alternate
+            # generic/own from there. Before any upload, fall back to generic.
+            return _dataset_path_for(round_number % 2 == 1 or not uploaded, uploaded)
         return EXAMPLE_DATASET_PATH  # format A
     return _dataset_path_for(bool(info.get("is_example_data", True)), uploaded)
+
+
+def _is_upload_gated(user_info: Optional[Dict[str, Any]]) -> bool:
+    """Whether /prediction must block on an upload right now (show the upload gate).
+
+    - Format B ("my data only"): gated until a file is uploaded (from round 1).
+    - Format C ("mixed"): round 1 is a generic warm-up (playable); from round 2
+      onward an upload is required, so the user isn't able to play a whole session
+      on generic data and forget to upload.
+    - Formats A / already-uploaded: never gated.
+    """
+    info = user_info or {}
+    if info.get("uploaded_data_path"):
+        return False
+    fmt = str(info.get("format") or "A")
+    if fmt == "B":
+        return True
+    if fmt == "C":
+        rounds = info.get("rounds") or []
+        round_num = int(info.get("current_round_number") or (len(rounds) + 1))
+        return round_num >= 2
+    return False
+
+
+def _upload_gate_text(user_info: Optional[Dict[str, Any]], locale: str) -> str:
+    """Gate message tailored to the chosen format (own-only vs mixed)."""
+    fmt = str((user_info or {}).get("format") or "A")
+    key = "ui.prediction.upload_mixed_gate" if fmt == "C" else "ui.prediction.upload_only_gate"
+    return t(key, locale=locale)
 
 
 @lru_cache(maxsize=32)
@@ -2779,12 +2810,16 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
     """Create the prediction page layout"""
     show_upload = format_value in ("B", "C")
     uploaded = bool(user_info.get("uploaded_data_path"))
-    # Format B is gated on the upload until a file arrives.
-    b_gated = (format_value == "B") and not uploaded
+    # Upload gate: B from round 1, C from round 2 (see _is_upload_gated).
+    b_gated = _is_upload_gated(user_info)
     consent_given = bool(user_info.get("consent_use_uploaded_data", False))
     consent_value = ['agree'] if consent_given else []
     data_source_name = str(user_info.get("data_source_name") or "")
-    if data_source_name:
+    if b_gated:
+        # While gated (awaiting upload) keep the Source blank -- any stale value
+        # refers to the generic warm-up, not the user's data.
+        data_source_display = ""
+    elif data_source_name:
         data_source_display = data_source_name
     elif format_value == "B":
         # "My data only": keep the Source blank until the user uploads their file.
@@ -2890,7 +2925,7 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
             # uploads their file. The Upload button itself lives in the action strip
             # below (reachable in both portrait and landscape).
             html.Div(
-                t("ui.prediction.upload_only_gate", locale=locale),
+                _upload_gate_text(user_info, locale),
                 id="prediction-upload-gate",
                 className="prediction-upload-gate",
                 disable_n_clicks=True,
@@ -3056,35 +3091,11 @@ def show_upload_required_alert(
     user_info: Optional[Dict[str, Any]],
     interface_language: Optional[str],
 ) -> Optional[html.Div]:
-    if pathname != "/prediction":
-        return None
-    fmt = str((user_info or {}).get("format") or "A")
-    # Format B has its own dedicated upload gate (prediction-upload-gate); format C
-    # is always playable on generic data. So this legacy alert no longer applies.
-    if fmt != "C":
-        return None
-    if current_df_data:
-        return None
-    locale = normalize_locale(interface_language)
-    has_prior_rounds = bool((user_info or {}).get("runs_by_format") or (user_info or {}).get("rounds"))
-    consent_ok = bool((user_info or {}).get("consent_use_uploaded_data", False))
-    children: list[Any] = [t("ui.prediction.upload_required_alert", locale=locale)]
-    if not consent_ok:
-        children += [
-            html.Br(),
-            html.Span(t("ui.startup.data_usage_consent_required", locale=locale)),
-        ]
-    if has_prior_rounds:
-        children += [
-            html.Br(),
-            html.Button(
-                t("ui.prediction.no_upload_back_to_final", locale=locale),
-                id="back-to-final-from-upload",
-                className="ui small button",
-                style={"paddingLeft": "0", "marginTop": "6px"},
-            ),
-        ]
-    return dbc.Alert(children, color="info", style={"marginBottom": "10px"})
+    # Superseded by the dedicated upload gate (prediction-upload-gate), which now
+    # handles both B (round 1) and C (round 2). Kept as an inert Output sink so the
+    # 'upload-required-alert' element stays wired; the Finish/Exit button in the
+    # action strip remains available for users who don't want to upload.
+    return None
 
 
 @app.callback(
@@ -3116,14 +3127,12 @@ def toggle_upload_gate(
     """
     if pathname != '/prediction':
         raise PreventUpdate
-    fmt = str((user_info or {}).get("format") or "A")
-    uploaded = bool((user_info or {}).get("uploaded_data_path"))
     locale = normalize_locale(interface_language)
-    if fmt == "B" and not uploaded:
+    if _is_upload_gated(user_info):
         return (
             {'display': 'none'},
             {'display': 'block'},
-            t("ui.prediction.upload_only_gate", locale=locale),
+            _upload_gate_text(user_info, locale),
             'b-gated',
         )
     return (
@@ -4801,11 +4810,17 @@ def handle_next_round_button(
             is_example = False
             source_name = str(user_info.get("uploaded_data_filename") or user_info.get("data_source_name") or "uploaded.csv")
         else:
-            # Format C ("mixed"): interleave uploaded (odd rounds) and example (even
-            # rounds). Always playable -- before the user uploads, the "own data"
-            # rounds fall back to generic so the game never blocks.
+            # Format C ("mixed"): round 1 is a generic warm-up; from round 2 an
+            # upload is REQUIRED, so if none exists yet, show the upload gate instead
+            # of silently continuing on generic data (a whole session of generic was
+            # the reported bug). Once uploaded, interleave: ODD round -> generic,
+            # EVEN round -> own data (so round 2 = own, round 3 = generic, ...).
             uploaded_path = user_info.get("uploaded_data_path")
-            use_example = (next_round_number % 2 == 0) or not uploaded_path
+            if not uploaded_path:
+                # next_round_number is always >= 2 here (round 1 came from init).
+                user_info['current_round_number'] = next_round_number
+                return '/prediction', user_info, {'hide_last_hour': True}, None, None, False, "", False, 0
+            use_example = (next_round_number % 2 == 1)
             if use_example:
                 full_df, events_df = load_glucose_data()
                 is_example = True
@@ -6006,13 +6021,11 @@ def initialize_data_on_url_change(
     if pathname != '/prediction':
         return _no_change
 
-    # Format B ("my data only"): require an upload before anything loads -- never
-    # auto-load the generic example. Format C ("mixed") is playable immediately on
-    # generic data and switches to the user's data once they upload, so it falls
-    # through to the example-loading path below.
-    fmt = str((user_info or {}).get("format") or "A")
-    uploaded_path = (user_info or {}).get("uploaded_data_path")
-    if fmt == "B" and not uploaded_path:
+    # Upload gate (B from round 1, C from round 2): don't auto-load a generic
+    # window when the session must block on an upload -- leave the window empty so
+    # the gate shows (handles direct load / resume mid-session). Format C round 1
+    # still falls through to load the generic warm-up window below.
+    if _is_upload_gated(user_info):
         return None, None, False, "", False, 0
 
     # Window already present — preserve (handles resume and round transitions).

@@ -189,6 +189,7 @@ ro:
     units_label: "Unități:"
     upload_required_alert: "Acest format necesită propriile date CGM. Te rugăm să încarci un fișier CSV pentru a începe."
     upload_only_gate: "Ai ales să joci doar cu propriile date. Pentru a începe, apasă butonul Încarcă și selectează fișierul tău."
+    upload_mixed_gate: "Ai ales modul mixt (date generice + propriile date). Pentru a continua, apasă butonul Încarcă și selectează fișierul tău — rundele vor alterna apoi între date generice și ale tale."
     upload_consent_recorded: "Consimțământ înregistrat. Acum poți încărca și folosi datele CGM în această sesiune."
     no_upload_back_to_final: "Nu ai date CGM de încărcat? Vezi rezultatele din rundele anterioare"
 
