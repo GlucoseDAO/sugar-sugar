@@ -23,6 +23,82 @@ _MISSING_FIELDS_STYLE: dict[str, str] = {
 }
 
 
+def import_controls_children(locale: str) -> list[Any]:
+    """Startup-stage 'import your CGM data' block: CSV upload + Nightscout fetch.
+
+    Rendered inside the data-usage-consent container (revealed for formats B/C), so
+    the user can bring their data in on the roomy startup screen instead of the
+    cramped prediction page. Uses dedicated ``startup-*`` ids so it never clashes
+    with the /prediction upload (id ``upload-data``). The import callbacks write
+    ``uploaded_data_path`` into ``user-info-store``; the game picks it up from there.
+    """
+    _input_style: dict[str, str] = {
+        'width': '100%', 'marginBottom': '8px', 'padding': '10px 12px',
+        'borderRadius': '6px', 'border': '1px solid #cbd5e1', 'fontSize': '16px',
+        'boxSizing': 'border-box',
+    }
+    return [
+        html.Div(
+            t("ui.startup.import_title", locale=locale),
+            style={'fontWeight': '800', 'fontSize': '18px', 'marginTop': '16px',
+                   'marginBottom': '4px', 'color': '#0f172a'},
+        ),
+        html.Div(
+            t("ui.startup.import_subtitle", locale=locale),
+            style={'fontSize': '13px', 'color': '#64748b', 'marginBottom': '10px', 'lineHeight': '1.4'},
+        ),
+        dcc.Upload(
+            id='startup-upload-data',
+            multiple=False,
+            accept='.csv,text/csv',
+            children=html.Div(t("ui.startup.import_upload_prompt", locale=locale), id='startup-upload-prompt'),
+            style={
+                'width': '100%', 'minHeight': '56px', 'display': 'flex',
+                'alignItems': 'center', 'justifyContent': 'center', 'textAlign': 'center',
+                'padding': '10px', 'borderWidth': '2px', 'borderStyle': 'dashed',
+                'borderColor': '#2185d0', 'borderRadius': '8px', 'color': '#2185d0',
+                'cursor': 'pointer', 'backgroundColor': '#f8fbff', 'boxSizing': 'border-box',
+            },
+        ),
+        html.Div(
+            t("ui.startup.import_or", locale=locale),
+            style={'textAlign': 'center', 'color': '#94a3b8', 'fontSize': '13px', 'margin': '10px 0'},
+        ),
+        dcc.Input(
+            id='startup-ns-url', type='url',
+            placeholder=t("ui.startup.import_ns_url_placeholder", locale=locale),
+            debounce=True, style=_input_style,
+        ),
+        dcc.Input(
+            id='startup-ns-token', type='text',
+            placeholder=t("ui.startup.import_ns_token_placeholder", locale=locale),
+            debounce=True, style=_input_style,
+        ),
+        html.Button(
+            t("ui.startup.import_ns_button", locale=locale),
+            id='startup-ns-import', type='button', className='ui blue button',
+            n_clicks=0, style={'width': '100%', 'marginBottom': '8px'},
+        ),
+        dcc.Loading(
+            html.Div(id='startup-import-status', style={'marginTop': '4px', 'fontSize': '15px', 'lineHeight': '1.4'}),
+            type='dot',
+        ),
+    ]
+
+
+def _import_status_msg(text: str, *, ok: bool) -> Any:
+    """Small coloured status pill for the startup import block."""
+    return html.Div(
+        text,
+        style={
+            'padding': '8px 10px', 'borderRadius': '6px', 'marginTop': '4px',
+            'backgroundColor': '#dcfce7' if ok else '#fee2e2',
+            'color': '#166534' if ok else '#b91c1c',
+            'fontWeight': '600', 'lineHeight': '1.4',
+        },
+    )
+
+
 @dataclass(frozen=True)
 class StartupValidationResult:
     """Outcome of startup-form field checks for one wizard step or the full form."""
@@ -458,7 +534,8 @@ class StartupPage(html.Div):
                                     persistence_type=STORAGE_TYPE,
                                     style={'fontSize': '16px'}
                                 ),
-                                html.Div(id='data-usage-error', style={'marginTop': '8px', 'color': '#d32f2f', 'fontSize': '16px'})
+                                html.Div(id='data-usage-error', style={'marginTop': '8px', 'color': '#d32f2f', 'fontSize': '16px'}),
+                                *import_controls_children(locale),
                             ],
                             style={'display': 'none', 'marginBottom': '20px'}
                         ),
@@ -666,6 +743,147 @@ class StartupPage(html.Div):
             if format_value in ('B', 'C'):
                 return {'display': 'block', 'marginBottom': '20px'}, list(current_value or [])
             return {'display': 'none', 'marginBottom': '20px'}, []
+
+        # --- Startup-stage data import (CSV upload + Nightscout) --------------
+        # Both write only `uploaded_data_path` / `uploaded_data_filename` into
+        # user-info-store; handle_start_button carries them forward and the game
+        # loads the window from that path (see resolve_dataset_identity). Consent
+        # (for B/C) is required before we persist any personal data.
+        def _consent_ok(format_value: Optional[str], consent_value: Optional[list[str]]) -> bool:
+            if format_value not in ('B', 'C'):
+                return True
+            return bool(consent_value and 'agree' in consent_value)
+
+        @app.callback(
+            [Output('user-info-store', 'data', allow_duplicate=True),
+             Output('startup-import-status', 'children', allow_duplicate=True)],
+            [Input('startup-upload-payload', 'data')],
+            [State('startup-upload-data', 'filename'),
+             State('user-info-store', 'data'),
+             State('format-dropdown', 'value'),
+             State('data-usage-consent', 'value'),
+             State('interface-language', 'data')],
+            prevent_initial_call=True,
+        )
+        def handle_startup_csv_upload(
+            contents: Optional[str],
+            filename: Optional[str],
+            user_info: Optional[dict[str, Any]],
+            format_value: Optional[str],
+            consent_value: Optional[list[str]],
+            interface_language: Optional[str],
+        ) -> tuple[Any, Any]:
+            from datetime import datetime
+            from pathlib import Path
+            from sugar_sugar.i18n import normalize_locale
+            from sugar_sugar.data import load_glucose_data, decode_upload_bytes
+
+            if not contents:
+                raise dash.exceptions.PreventUpdate
+            locale = normalize_locale(interface_language)
+            if not _consent_ok(format_value, consent_value):
+                return no_update, _import_status_msg(t("ui.startup.import_needs_consent", locale=locale), ok=False)
+            decoded = decode_upload_bytes(contents)
+            if decoded is None:
+                return no_update, _import_status_msg(t("ui.startup.import_bad_file", locale=locale), ok=False)
+
+            # Parse/save is fully guarded: a malformed file must never 500 the app.
+            try:
+                users_dir = Path('data/input/users')
+                users_dir.mkdir(parents=True, exist_ok=True)
+                safe = (filename or 'uploaded').replace(' ', '_').replace('/', '_')
+                if not safe.lower().endswith('.csv'):
+                    safe += '.csv'
+                save_path = users_dir / f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{safe}"
+                save_path.write_bytes(decoded)
+                glucose_df, _events = load_glucose_data(save_path)
+            except Exception:
+                return no_update, _import_status_msg(t("ui.startup.import_bad_file", locale=locale), ok=False)
+
+            if glucose_df is None or glucose_df.height == 0:
+                return no_update, _import_status_msg(t("ui.startup.import_empty", locale=locale), ok=False)
+
+            info = dict(user_info or {})
+            info['uploaded_data_path'] = str(save_path)
+            info['uploaded_data_filename'] = str(filename or 'uploaded.csv')
+            return info, _import_status_msg(
+                t("ui.startup.import_success", locale=locale, count=glucose_df.height, source=str(filename or 'CSV')),
+                ok=True,
+            )
+
+        @app.callback(
+            [Output('user-info-store', 'data', allow_duplicate=True),
+             Output('startup-import-status', 'children', allow_duplicate=True)],
+            [Input('startup-ns-import', 'n_clicks')],
+            [State('startup-ns-url', 'value'),
+             State('startup-ns-token', 'value'),
+             State('user-info-store', 'data'),
+             State('format-dropdown', 'value'),
+             State('data-usage-consent', 'value'),
+             State('interface-language', 'data')],
+            prevent_initial_call=True,
+        )
+        def handle_startup_nightscout_import(
+            n_clicks: Optional[int],
+            url: Optional[str],
+            token: Optional[str],
+            user_info: Optional[dict[str, Any]],
+            format_value: Optional[str],
+            consent_value: Optional[list[str]],
+            interface_language: Optional[str],
+        ) -> tuple[Any, Any]:
+            from pathlib import Path
+            from sugar_sugar.i18n import normalize_locale
+
+            if not n_clicks:
+                raise dash.exceptions.PreventUpdate
+            locale = normalize_locale(interface_language)
+            if not _consent_ok(format_value, consent_value):
+                return no_update, _import_status_msg(t("ui.startup.import_needs_consent", locale=locale), ok=False)
+            if not (url and url.strip()):
+                return no_update, _import_status_msg(t("ui.startup.import_needs_url", locale=locale), ok=False)
+
+            try:
+                import httpx as _httpx
+            except Exception:
+                _httpx = None
+
+            # The whole network path is guarded so a malformed/incomplete/offline
+            # Nightscout never crashes the app -- each failure maps to a friendly,
+            # non-leaking message (raw exception text can contain the URL/token).
+            try:
+                from sugar_sugar.data import load_glucose_data_from_nightscout
+                glucose_df, _events, save_path = load_glucose_data_from_nightscout(
+                    url.strip(), token=(token or None), save_dir=Path('data/input/users'),
+                )
+            except ImportError:
+                return no_update, _import_status_msg(t("ui.startup.import_ns_unavailable", locale=locale), ok=False)
+            except Exception as exc:  # network / HTTP / parse -- classify, don't leak
+                name = type(exc).__name__
+                if _httpx is not None and isinstance(exc, _httpx.HTTPStatusError):
+                    code = exc.response.status_code if getattr(exc, 'response', None) is not None else '?'
+                    return no_update, _import_status_msg(t("ui.startup.import_ns_http_error", locale=locale, code=code), ok=False)
+                if _httpx is not None and isinstance(exc, _httpx.TimeoutException) or 'Timeout' in name:
+                    return no_update, _import_status_msg(t("ui.startup.import_ns_timeout", locale=locale), ok=False)
+                if (_httpx is not None and isinstance(exc, (_httpx.ConnectError, _httpx.NetworkError))) \
+                        or any(k in name for k in ('Connect', 'Network', 'Resolve', 'Proxy')):
+                    return no_update, _import_status_msg(t("ui.startup.import_ns_unreachable", locale=locale), ok=False)
+                return no_update, _import_status_msg(t("ui.startup.import_failed", locale=locale), ok=False)
+
+            if glucose_df is None or glucose_df.height == 0:
+                return no_update, _import_status_msg(t("ui.startup.import_empty", locale=locale), ok=False)
+
+            ns_label = url.strip().rstrip('/')
+            info = dict(user_info or {})
+            info['uploaded_data_path'] = str(save_path)
+            info['uploaded_data_filename'] = ns_label
+            info['nightscout_url'] = ns_label
+            if token:
+                info['nightscout_token'] = token
+            return info, _import_status_msg(
+                t("ui.startup.import_success", locale=locale, count=glucose_df.height, source='Nightscout'),
+                ok=True,
+            )
 
         @app.callback(
             [Output('diabetic-details', 'style'),
@@ -1309,6 +1527,7 @@ class StartupPageMobile(html.Div):
                         value=[], persistence=True, persistence_type=STORAGE_TYPE, style={'fontSize': '16px'},
                     ),
                     html.Div(id='data-usage-error', style={'marginTop': '8px', 'color': '#d32f2f', 'fontSize': '15px'}, disable_n_clicks=True),
+                    *import_controls_children(locale),
                 ],
                 style={'display': 'none', 'marginBottom': '20px'},
             ),

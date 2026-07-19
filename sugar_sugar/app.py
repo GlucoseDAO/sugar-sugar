@@ -55,7 +55,7 @@ _configure_eliot_logging()
 from sugar_sugar.i18n import setup_i18n, normalize_locale, t, t_list, t_raw
 setup_i18n()
 
-from sugar_sugar.data import load_glucose_data, load_glucose_data_from_nightscout
+from sugar_sugar.data import load_glucose_data, load_glucose_data_from_nightscout, decode_upload_bytes
 from sugar_sugar.config import (
     DEFAULT_POINTS,
     MIN_POINTS,
@@ -90,7 +90,7 @@ from sugar_sugar.components.landing import LandingPage, LandingPageMobile
 from sugar_sugar.components.consent_form import ConsentFormPage
 from sugar_sugar.components.submit import SubmitComponent
 from sugar_sugar.encouragement import pick_bracket
-from sugar_sugar.components.header import HeaderComponent
+from sugar_sugar.components.header import HeaderComponent, make_csv_upload
 from sugar_sugar.components.ending import EndingPage
 from sugar_sugar.components.navbar import NavBar, MobileNavBar
 from sugar_sugar.components.share import (
@@ -308,6 +308,102 @@ def get_random_data_window(
     windowed_df = full_df.slice(random_start, points)
     return windowed_df, random_start
 
+
+# ---------------------------------------------------------------------------
+# Server-side dataset access.
+#
+# The full CGM dataset is NOT shipped to the browser. Instead it is loaded from
+# its on-disk path on the server and cached per-worker; callbacks slice the small
+# window they need. Every dataset has a stable file: the example ships in the
+# repo (`data/example.csv`), uploads/nightscout are saved under
+# `data/input/users/` and their path is kept in `user_info['uploaded_data_path']`.
+# See docs / the "stop hauling the whole dataset" refactor.
+# ---------------------------------------------------------------------------
+EXAMPLE_DATASET_PATH: Path = Path("data/example.csv")
+
+
+def _dataset_path_for(is_example: bool, uploaded_path: Optional[str]) -> Path:
+    """Pick the on-disk dataset path for the example vs an uploaded file."""
+    if is_example or not uploaded_path:
+        return EXAMPLE_DATASET_PATH
+    return Path(str(uploaded_path))
+
+
+def resolve_dataset_identity(
+    user_info: Optional[Dict[str, Any]], *, round_number: Optional[int] = None
+) -> Path:
+    """Resolve which on-disk dataset a session (or a specific round) uses.
+
+    Without ``round_number`` this returns the *current window's* dataset, trusting
+    the per-round ``is_example_data`` flag in ``user_info`` (set by
+    ``handle_next_round_button`` / format switches). With ``round_number`` it
+    mirrors ``handle_next_round_button``'s per-format choice so per-round stats can
+    resolve the correct dataset even for format C (which alternates datasets).
+    """
+    info = user_info or {}
+    fmt = str(info.get("format") or "A")
+    uploaded = info.get("uploaded_data_path")
+    if round_number is not None:
+        if fmt == "B":
+            return _dataset_path_for(False, uploaded)
+        if fmt == "C":
+            # Mirror handle_next_round_button: ODD round -> example (generic),
+            # EVEN round -> uploaded. Round 1 is always the generic warm-up; from
+            # round 2 an upload is required (see _is_upload_gated), so they alternate
+            # generic/own from there. Before any upload, fall back to generic.
+            return _dataset_path_for(round_number % 2 == 1 or not uploaded, uploaded)
+        return EXAMPLE_DATASET_PATH  # format A
+    return _dataset_path_for(bool(info.get("is_example_data", True)), uploaded)
+
+
+def _is_upload_gated(user_info: Optional[Dict[str, Any]]) -> bool:
+    """Whether /prediction must block on an upload right now (show the upload gate).
+
+    - Format B ("my data only"): gated until a file is uploaded (from round 1).
+    - Format C ("mixed"): round 1 is a generic warm-up (playable); from round 2
+      onward an upload is required, so the user isn't able to play a whole session
+      on generic data and forget to upload.
+    - Formats A / already-uploaded: never gated.
+    """
+    info = user_info or {}
+    if info.get("uploaded_data_path"):
+        return False
+    fmt = str(info.get("format") or "A")
+    if fmt == "B":
+        return True
+    if fmt == "C":
+        rounds = info.get("rounds") or []
+        round_num = int(info.get("current_round_number") or (len(rounds) + 1))
+        return round_num >= 2
+    return False
+
+
+def _upload_gate_text(user_info: Optional[Dict[str, Any]], locale: str) -> str:
+    """Gate message tailored to the chosen format (own-only vs mixed)."""
+    fmt = str((user_info or {}).get("format") or "A")
+    key = "ui.prediction.upload_mixed_gate" if fmt == "C" else "ui.prediction.upload_only_gate"
+    return t(key, locale=locale)
+
+
+@lru_cache(maxsize=32)
+def _load_dataset_cached(path_str: str) -> Tuple[pl.DataFrame, pl.DataFrame]:
+    glucose_df, events_df = load_glucose_data(Path(path_str))
+    # Match the store schema callers expect (they all reset predictions to 0.0
+    # right after loading). The cached frame is treated as immutable: callers
+    # only `.slice(...)` it and add predictions to the *window*, never here.
+    glucose_df = glucose_df.with_columns(pl.lit(0.0).alias("prediction"))
+    return glucose_df, events_df
+
+
+def load_dataset(path: Path) -> Tuple[pl.DataFrame, pl.DataFrame]:
+    """Load + adapt a dataset by path, cached per-worker. Returns (glucose, events).
+
+    Files are immutable (the example is in the repo; uploads have timestamped
+    names), so the resolved absolute path is a safe cache key with no mtime check.
+    """
+    return _load_dataset_cached(str(Path(path).resolve()))
+
+
 # Load initial data for session storage.
 # When ``_CHART_FILE`` env var is set (by the ``chart`` CLI command), load from
 # that file and optionally prefill predictions so the debug reloader preserves
@@ -354,7 +450,6 @@ if _chart_prefill:
                 pl.when(pl.col("time") == _tv).then(_pv).otherwise(pl.col("prediction")).alias("prediction")
             )
 
-example_full_df_store = dataframe_to_store_dict(_init_full_df)
 example_initial_df_store = dataframe_to_store_dict(_init_window_df)
 example_events_df_store = events_dataframe_to_store_dict(_init_events_df)
 example_initial_slider_value = _init_start
@@ -1030,8 +1125,12 @@ def _staging_base_user_info() -> dict[str, Any]:
     }
 
 
-def _staging_ending_args() -> tuple[dict, dict, dict, dict[str, Any]]:
-    """Build (full_df_store, window_store, events_store, user_info) for /staging/ending."""
+def _staging_ending_args() -> tuple[dict, dict, dict[str, Any]]:
+    """Build (window_store, events_store, user_info) for /staging/ending.
+
+    The full dataset is not shipped to the client; create_ending_layout reloads
+    it server-side if needed (here current-window-df is always present).
+    """
     full_df, events_df = load_glucose_data()
     full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
     full_df, window_df, start = _staging_prefill_window(full_df)
@@ -1042,15 +1141,14 @@ def _staging_ending_args() -> tuple[dict, dict, dict, dict[str, Any]]:
         "prediction_table_data": _staging_ptd_from_window(window_df),
     })
     return (
-        dataframe_to_store_dict(full_df),
         dataframe_to_store_dict(window_df),
         events_dataframe_to_store_dict(events_df),
         info,
     )
 
 
-def _staging_final_user_info(*, rounds_n: int = 3, formats: Optional[list[str]] = None) -> tuple[dict, dict[str, Any]]:
-    """Build (full_df_store, user_info-with-rounds) for /staging/final."""
+def _staging_final_user_info(*, rounds_n: int = 3, formats: Optional[list[str]] = None) -> dict[str, Any]:
+    """Build user_info-with-rounds for /staging/final."""
     fmts = formats or ["A", "B", "C"]
     full_df, _events = load_glucose_data()
     full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
@@ -1073,7 +1171,7 @@ def _staging_final_user_info(*, rounds_n: int = 3, formats: Optional[list[str]] 
         "current_round_number": rounds_n,
         "format": rounds[-1]["format"] if rounds else "A",
     })
-    return dataframe_to_store_dict(full_df), info
+    return info
 
 
 def _staging_build_share_record(*, rounds_n: int = 6, formats: Optional[list[str]] = None, locale: str = "en") -> str:
@@ -1144,11 +1242,11 @@ def _staging_display(pathname: str, *, locale: str, glucose_unit: Optional[str])
     if pathname in ("/staging", "/staging/"):
         return _staging_index_layout(locale=locale)
     if pathname == "/staging/ending":
-        full_store, window_store, events_store, info = _staging_ending_args()
-        return create_ending_layout(full_store, window_store, events_store, info, glucose_unit, locale=locale)
+        window_store, events_store, info = _staging_ending_args()
+        return create_ending_layout(window_store, events_store, info, glucose_unit, locale=locale)
     if pathname == "/staging/final":
-        full_store, info = _staging_final_user_info()
-        return create_final_layout(full_store, info, glucose_unit, locale=locale)
+        info = _staging_final_user_info()
+        return create_final_layout(info, glucose_unit, locale=locale)
     # /staging/prediction is handled by the _staging_seed_prediction callback,
     # which seeds the stores and redirects to /prediction. Fall through here.
     return None
@@ -1196,7 +1294,6 @@ if _is_staging_mode:
     @app.callback(
         [Output('url', 'pathname', allow_duplicate=True),
          Output('user-info-store', 'data', allow_duplicate=True),
-         Output('full-df', 'data', allow_duplicate=True),
          Output('current-window-df', 'data', allow_duplicate=True),
          Output('events-df', 'data', allow_duplicate=True),
          Output('randomization-initialized', 'data', allow_duplicate=True),
@@ -1209,8 +1306,8 @@ if _is_staging_mode:
         """Seed the prediction stores with a prefilled window, then route to /prediction."""
         if pathname != '/staging/prediction':
             raise PreventUpdate
-        full_store, window_store, events_store, info = _staging_ending_args()
-        return ('/prediction', info, full_store, window_store, events_store, True, True, "example.csv")
+        window_store, events_store, info = _staging_ending_args()
+        return ('/prediction', info, window_store, events_store, True, True, "example.csv")
 
 app.clientside_callback(
     "function() { return window.navigator.userAgent || ''; }",
@@ -1282,6 +1379,11 @@ _chart_source = os.environ.get("_CHART_SOURCE", "example.csv")
 _chart_is_example = _chart_file_env is None
 _chart_unit = os.environ.get("_CHART_UNIT", "mg/dL")
 _chart_locale = os.environ.get("_CHART_LOCALE", "en")
+# Data-source format for chart mode (A=generic, B=own only, C=mixed). Lets the
+# screenshot harness render the B upload-gate and the C prediction page.
+_chart_format = os.environ.get("_CHART_FORMAT", "A")
+if _chart_format not in ("A", "B", "C"):
+    _chart_format = "A"
 
 if _is_chart_mode:
     _chart_user_info: Optional[Dict[str, Any]] = {
@@ -1291,9 +1393,11 @@ if _is_chart_mode:
         "gender": "F",
         "uses_cgm": True,
         "cgm_duration_years": 1,
-        "format": "A",
-        "run_format": "A",
-        "consent_use_uploaded_data": False,
+        "format": _chart_format,
+        "run_format": _chart_format,
+        # B/C in the real flow always reach /prediction already data-consented
+        # (update_form_validation gates Start on it), so mirror that here.
+        "consent_use_uploaded_data": _chart_format in ("B", "C"),
         "diabetic": True,
         "diabetic_type": "Type 1",
         "diabetes_duration": 5,
@@ -1303,7 +1407,8 @@ if _is_chart_mode:
         "current_round_number": 1,
         "statistics_saved": False,
         "is_example_data": _chart_is_example,
-        "data_source_name": _chart_source,
+        # Format B starts with no data (upload gate); keep Source empty until upload.
+        "data_source_name": "" if _chart_format == "B" else _chart_source,
         "consent_play_only": True,
         "consent_participate_in_study": False,
         "consent_receive_results_later": False,
@@ -1334,11 +1439,19 @@ app.layout = html.Div([
     # every reconnecting browser to do a full reload and pick up the new JS.
     dcc.Store(id='_build', data=DEPLOY_BUILD),
     dcc.Store(id='consent-scroll-request', data=0),
+    # Client-compressed upload payloads (a clientside callback gzips dcc.Upload
+    # contents into these so large CGM files survive the mobile upload path).
+    dcc.Store(id='upload-data-payload', storage_type='memory'),
+    dcc.Store(id='startup-upload-payload', storage_type='memory'),
     dcc.Store(id='current-window-df', data=example_initial_df_store, storage_type=STORAGE_TYPE),
-    dcc.Store(id='full-df', data=example_full_df_store, storage_type=STORAGE_TYPE),
+    # NOTE: there is intentionally no 'full-df' client store. The full dataset is
+    # never shipped to the browser -- it is loaded server-side on demand from its
+    # on-disk path (see load_dataset / resolve_dataset_identity) and only the small
+    # current-window-df is kept client-side. This removes the per-interaction
+    # whole-dataset round-trip (lag) and the localStorage-quota risk.
     dcc.Store(id='events-df', data=example_events_df_store, storage_type=STORAGE_TYPE),
     dcc.Store(id='is-example-data', data=_chart_is_example, storage_type=STORAGE_TYPE),
-    dcc.Store(id='data-source-name', data=_chart_source if _is_chart_mode else _init_generic_source_name, storage_type=STORAGE_TYPE),
+    dcc.Store(id='data-source-name', data=("" if _chart_format == "B" else _chart_source) if _is_chart_mode else _init_generic_source_name, storage_type=STORAGE_TYPE),
     dcc.Store(id='randomization-initialized', data=_is_chart_mode, storage_type=STORAGE_TYPE),
     dcc.Store(id='glucose-chart-mode', data={'hide_last_hour': True}, storage_type='memory'),
     dcc.Store(id='glucose-unit', data=_chart_unit if _is_chart_mode else 'mg/dL', storage_type=STORAGE_TYPE),
@@ -1737,11 +1850,11 @@ app.clientside_callback(
     [State('url', 'pathname')],
     prevent_initial_call=False,
 )
-def update_fullscreen_button_text(interface_language: Optional[str], pathname: Optional[str]) -> str:
-    """Keep the 'Go fullscreen' button translated as the language changes."""
+def update_fullscreen_button_text(interface_language: Optional[str], pathname: Optional[str]) -> Any:
+    """Keep the 'Go fullscreen' button (expand icon + label) translated."""
     if pathname != '/prediction':
         raise PreventUpdate
-    return t("ui.orientation.go_fullscreen", locale=normalize_locale(interface_language))
+    return _fullscreen_button_children(normalize_locale(interface_language))
 
 
 @app.callback(
@@ -1914,7 +2027,6 @@ def _navbar(*, locale: str, pathname: Optional[str]) -> html.Div:
     [State('url', 'pathname'),
      State('user-info-store', 'data'),
      State('user-agent', 'data'),
-     State('full-df', 'data'),
      State('glucose-unit', 'data')],
     prevent_initial_call=True,
 )
@@ -1923,7 +2035,6 @@ def update_on_language_change(
     pathname: Optional[str],
     user_info: Optional[Dict[str, Any]],
     user_agent: Optional[str],
-    full_df_data: Optional[Dict],
     glucose_unit: Optional[str],
 ) -> tuple:
     """Re-render page content and navbar when language changes.
@@ -1944,7 +2055,7 @@ def update_on_language_change(
             return staging_layout, warning_content, navbar
     if pathname == '/final':
         if user_info:
-            return create_final_layout(full_df_data, user_info, glucose_unit, locale=locale), warning_content, navbar
+            return create_final_layout(user_info, glucose_unit, locale=locale), warning_content, navbar
         return no_update, no_update, navbar
     if pathname and pathname.startswith('/share/'):
         share_id = pathname.split('/share/', 1)[1].strip('/').split('/', 1)[0]
@@ -2031,10 +2142,7 @@ def update_prediction_text_on_language_change(
         ],
         t("ui.header.description_1", locale=locale),
         "Source:" if locale == "en" else t("ui.header.current_data_source", locale=locale),
-        [
-            t("ui.header.upload_prompt_1", locale=locale),
-            html.A(t("ui.header.upload_prompt_2", locale=locale)),
-        ],
+        t("ui.header.upload_button", locale=locale),
         t("ui.header.use_example_data", locale=locale),
         t("ui.header.time_window_label", locale=locale),
         t("ui.prediction.units_label", locale=locale),
@@ -2167,7 +2275,6 @@ def update_ending_text_on_language_change(
     [Input('url', 'pathname')],
     [State('interface-language', 'data'),
      State('user-info-store', 'data'),
-     State('full-df', 'data'),
      State('current-window-df', 'data'),
      State('events-df', 'data'),
      State('glucose-unit', 'data'),
@@ -2178,15 +2285,13 @@ def display_page(
     pathname: Optional[str],
     interface_language: Optional[str],
     user_info: Optional[Dict[str, Any]],
-    full_df_data: Optional[Dict],
     current_df_data: Optional[Dict],
     events_df_data: Optional[Dict],
     glucose_unit: Optional[str],
     user_agent: Optional[str],
 ) -> tuple[html.Div, Optional[html.Div], html.Div]:
     has_ptd = bool(user_info and 'prediction_table_data' in user_info) if user_info else False
-    has_full = bool(full_df_data)
-    print(f"DEBUG display_page: pathname={pathname} has_user_info={user_info is not None} has_prediction_table_data={has_ptd} has_full_df={has_full}")
+    print(f"DEBUG display_page: pathname={pathname} has_user_info={user_info is not None} has_prediction_table_data={has_ptd}")
     locale = normalize_locale(interface_language)
     navbar = _navbar(locale=locale, pathname=pathname)
     
@@ -2219,8 +2324,11 @@ def display_page(
                 return (_landing_builder(locale=locale), warning_content, navbar)
             return (_startup_builder(locale=locale), warning_content, navbar)
         if pathname == '/ending':
-            # Check if we have the required data for ending page
-            if not full_df_data or not user_info or 'prediction_table_data' not in user_info:
+            # Check if we have the required data for ending page. Keyed on the
+            # small window store (full-df is no longer shipped to the client);
+            # create_ending_layout reloads the dataset server-side if it needs a
+            # fallback window.
+            if not current_df_data or not user_info or 'prediction_table_data' not in user_info:
                 return html.Div([
                     html.H2(t("ui.session_expired.title", locale=locale), style={'textAlign': 'center', 'marginTop': '50px'}),
                     html.P(t("ui.session_expired.text", locale=locale), style={'textAlign': 'center', 'marginBottom': '30px'}),
@@ -2239,7 +2347,7 @@ def display_page(
                         )
                     ], style={'textAlign': 'center'})
                 ]), warning_content, navbar
-            return create_ending_layout(full_df_data, current_df_data, events_df_data, user_info, glucose_unit, locale=locale), warning_content, navbar
+            return create_ending_layout(current_df_data, events_df_data, user_info, glucose_unit, locale=locale), warning_content, navbar
         if pathname == '/final':
             if not user_info:
                 return html.Div([
@@ -2260,7 +2368,7 @@ def display_page(
                         )
                     ], style={'textAlign': 'center'})
                 ]), warning_content, navbar
-            return create_final_layout(full_df_data, user_info, glucose_unit, locale=locale), warning_content, navbar
+            return create_final_layout(user_info, glucose_unit, locale=locale), warning_content, navbar
         if pathname and pathname.startswith('/share/'):
             share_id = pathname.split('/share/', 1)[1].strip('/').split('/', 1)[0]
             record = share_store.load_share(share_id) if share_id else None
@@ -2704,24 +2812,44 @@ def create_demo_page(*, locale: str) -> html.Div:
     )
 
 
+def _fullscreen_button_children(locale: str) -> list[Any]:
+    """Fullscreen button content: FontAwesome four-corners expand icon + label."""
+    return [
+        html.I(className="fas fa-expand", style={"marginRight": "8px"}),
+        t("ui.orientation.go_fullscreen", locale=locale),
+    ]
+
+
 def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[str, Any]) -> html.Div:
     """Create the prediction page layout"""
     show_upload = format_value in ("B", "C")
+    uploaded = bool(user_info.get("uploaded_data_path"))
+    # Upload gate: B from round 1, C from round 2 (see _is_upload_gated).
+    b_gated = _is_upload_gated(user_info)
     consent_given = bool(user_info.get("consent_use_uploaded_data", False))
     consent_value = ['agree'] if consent_given else []
     data_source_name = str(user_info.get("data_source_name") or "")
-    if data_source_name:
+    if b_gated:
+        # While gated (awaiting upload) keep the Source blank -- any stale value
+        # refers to the generic warm-up, not the user's data.
+        data_source_display = ""
+    elif data_source_name:
         data_source_display = data_source_name
-    elif format_value in ("B", "C"):
-        data_source_display = t("ui.header.upload_required", locale=locale)
+    elif format_value == "B":
+        # "My data only": keep the Source blank until the user uploads their file.
+        data_source_display = ""
     else:
+        # A / C start on the generic example.
         data_source_display = "example.csv"
     return html.Div([
         HeaderComponent(
             show_time_slider=False,
-            show_upload_section=show_upload,
+            # The CSV upload now lives in the always-visible action strip (so it is
+            # reachable in landscape for B/C); the header no longer renders it.
+            show_upload_section=False,
             show_example_button=(format_value == "A"),
             show_data_source_section=False,
+            render_csv_upload=(format_value == "A"),
             initial_slider_value=example_initial_slider_value,
             locale=locale,
             data_source_name=data_source_display,
@@ -2756,7 +2884,11 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
                 'borderRadius': '10px',
                 'boxShadow': '0 2px 4px rgba(0,0,0,0.06)',
                 'border': '1px solid #e5e7eb',
-                'display': 'block' if show_upload else 'none',
+                # Consent is mandatory at startup for B/C, so it is normally already
+                # recorded here -- only surface this in-page consent fallback when it
+                # is somehow missing. Kept in the DOM (display:none) so
+                # handle_file_upload's Input('prediction-data-usage-consent') stays wired.
+                'display': 'block' if (show_upload and not consent_given) else 'none',
             },
         ),
         html.Div(id="upload-required-alert", style={'margin': '0 auto', 'maxWidth': '900px'}),
@@ -2800,7 +2932,18 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
         html.Div([
             html.Div(
                 GlucoseChart(id='glucose-graph', hide_last_hour=True),
-                id='prediction-glucose-chart-container'
+                id='prediction-glucose-chart-container',
+                style={'display': 'none'} if b_gated else None,
+            ),
+            # Format B upload gate: shown in place of the chart until the user
+            # uploads their file. The Upload button itself lives in the action strip
+            # below (reachable in both portrait and landscape).
+            html.Div(
+                _upload_gate_text(user_info, locale),
+                id="prediction-upload-gate",
+                className="prediction-upload-gate",
+                disable_n_clicks=True,
+                style={'display': 'block'} if b_gated else {'display': 'none'},
             ),
             html.Div(
                 [
@@ -2824,14 +2967,25 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
             html.Div(
                 [
                     html.Button(
-                        t("ui.orientation.go_fullscreen", locale=locale),
+                        _fullscreen_button_children(locale),
                         id="prediction-fullscreen-button",
                         className="prediction-fullscreen-button",
                         type="button",
                     ),
+                    # B/C only: relocated CSV upload, styled as a button. It is a
+                    # DIRECT child of the action strip (not nested in SubmitComponent)
+                    # so CSS can lay Fullscreen/Upload/Submit/Finish out as uniformly
+                    # sized siblings -- `display:contents` on #prediction-actions (see
+                    # .has-upload rules in mobile.css) promotes Submit/Finish up to
+                    # this container. Kept out of the header so it stays reachable in
+                    # immersive landscape (where the header is hidden).
+                    make_csv_upload(
+                        locale, style={}, className="prediction-upload-button"
+                    ) if show_upload else None,
                     SubmitComponent(locale=locale),
                 ],
                 id="prediction-mobile-actions",
+                className="has-upload" if show_upload else "",
             ),
         ], id='prediction-chart-submit-wrap', style={'flex': '1'})
     ], style={
@@ -2951,33 +3105,81 @@ def show_upload_required_alert(
     user_info: Optional[Dict[str, Any]],
     interface_language: Optional[str],
 ) -> Optional[html.Div]:
-    if pathname != "/prediction":
-        return None
-    fmt = str((user_info or {}).get("format") or "A")
-    if fmt not in ("B", "C"):
-        return None
-    if current_df_data:
-        return None
+    # Superseded by the dedicated upload gate (prediction-upload-gate), which now
+    # handles both B (round 1) and C (round 2). Kept as an inert Output sink so the
+    # 'upload-required-alert' element stays wired; the Finish/Exit button in the
+    # action strip remains available for users who don't want to upload.
+    return None
+
+
+@app.callback(
+    [Output('prediction-glucose-chart-container', 'style', allow_duplicate=True),
+     Output('prediction-upload-gate', 'style'),
+     Output('prediction-upload-gate', 'children'),
+     Output('prediction-chart-submit-wrap', 'className')],
+    [Input('url', 'pathname'),
+     Input('user-info-store', 'data'),
+     Input('interface-language', 'data')],
+    prevent_initial_call='initial_duplicate',
+)
+def toggle_upload_gate(
+    pathname: Optional[str],
+    user_info: Optional[Dict[str, Any]],
+    interface_language: Optional[str],
+) -> Tuple[Dict[str, str], Dict[str, str], Any, str]:
+    """Show the format-B upload gate (and hide the chart) until a file is uploaded.
+
+    Runs on load as well as navigation so it also catches direct loads / resumes
+    onto /prediction, where the persisted example window would otherwise leak a
+    playable generic chart into a "my data only" session. Keyed on user_info (not
+    the window store) so it never clobbers a just-uploaded window and never loops.
+
+    The ``b-gated`` class on the chart/submit wrapper lets CSS force-hide the
+    Source plaque (whose time/metadata reflect the stale example seed) even in
+    immersive landscape, where the plaque style is otherwise re-shown with
+    ``!important`` and would beat an inline ``display:none``.
+    """
+    if pathname != '/prediction':
+        raise PreventUpdate
     locale = normalize_locale(interface_language)
-    has_prior_rounds = bool((user_info or {}).get("runs_by_format") or (user_info or {}).get("rounds"))
-    consent_ok = bool((user_info or {}).get("consent_use_uploaded_data", False))
-    children: list[Any] = [t("ui.prediction.upload_required_alert", locale=locale)]
-    if not consent_ok:
-        children += [
-            html.Br(),
-            html.Span(t("ui.startup.data_usage_consent_required", locale=locale)),
-        ]
-    if has_prior_rounds:
-        children += [
-            html.Br(),
-            html.Button(
-                t("ui.prediction.no_upload_back_to_final", locale=locale),
-                id="back-to-final-from-upload",
-                className="ui small button",
-                style={"paddingLeft": "0", "marginTop": "6px"},
-            ),
-        ]
-    return dbc.Alert(children, color="info", style={"marginBottom": "10px"})
+    if _is_upload_gated(user_info):
+        return (
+            {'display': 'none'},
+            {'display': 'block'},
+            _upload_gate_text(user_info, locale),
+            'b-gated',
+        )
+    return (
+        {'display': 'block'},
+        {'display': 'none'},
+        no_update,
+        '',
+    )
+
+
+@app.callback(
+    Output('startup-step', 'data', allow_duplicate=True),
+    Input('url', 'pathname'),
+    State('startup-step', 'data'),
+    prevent_initial_call=True,
+)
+def reset_startup_wizard_step(pathname: Optional[str], current_step: Optional[int]) -> Any:
+    """Reset the mobile startup wizard to step 0 whenever /startup is (re)entered.
+
+    `startup-step` is a memory store that survives client-side (SPA) navigation --
+    it is only reset by a full browser reload, and nothing else resets it on
+    arrival. So after leaving mid-wizard and returning (resume "Continue",
+    tab-switch, or a play-again reset that routes through /), the store kept a
+    stale index while the layout re-baked step 0 visible; the next Back/Next then
+    jumped several steps in (surfaced as "resumed at Step 5 of 6"). Snapping it
+    back to 0 on entry keeps the store in sync with the freshly rendered layout.
+    """
+    if pathname != '/startup':
+        raise PreventUpdate
+    if int(current_step or 0) == 0:
+        raise PreventUpdate
+    return 0
+
 
 def _compute_round_mae(prediction_table_data: list[dict[str, str]]) -> Optional[float]:
     """Extract MAE from raw prediction table data (always in mg/dL)."""
@@ -3181,7 +3383,6 @@ def _build_gamification_section(
 
 
 def create_ending_layout(
-    full_df_data: Optional[Dict],
     current_df_data: Optional[Dict],
     events_df_data: Optional[Dict],
     user_info: Optional[Dict] = None,
@@ -3190,23 +3391,28 @@ def create_ending_layout(
     locale: str,
 ) -> html.Div:
     """Create the ending page layout"""
-    if not full_df_data:
-        print("DEBUG: No data available for ending page")
-        return html.Div("No data available", style={'textAlign': 'center', 'padding': '50px'})
-    
     print("DEBUG: Creating ending page with stored data")
-    
-    # Reconstruct DataFrames from stored data
-    full_df = reconstruct_dataframe_from_dict(full_df_data)
-    events_df = reconstruct_events_dataframe_from_dict(events_df_data) if events_df_data else pl.DataFrame(
-        {
-            'time': [],
-            'event_type': [],
-            'event_subtype': [],
-            'insulin_value': []
-        }
-    )
-    
+
+    # The full dataset is NOT shipped to the client. Load it server-side lazily,
+    # only as a fallback window source when current-window-df is absent.
+    _full_df_cache: list[pl.DataFrame] = []
+    def _ending_full_df() -> pl.DataFrame:
+        if not _full_df_cache:
+            glucose_df, _ = load_dataset(resolve_dataset_identity(user_info))
+            _full_df_cache.append(glucose_df)
+        return _full_df_cache[0]
+
+    # Events for the markers: prefer the small events store; else load from the
+    # dataset server-side (the chart filters events to the window anyway).
+    if events_df_data:
+        events_df = reconstruct_events_dataframe_from_dict(events_df_data)
+    elif user_info:
+        _, events_df = load_dataset(resolve_dataset_identity(user_info))
+    else:
+        events_df = pl.DataFrame(
+            {'time': [], 'event_type': [], 'event_subtype': [], 'insulin_value': []}
+        )
+
     # Check if we have stored prediction data from the submit button
     if user_info and 'prediction_table_data' in user_info:
         print("DEBUG: Using stored prediction table data from submit button")
@@ -3232,6 +3438,7 @@ def create_ending_layout(
             df = reconstruct_dataframe_from_dict(current_df_data)
             print(f"DEBUG: Using current-window-df for ending chart (points={len(df)})")
         elif user_info and 'prediction_window_start' in user_info and 'prediction_window_size' in user_info:
+            full_df = _ending_full_df()
             window_start = user_info['prediction_window_start']
             window_size = user_info['prediction_window_size']
             # Ensure we don't go beyond the available data
@@ -3242,7 +3449,7 @@ def create_ending_layout(
             print(f"DEBUG: Using prediction window starting at {safe_start} with size {window_size}")
         else:
             # Fallback to first DEFAULT_POINTS for display
-            df = full_df.slice(0, DEFAULT_POINTS)
+            df = _ending_full_df().slice(0, DEFAULT_POINTS)
             print("DEBUG: No prediction window info found, using default first 24 points")
     else:
         print("DEBUG: No stored prediction data found")
@@ -3758,7 +3965,7 @@ def _build_aggregate_table_data(rounds: list[dict[str, Any]]) -> list[dict[str, 
     return [actual_row, prediction_row]
 
 
-def create_final_layout(full_df_data: Optional[Dict], user_info: Dict[str, Any], glucose_unit: Optional[str], *, locale: str) -> html.Div:
+def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], *, locale: str) -> html.Div:
     rounds: list[dict[str, Any]] = user_info.get('rounds') or []
     # If current rounds are empty (e.g. user just switched format), fall back to the
     # most recently archived run so results are still visible.
@@ -4307,9 +4514,23 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
             'max_rounds': int(info.get('max_rounds') or MAX_ROUNDS),
             'current_round_number': int(info.get('current_round_number') or 1),
             'statistics_saved': bool(info.get('statistics_saved') or False),
-            'is_example_data': bool(info.get('is_example_data', True)),
-            'data_source_name': str(info.get('data_source_name', 'example.csv')),
         })
+
+        # Round-1 data-source identity, accounting for a file imported at startup
+        # (uploaded_data_path set by handle_startup_csv_upload / _nightscout_import):
+        #  - B with an import -> round 1 is the user's own data.
+        #  - B without an import -> gated on /prediction (blank Source until upload).
+        #  - A / C -> round 1 is always the generic warm-up.
+        _startup_uploaded = info.get('uploaded_data_path')
+        if format_value == "B" and _startup_uploaded:
+            info['is_example_data'] = False
+            info['data_source_name'] = str(info.get('uploaded_data_filename') or 'uploaded.csv')
+        elif format_value == "B":
+            info['is_example_data'] = True
+            info['data_source_name'] = ""
+        else:  # A / C -> generic warm-up
+            info['is_example_data'] = True
+            info['data_source_name'] = "example.csv"
 
         # Ensure stable "number" across consent + stats + ranking CSVs.
         if info.get("number") is None:
@@ -4452,7 +4673,6 @@ def sync_data_source_into_user_info(
      Output('current-window-df', 'data', allow_duplicate=True)],
     [Input('submit-button', 'n_clicks')],
     [State('user-info-store', 'data'),
-     State('full-df', 'data'),
      State('current-window-df', 'data'),
      State('time-slider', 'value')],
     prevent_initial_call=True
@@ -4460,7 +4680,6 @@ def sync_data_source_into_user_info(
 def handle_submit_button(
     n_clicks: Optional[int],
     user_info: Optional[Dict[str, Any]],
-    full_df_data: Optional[Dict],
     current_df_data: Optional[Dict],
     slider_value: Optional[int],
 ) -> Tuple[str, Optional[Dict[str, Any]], Dict[str, bool], Dict[str, List[Any]]]:
@@ -4478,18 +4697,17 @@ def handle_submit_button(
     if pending_round_number == last_submit_round_number and int(n_clicks) <= last_submit_n_clicks:
         return no_update, no_update, no_update, no_update
 
-    if full_df_data and current_df_data:
+    if current_df_data:
         print("DEBUG: Submit button clicked")
-        
-        # Reconstruct DataFrames from session storage
-        current_full_df = reconstruct_dataframe_from_dict(full_df_data)
+
+        # Only the small window is needed here; the full dataset is no longer
+        # round-tripped through the client (it lives server-side, sliced on demand).
         current_df = reconstruct_dataframe_from_dict(current_df_data)
-        
-        # Update age and user_id from user_info
+
+        # Update age from user_info on the window.
         if user_info and 'age' in user_info:
-            current_full_df = current_full_df.with_columns(pl.lit(int(user_info['age'])).alias("age"))
             current_df = current_df.with_columns(pl.lit(int(user_info['age'])).alias("age"))
-        
+
         # Generate prediction table data directly from DataFrame instead of relying on component
         if user_info is None:
             user_info = {}
@@ -4512,11 +4730,17 @@ def handle_submit_button(
         user_info['prediction_table_data'] = prediction_table_data
         user_info['current_round_number'] = round_number
 
+        # Capture the window's absolute times now (the window df is in hand) so
+        # save_statistics never needs the full dataset to recover per-round times.
+        window_times = current_df.get_column('time').dt.strftime('%Y-%m-%d %H:%M:%S').to_list()
+        user_info['window_times'] = window_times
+
         round_info: dict[str, Any] = {
             'round_number': round_number,
             'prediction_window_start': user_info['prediction_window_start'],
             'prediction_window_size': user_info['prediction_window_size'],
             'prediction_table_data': prediction_table_data,
+            'window_times': window_times,
             'format': str(user_info.get('format') or ''),
             'is_example_data': bool(user_info.get('is_example_data', True)),
             'data_source_name': str(user_info.get('data_source_name', 'example.csv')),
@@ -4532,7 +4756,7 @@ def handle_submit_button(
         # Save exactly once when finishing the study (round 12 or user exits early)
         play_only = bool(user_info.get('consent_play_only'))
         if (not play_only) and round_number >= max_rounds and not bool(user_info.get('statistics_saved')):
-            submit_component.save_statistics(current_full_df, user_info)
+            submit_component.save_statistics(user_info)
             user_info['statistics_saved'] = True
         
         # Update chart mode to show ground truth and return the full window with ground truth
@@ -4557,7 +4781,6 @@ def handle_submit_button(
     [Output('url', 'pathname', allow_duplicate=True),
      Output('user-info-store', 'data', allow_duplicate=True),
      Output('glucose-chart-mode', 'data', allow_duplicate=True),
-     Output('full-df', 'data', allow_duplicate=True),
      Output('current-window-df', 'data', allow_duplicate=True),
      Output('events-df', 'data', allow_duplicate=True),
      Output('is-example-data', 'data', allow_duplicate=True),
@@ -4565,24 +4788,22 @@ def handle_submit_button(
      Output('randomization-initialized', 'data', allow_duplicate=True),
      Output('initial-slider-value', 'data', allow_duplicate=True)],
     [Input('next-round-button', 'n_clicks')],
-    [State('user-info-store', 'data'),
-     State('full-df', 'data')],
+    [State('user-info-store', 'data')],
     prevent_initial_call=True
 )
 def handle_next_round_button(
     n_clicks: Optional[int],
     user_info: Optional[Dict[str, Any]],
-    full_df_data: Optional[Dict]
-) -> Tuple[str, Dict[str, Any], Dict[str, bool], Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int]:
+) -> Tuple[str, Dict[str, Any], Dict[str, bool], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int]:
     print(f"DEBUG handle_next_round_button FIRED: n_clicks={n_clicks}")
     if not n_clicks or not user_info:
-        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
 
     rounds: list[dict[str, Any]] = user_info.get('rounds') or []
     max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS)
     next_round_number = len(rounds) + 1
     if next_round_number > max_rounds:
-        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
 
     with start_action(action_type=u"handle_next_round_button", next_round=next_round_number):
         fmt = str(user_info.get("format") or "A")
@@ -4599,16 +4820,22 @@ def handle_next_round_button(
             uploaded_path = user_info.get("uploaded_data_path")
             if not uploaded_path:
                 # Should not happen in normal flow, but keep safe empty state.
-                return '/prediction', user_info, {'hide_last_hour': True}, no_update, no_update, no_update, False, "", False, 0
+                return '/prediction', user_info, {'hide_last_hour': True}, no_update, no_update, False, "", False, 0
             full_df, events_df = load_glucose_data(Path(str(uploaded_path)))
             is_example = False
             source_name = str(user_info.get("uploaded_data_filename") or user_info.get("data_source_name") or "uploaded.csv")
         else:
-            # Format C: alternate between uploaded (odd rounds) and example (even rounds)
+            # Format C ("mixed"): round 1 is a generic warm-up; from round 2 an
+            # upload is REQUIRED, so if none exists yet, show the upload gate instead
+            # of silently continuing on generic data (a whole session of generic was
+            # the reported bug). Once uploaded, interleave: ODD round -> generic,
+            # EVEN round -> own data (so round 2 = own, round 3 = generic, ...).
             uploaded_path = user_info.get("uploaded_data_path")
             if not uploaded_path:
-                return '/prediction', user_info, {'hide_last_hour': True}, no_update, no_update, no_update, False, "", False, 0
-            use_example = (next_round_number % 2 == 0)
+                # next_round_number is always >= 2 here (round 1 came from init).
+                user_info['current_round_number'] = next_round_number
+                return '/prediction', user_info, {'hide_last_hour': True}, None, None, False, "", False, 0
+            use_example = (next_round_number % 2 == 1)
             if use_example:
                 full_df, events_df, source_name = _load_generic_round_data()
                 is_example = True
@@ -4637,7 +4864,6 @@ def handle_next_round_button(
             '/prediction',
             user_info,
             chart_mode,
-            convert_df_to_dict(full_df),
             convert_df_to_dict(new_df),
             convert_events_df_to_dict(events_df),
             is_example,
@@ -4652,14 +4878,12 @@ def handle_next_round_button(
      Output('user-info-store', 'data', allow_duplicate=True),
      Output('glucose-chart-mode', 'data', allow_duplicate=True)],
     [Input('finish-study-button', 'n_clicks')],
-    [State('user-info-store', 'data'),
-     State('full-df', 'data')],
+    [State('user-info-store', 'data')],
     prevent_initial_call=True
 )
 def handle_finish_study_from_prediction(
     n_clicks: Optional[int],
     user_info: Optional[Dict[str, Any]],
-    full_df_data: Optional[Dict]
 ) -> Tuple[str, Optional[Dict[str, Any]], Dict[str, bool]]:
     print(f"DEBUG handle_finish_study_from_prediction FIRED: n_clicks={n_clicks}")
     if not n_clicks:
@@ -4676,10 +4900,9 @@ def handle_finish_study_from_prediction(
         return '/final', user_info, {'hide_last_hour': True}
 
     play_only = bool(user_info.get('consent_play_only')) if user_info else False
-    if full_df_data and (not play_only) and not bool(user_info.get('statistics_saved')):
+    if (not play_only) and not bool(user_info.get('statistics_saved')):
         with start_action(action_type=u"handle_finish_study_from_prediction"):
-            full_df = reconstruct_dataframe_from_dict(full_df_data)
-            submit_component.save_statistics(full_df, user_info)
+            submit_component.save_statistics(user_info)
             user_info['statistics_saved'] = True
 
     return '/final', user_info, {'hide_last_hour': False}
@@ -4690,14 +4913,12 @@ def handle_finish_study_from_prediction(
      Output('user-info-store', 'data', allow_duplicate=True),
      Output('glucose-chart-mode', 'data', allow_duplicate=True)],
     [Input('finish-study-button-ending', 'n_clicks')],
-    [State('user-info-store', 'data'),
-     State('full-df', 'data')],
+    [State('user-info-store', 'data')],
     prevent_initial_call=True
 )
 def handle_finish_study_from_ending(
     n_clicks: Optional[int],
     user_info: Optional[Dict[str, Any]],
-    full_df_data: Optional[Dict]
 ) -> Tuple[str, Optional[Dict[str, Any]], Dict[str, bool]]:
     print(f"DEBUG handle_finish_study_from_ending FIRED: n_clicks={n_clicks}")
     if not n_clicks:
@@ -4714,10 +4935,9 @@ def handle_finish_study_from_ending(
         return '/final', user_info, {'hide_last_hour': True}
 
     play_only = bool(user_info.get('consent_play_only')) if user_info else False
-    if full_df_data and (not play_only) and not bool(user_info.get('statistics_saved')):
+    if (not play_only) and not bool(user_info.get('statistics_saved')):
         with start_action(action_type=u"handle_finish_study_from_ending"):
-            full_df = reconstruct_dataframe_from_dict(full_df_data)
-            submit_component.save_statistics(full_df, user_info)
+            submit_component.save_statistics(user_info)
             user_info['statistics_saved'] = True
 
     return '/final', user_info, {'hide_last_hour': False}
@@ -4743,7 +4963,6 @@ def handle_back_to_final_from_upload(n_clicks: Optional[int]) -> Tuple[str, Dict
      Output('glucose-unit', 'data', allow_duplicate=True),
      Output('interface-language', 'data', allow_duplicate=True),
      Output('last-visited-page', 'data', allow_duplicate=True),
-     Output('full-df', 'data', allow_duplicate=True),
      Output('current-window-df', 'data', allow_duplicate=True),
      Output('events-df', 'data', allow_duplicate=True),
      Output('is-example-data', 'data', allow_duplicate=True),
@@ -4778,7 +4997,6 @@ def _full_session_reset() -> tuple:
         'mg/dL',                   # glucose-unit
         'en',                      # interface-language
         None,                      # last-visited-page
-        None,                      # full-df
         None,                      # current-window-df
         None,                      # events-df
         True,                      # is-example-data
@@ -4797,7 +5015,6 @@ def _full_session_reset() -> tuple:
      Output('glucose-unit', 'data', allow_duplicate=True),
      Output('interface-language', 'data', allow_duplicate=True),
      Output('last-visited-page', 'data', allow_duplicate=True),
-     Output('full-df', 'data', allow_duplicate=True),
      Output('current-window-df', 'data', allow_duplicate=True),
      Output('events-df', 'data', allow_duplicate=True),
      Output('is-example-data', 'data', allow_duplicate=True),
@@ -4989,7 +5206,6 @@ app.clientside_callback(
         Output('url', 'pathname', allow_duplicate=True),
         Output('user-info-store', 'data', allow_duplicate=True),
         Output('glucose-chart-mode', 'data', allow_duplicate=True),
-        Output('full-df', 'data', allow_duplicate=True),
         Output('current-window-df', 'data', allow_duplicate=True),
         Output('events-df', 'data', allow_duplicate=True),
         Output('is-example-data', 'data', allow_duplicate=True),
@@ -5021,7 +5237,6 @@ def handle_switch_format(
     Dict[str, bool],
     Optional[Dict[str, List[Any]]],
     Optional[Dict[str, List[Any]]],
-    Optional[Dict[str, List[Any]]],
     bool,
     str,
     bool,
@@ -5045,7 +5260,6 @@ def handle_switch_format(
     # Consent for uploaded CGM data usage is optional and stored as a boolean.
     if target_format in ("B", "C") and not bool(info.get("uses_cgm", False)):
         return (
-            no_update,
             no_update,
             no_update,
             no_update,
@@ -5117,7 +5331,6 @@ def handle_switch_format(
                 "/prediction",
                 info,
                 chart_mode,
-                convert_df_to_dict(full_df),
                 convert_df_to_dict(new_df),
                 convert_events_df_to_dict(events_df),
                 True,
@@ -5139,7 +5352,6 @@ def handle_switch_format(
                 "/prediction",
                 info,
                 chart_mode,
-                convert_df_to_dict(full_df),
                 convert_df_to_dict(new_df),
                 convert_events_df_to_dict(events_df),
                 False,
@@ -5156,7 +5368,6 @@ def handle_switch_format(
             "/prediction",
             info,
             chart_mode,
-            None,
             None,
             None,
             False,
@@ -5262,7 +5473,7 @@ app.clientside_callback(
      Output('session-active', 'data')],
     [Input('last-visited-page', 'data'),
      Input('user-info-store', 'data'),
-     Input('full-df', 'data')],
+     Input('current-window-df', 'data')],
     [State('page-restore-done', 'data'),
      State('url', 'pathname'),
      State('session-active', 'data')],
@@ -5271,7 +5482,7 @@ app.clientside_callback(
 def restore_page_on_load(
     last_page: Optional[str],
     user_info: Optional[Dict[str, Any]],
-    full_df_data: Optional[Dict],
+    current_df_data: Optional[Dict],
     already_done: Optional[bool],
     pathname: Optional[str],
     session_active: Optional[bool],
@@ -5286,9 +5497,11 @@ def restore_page_on_load(
     interacted in this tab and just clicked a navbar link that caused a full
     reload): silently redirect to the last game page without a dialog.
 
-    All three localStorage stores (last-visited-page, user-info-store, full-df)
-    are Inputs so the callback re-fires as each store hydrates.  The
-    ``page-restore-done`` memory flag prevents action after the first decision.
+    All three localStorage stores (last-visited-page, user-info-store,
+    current-window-df) are Inputs so the callback re-fires as each store
+    hydrates.  The ``page-restore-done`` memory flag prevents action after the
+    first decision. (full-df is no longer a client store; the small window store
+    is the "game in progress" signal now.)
     """
     if already_done or _is_chart_mode:
         raise PreventUpdate
@@ -5301,7 +5514,7 @@ def restore_page_on_load(
 
     if last_page in ("/prediction", "/ending", "/final") and not user_info:
         raise PreventUpdate
-    if last_page == "/ending" and not full_df_data:
+    if last_page == "/ending" and not current_df_data:
         raise PreventUpdate
 
     rounds_played = 0
@@ -5321,7 +5534,7 @@ def restore_page_on_load(
 
         elif last_page == "/ending":
             has_prediction_data = bool(user_info and "prediction_table_data" in user_info)
-            if has_prediction_data and full_df_data:
+            if has_prediction_data and current_df_data:
                 target = "/ending"
             elif user_info:
                 target = "/prediction"
@@ -5359,14 +5572,14 @@ def restore_page_on_load(
     [Input('url', 'pathname')],
     [State('last-visited-page', 'data'),
      State('user-info-store', 'data'),
-     State('full-df', 'data')],
+     State('current-window-df', 'data')],
     prevent_initial_call=True,
 )
 def redirect_landing_to_game(
     pathname: Optional[str],
     last_page: Optional[str],
     user_info: Optional[Dict[str, Any]],
-    full_df_data: Optional[Dict],
+    current_df_data: Optional[Dict],
 ) -> str:
     """Redirect ``/`` → last game page when an active session exists.
 
@@ -5385,7 +5598,7 @@ def redirect_landing_to_game(
 
     if last_page == "/ending":
         has_ptd = bool(user_info and "prediction_table_data" in user_info)
-        if has_ptd and full_df_data:
+        if has_ptd and current_df_data:
             return "/ending"
         if user_info:
             return "/prediction"
@@ -5550,7 +5763,6 @@ def handle_resume_continue(
      Output('glucose-unit', 'data', allow_duplicate=True),
      Output('interface-language', 'data', allow_duplicate=True),
      Output('last-visited-page', 'data', allow_duplicate=True),
-     Output('full-df', 'data', allow_duplicate=True),
      Output('current-window-df', 'data', allow_duplicate=True),
      Output('events-df', 'data', allow_duplicate=True),
      Output('is-example-data', 'data', allow_duplicate=True),
@@ -5579,7 +5791,6 @@ def handle_resume_start_over(
         'mg/dL',                   # glucose-unit
         'en',                      # interface-language
         None,                      # last-visited-page
-        None,                      # full-df
         None,                      # current-window-df
         None,                      # events-df
         True,                      # is-example-data
@@ -5602,17 +5813,21 @@ def handle_resume_start_over(
 # ---------------------------------------------------------------------------
 def _resume_payload(
     user_info: Optional[Dict[str, Any]],
-    full_df: Optional[Dict],
     current_df: Optional[Dict],
     events_df: Optional[Dict],
     last_page: Optional[str],
     glucose_unit: Optional[str],
     interface_language: Optional[str],
 ) -> Dict[str, Any]:
-    """Thin JSON-serialisable snapshot of the stores needed to restore a game."""
+    """Thin JSON-serialisable snapshot of the stores needed to restore a game.
+
+    The full dataset is NOT snapshotted -- only its identity (in user_info:
+    is_example_data / uploaded_data_path) plus the current window + its events.
+    On restore the dataset is reloaded server-side from that identity, so the
+    file must persist on the server (uploads under data/input/users do).
+    """
     return {
         "user_info": user_info,
-        "full_df": full_df,
         "current_window_df": current_df,
         "events_df": events_df,
         "last_visited_page": last_page,
@@ -5627,8 +5842,7 @@ def _resume_payload(
      Input('last-visited-page', 'data'),
      Input('glucose-unit', 'data'),
      Input('interface-language', 'data')],
-    [State('full-df', 'data'),
-     State('current-window-df', 'data'),
+    [State('current-window-df', 'data'),
      State('events-df', 'data')],
     prevent_initial_call=True,
 )
@@ -5637,7 +5851,6 @@ def auto_snapshot_session(
     last_page: Optional[str],
     glucose_unit: Optional[str],
     interface_language: Optional[str],
-    full_df: Optional[Dict],
     current_df: Optional[Dict],
     events_df: Optional[Dict],
 ) -> Any:
@@ -5657,7 +5870,7 @@ def auto_snapshot_session(
         raise PreventUpdate
     resume_store.save_session(
         code,
-        _resume_payload(user_info, full_df, current_df, events_df, last_page, glucose_unit, interface_language),
+        _resume_payload(user_info, current_df, events_df, last_page, glucose_unit, interface_language),
     )
     return code
 
@@ -5666,7 +5879,7 @@ def _restore_outputs_from_code(code: Optional[str]) -> Optional[tuple]:
     """Load a session by code and return the store-output tuple, or None if missing.
 
     Output order matches the redeem callbacks:
-    (pathname, user_info, full_df, current_window_df, events_df, glucose_unit,
+    (pathname, user_info, current_window_df, events_df, glucose_unit,
      interface_language, last_visited_page, randomization_initialized,
      is_example_data, data_source_name, session_active).
     """
@@ -5678,7 +5891,6 @@ def _restore_outputs_from_code(code: Optional[str]) -> Optional[tuple]:
     return (
         last_page,
         user_info,
-        payload.get("full_df"),
         payload.get("current_window_df"),
         payload.get("events_df"),
         payload.get("glucose_unit") or "mg/dL",
@@ -5694,7 +5906,6 @@ def _restore_outputs_from_code(code: Optional[str]) -> Optional[tuple]:
 _RESUME_RESTORE_OUTPUTS = [
     Output('url', 'pathname', allow_duplicate=True),
     Output('user-info-store', 'data', allow_duplicate=True),
-    Output('full-df', 'data', allow_duplicate=True),
     Output('current-window-df', 'data', allow_duplicate=True),
     Output('events-df', 'data', allow_duplicate=True),
     Output('glucose-unit', 'data', allow_duplicate=True),
@@ -5789,24 +6000,22 @@ def redeem_resume_from_input(
 
 # Data initialization callback (URL-based only)
 @app.callback(
-    [Output('full-df', 'data', allow_duplicate=True),
-     Output('current-window-df', 'data', allow_duplicate=True),
+    [Output('current-window-df', 'data', allow_duplicate=True),
      Output('events-df', 'data', allow_duplicate=True),
      Output('is-example-data', 'data', allow_duplicate=True),
      Output('data-source-name', 'data', allow_duplicate=True),
      Output('randomization-initialized', 'data', allow_duplicate=True),
      Output('initial-slider-value', 'data', allow_duplicate=True)],
     [Input('url', 'pathname')],
-    [State('full-df', 'data'),
+    [State('current-window-df', 'data'),
      State('user-info-store', 'data')],
     prevent_initial_call=True
 )
 def initialize_data_on_url_change(
     pathname: Optional[str],
-    full_df_data: Optional[Dict],
+    current_df_data: Optional[Dict],
     user_info: Optional[Dict[str, Any]],
 ) -> Tuple[
-    Optional[Dict[str, List[Any]]],
     Optional[Dict[str, List[Any]]],
     Optional[Dict[str, List[Any]]],
     bool,
@@ -5814,50 +6023,110 @@ def initialize_data_on_url_change(
     bool,
     int,
 ]:
-    """Initialize data when URL changes to /prediction without existing data.
+    """Initialize the window when URL changes to /prediction without existing data.
 
-    Only loads fresh example data when navigating to /prediction and no data
-    exists yet.  All other pages are left alone so that persisted localStorage
-    stores are never overwritten (critical for the resume flow).
+    Only loads a fresh example window when navigating to /prediction and no
+    window exists yet.  All other pages are left alone so that persisted
+    localStorage stores are never overwritten (critical for the resume flow).
+    The full dataset is sliced server-side; only the window is shipped.
     """
-    _no_change = (no_update, no_update, no_update, no_update, no_update, no_update, no_update)
+    _no_change = (no_update, no_update, no_update, no_update, no_update, no_update)
 
     if pathname != '/prediction':
         return _no_change
 
-    # For format B/C: require upload, don't auto-load example dataset.
-    fmt = str((user_info or {}).get("format") or "A")
-    uploaded_path = (user_info or {}).get("uploaded_data_path")
-    if fmt in ("B", "C") and not uploaded_path:
-        return None, None, None, False, "", False, 0
+    # Upload gate (B from round 1, C from round 2): don't auto-load a generic
+    # window when the session must block on an upload -- leave the window empty so
+    # the gate shows (handles direct load / resume mid-session). Format C round 1
+    # still falls through to load the generic warm-up window below.
+    if _is_upload_gated(user_info):
+        return None, None, False, "", False, 0
 
-    # Data already present — preserve (handles resume and round transitions).
-    if full_df_data is not None:
+    # Window already present — preserve (handles resume and round transitions).
+    if current_df_data is not None:
         return _no_change
 
-    # First visit to /prediction with no data: load fresh generic data.
-    full_df, events_df, source_name = _load_generic_round_data()
+    # First visit to /prediction with no window: load the round-1 dataset. Format B
+    # with a startup import uses the user's own file; A / C round 1 (and any other
+    # generic warm-up) pick a random generic source via _load_generic_round_data().
+    fmt = str((user_info or {}).get("format") or "A")
+    uploaded_path = (user_info or {}).get("uploaded_data_path")
+    if fmt == "B" and uploaded_path:
+        full_df, events_df = load_dataset(Path(str(uploaded_path)))
+        is_example = False
+        source_name = str(
+            (user_info or {}).get("uploaded_data_filename")
+            or (user_info or {}).get("data_source_name")
+            or "uploaded.csv"
+        )
+    else:
+        full_df, events_df, source_name = _load_generic_round_data()
+        is_example = True
     df, random_start = get_random_data_window(full_df, DEFAULT_POINTS)
-    full_df = full_df.with_columns(pl.lit(0.0).alias('prediction'))
     df = df.with_columns(pl.lit(0.0).alias('prediction'))
 
     with start_action(action_type=u"initialize_data_on_url_change") as action:
-        action.log(message_type="new_random_start", random_start=random_start)
+        action.log(message_type="new_random_start", random_start=random_start, is_example=is_example)
 
     return (
-        convert_df_to_dict(full_df),
         convert_df_to_dict(df),
         convert_events_df_to_dict(events_df),
-        True,
+        is_example,
         source_name,
         False,
         random_start,
     )
 
+# Client-side upload compression. dcc.Upload hands us the file as a base64 data
+# URL; we gzip it in the browser (CompressionStream, Safari 16.4+/Chrome/Firefox)
+# and hand a "gzip:<base64>" string to the server store instead. A ~2.4 MB CSV
+# shrinks to ~300-400 KB, well under whatever ceiling the mobile browser hits.
+# Any failure (no CompressionStream, exception) returns the original contents so
+# the server's data-URL path still works -- desktop behaviour is unchanged.
+_UPLOAD_COMPRESS_JS = """
+async function(contents, filename) {
+    if (!contents) { return window.dash_clientside.no_update; }
+    try {
+        if (typeof CompressionStream === 'undefined') { return contents; }
+        var comma = contents.indexOf(',');
+        if (comma < 0) { return contents; }
+        var b64 = contents.slice(comma + 1);
+        var raw = Uint8Array.from(atob(b64), function(c){ return c.charCodeAt(0); });
+        var cs = new CompressionStream('gzip');
+        var buf = await new Response(new Blob([raw]).stream().pipeThrough(cs)).arrayBuffer();
+        var comp = new Uint8Array(buf);
+        var bin = '';
+        var CH = 0x8000;
+        for (var i = 0; i < comp.length; i += CH) {
+            bin += String.fromCharCode.apply(null, comp.subarray(i, i + CH));
+        }
+        return 'gzip:' + btoa(bin);
+    } catch (e) {
+        return contents;
+    }
+}
+"""
+
+app.clientside_callback(
+    _UPLOAD_COMPRESS_JS,
+    Output('upload-data-payload', 'data'),
+    Input('upload-data', 'contents'),
+    State('upload-data', 'filename'),
+    prevent_initial_call=True,
+)
+
+app.clientside_callback(
+    _UPLOAD_COMPRESS_JS,
+    Output('startup-upload-payload', 'data'),
+    Input('startup-upload-data', 'contents'),
+    State('startup-upload-data', 'filename'),
+    prevent_initial_call=True,
+)
+
+
 # Separate callback for file upload handling
 @app.callback(
     [Output('last-click-time', 'data'),
-     Output('full-df', 'data', allow_duplicate=True),
      Output('current-window-df', 'data', allow_duplicate=True),
      Output('events-df', 'data', allow_duplicate=True),
      Output('is-example-data', 'data', allow_duplicate=True),
@@ -5866,7 +6135,7 @@ def initialize_data_on_url_change(
      Output('initial-slider-value', 'data', allow_duplicate=True),
      Output('user-info-store', 'data', allow_duplicate=True),
      Output('consent-scroll-request', 'data')],
-    [Input('upload-data', 'contents'),
+    [Input('upload-data-payload', 'data'),
      Input('prediction-data-usage-consent', 'value')],
     [State('upload-data', 'filename'),
      State('user-info-store', 'data')],
@@ -5877,10 +6146,10 @@ def handle_file_upload(
     consent_value: Optional[list[str]],
     filename: Optional[str],
     user_info: Optional[Dict[str, Any]],
-) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int, Dict[str, Any], int]:
+) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int, Dict[str, Any], int]:
     """Handle file upload and data loading"""
     triggered = ctx.triggered_id
-    if triggered not in ("upload-data", "prediction-data-usage-consent"):
+    if triggered not in ("upload-data-payload", "prediction-data-usage-consent"):
         raise PreventUpdate
 
     info_pre: Dict[str, Any] = dict(user_info or {})
@@ -5947,8 +6216,8 @@ def handle_file_upload(
             filename = str(info_pre.get("pending_upload_filename") or filename or "")
 
         if not upload_contents:
-            return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
-    
+            return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+
         consent_ok = bool(info_pre.get("consent_use_uploaded_data", False)) or bool(consent_value and "agree" in consent_value)
         if fmt in ("B", "C") and not consent_ok:
             info_pre["blocked_upload_requires_consent"] = True
@@ -5964,13 +6233,13 @@ def handle_file_upload(
                 no_update,
                 no_update,
                 no_update,
-                no_update,
                 info_pre,
                 no_update,
             )
         
-        # Parse upload contents
-        if ',' not in upload_contents:
+        # Parse upload contents (gzip-compressed by the client, or a raw data URL)
+        decoded = decode_upload_bytes(upload_contents)
+        if decoded is None:
             print(f"ERROR: Invalid upload format for file {filename}")
             return (
                 current_time,
@@ -5980,14 +6249,10 @@ def handle_file_upload(
                 no_update,
                 no_update,
                 no_update,
-                no_update,
                 dict(user_info or {}),
                 no_update,
             )
-        
-        content_type, content_string = upload_contents.split(',', 1)
-        decoded = base64.b64decode(content_string)
-        
+
         # Ensure user data directory exists under data/input/users
         users_data_dir = project_root / 'data' / 'input' / 'users'
         users_data_dir.mkdir(parents=True, exist_ok=True)
@@ -6024,7 +6289,6 @@ def handle_file_upload(
 
         return (
             current_time,
-            convert_df_to_dict(new_full_df),
             convert_df_to_dict(new_df),
             convert_events_df_to_dict(new_events_df),
             False,  # is_example_data = False for uploaded files
@@ -6039,7 +6303,6 @@ def handle_file_upload(
 # Nightscout data load callback
 @app.callback(
     [Output('last-click-time', 'data', allow_duplicate=True),
-     Output('full-df', 'data', allow_duplicate=True),
      Output('current-window-df', 'data', allow_duplicate=True),
      Output('events-df', 'data', allow_duplicate=True),
      Output('is-example-data', 'data', allow_duplicate=True),
@@ -6061,12 +6324,12 @@ def handle_nightscout_load(
     nightscout_token: Optional[str],
     user_info: Optional[Dict[str, Any]],
     consent_value: Optional[list[str]],
-) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int, Dict[str, Any], Any]:
+) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int, Dict[str, Any], Any]:
     """Load CGM data from a Nightscout server URL."""
     if not n_clicks:
         raise PreventUpdate
 
-    _no = (no_update,) * 9
+    _no = (no_update,) * 8
 
     info_pre: Dict[str, Any] = dict(user_info or {})
     fmt = str(info_pre.get("format") or "A")
@@ -6135,7 +6398,6 @@ def handle_nightscout_load(
 
         return (
             current_time,
-            convert_df_to_dict(new_full_df),
             convert_df_to_dict(new_df),
             convert_events_df_to_dict(new_events_df),
             False,
@@ -6150,7 +6412,6 @@ def handle_nightscout_load(
 # Separate callback for example data button
 @app.callback(
     [Output('last-click-time', 'data', allow_duplicate=True),
-     Output('full-df', 'data', allow_duplicate=True),
      Output('current-window-df', 'data', allow_duplicate=True),
      Output('events-df', 'data', allow_duplicate=True),
      Output('is-example-data', 'data', allow_duplicate=True),
@@ -6161,10 +6422,10 @@ def handle_nightscout_load(
     [Input('use-example-data-button', 'n_clicks')],
     prevent_initial_call=True
 )
-def handle_example_data_button(example_button_clicks: Optional[int]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int, int]:
+def handle_example_data_button(example_button_clicks: Optional[int]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int, int]:
     """Handle use example data button click"""
     if not example_button_clicks:
-        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
     
     with start_action(action_type=u"handle_example_data_button"):
         current_time = int(time.time() * 1000)
@@ -6182,8 +6443,7 @@ def handle_example_data_button(example_button_clicks: Optional[int]) -> Tuple[in
         
         print(f"DEBUG: Generated new random start position for example data: {random_start}")
         
-        return (current_time, 
-               convert_df_to_dict(new_full_df),
+        return (current_time,
                convert_df_to_dict(new_df),
                convert_events_df_to_dict(new_events_df),
                True,  # is_example_data = True for generic data
@@ -6198,31 +6458,50 @@ def handle_example_data_button(example_button_clicks: Optional[int]) -> Tuple[in
     [Output('last-click-time', 'data', allow_duplicate=True),
      Output('current-window-df', 'data', allow_duplicate=True)],
     [Input('time-slider', 'value')],
-    [State('full-df', 'data')],
+    [State('user-info-store', 'data'),
+     State('current-window-df', 'data')],
     prevent_initial_call=True
 )
 def handle_time_slider(
     slider_value: Optional[int],
-    full_df_data: Optional[Dict],
+    user_info: Optional[Dict[str, Any]],
+    current_df_data: Optional[Dict[str, List[Any]]],
 ) -> Tuple[int, Dict[str, List[Any]]]:
-    """Handle time slider changes"""
-    if slider_value is None or not full_df_data:
+    """Handle time slider changes (slices the window server-side from the dataset).
+
+    The re-slice comes from ``load_dataset`` which zeroes the ``prediction`` column
+    (datasets are immutable; predictions live only in the window). The slider is
+    ``persistence=True`` and always mounted, so it re-fires on every layout rebuild
+    (page nav, resume, language change) with its persisted value -- which re-slices
+    the SAME window and would overwrite ``current-window-df``, wiping any
+    predictions already there (a resumed in-progress round, or the ``--prefill``
+    seed). Guard: if the freshly-sliced window covers the same timestamps as the
+    current one, no-op so those predictions survive. A genuine move to a different
+    window still returns a fresh (legitimately zeroed) window.
+    """
+    if slider_value is None or not user_info:
         return no_update, no_update
-    
+
     with start_action(action_type=u"handle_time_slider", slider_value=slider_value):
         current_time = int(time.time() * 1000)
-        
-        full_df = reconstruct_dataframe_from_dict(full_df_data)
-        
+
+        full_df, _ = load_dataset(resolve_dataset_identity(user_info))
+
         # Ensure we don't go beyond the available data
         points = max(MIN_POINTS, min(MAX_POINTS, DEFAULT_POINTS))
         max_start = len(full_df) - points
         safe_slider_value = min(slider_value, max_start)
         safe_slider_value = max(0, safe_slider_value)
-        
+
         new_df = full_df.slice(safe_slider_value, points)
-        
-        return current_time, convert_df_to_dict(new_df)
+        new_dict = convert_df_to_dict(new_df)
+
+        # Same window as already displayed (slider mount / persistence re-fire) ->
+        # preserve the current window (and its predictions) instead of clobbering.
+        if current_df_data and current_df_data.get('time') == new_dict.get('time'):
+            return no_update, no_update
+
+        return current_time, new_dict
 
 # Separate callback for glucose graph interactions (only active on prediction page)
 @app.callback(
@@ -6401,8 +6680,10 @@ def update_data_source_display(
     if source_name:
         return source_name
     fmt = str((user_info or {}).get("format") or "A")
-    if fmt in ("B", "C"):
-        return t("ui.header.upload_required", locale=normalize_locale(interface_language))
+    # Format B: keep the Source blank until the user uploads their file.
+    if fmt == "B":
+        return ""
+    # Format C plays generic until an upload arrives.
     return "example.csv"
 
 
@@ -6461,21 +6742,21 @@ def update_generic_source_metadata_display(
      Output('randomization-initialized', 'data', allow_duplicate=True)],
     [Input('time-slider', 'max')],  # Triggers when slider is created and max is set
     [State('url', 'pathname'),
-     State('full-df', 'data'),
+     State('user-info-store', 'data'),
      State('randomization-initialized', 'data'),
      State('initial-slider-value', 'data')],
     prevent_initial_call=True
 )
-def randomize_slider_on_prediction_page(slider_max: int, pathname: str, full_df_data: Optional[Dict], 
-                                       randomization_initialized: bool, 
+def randomize_slider_on_prediction_page(slider_max: int, pathname: str, user_info: Optional[Dict[str, Any]],
+                                       randomization_initialized: bool,
                                        initial_slider_value: Optional[int]) -> Tuple[int, bool]:
     """Set slider to a random valid window start when slider mounts on prediction page. Returns slider value and updated randomization flag."""
-    if pathname == '/prediction' and full_df_data and slider_max is not None and not randomization_initialized:
+    if pathname == '/prediction' and user_info and slider_max is not None and not randomization_initialized:
         # Use the stored initial slider value if available
         if initial_slider_value is not None:
             return initial_slider_value, True
-        # Otherwise generate a new random start
-        full_df = reconstruct_dataframe_from_dict(full_df_data)
+        # Otherwise generate a new random start (dataset loaded server-side)
+        full_df, _ = load_dataset(resolve_dataset_identity(user_info))
         points = max(MIN_POINTS, min(MAX_POINTS, DEFAULT_POINTS))
         _, random_start = get_random_data_window(full_df, points)
         return random_start, True  # Set randomization flag to True after randomizing
@@ -6539,21 +6820,20 @@ def update_upload_success_message(
      Output('upload-data', 'contents', allow_duplicate=True),  # Reset upload contents
      Output('upload-data', 'filename', allow_duplicate=True)],  # Reset filename
     [Input('use-example-data-button', 'n_clicks')],
-    [State('full-df', 'data'),
-     State('interface-language', 'data')],
+    [State('interface-language', 'data')],
     prevent_initial_call=True
 )
 def reset_upload_on_example_data(
     example_button_clicks: Optional[int],
-    full_df_data: Optional[Dict],
     interface_language: Optional[str],
 ) -> Tuple[Optional[html.Div], int, None, None]:
     """Reset upload component and show message when example data button is clicked"""
-    if not example_button_clicks or not full_df_data:
+    if not example_button_clicks:
         return no_update, no_update, no_update, no_update
-    
+
     with start_action(action_type=u"reset_upload_on_example_data"):
-        full_df = reconstruct_dataframe_from_dict(full_df_data)
+        # This button switches to the example dataset; size the slider to it.
+        full_df, _ = load_dataset(EXAMPLE_DATASET_PATH)
         points = max(MIN_POINTS, min(MAX_POINTS, DEFAULT_POINTS))
         new_max = len(full_df) - points
         
@@ -6780,6 +7060,9 @@ def _seed_chart_env_from_argv(argv: list[str], env: Dict[str, str]) -> None:
     env["_CHART_UNIT"] = unit_arg if unit_arg in ("mg/dL", "mmol/L") else "mg/dL"
     env["_CHART_LOCALE"] = normalize_locale(_arg_value(argv, "--locale", "-l") or "en")
 
+    format_arg = _arg_value(argv, "--format")
+    env["_CHART_FORMAT"] = format_arg if format_arg in ("A", "B", "C") else "A"
+
     if _arg_present(argv, "--prefill"):
         env["_CHART_PREFILL"] = "1"
         env["_CHART_NOISE"] = _arg_value(argv, "--noise") or "0.05"
@@ -6848,6 +7131,7 @@ def chart(
     start: Optional[int] = typer.Option(None, "--start", "-s", help="Start index for the data window (default: random)"),
     unit: str = typer.Option("mg/dL", "--unit", "-u", help="Glucose unit: mg/dL or mmol/L"),
     locale: str = typer.Option("en", "--locale", "-l", help="UI locale (en, de, uk, ro)"),
+    format: str = typer.Option("A", "--format", help="Data-source format: A=generic, B=my data only (upload gate), C=mixed"),
     prefill: bool = typer.Option(False, "--prefill", help="Pre-fill predictions with noisy ground truth so submit/ending can be tested immediately"),
     noise: float = typer.Option(0.05, "--noise", help="Noise level for --prefill (fraction of gl value, e.g. 0.05 = +/-5%%)"),
     clean: bool = typer.Option(False, "--clean", help="Clear browser localStorage on first connect so the session starts fresh"),
@@ -6876,6 +7160,7 @@ def chart(
         os.environ["_CHART_START"] = str(start)
     os.environ["_CHART_UNIT"] = unit if unit in ("mg/dL", "mmol/L") else "mg/dL"
     os.environ["_CHART_LOCALE"] = normalize_locale(locale)
+    os.environ["_CHART_FORMAT"] = format if format in ("A", "B", "C") else "A"
     os.environ["_CHART_SOURCE"] = file.name if file else "example.csv"
     if prefill:
         os.environ["_CHART_PREFILL"] = "1"

@@ -153,12 +153,31 @@ en:
     format_help_c: "Generic + My Data — try both. You will upload your own file, but each round uses either sample data or your own data."
     data_usage_consent_label: "I agree to the use of my uploaded CGM data for this study."
     data_usage_consent_required: "Please confirm data usage consent to continue."
+    import_title: "Import your CGM data"
+    import_subtitle: "Upload a CSV (Dexcom / Libre / Medtronic / Nightscout export) or pull it directly from your Nightscout site. You can also do this later on the prediction screen."
+    import_or: "— or —"
+    import_upload_prompt: "Drag & drop or click to select a CSV file"
+    import_ns_url_placeholder: "Nightscout URL (https://your-site.com)"
+    import_ns_token_placeholder: "Access token or API secret (optional)"
+    import_ns_button: "Import from Nightscout"
+    import_ns_loading: "Contacting your Nightscout site…"
+    import_success: "Loaded %{count} readings from %{source}. You're ready to start."
+    import_needs_consent: "Please tick the data-usage consent box above before importing."
+    import_needs_url: "Please enter your Nightscout URL first."
+    import_empty: "That source returned no glucose readings. Check the URL/token (or the date range) and try again."
+    import_bad_file: "Could not read that file — please export a standard CGM CSV (Dexcom / Libre / Medtronic / Nightscout) and try again."
+    import_ns_unreachable: "Could not reach that Nightscout site. Check the URL and your connection, then try again."
+    import_ns_timeout: "The Nightscout site took too long to respond. Please try again."
+    import_ns_http_error: "The Nightscout site rejected the request (HTTP %{code}). Check the URL and token."
+    import_ns_unavailable: "Nightscout import isn't available on this server (missing network dependency)."
+    import_failed: "Import failed. Please check your file or Nightscout details and try again."
 
   header:
     points_label: "Number of points to show:"
     time_window_label: "Time Window Position:"
     upload_prompt_1: "Drag and Drop or "
     upload_prompt_2: "Upload Your Data Here"
+    upload_button: "Upload"
     use_example_data: "Use Generic Data"
     upload_required: "Upload required"
     upload_success: "Successfully loaded data from %{filename}. This data will be used for predictions."
@@ -188,6 +207,8 @@ en:
   prediction:
     units_label: "Units:"
     upload_required_alert: "This format requires your own CGM data. Please upload a CSV file to start."
+    upload_only_gate: "You chose to play with your own data only. To start playing, press the Upload button and select your file."
+    upload_mixed_gate: "You chose the mixed mode (generic + your own data). To continue, press the Upload button and select your CGM file — rounds then alternate between generic and your data."
     upload_consent_recorded: "Consent recorded. You can now upload and use your CGM data in this session."
     no_upload_back_to_final: "No CGM data to upload? View your results from previous rounds"
 
@@ -206,7 +227,7 @@ en:
     # landscape flowpath). Keys kept harmless in case other locales still list them.
     title: "ROTATE YOUR PHONE TO LANDSCAPE TO DRAW"
     subtitle: ""
-    go_fullscreen: "Fullscreen mode"
+    go_fullscreen: "Fullscreen"
 
   share:
     button_share: "Share my results"

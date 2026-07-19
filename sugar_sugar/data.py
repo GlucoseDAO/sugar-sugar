@@ -1,3 +1,5 @@
+import base64
+import gzip
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -5,6 +7,29 @@ from typing import Optional
 import polars as pl
 from cgm_format import FormatParser, FormatProcessor, UnifiedEventType
 from eliot import start_action
+
+
+def decode_upload_bytes(payload: Optional[str]) -> Optional[bytes]:
+    """Decode an upload payload to raw file bytes.
+
+    Uploads are gzip-compressed client-side (``"gzip:<base64>"``) so the ~3.3 MB
+    base64 of a multi-MB CGM export never has to cross the wire from the phone --
+    mobile browsers reliably fail to POST a payload that large, which is why a big
+    Dexcom export uploaded fine on desktop but silently failed on mobile (server
+    parsing was never the problem). Falls back to a plain data URL
+    (``"<mime>,<base64>"``) for desktop/older browsers without CompressionStream.
+    Returns None if the payload is unrecognisable.
+    """
+    if not payload:
+        return None
+    try:
+        if payload.startswith("gzip:"):
+            return gzip.decompress(base64.b64decode(payload[5:]))
+        if "," in payload:
+            return base64.b64decode(payload.split(",", 1)[1])
+    except Exception:
+        return None
+    return None
 
 _RENDERED_EVENT_TYPES: tuple[str, ...] = (
     UnifiedEventType.CARBOHYDRATES.value,

@@ -2025,3 +2025,161 @@ html.route-prediction.mobile-device #submit-button {
     font-size: 64px !important;
   }
 }
+
+/* =====================================================================
+   Format B/C CSV upload button + Format B upload gate.
+   The single dcc.Upload (id='upload-data') is relocated from the header into
+   the submit action row so it stays reachable in immersive landscape (where the
+   header is hidden). It is styled as a button matching Submit and sits to its
+   LEFT. `.prediction-upload-gate` replaces the chart for "my data only" (B)
+   until a file is uploaded. Appended last so these win.
+   ===================================================================== */
+/* The dcc.Upload ROOT element is div#upload-data -- that is the real flex/grid
+   item. The className we pass lands on an inner node, so style AND size the
+   button via #upload-data itself (targeting the inner class left it width:0). */
+#upload-data {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  cursor: pointer;
+  background-color: #2185d0;
+  color: #fff !important;
+  border: 0;
+  border-radius: 6px;
+  font-weight: 700;
+  text-align: center;
+  touch-action: manipulation;
+  width: 300px;
+  height: 60px;
+  font-size: 20px;
+  margin: 0 auto 10px auto;
+  overflow: hidden;
+  white-space: nowrap;
+}
+#upload-data:active { transform: scale(0.97); }
+/* Hitbox fix: the real dcc.Upload dropzone is the inner .prediction-upload-button
+   (it holds the hidden <input type=file>), which otherwise shrinks to the text
+   (~64x20) so only the label was clickable -- the rest of the blue rectangle did
+   nothing. Make the dropzone fill #upload-data so the WHOLE button opens the file
+   dialog. The absolutely-positioned inner <input> (inset:0) then covers it too. */
+#upload-data > .prediction-upload-button {
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+/* The label text lives in #header-upload-prompt (a nested element), which the
+   broad `body :not(...) { font-size:18px !important }` rule shrinks -- making
+   "Upload" thinner/smaller than the Fomantic buttons. Two IDs beat that rule, so
+   match the sibling buttons' size + weight here. */
+#upload-data #header-upload-prompt {
+  margin: 0;
+  color: #fff;
+  font-size: 20px !important;
+  font-weight: 700 !important;
+}
+#upload-data a { color: #fff; text-decoration: none; }
+
+.prediction-upload-gate {
+  padding: 28px 24px;
+  margin: 20px auto;
+  max-width: 780px;
+  background: #eef5ff;
+  border: 1px dashed #2185d0;
+  border-radius: 12px;
+  color: #1f2a44;
+  line-height: 1.45;
+  text-align: center;
+}
+/* Enlarge the gate PANE text (~2x) and scale it with the viewport width. Must be
+   ID-scoped: a broad `html.route-prediction.mobile-device body :not(...)`
+   `font-size:18px !important` rule outweighs a class selector, so only an ID
+   selector (higher specificity) wins here. */
+#prediction-upload-gate {
+  font-size: clamp(34px, 2.8vw, 56px) !important;
+}
+
+/* Format-B gated state (no upload yet): hide the Source plaque entirely -- its
+   time/metadata reflect the stale example seed and are meaningless here. Must
+   beat the immersive-landscape rule that re-shows the plaque with !important. */
+#prediction-chart-submit-wrap.b-gated #prediction-source-plaque {
+  display: none !important;
+}
+
+/* ---- Uniform action buttons for formats B/C (`has-upload`) ----
+   The action strip holds Fullscreen + Upload + Submit + Finish. `display:contents`
+   on #prediction-actions promotes Submit/Finish up so all four are siblings of the
+   strip and can be sized identically. A-mode (no `has-upload`) keeps its original
+   Fullscreen(2x)+Submit/Finish layout untouched. */
+
+/* Portrait B/C: 2x2 grid -> column 1 = Fullscreen / Upload, column 2 = Submit /
+   Finish; all four identical. (column flow fills top-to-bottom then next column.) */
+@media (orientation: portrait) {
+  html.route-prediction.mobile-device #prediction-mobile-actions.has-upload {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    grid-template-rows: 1fr 1fr !important;
+    grid-auto-flow: column !important;
+    gap: 10px 12px !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    margin: 0 !important;
+  }
+  html.route-prediction.mobile-device #prediction-mobile-actions.has-upload #prediction-actions {
+    display: contents !important;
+  }
+  html.route-prediction.mobile-device #prediction-mobile-actions.has-upload .prediction-fullscreen-button,
+  html.route-prediction.mobile-device #prediction-mobile-actions.has-upload #upload-data,
+  html.route-prediction.mobile-device #prediction-mobile-actions.has-upload #submit-button,
+  html.route-prediction.mobile-device #prediction-mobile-actions.has-upload #finish-study-button {
+    grid-row: auto !important;
+    grid-column: auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    margin: 0 !important;
+    font-size: 20px !important;
+    box-sizing: border-box !important;
+  }
+}
+
+/* Landscape B/C: one row of three equal buttons (Upload | Submit | Finish),
+   Fullscreen hidden. Widen the strip from 548px so three ~264px buttons fit
+   (they overflowed left onto the How-to-play toggle at 548px). */
+@media (orientation: landscape) and (pointer: coarse) {
+  html.route-prediction.mobile-device #prediction-mobile-actions.has-upload {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 828px !important;
+  }
+  html.route-prediction.mobile-device #prediction-mobile-actions.has-upload #prediction-actions {
+    display: contents !important;
+  }
+  html.route-prediction.mobile-device #prediction-mobile-actions.has-upload #upload-data,
+  html.route-prediction.mobile-device #prediction-mobile-actions.has-upload #submit-button,
+  html.route-prediction.mobile-device #prediction-mobile-actions.has-upload #finish-study-button {
+    flex: 1 1 0 !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    height: 46px !important;
+    min-height: 46px !important;
+    font-size: 20px !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+  }
+  /* Gate fills the freed chart area. The top header chips (Round/Source/Units)
+     are absolutely positioned over the first ~50px, so push the gate below them
+     to avoid clipping. No display override here -- the toggle callback owns
+     display via inline style. */
+  html.route-prediction.mobile-device .prediction-upload-gate {
+    flex: 0 0 auto !important;
+    margin: 68px auto 8px auto !important;
+    max-width: 92% !important;
+  }
+}
