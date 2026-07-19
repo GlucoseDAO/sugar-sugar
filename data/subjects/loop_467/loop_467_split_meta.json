@@ -1,0 +1,26 @@
+{
+  "n_rows": 150512,
+  "train": {
+    "n_rows": 95951,
+    "start": "2018-04-21 00:01:00",
+    "end": "2019-03-26 03:32:00"
+  },
+  "val": {
+    "n_rows": 16933,
+    "start": "2019-03-26 03:37:00",
+    "end": "2019-05-24 02:45:00"
+  },
+  "test": {
+    "n_rows": 37628,
+    "start": "2019-05-24 02:50:00",
+    "end": "2019-10-04 04:29:00"
+  },
+  "test_fraction": 0.25,
+  "val_fraction_of_remainder": 0.15,
+  "personal_days": null,
+  "source": "data\\loop_and_ai_ready\\loop.csv",
+  "subject": "loop_467",
+  "user_ids": [
+    "467"
+  ]
+}

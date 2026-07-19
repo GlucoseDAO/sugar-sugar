@@ -1,0 +1,69 @@
+User ID: 467
+Subject folder: loop_467
+Role: joined2_test_split
+Source preprocessed CSV: data/loop_and_ai_ready/loop.csv
+Global joined2 split: test
+
+=== Personalization split (chronological) ===
+train: n_rows=95951  2018-04-21 00:01:00 -> 2019-03-26 03:32:00
+val: n_rows=16933  2019-03-26 03:37:00 -> 2019-05-24 02:45:00
+test: n_rows=37628  2019-05-24 02:50:00 -> 2019-10-04 04:29:00
+Total rows: 150512
+
+=== PtRoster ===
+PtID: 467
+EnrollDt: 7/23/2018
+VisitSchedStartDt: 7/23/2018
+PtStatus: Completed
+PtCohort: B
+AgeAtEnrollment: 57
+LoopUseTimeAtEnroll: More than 12 months
+PtTimezoneOffset: -7
+PrefContactMethod: Email
+
+=== Surveys (Baseline demographics / clinical) ===
+ageAtBaseline: 57
+gender_code: 1
+gender: Male/Man
+ethnicity_code: 2
+ethnicity: Not Hispanic or Latino
+race_code: 1
+race: White
+height_feet: 5
+height_inches: 8
+weight_lb: 140.0
+age_diabetes_developed: 14.0
+diabetes_duration_years_coded: 44
+hba1c_level_survey_code: 1
+hba1c_when_measured_code: 1
+pregnant_code: 
+pump_use_code: 2
+aid_use_code: 1
+pump_type_use_code: 3
+what_cgm_code: 1
+cgm_experience_code: 2
+PtCohort: B
+
+Note: gender/ethnicity/race labels are decoded from LOOP survey integer codes
+(gender: 1=Male/Man, 2=Female/Woman, 3=Nonbinary; ethnicity: 1=Hispanic/Latino, 2=Not;
+ race: 1=White, 2=Black/African American, 3=Asian, 4=NHPI, 5=AI/AN, 6=More than one).
+Other *_code fields left as raw survey codes.
+
+=== SampleResults (lab) ===
+Baseline: GLYHB=4.7 % (collected 8/4/2018, analyzed 8/12/2018)
+Month 12: GLYHB=4.5 % (collected 7/20/2019, analyzed 7/23/2019)
+Month 6: GLYHB=4.8 % (collected 1/26/2019, analyzed 2/8/2019)
+
+=== gluIndices (CGM summary metrics) ===
+Period=Baseline | gluInRange=92% | gluMean=97 | gluAbove180=1% | gluAbove250=0% | gluBelow70=7.4% | gluBelow54=0.7% | gluSD=22 | gluCV=23% | totalDailyIns=30 | totalDailyInsBasal=18 | totalDailyInsBolus=12 | gluHours=2195.0
+Period=Month 12 | gluInRange=96% | gluMean=98 | gluAbove180=0% | gluAbove250=0% | gluBelow70=4.1% | gluBelow54=0.2% | gluSD=19 | gluCV=20% | totalDailyIns=27 | totalDailyInsBasal=12 | totalDailyInsBolus=15 | gluHours=2193.0
+Period=Month 3 | gluInRange=95% | gluMean=101 | gluAbove180=0% | gluAbove250=0% | gluBelow70=4.4% | gluBelow54=0.5% | gluSD=22 | gluCV=22% | totalDailyIns=29 | totalDailyInsBasal=19 | totalDailyInsBolus=10 | gluHours=2166.0
+Period=Month 6 | gluInRange=93% | gluMean=101 | gluAbove180=1% | gluAbove250=0% | gluBelow70=6.0% | gluBelow54=0.6% | gluSD=24 | gluCV=24% | totalDailyIns=30 | totalDailyInsBasal=20 | totalDailyInsBolus=10 | gluHours=2142.0
+Period=Month 9 | gluInRange=94% | gluMean=95 | gluAbove180=0% | gluAbove250=0% | gluBelow70=5.8% | gluBelow54=0.4% | gluSD=19 | gluCV=20% | totalDailyIns=24 | totalDailyInsBasal=14 | totalDailyInsBolus=10 | gluHours=2156.0
+Period=Months 1-6 | gluInRange=94% | gluMean=101 | gluAbove180=1% | gluAbove250=0% | gluBelow70=5.2% | gluBelow54=0.6% | gluSD=23 | gluCV=23% | totalDailyIns=29 | totalDailyInsBasal=19 | totalDailyInsBolus=10 | gluHours=4308.0
+
+=== LOOPPtFinalStatus (withdrawal) ===
+(no withdrawal record)
+
+Demographic source: D:\dev\glucose_data_processing\data\loop\Data Tables
+Study: LOOP Observational Study (NCT03838900), Jaeb Center for Health Research

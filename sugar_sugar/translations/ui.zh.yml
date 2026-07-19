@@ -175,6 +175,7 @@ zh:
     nightscout_consent_required: "请在加载 Nightscout 数据前授予数据使用同意。"
     current_data_source: "当前数据源："
     weight_label: "体重"
+    no_carbs_note: "此用餐时段窗口没有记录的碳水化合物数据。"
     description_1: "测试您的血糖预测技能！"
     description_2: "在图表上点击或绘制线条来预测未来的血糖值。"
     description_3: "游戏将显示您的预测与实际测量值的对比准确度。"

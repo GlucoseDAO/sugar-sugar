@@ -177,6 +177,7 @@ es:
     nightscout_consent_required: "Por favor, concede el consentimiento de uso de datos antes de cargar datos de Nightscout."
     current_data_source: "Fuente de datos actual:"
     weight_label: "Peso"
+    no_carbs_note: "Esta franja horaria de comida no incluye datos de carbohidratos registrados."
     description_1: "¡Pon a prueba tus habilidades de predicción de glucosa!"
     description_2: "Haz clic en el gráfico o dibuja líneas para predecir los valores futuros de glucosa."
     description_3: "El juego te mostrará qué tan precisas son tus predicciones en comparación con las mediciones reales."

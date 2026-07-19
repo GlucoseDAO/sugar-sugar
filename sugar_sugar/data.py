@@ -74,9 +74,95 @@ def load_glucose_data_from_nightscout(
 def load_glucose_data(file_path: Path = Path("data/example.csv")) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Load CGM data through cgm-format and adapt it to the app store schema."""
     with start_action(action_type=u"load_glucose_data", file_path=str(file_path)):
+        if _is_loop_chronological_csv(file_path):
+            return load_loop_chronological_data(file_path)
         unified_df = FormatParser.parse_file(file_path)
         glucose_df, events_df = FormatProcessor.split_glucose_events(unified_df)
         return _adapt_glucose_df(glucose_df), _adapt_events_df(events_df)
+
+
+def _is_loop_chronological_csv(file_path: Path) -> bool:
+    name = file_path.name.lower()
+    if name.endswith("_chronological.csv"):
+        return True
+    if not file_path.exists():
+        return False
+    header = file_path.read_text(encoding="utf-8", errors="replace").splitlines()[:1]
+    if not header:
+        return False
+    return "Glucose (mg/dL)" in header[0] and "Recommended Split" in header[0]
+
+
+def _non_empty_str(column: str) -> pl.Expr:
+    as_text = pl.col(column).cast(pl.Utf8, strict=False).str.strip_chars()
+    return pl.col(column).is_not_null() & (as_text != "")
+
+
+def _parse_loop_numeric(column: str) -> pl.Expr:
+    return pl.col(column).cast(pl.Utf8, strict=False).str.strip_chars().cast(pl.Float64, strict=False)
+
+
+def load_loop_chronological_data(file_path: Path) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Load LOOP study chronological CSV exports into the app store schema."""
+    with start_action(action_type=u"load_loop_chronological_data", file_path=str(file_path)):
+        raw_df = pl.read_csv(file_path, infer_schema_length=10000)
+        time_expr = pl.col("Timestamp").str.to_datetime(strict=False)
+
+        glucose_df = (
+            raw_df.filter(pl.col("Event Type").is_in(["EGV", "Interpolated"]))
+            .filter(_non_empty_str("Glucose (mg/dL)"))
+            .select(
+                [
+                    time_expr.alias("time"),
+                    _parse_loop_numeric("Glucose (mg/dL)").alias("gl"),
+                    pl.lit(0.0).alias("prediction"),
+                    pl.lit(0).alias("age"),
+                    pl.lit(1).alias("user_id"),
+                ]
+            )
+            .filter(pl.col("time").is_not_null() & pl.col("gl").is_not_null())
+            .sort("time")
+        )
+
+        carb_events = (
+            raw_df.filter(_non_empty_str("Carbohydrates (g)"))
+            .select(
+                [
+                    time_expr.alias("time"),
+                    pl.lit("Carbohydrates").alias("event_type"),
+                    pl.lit("Carbs").alias("event_subtype"),
+                    pl.lit(None, dtype=pl.Float64).alias("insulin_value"),
+                ]
+            )
+            .filter(pl.col("time").is_not_null())
+        )
+        bolus_events = (
+            raw_df.filter(_non_empty_str("Bolus Insulin (U)"))
+            .select(
+                [
+                    time_expr.alias("time"),
+                    pl.lit("Insulin").alias("event_type"),
+                    pl.lit("Fast Acting").alias("event_subtype"),
+                    _parse_loop_numeric("Bolus Insulin (U)").alias("insulin_value"),
+                ]
+            )
+            .filter(pl.col("time").is_not_null() & pl.col("insulin_value").is_not_null())
+        )
+        basal_events = (
+            raw_df.filter(_non_empty_str("Basal Rate (U/h)"))
+            .select(
+                [
+                    time_expr.alias("time"),
+                    pl.lit("Insulin").alias("event_type"),
+                    pl.lit("Long Acting").alias("event_subtype"),
+                    _parse_loop_numeric("Basal Rate (U/h)").alias("insulin_value"),
+                ]
+            )
+            .filter(pl.col("time").is_not_null() & pl.col("insulin_value").is_not_null())
+        )
+
+        events_df = pl.concat([carb_events, bolus_events, basal_events], how="vertical").sort("time")
+        return glucose_df, events_df
 
 
 def _adapt_glucose_df(glucose_df: pl.DataFrame) -> pl.DataFrame:

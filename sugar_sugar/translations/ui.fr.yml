@@ -177,6 +177,7 @@ fr:
     nightscout_consent_required: "Merci d'accorder ton consentement à l'utilisation des données avant de charger les données Nightscout."
     current_data_source: "Source de données actuelle :"
     weight_label: "Poids"
+    no_carbs_note: "Cette plage horaire de repas ne contient aucune donnée de glucides enregistrée."
     description_1: "Teste tes compétences en prédiction de la glycémie !"
     description_2: "Clique sur le graphique ou trace des lignes pour prédire les valeurs futures de glycémie."
     description_3: "Le jeu te montrera la précision de tes prédictions par rapport aux mesures réelles."

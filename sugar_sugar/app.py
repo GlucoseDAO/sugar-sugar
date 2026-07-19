@@ -100,7 +100,9 @@ from sugar_sugar.components.share import (
 )
 from sugar_sugar import share_store
 from sugar_sugar import resume_store
-from sugar_sugar.generic_sources_metadata import load_generic_sources_metadata
+from sugar_sugar.generic_sources_metadata import GenericSourceMetadata, format_generic_source_metadata, load_generic_sources_metadata
+from sugar_sugar.prediction_window_context import should_show_no_carbs_note
+from sugar_sugar.subject_sources import load_random_generic_dataset
 from sugar_sugar.contact_info import load_contact_info
 from sugar_sugar.static_markdown import static_markdown_autosize_iframe
 
@@ -112,6 +114,12 @@ GLUCOSE_MGDL_PER_MMOLL: float = 18.0
 
 FORMAT_ORDER: dict[str, int] = {"C": 0, "B": 1, "A": 2}
 GENERIC_SOURCES_METADATA = load_generic_sources_metadata()
+
+
+def _load_generic_round_data() -> tuple[pl.DataFrame, pl.DataFrame, str]:
+    full_df, events_df, source = load_random_generic_dataset()
+    return full_df, events_df, source.source_name
+
 
 SITE_TITLE: str = "Sugar Sugar"
 SITE_DESCRIPTION: str = (
@@ -408,8 +416,10 @@ _chart_start_env = os.environ.get("_CHART_START")
 
 if _chart_file_env:
     _init_full_df, _init_events_df = load_glucose_data(Path(_chart_file_env))
+    _init_generic_source_name = Path(_chart_file_env).name
 else:
-    _init_full_df, _init_events_df = load_glucose_data()
+    _init_full_df, _init_events_df, _init_generic_source = load_random_generic_dataset()
+    _init_generic_source_name = _init_generic_source.source_name
 
 _init_full_df = _init_full_df.with_columns(pl.lit(0.0).alias("prediction"))
 
@@ -1441,7 +1451,7 @@ app.layout = html.Div([
     # whole-dataset round-trip (lag) and the localStorage-quota risk.
     dcc.Store(id='events-df', data=example_events_df_store, storage_type=STORAGE_TYPE),
     dcc.Store(id='is-example-data', data=_chart_is_example, storage_type=STORAGE_TYPE),
-    dcc.Store(id='data-source-name', data=("" if _chart_format == "B" else _chart_source) if _is_chart_mode else "example.csv", storage_type=STORAGE_TYPE),
+    dcc.Store(id='data-source-name', data=("" if _chart_format == "B" else _chart_source) if _is_chart_mode else _init_generic_source_name, storage_type=STORAGE_TYPE),
     dcc.Store(id='randomization-initialized', data=_is_chart_mode, storage_type=STORAGE_TYPE),
     dcc.Store(id='glucose-chart-mode', data={'hide_last_hour': True}, storage_type='memory'),
     dcc.Store(id='glucose-unit', data=_chart_unit if _is_chart_mode else 'mg/dL', storage_type=STORAGE_TYPE),
@@ -3510,20 +3520,10 @@ def create_ending_layout(
     if data_source_name:
         subject_parts.append(t("ui.ending.data_source_label", locale=locale, source=Path(data_source_name).name))
     if meta:
-        gender_raw = str(meta.gender or "").strip().lower()
-        gender_display = (
-            t(f"ui.startup.gender_{gender_raw}", locale=locale)
-            if gender_raw in ("male", "female", "na")
-            else meta.gender
+        show_no_carbs = should_show_no_carbs_note(df, events_df)
+        subject_parts.append(
+            format_generic_source_metadata(meta, locale=locale, show_no_carbs_note=show_no_carbs)
         )
-        meta_line = (
-            f"{t('ui.startup.age_label', locale=locale)}: {meta.age} · "
-            f"{t('ui.startup.gender_label', locale=locale)}: {gender_display} · "
-            f"{t('ui.header.weight_label', locale=locale)}: {meta.weight}"
-        )
-        if meta.sensor:
-            meta_line += f" · {t('ui.ending.sensor_label', locale=locale)}: {meta.sensor}"
-        subject_parts.append(meta_line)
     elif user_info:
         age = user_info.get('age')
         gender_raw = str(user_info.get('gender') or "").strip().lower()
@@ -4814,9 +4814,8 @@ def handle_next_round_button(
         is_example: bool
         source_name: str
         if fmt == "A":
-            full_df, events_df = load_glucose_data()
+            full_df, events_df, source_name = _load_generic_round_data()
             is_example = True
-            source_name = "example.csv"
         elif fmt == "B":
             uploaded_path = user_info.get("uploaded_data_path")
             if not uploaded_path:
@@ -4838,9 +4837,8 @@ def handle_next_round_button(
                 return '/prediction', user_info, {'hide_last_hour': True}, None, None, False, "", False, 0
             use_example = (next_round_number % 2 == 1)
             if use_example:
-                full_df, events_df = load_glucose_data()
+                full_df, events_df, source_name = _load_generic_round_data()
                 is_example = True
-                source_name = "example.csv"
             else:
                 full_df, events_df = load_glucose_data(Path(str(uploaded_path)))
                 is_example = False
@@ -5323,12 +5321,12 @@ def handle_switch_format(
         uploaded_path = info.get("uploaded_data_path")
 
         if target_format == "A":
-            full_df, events_df = load_glucose_data()
+            full_df, events_df, source_name = _load_generic_round_data()
             full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
             new_df, random_start = get_random_data_window(full_df, points)
             new_df = new_df.with_columns(pl.lit(0.0).alias("prediction"))
             info["is_example_data"] = True
-            info["data_source_name"] = "example.csv"
+            info["data_source_name"] = source_name
             return (
                 "/prediction",
                 info,
@@ -5336,7 +5334,7 @@ def handle_switch_format(
                 convert_df_to_dict(new_df),
                 convert_events_df_to_dict(events_df),
                 True,
-                "example.csv",
+                source_name,
                 False,
                 random_start,
                 None,
@@ -6048,19 +6046,22 @@ def initialize_data_on_url_change(
     if current_df_data is not None:
         return _no_change
 
-    # First visit to /prediction with no window: load the round-1 dataset. This
-    # respects a file imported at startup -- for format B with an uploaded path the
-    # current window is the user's own data (is_example_data=False); A / C round 1
-    # resolve to the generic example. resolve_dataset_identity reads is_example_data
-    # (set by handle_start_button), so the right dataset loads on the first render.
-    ds_path = resolve_dataset_identity(user_info)
-    full_df, events_df = load_dataset(ds_path)
-    is_example = (ds_path == EXAMPLE_DATASET_PATH)
-    source_name = (
-        "example.csv" if is_example
-        else str((user_info or {}).get("uploaded_data_filename")
-                 or (user_info or {}).get("data_source_name") or "uploaded.csv")
-    )
+    # First visit to /prediction with no window: load the round-1 dataset. Format B
+    # with a startup import uses the user's own file; A / C round 1 (and any other
+    # generic warm-up) pick a random generic source via _load_generic_round_data().
+    fmt = str((user_info or {}).get("format") or "A")
+    uploaded_path = (user_info or {}).get("uploaded_data_path")
+    if fmt == "B" and uploaded_path:
+        full_df, events_df = load_dataset(Path(str(uploaded_path)))
+        is_example = False
+        source_name = str(
+            (user_info or {}).get("uploaded_data_filename")
+            or (user_info or {}).get("data_source_name")
+            or "uploaded.csv"
+        )
+    else:
+        full_df, events_df, source_name = _load_generic_round_data()
+        is_example = True
     df, random_start = get_random_data_window(full_df, DEFAULT_POINTS)
     df = df.with_columns(pl.lit(0.0).alias('prediction'))
 
@@ -6429,8 +6430,8 @@ def handle_example_data_button(example_button_clicks: Optional[int]) -> Tuple[in
     with start_action(action_type=u"handle_example_data_button"):
         current_time = int(time.time() * 1000)
         
-        # Load fresh example data
-        new_full_df, new_events_df = load_glucose_data()
+        # Load fresh generic data
+        new_full_df, new_events_df, source_name = _load_generic_round_data()
         
         # Start at a random position for example data too
         points = max(MIN_POINTS, min(MAX_POINTS, DEFAULT_POINTS))
@@ -6445,8 +6446,8 @@ def handle_example_data_button(example_button_clicks: Optional[int]) -> Tuple[in
         return (current_time,
                convert_df_to_dict(new_df),
                convert_events_df_to_dict(new_events_df),
-               True,  # is_example_data = True for example data
-               "example.csv",  # data_source_name for example data
+               True,  # is_example_data = True for generic data
+               source_name,
                False,  # reset randomization flag for new data
                random_start,  # Set slider to the random start position
                random_start)  # Update initial slider value
@@ -6691,6 +6692,8 @@ def update_data_source_display(
     [
         Input("url", "pathname"),
         Input("data-source-name", "data"),
+        Input("current-window-df", "data"),
+        Input("events-df", "data"),
         Input("interface-language", "data"),
     ],
     prevent_initial_call=False,
@@ -6698,6 +6701,8 @@ def update_data_source_display(
 def update_generic_source_metadata_display(
     pathname: str,
     source_name: Optional[str],
+    window_df_data: Optional[Dict[str, List[Any]]],
+    events_df_data: Optional[Dict[str, List[Any]]],
     interface_language: Optional[str],
 ) -> str:
     if pathname != "/prediction":
@@ -6708,26 +6713,27 @@ def update_generic_source_metadata_display(
     if meta is None:
         return ""
 
-    locale = normalize_locale(interface_language)
-    gender_raw = str(meta.gender or "").strip().lower()
-    if gender_raw in ("male", "female", "na"):
-        gender_display = t(f"ui.startup.gender_{gender_raw}", locale=locale)
-    else:
-        gender_display = meta.gender
+    show_no_carbs = False
+    if window_df_data and window_df_data.get("time"):
+        window_df = reconstruct_dataframe_from_dict(window_df_data)
+        events_df = (
+            reconstruct_events_dataframe_from_dict(events_df_data)
+            if events_df_data
+            else pl.DataFrame(
+                {
+                    "time": [],
+                    "event_type": [],
+                    "event_subtype": [],
+                    "insulin_value": [],
+                }
+            )
+        )
+        show_no_carbs = should_show_no_carbs_note(window_df, events_df)
 
-    age_display = (
-        str(meta.age)
-        .replace("years old", "")
-        .replace("year old", "")
-        .strip()
-    )
-    weight_display = str(meta.weight).replace(" ", "")
-    if locale == "en":
-        return f"{age_display} yr old {gender_display}, weight {weight_display}"
-
-    return (
-        f"{age_display} · {gender_display} · "
-        f"{t('ui.header.weight_label', locale=locale)} {weight_display}"
+    return format_generic_source_metadata(
+        meta,
+        locale=normalize_locale(interface_language),
+        show_no_carbs_note=show_no_carbs,
     )
 
 # Add callback for random slider initialization when prediction page components are ready
