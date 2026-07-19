@@ -177,6 +177,7 @@ de:
     current_data_source: "Aktuelle Datenquelle:"
     weight_label: "Gewicht"
     no_carbs_note: "Dieses Mahlzeitenfenster enthält keine protokollierten Kohlenhydratdaten."
+    carbs_info_note: "Kohlenhydrat-Markierungen erscheinen nur, wenn dein Datensatz sie enthält. Prüfe die Zeitstempel — nicht alle CGM-Exporte protokollieren Kohlenhydrate."
     description_1: "Teste deine Glukose‑Vorhersage!"
     description_2: "Klicke im Chart oder zeichne Linien, um zukünftige Glukosewerte vorherzusagen."
     description_3: "Das Spiel zeigt dir, wie genau deine Vorhersagen im Vergleich zu den Messwerten sind."
@@ -325,6 +326,15 @@ de:
     warning: "Bitte starte nicht neu, nur weil du mit deinen Vorhersagen unzufrieden bist — ein Neustart verfälscht die Forschungsdaten und beeinträchtigt die Studienergebnisse."
     continue_btn: "Weiter"
     start_over_btn: "Neu starten"
+    your_code: "Dein Fortsetzungscode (um auf einem anderen Gerät weiterzuspielen): %{code}"
+
+  resume_code:
+    landing_prompt: "Auf einem neuen Gerät weitermachen? Gib deinen Fortsetzungscode ein:"
+    placeholder: "Fortsetzungscode"
+    redeem_btn: "Fortsetzen"
+    not_found: "Wir konnten keine Sitzung für diesen Code finden. Bitte prüfen und erneut versuchen."
+    copy_link: "🔗 Fortsetzungslink kopieren"
+    copied: "✓ Link kopiert!"
 
   session_expired:
     title: "Sitzung abgelaufen"

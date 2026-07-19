@@ -196,6 +196,7 @@ en:
     current_data_source: "Current Data Source:"
     weight_label: "Weight"
     no_carbs_note: "This meal-time window has no logged carbohydrate data."
+    carbs_info_note: "Carb markers appear only when your dataset includes them. Check the timestamps — not all CGM exports log carbs."
     description_1: "Test your glucose prediction skills!"
     description_2: "Click on the graph or draw lines to predict future glucose values."
     description_3: "The game will show you how accurate your predictions are compared to actual measurements."

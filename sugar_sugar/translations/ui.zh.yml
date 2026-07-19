@@ -176,6 +176,7 @@ zh:
     current_data_source: "当前数据源："
     weight_label: "体重"
     no_carbs_note: "此用餐时段窗口没有记录的碳水化合物数据。"
+    carbs_info_note: "仅当数据集包含碳水化合物时才会显示相关标记。请核对时间戳——并非所有 CGM 导出都记录碳水化合物。"
     description_1: "测试您的血糖预测技能！"
     description_2: "在图表上点击或绘制线条来预测未来的血糖值。"
     description_3: "游戏将显示您的预测与实际测量值的对比准确度。"
@@ -324,6 +325,15 @@ zh:
     warning: "请不要仅仅因为对自己的预测不满意就重新开始——重新开始会扭曲研究数据并削弱研究结果。"
     continue_btn: "继续"
     start_over_btn: "重新开始"
+    your_code: "您的恢复代码（以便在其他设备上继续）：%{code}"
+
+  resume_code:
+    landing_prompt: "在新设备上继续？请输入您的恢复代码："
+    placeholder: "恢复代码"
+    redeem_btn: "恢复"
+    not_found: "我们找不到该代码对应的会话。请检查后重试。"
+    copy_link: "🔗 复制恢复链接"
+    copied: "✓ 链接已复制！"
 
   session_expired:
     title: "会话已过期"

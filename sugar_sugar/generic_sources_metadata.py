@@ -70,21 +70,130 @@ def load_generic_sources_metadata() -> dict[str, GenericSourceMetadata]:
     return out
 
 
+def _gender_display(gender: str, *, locale: str) -> str:
+    from sugar_sugar.i18n import t
+
+    key_map = {
+        "m": "male",
+        "f": "female",
+        "n/a": "na",
+        "male": "male",
+        "female": "female",
+        "na": "na",
+    }
+    raw = str(gender or "").strip().lower()
+    normalized = key_map.get(raw, raw)
+    if normalized in ("male", "female", "na"):
+        return t(f"ui.startup.gender_{normalized}", locale=locale)
+    return str(gender or "")
+
+
+def _format_demographics_line(
+    *,
+    age_display: str,
+    gender_display: str,
+    weight_display: str,
+    sensor: str,
+    locale: str,
+) -> str:
+    from sugar_sugar.i18n import t
+
+    if locale == "en" and age_display and gender_display:
+        if weight_display:
+            return f"{age_display} yr old {gender_display}, weight {weight_display}"
+        return f"{age_display} yr old {gender_display}"
+
+    detail_parts: list[str] = []
+    if age_display:
+        detail_parts.append(f"{t('ui.startup.age_label', locale=locale)}: {age_display}")
+    if gender_display:
+        detail_parts.append(f"{t('ui.startup.gender_label', locale=locale)}: {gender_display}")
+    if weight_display:
+        detail_parts.append(f"{t('ui.header.weight_label', locale=locale)}: {weight_display}")
+    if sensor:
+        detail_parts.append(f"{t('ui.ending.sensor_label', locale=locale)}: {sensor}")
+    return " · ".join(detail_parts)
+
+
+def _append_metadata_notes(
+    line: str,
+    *,
+    locale: str,
+    show_no_carbs_note: bool,
+    show_carbs_info_note: bool,
+) -> str:
+    from sugar_sugar.i18n import t
+
+    note_parts: list[str] = []
+    if show_carbs_info_note:
+        note_parts.append(t("ui.header.carbs_info_note", locale=locale))
+    if show_no_carbs_note:
+        note_parts.append(t("ui.header.no_carbs_note", locale=locale))
+    if not note_parts:
+        return line
+    notes = " · ".join(note_parts)
+    if line:
+        return f"{line} · {notes}"
+    return notes
+
+
+def format_source_notes(
+    *,
+    locale: str,
+    show_no_carbs_note: bool = False,
+    show_carbs_info_note: bool = False,
+) -> str:
+    from sugar_sugar.i18n import normalize_locale
+
+    return _append_metadata_notes(
+        "",
+        locale=normalize_locale(locale),
+        show_no_carbs_note=show_no_carbs_note,
+        show_carbs_info_note=show_carbs_info_note,
+    )
+
+
+def format_participant_demographics(
+    age: int | float | str,
+    gender: str,
+    *,
+    locale: str,
+    weight: str = "",
+    show_no_carbs_note: bool = False,
+    show_carbs_info_note: bool = False,
+) -> str:
+    from sugar_sugar.i18n import normalize_locale
+
+    locale = normalize_locale(locale)
+    age_display = str(int(float(age))) if age not in (None, "") else ""
+    gender_display = _gender_display(gender, locale=locale)
+    weight_display = str(weight).replace(" ", "")
+    line = _format_demographics_line(
+        age_display=age_display,
+        gender_display=gender_display,
+        weight_display=weight_display,
+        sensor="",
+        locale=locale,
+    )
+    return _append_metadata_notes(
+        line,
+        locale=locale,
+        show_no_carbs_note=show_no_carbs_note,
+        show_carbs_info_note=show_carbs_info_note,
+    )
+
+
 def format_generic_source_metadata(
     meta: GenericSourceMetadata,
     *,
     locale: str,
     show_no_carbs_note: bool = False,
+    show_carbs_info_note: bool = False,
 ) -> str:
-    from sugar_sugar.i18n import normalize_locale, t
+    from sugar_sugar.i18n import normalize_locale
 
     locale = normalize_locale(locale)
-    gender_raw = str(meta.gender or "").strip().lower()
-    if gender_raw in ("male", "female", "na"):
-        gender_display = t(f"ui.startup.gender_{gender_raw}", locale=locale)
-    else:
-        gender_display = meta.gender
-
+    gender_display = _gender_display(meta.gender, locale=locale)
     age_display = (
         str(meta.age)
         .replace("years old", "")
@@ -92,27 +201,16 @@ def format_generic_source_metadata(
         .strip()
     )
     weight_display = str(meta.weight).replace(" ", "")
-
-    note_parts: list[str] = []
-    if show_no_carbs_note:
-        note_parts.append(t("ui.header.no_carbs_note", locale=locale))
-
-    if locale == "en" and age_display and gender_display and weight_display:
-        line = f"{age_display} yr old {gender_display}, weight {weight_display}"
-    else:
-        detail_parts: list[str] = []
-        if age_display:
-            detail_parts.append(f"{t('ui.startup.age_label', locale=locale)}: {age_display}")
-        if gender_display:
-            detail_parts.append(f"{t('ui.startup.gender_label', locale=locale)}: {gender_display}")
-        if weight_display:
-            detail_parts.append(f"{t('ui.header.weight_label', locale=locale)}: {weight_display}")
-        if meta.sensor:
-            detail_parts.append(f"{t('ui.ending.sensor_label', locale=locale)}: {meta.sensor}")
-        line = " · ".join(detail_parts)
-
-    if note_parts:
-        if line:
-            return f"{line} · {note_parts[0]}"
-        return note_parts[0]
-    return line
+    line = _format_demographics_line(
+        age_display=age_display,
+        gender_display=gender_display,
+        weight_display=weight_display,
+        sensor=str(meta.sensor or ""),
+        locale=locale,
+    )
+    return _append_metadata_notes(
+        line,
+        locale=locale,
+        show_no_carbs_note=show_no_carbs_note,
+        show_carbs_info_note=show_carbs_info_note,
+    )

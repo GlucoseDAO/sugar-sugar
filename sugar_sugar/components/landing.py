@@ -422,6 +422,8 @@ class LandingPage(html.Div):
 
             info["consent_gdpr"] = gdpr_consented
             info["consent_upload_own_data"] = upload_own_data
+            if upload_own_data:
+                info["consent_use_uploaded_data"] = True
             info["consent_play_only"] = play_only
             # If user didn't select anything, record that they did not consent to participate.
             info["consent_participate_in_study"] = (not play_only) and (not no_selection)

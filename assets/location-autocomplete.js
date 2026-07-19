@@ -254,11 +254,31 @@
     }
   }
 
-  function selectSuggestion(input, value) {
-    suppressNextInput = true;
-    input.value = value;
+  function setInputValue(input, value) {
+    if (!input) {
+      return;
+    }
+    // Dash wraps dcc.Input in React; a plain `input.value = …` does not update
+    // the component state, so Start/validation never see the selection.
+    var descriptor = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype,
+      'value'
+    );
+    if (descriptor && descriptor.set) {
+      descriptor.set.call(input, value);
+    } else {
+      input.value = value;
+    }
     input.dispatchEvent(new Event('input', { bubbles: true }));
     input.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function selectSuggestion(input, value) {
+    if (!input) {
+      return;
+    }
+    suppressNextInput = true;
+    setInputValue(input, value);
     hideDropdown();
     input.focus();
   }
@@ -314,7 +334,7 @@
       setActiveIndex(Math.max(activeIndex - 1, 0));
     } else if (event.key === 'Enter' && activeIndex >= 0) {
       event.preventDefault();
-      selectSuggestion(event.target, items[activeIndex].textContent);
+      selectSuggestion(getInputElement(), items[activeIndex].textContent);
     } else if (event.key === 'Escape') {
       hideDropdown();
     }

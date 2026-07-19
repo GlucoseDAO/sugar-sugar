@@ -100,9 +100,22 @@ from sugar_sugar.components.share import (
 )
 from sugar_sugar import share_store
 from sugar_sugar import resume_store
-from sugar_sugar.generic_sources_metadata import GenericSourceMetadata, format_generic_source_metadata, load_generic_sources_metadata
+from sugar_sugar.generic_sources_metadata import (
+    GenericSourceMetadata,
+    format_generic_source_metadata,
+    format_participant_demographics,
+    format_source_notes,
+    load_generic_sources_metadata,
+)
 from sugar_sugar.prediction_window_context import should_show_no_carbs_note
-from sugar_sugar.subject_sources import load_random_generic_dataset
+from sugar_sugar.subject_sources import (
+    collect_generic_round_history,
+    generic_round_window_from_df,
+    generic_window_slice_key,
+    load_random_generic_dataset,
+    pick_unique_generic_window,
+    resolve_generic_source_path,
+)
 from sugar_sugar.contact_info import load_contact_info
 from sugar_sugar.static_markdown import static_markdown_autosize_iframe
 
@@ -116,9 +129,118 @@ FORMAT_ORDER: dict[str, int] = {"C": 0, "B": 1, "A": 2}
 GENERIC_SOURCES_METADATA = load_generic_sources_metadata()
 
 
-def _load_generic_round_data() -> tuple[pl.DataFrame, pl.DataFrame, str]:
-    full_df, events_df, source = load_random_generic_dataset()
-    return full_df, events_df, source.source_name
+def _build_source_metadata_line(
+    *,
+    source_name: str,
+    user_info: Optional[Dict[str, Any]],
+    is_example_data: bool,
+    window_df: pl.DataFrame,
+    events_df: pl.DataFrame,
+    locale: str,
+) -> str:
+    key = Path(str(source_name or "example.csv")).name
+    meta = GENERIC_SOURCES_METADATA.get(key)
+    show_no_carbs = should_show_no_carbs_note(window_df, events_df)
+    show_carbs_info = not is_example_data
+
+    if meta is not None:
+        return format_generic_source_metadata(
+            meta,
+            locale=locale,
+            show_no_carbs_note=show_no_carbs,
+            show_carbs_info_note=show_carbs_info,
+        )
+
+    if not is_example_data and user_info and user_info.get("age"):
+        return format_participant_demographics(
+            user_info["age"],
+            str(user_info.get("gender") or ""),
+            locale=locale,
+            show_no_carbs_note=show_no_carbs,
+            show_carbs_info_note=True,
+        )
+
+    if show_carbs_info or show_no_carbs:
+        return format_source_notes(
+            locale=locale,
+            show_no_carbs_note=show_no_carbs,
+            show_carbs_info_note=show_carbs_info,
+        )
+    return ""
+
+
+def _load_generic_round_window(
+    points: int,
+    rounds: list[dict[str, Any]] | None = None,
+    user_info: dict[str, Any] | None = None,
+) -> tuple[pl.DataFrame, pl.DataFrame, str, int, str, str, str, str]:
+    history = collect_generic_round_history(rounds, user_info)
+    selection = pick_unique_generic_window(points, history)
+    round_window = generic_round_window_from_df(
+        selection.window_df,
+        source_name=selection.source.source_name,
+    )
+    return (
+        selection.window_df,
+        selection.events_df,
+        selection.source.source_name,
+        selection.start_index,
+        selection.slice_key,
+        round_window.window_start.isoformat(sep=" "),
+        round_window.window_end.isoformat(sep=" "),
+        round_window.anchor_time.isoformat(sep=" "),
+    )
+
+
+def _store_current_generic_window(
+    user_info: Dict[str, Any],
+    *,
+    source_name: str,
+    slice_key: str,
+    window_start: str,
+    window_end: str,
+    anchor_time: str,
+) -> None:
+    user_info['current_generic_slice_key'] = slice_key
+    user_info['current_generic_window_start'] = window_start
+    user_info['current_generic_window_end'] = window_end
+    user_info['current_generic_anchor_time'] = anchor_time
+    user_info['data_source_name'] = source_name
+
+
+def _apply_generic_round_selection(
+    user_info: Dict[str, Any],
+    rounds: list[dict[str, Any]] | None,
+    points: int,
+) -> tuple[pl.DataFrame, pl.DataFrame, str, int]:
+    new_df, events_df, source_name, random_start, slice_key, window_start, window_end, anchor_time = (
+        _load_generic_round_window(points, rounds, user_info)
+    )
+    _store_current_generic_window(
+        user_info,
+        source_name=source_name,
+        slice_key=slice_key,
+        window_start=window_start,
+        window_end=window_end,
+        anchor_time=anchor_time,
+    )
+    return new_df, events_df, source_name, random_start
+
+
+def _upload_data_consent_given(user_info: Optional[Dict[str, Any]]) -> bool:
+    """True once upload/CGM-data usage consent is known for this session."""
+    from sugar_sugar.components.startup import prior_upload_data_consent
+
+    return prior_upload_data_consent(user_info)
+
+
+def _show_prediction_upload_consent(user_info: Optional[Dict[str, Any]], *, show_upload: bool) -> bool:
+    """Show prediction consent only for B/C when consent was never given anywhere."""
+    if not show_upload:
+        return False
+    # Consent form, startup checkbox, prior B/C rounds, or an existing upload —
+    # any of these means do not ask again (including after C→B format switches).
+    return not _upload_data_consent_given(user_info)
 
 
 SITE_TITLE: str = "Sugar Sugar"
@@ -329,6 +451,17 @@ def _dataset_path_for(is_example: bool, uploaded_path: Optional[str]) -> Path:
     return Path(str(uploaded_path))
 
 
+def _resolve_generic_dataset_path(user_info: Dict[str, Any]) -> Path:
+    """Resolve the current generic source path from ``data_source_name``."""
+    source_name = Path(str(user_info.get("data_source_name") or "")).name
+    if not source_name or source_name == EXAMPLE_DATASET_PATH.name:
+        return EXAMPLE_DATASET_PATH
+    resolved = resolve_generic_source_path(source_name)
+    if resolved is not None:
+        return resolved
+    return EXAMPLE_DATASET_PATH
+
+
 def resolve_dataset_identity(
     user_info: Optional[Dict[str, Any]], *, round_number: Optional[int] = None
 ) -> Path:
@@ -339,6 +472,8 @@ def resolve_dataset_identity(
     ``handle_next_round_button`` / format switches). With ``round_number`` it
     mirrors ``handle_next_round_button``'s per-format choice so per-round stats can
     resolve the correct dataset even for format C (which alternates datasets).
+    Generic rounds use the selected subject file (via ``data_source_name``), not
+    always ``example.csv``.
     """
     info = user_info or {}
     fmt = str(info.get("format") or "A")
@@ -347,13 +482,18 @@ def resolve_dataset_identity(
         if fmt == "B":
             return _dataset_path_for(False, uploaded)
         if fmt == "C":
-            # Mirror handle_next_round_button: ODD round -> example (generic),
+            # Mirror handle_next_round_button: ODD round -> generic,
             # EVEN round -> uploaded. Round 1 is always the generic warm-up; from
             # round 2 an upload is required (see _is_upload_gated), so they alternate
             # generic/own from there. Before any upload, fall back to generic.
-            return _dataset_path_for(round_number % 2 == 1 or not uploaded, uploaded)
-        return EXAMPLE_DATASET_PATH  # format A
-    return _dataset_path_for(bool(info.get("is_example_data", True)), uploaded)
+            use_generic = round_number % 2 == 1 or not uploaded
+            if use_generic:
+                return _resolve_generic_dataset_path(info)
+            return Path(str(uploaded))
+        return _resolve_generic_dataset_path(info)  # format A
+    if bool(info.get("is_example_data", True)) or not uploaded:
+        return _resolve_generic_dataset_path(info)
+    return Path(str(uploaded))
 
 
 def _is_upload_gated(user_info: Optional[Dict[str, Any]]) -> bool:
@@ -1913,8 +2053,25 @@ def set_interface_language(
     return new_lang
 
 
+_PREDICTION_CONSENT_WRAP_VISIBLE: Dict[str, str] = {
+    'maxWidth': '900px',
+    'margin': '0 auto',
+    'padding': '12px 16px',
+    'backgroundColor': 'white',
+    'borderRadius': '10px',
+    'boxShadow': '0 2px 4px rgba(0,0,0,0.06)',
+    'border': '1px solid #e5e7eb',
+    'display': 'block',
+}
+_PREDICTION_CONSENT_WRAP_HIDDEN: Dict[str, str] = {
+    **_PREDICTION_CONSENT_WRAP_VISIBLE,
+    'display': 'none',
+}
+
+
 @app.callback(
     [
+        Output('prediction-data-usage-consent-wrap', 'style'),
         Output('prediction-data-usage-consent', 'style'),
         Output('prediction-data-usage-consent', 'options'),
         Output('prediction-data-usage-consent', 'value'),
@@ -1931,31 +2088,29 @@ def update_prediction_uploaded_data_consent_ui(
     pathname: Optional[str],
     interface_language: Optional[str],
     current_value: Optional[list[str]],
-) -> Tuple[Dict[str, str], list[dict[str, Any]], list[str], Optional[html.Div]]:
+) -> Tuple[Dict[str, str], Dict[str, str], list[dict[str, Any]], list[str], Optional[html.Div]]:
     if pathname != '/prediction':
         raise PreventUpdate
     if not user_info:
         raise PreventUpdate
 
     fmt = str(user_info.get("format") or "A")
-    if fmt not in ("B", "C"):
-        return {'display': 'none'}, [], [], None
-
     locale = normalize_locale(interface_language)
     base_label = t("ui.startup.data_usage_consent_label", locale=locale)
-    if bool(user_info.get("consent_use_uploaded_data", False)):
+    consented = _upload_data_consent_given(user_info)
+    # Already consented (form / prior B/C play / upload) or not a B/C session —
+    # keep the checklist in the DOM for upload wiring, but never show it again.
+    if fmt not in ("B", "C") or consented:
         return (
-            {'display': 'block', 'fontSize': '16px'},
+            _PREDICTION_CONSENT_WRAP_HIDDEN,
+            {'display': 'none'},
             [{'label': base_label, 'value': 'agree', 'disabled': True}],
-            ['agree'],
-            dbc.Alert(
-                t("ui.prediction.upload_consent_recorded", locale=locale),
-                color="success",
-                style={"marginTop": "8px"},
-            ),
+            ['agree'] if consented else [],
+            None,
         )
 
     return (
+        _PREDICTION_CONSENT_WRAP_VISIBLE,
         {'display': 'block', 'fontSize': '16px'},
         [{'label': base_label, 'value': 'agree', 'disabled': False}],
         list(current_value or []),
@@ -2171,7 +2326,8 @@ def update_prediction_text_on_language_change(
      Output('ending-switch-format-title', 'children'),
      Output('switch-format-c', 'children'),
      Output('switch-format-a', 'children'),
-     Output('switch-format-b', 'children')],
+     Output('switch-format-b', 'children'),
+     Output('ending-copy-link-button', 'children')],
     [Input('interface-language', 'data')],
     [State('url', 'pathname'),
      State('user-info-store', 'data'),
@@ -2265,6 +2421,7 @@ def update_ending_text_on_language_change(
         t("ui.switch_format.try_c", locale=locale),
         t("ui.switch_format.try_a", locale=locale),
         t("ui.switch_format.try_b", locale=locale),
+        t("ui.resume_code.copy_link", locale=locale),
     )
 
 
@@ -2826,8 +2983,9 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
     uploaded = bool(user_info.get("uploaded_data_path"))
     # Upload gate: B from round 1, C from round 2 (see _is_upload_gated).
     b_gated = _is_upload_gated(user_info)
-    consent_given = bool(user_info.get("consent_use_uploaded_data", False))
+    consent_given = _upload_data_consent_given(user_info)
     consent_value = ['agree'] if consent_given else []
+    show_consent_ui = _show_prediction_upload_consent(user_info, show_upload=show_upload)
     data_source_name = str(user_info.get("data_source_name") or "")
     if b_gated:
         # While gated (awaiting upload) keep the Source blank -- any stale value
@@ -2876,20 +3034,15 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
                 ),
                 html.Div(id="prediction-data-usage-consent-status"),
             ],
-            style={
-                'maxWidth': '900px',
-                'margin': '0 auto',
-                'padding': '12px 16px',
-                'backgroundColor': 'white',
-                'borderRadius': '10px',
-                'boxShadow': '0 2px 4px rgba(0,0,0,0.06)',
-                'border': '1px solid #e5e7eb',
-                # Consent is mandatory at startup for B/C, so it is normally already
-                # recorded here -- only surface this in-page consent fallback when it
-                # is somehow missing. Kept in the DOM (display:none) so
-                # handle_file_upload's Input('prediction-data-usage-consent') stays wired.
-                'display': 'block' if (show_upload and not consent_given) else 'none',
-            },
+            id="prediction-data-usage-consent-wrap",
+            # Consent is recorded on landing/startup for B/C — only show this
+            # fallback when it is somehow missing. Kept in the DOM (display:none)
+            # so handle_file_upload's Input('prediction-data-usage-consent') stays wired.
+            style=(
+                _PREDICTION_CONSENT_WRAP_VISIBLE
+                if show_consent_ui
+                else _PREDICTION_CONSENT_WRAP_HIDDEN
+            ),
         ),
         html.Div(id="upload-required-alert", style={'margin': '0 auto', 'maxWidth': '900px'}),
         html.Div(
@@ -3514,29 +3667,21 @@ def create_ending_layout(
     switch_data_consent_value: list[str] = []
 
     data_source_name = str(user_info.get('data_source_name') or '') if user_info else ''
-    meta = GENERIC_SOURCES_METADATA.get(Path(data_source_name).name) if data_source_name else None
+    is_example = bool(user_info.get('is_example_data', True)) if user_info else True
 
     subject_parts: list[str] = []
     if data_source_name:
         subject_parts.append(t("ui.ending.data_source_label", locale=locale, source=Path(data_source_name).name))
-    if meta:
-        show_no_carbs = should_show_no_carbs_note(df, events_df)
-        subject_parts.append(
-            format_generic_source_metadata(meta, locale=locale, show_no_carbs_note=show_no_carbs)
-        )
-    elif user_info:
-        age = user_info.get('age')
-        gender_raw = str(user_info.get('gender') or "").strip().lower()
-        if age:
-            gender_display = (
-                t(f"ui.startup.gender_{gender_raw}", locale=locale)
-                if gender_raw in ("male", "female", "na")
-                else (user_info.get('gender') or "")
-            )
-            parts = [f"{t('ui.startup.age_label', locale=locale)}: {age}"]
-            if gender_display:
-                parts.append(f"{t('ui.startup.gender_label', locale=locale)}: {gender_display}")
-            subject_parts.append(" · ".join(parts))
+    metadata_line = _build_source_metadata_line(
+        source_name=data_source_name,
+        user_info=user_info,
+        is_example_data=is_example,
+        window_df=df,
+        events_df=events_df,
+        locale=locale,
+    )
+    if metadata_line:
+        subject_parts.append(metadata_line)
 
     subject_info_line = " — ".join(subject_parts) if subject_parts else ""
 
@@ -4459,10 +4604,13 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
 
     from sugar_sugar.components.startup import (
         _wants_contact_from_user_info,
+        prior_upload_data_consent,
+        stamp_upload_data_consent,
         validate_startup_form,
     )
 
     wants_contact = _wants_contact_from_user_info(existing_user_info)
+    already_upload_consent = prior_upload_data_consent(existing_user_info)
     validation = validate_startup_form(
         email=email,
         age=age,
@@ -4477,6 +4625,7 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
         cgm_duration=cgm_duration_years,
         wants_contact=wants_contact,
         locale=None,
+        prior_upload_consent=already_upload_consent,
     )
     if not validation.form_complete:
         return no_update, no_update
@@ -4485,7 +4634,10 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
         from datetime import datetime
         from sugar_sugar.consent import ensure_consent_agreement_row, get_next_study_number
 
-        has_data_consent = bool(data_usage_consent and "agree" in data_usage_consent)
+        has_data_consent = (
+            bool(data_usage_consent and "agree" in data_usage_consent)
+            or already_upload_consent
+        )
         info: Dict[str, Any] = dict(existing_user_info or {})
         study_id = info.get('study_id') or str(uuid.uuid4())
         run_id = str(uuid.uuid4())
@@ -4503,9 +4655,11 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
             'cgm_duration_years': cgm_duration_years,
             'format': format_value,
             'run_format': format_value,
-            # Optional consent for uploaded CGM data usage in study.
-            # Only meaningful for B/C, but we store an explicit boolean for all formats.
-            'consent_use_uploaded_data': bool(has_data_consent) if format_value in ("B", "C") else False,
+            # Startup B/C checkbox and/or landing upload consent — stamp both flags.
+            'consent_use_uploaded_data': bool(has_data_consent),
+            'consent_upload_own_data': bool(
+                has_data_consent or info.get("consent_upload_own_data")
+            ),
             'diabetic': diabetic,
             'diabetic_type': diabetic_type,
             'diabetes_duration': diabetes_duration,
@@ -4515,6 +4669,7 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
             'current_round_number': int(info.get('current_round_number') or 1),
             'statistics_saved': bool(info.get('statistics_saved') or False),
         })
+        stamp_upload_data_consent(info)
 
         # Round-1 data-source identity, accounting for a file imported at startup
         # (uploaded_data_path set by handle_startup_csv_upload / _nightscout_import):
@@ -4562,6 +4717,7 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
             "receive_results_later": bool(info.get("consent_receive_results_later", False)),
             "keep_up_to_date": bool(info.get("consent_keep_up_to_date", False)),
             "no_selection": bool(info.get("consent_no_selection", True)),
+            "consent_use_uploaded_data": bool(info.get("consent_use_uploaded_data", False)),
         }
         ensure_consent_agreement_row(consent_row)
         return '/prediction', info
@@ -4635,6 +4791,7 @@ def record_mobile_consent(
     info.update({
         "consent_gdpr": gdpr_consented,
         "consent_upload_own_data": upload_own_data,
+        "consent_use_uploaded_data": bool(info.get("consent_use_uploaded_data")) or upload_own_data,
         "consent_play_only": play_only,
         "consent_participate_in_study": (not play_only) and (not no_selection),
         "consent_receive_results_later": receive_results,
@@ -4745,6 +4902,15 @@ def handle_submit_button(
             'is_example_data': bool(user_info.get('is_example_data', True)),
             'data_source_name': str(user_info.get('data_source_name', 'example.csv')),
         }
+        if round_info['is_example_data']:
+            generic_window = generic_round_window_from_df(
+                current_df,
+                source_name=str(round_info['data_source_name']),
+            )
+            round_info['generic_slice_key'] = (
+                user_info.get('current_generic_slice_key')
+                or generic_window.slice_key
+            )
         rounds.append(round_info)
         user_info['rounds'] = rounds
         
@@ -4813,8 +4979,11 @@ def handle_next_round_button(
         # Choose dataset based on format.
         is_example: bool
         source_name: str
+        random_start: int
         if fmt == "A":
-            full_df, events_df, source_name = _load_generic_round_data()
+            new_df, events_df, source_name, random_start = _apply_generic_round_selection(
+                user_info, rounds, points,
+            )
             is_example = True
         elif fmt == "B":
             uploaded_path = user_info.get("uploaded_data_path")
@@ -4824,6 +4993,13 @@ def handle_next_round_button(
             full_df, events_df = load_glucose_data(Path(str(uploaded_path)))
             is_example = False
             source_name = str(user_info.get("uploaded_data_filename") or user_info.get("data_source_name") or "uploaded.csv")
+            used_starts: set[int] = {
+                int(r["prediction_window_start"])
+                for r in rounds
+                if not r.get("is_example_data", True)
+                and r.get("prediction_window_start") is not None
+            }
+            new_df, random_start = get_random_data_window(full_df, points, used_starts=used_starts)
         else:
             # Format C ("mixed"): round 1 is a generic warm-up; from round 2 an
             # upload is REQUIRED, so if none exists yet, show the upload gate instead
@@ -4837,22 +5013,23 @@ def handle_next_round_button(
                 return '/prediction', user_info, {'hide_last_hour': True}, None, None, False, "", False, 0
             use_example = (next_round_number % 2 == 1)
             if use_example:
-                full_df, events_df, source_name = _load_generic_round_data()
+                new_df, events_df, source_name, random_start = _apply_generic_round_selection(
+                    user_info, rounds, points,
+                )
                 is_example = True
             else:
                 full_df, events_df = load_glucose_data(Path(str(uploaded_path)))
                 is_example = False
                 source_name = str(user_info.get("uploaded_data_filename") or user_info.get("data_source_name") or "uploaded.csv")
+                used_starts = {
+                    int(r["prediction_window_start"])
+                    for r in rounds
+                    if not r.get("is_example_data", True)
+                    and r.get("prediction_window_start") is not None
+                }
+                new_df, random_start = get_random_data_window(full_df, points, used_starts=used_starts)
 
         # Reset any previous predictions before starting a fresh round.
-        full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
-
-        used_starts: set[int] = {
-            int(r["prediction_window_start"])
-            for r in rounds
-            if r.get("prediction_window_start") is not None
-        }
-        new_df, random_start = get_random_data_window(full_df, points, used_starts=used_starts)
         new_df = new_df.with_columns(pl.lit(0.0).alias("prediction"))
 
         user_info['current_round_number'] = next_round_number
@@ -5297,7 +5474,11 @@ def handle_switch_format(
         info_in["runs_by_format"] = runs_by_format
 
     with start_action(action_type=u"handle_switch_format", target=target_format):
+        from sugar_sugar.components.startup import stamp_upload_data_consent
+
         _archive_current_run(info)
+        # C→B (etc.): if consent/upload already happened in a prior format, keep it.
+        stamp_upload_data_consent(info)
 
         # Reset current run state, keep participant + consent fields.
         info["format"] = target_format
@@ -5321,9 +5502,7 @@ def handle_switch_format(
         uploaded_path = info.get("uploaded_data_path")
 
         if target_format == "A":
-            full_df, events_df, source_name = _load_generic_round_data()
-            full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
-            new_df, random_start = get_random_data_window(full_df, points)
+            new_df, events_df, source_name, random_start = _apply_generic_round_selection(info, [], points)
             new_df = new_df.with_columns(pl.lit(0.0).alias("prediction"))
             info["is_example_data"] = True
             info["data_source_name"] = source_name
@@ -6047,8 +6226,8 @@ def initialize_data_on_url_change(
         return _no_change
 
     # First visit to /prediction with no window: load the round-1 dataset. Format B
-    # with a startup import uses the user's own file; A / C round 1 (and any other
-    # generic warm-up) pick a random generic source via _load_generic_round_data().
+    # with a startup import uses the user's own file; A / C round 1 pick a random
+    # generic window via _apply_generic_round_selection().
     fmt = str((user_info or {}).get("format") or "A")
     uploaded_path = (user_info or {}).get("uploaded_data_path")
     if fmt == "B" and uploaded_path:
@@ -6059,10 +6238,15 @@ def initialize_data_on_url_change(
             or (user_info or {}).get("data_source_name")
             or "uploaded.csv"
         )
+        df, random_start = get_random_data_window(full_df, DEFAULT_POINTS)
     else:
-        full_df, events_df, source_name = _load_generic_round_data()
+        info_dict: Dict[str, Any] = dict(user_info or {})
+        df, events_df, source_name, random_start = _apply_generic_round_selection(
+            info_dict,
+            info_dict.get("rounds"),
+            DEFAULT_POINTS,
+        )
         is_example = True
-    df, random_start = get_random_data_window(full_df, DEFAULT_POINTS)
     df = df.with_columns(pl.lit(0.0).alias('prediction'))
 
     with start_action(action_type=u"initialize_data_on_url_change") as action:
@@ -6168,11 +6352,15 @@ def handle_file_upload(
                 # Ignore attempts to uncheck.
                 raise PreventUpdate
 
-            prev_consent = bool(info_pre.get("consent_use_uploaded_data", False))
+            prev_consent = _upload_data_consent_given(info_pre)
             pending = info_pre.get("pending_upload_contents")
 
             if not prev_consent:
+                from sugar_sugar.components.startup import stamp_upload_data_consent
+
                 info_pre["consent_use_uploaded_data"] = True
+                info_pre["consent_upload_own_data"] = True
+                stamp_upload_data_consent(info_pre)
                 info_pre["blocked_upload_requires_consent"] = False
 
                 study_id = str(info_pre.get("study_id") or "")
@@ -6183,6 +6371,7 @@ def handle_file_upload(
                         study_id,
                         {
                             "consent_use_uploaded_data": True,
+                            "upload_own_data": True,
                             "consent_use_uploaded_data_timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                         },
                     )
@@ -6218,7 +6407,7 @@ def handle_file_upload(
         if not upload_contents:
             return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
 
-        consent_ok = bool(info_pre.get("consent_use_uploaded_data", False)) or bool(consent_value and "agree" in consent_value)
+        consent_ok = _upload_data_consent_given(info_pre) or bool(consent_value and "agree" in consent_value)
         if fmt in ("B", "C") and not consent_ok:
             info_pre["blocked_upload_requires_consent"] = True
             # Cache the attempted upload so we can process it immediately after consent is given,
@@ -6347,7 +6536,7 @@ def handle_nightscout_load(
     if not nightscout_url or not nightscout_url.strip():
         return _no + (_error(t("ui.header.nightscout_url_required", locale=locale)),)
 
-    consent_ok = bool(info_pre.get("consent_use_uploaded_data", False)) or bool(consent_value and "agree" in consent_value)
+    consent_ok = _upload_data_consent_given(info_pre) or bool(consent_value and "agree" in consent_value)
     if fmt in ("B", "C") and not consent_ok:
         return _no + (_error(t("ui.header.nightscout_consent_required", locale=locale)),)
 
@@ -6420,9 +6609,13 @@ def handle_nightscout_load(
      Output('time-slider', 'value', allow_duplicate=True),
      Output('initial-slider-value', 'data', allow_duplicate=True)],  # Add initial slider value update
     [Input('use-example-data-button', 'n_clicks')],
+    [State('user-info-store', 'data')],
     prevent_initial_call=True
 )
-def handle_example_data_button(example_button_clicks: Optional[int]) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int, int]:
+def handle_example_data_button(
+    example_button_clicks: Optional[int],
+    user_info: Optional[Dict[str, Any]],
+) -> Tuple[int, Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int, int]:
     """Handle use example data button click"""
     if not example_button_clicks:
         return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
@@ -6430,15 +6623,13 @@ def handle_example_data_button(example_button_clicks: Optional[int]) -> Tuple[in
     with start_action(action_type=u"handle_example_data_button"):
         current_time = int(time.time() * 1000)
         
-        # Load fresh generic data
-        new_full_df, new_events_df, source_name = _load_generic_round_data()
-        
-        # Start at a random position for example data too
         points = max(MIN_POINTS, min(MAX_POINTS, DEFAULT_POINTS))
-        new_df, random_start = get_random_data_window(new_full_df, points)
-        
-        # Reset predictions
-        new_full_df = new_full_df.with_columns(pl.lit(0.0).alias("prediction"))
+        info_dict: Dict[str, Any] = dict(user_info or {})
+        new_df, new_events_df, source_name, random_start = _apply_generic_round_selection(
+            info_dict,
+            info_dict.get("rounds"),
+            points,
+        )
         new_df = new_df.with_columns(pl.lit(0.0).alias("prediction"))
         
         print(f"DEBUG: Generated new random start position for example data: {random_start}")
@@ -6695,6 +6886,8 @@ def update_data_source_display(
         Input("current-window-df", "data"),
         Input("events-df", "data"),
         Input("interface-language", "data"),
+        Input("user-info-store", "data"),
+        Input("is-example-data", "data"),
     ],
     prevent_initial_call=False,
 )
@@ -6704,36 +6897,42 @@ def update_generic_source_metadata_display(
     window_df_data: Optional[Dict[str, List[Any]]],
     events_df_data: Optional[Dict[str, List[Any]]],
     interface_language: Optional[str],
+    user_info: Optional[Dict[str, Any]],
+    is_example_data: Optional[bool],
 ) -> str:
     if pathname != "/prediction":
         return ""
 
-    key = Path(str(source_name or "example.csv")).name
-    meta = GENERIC_SOURCES_METADATA.get(key)
-    if meta is None:
+    locale = normalize_locale(interface_language)
+    is_example = bool(is_example_data) if is_example_data is not None else bool(
+        (user_info or {}).get("is_example_data", True)
+    )
+    empty_events = pl.DataFrame(
+        {
+            "time": [],
+            "event_type": [],
+            "event_subtype": [],
+            "insulin_value": [],
+        }
+    )
+    if not window_df_data or not window_df_data.get("time"):
+        if not is_example:
+            return format_source_notes(locale=locale, show_carbs_info_note=True)
         return ""
 
-    show_no_carbs = False
-    if window_df_data and window_df_data.get("time"):
-        window_df = reconstruct_dataframe_from_dict(window_df_data)
-        events_df = (
-            reconstruct_events_dataframe_from_dict(events_df_data)
-            if events_df_data
-            else pl.DataFrame(
-                {
-                    "time": [],
-                    "event_type": [],
-                    "event_subtype": [],
-                    "insulin_value": [],
-                }
-            )
-        )
-        show_no_carbs = should_show_no_carbs_note(window_df, events_df)
-
-    return format_generic_source_metadata(
-        meta,
-        locale=normalize_locale(interface_language),
-        show_no_carbs_note=show_no_carbs,
+    window_df = reconstruct_dataframe_from_dict(window_df_data)
+    events_df = (
+        reconstruct_events_dataframe_from_dict(events_df_data)
+        if events_df_data
+        else empty_events
+    )
+    return _build_source_metadata_line(
+        source_name=str(source_name or ""),
+        user_info=user_info,
+        is_example_data=is_example,
+        window_df=window_df,
+        events_df=events_df,
+        locale=locale,
     )
 
 # Add callback for random slider initialization when prediction page components are ready
@@ -6786,7 +6985,7 @@ def update_upload_success_message(
 
     info = dict(user_info or {})
     fmt = str(info.get("format") or "A")
-    consent_ok = bool(info.get("consent_use_uploaded_data", False))
+    consent_ok = _upload_data_consent_given(info)
     if fmt in ("B", "C") and (not consent_ok):
         return html.Div(
             t("ui.startup.data_usage_consent_required", locale=normalize_locale(interface_language)),

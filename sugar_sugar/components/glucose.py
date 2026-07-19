@@ -382,6 +382,10 @@ class GlucoseChart(html.Div):
         # Add traces for each event type
         for event_type, style in self.EVENT_STYLES.items():
             events = window_events.filter(pl.col("event_type") == event_type)
+            if event_type == "Insulin":
+                events = events.filter(
+                    pl.col("insulin_value").is_not_null() & (pl.col("insulin_value") != 0)
+                )
             if events.height > 0:
                 event_times = events.get_column("time")
                 y_positions = []

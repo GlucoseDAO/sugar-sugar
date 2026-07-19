@@ -196,6 +196,7 @@ ro:
     current_data_source: "Sursa curentă de date:"
     weight_label: "Greutate"
     no_carbs_note: "Această fereastră de masă nu include date de carbohidrați înregistrate."
+    carbs_info_note: "Markerii de carbohidrați apar doar dacă setul tău de date îi include. Verifică marcajele de timp — nu toate exporturile CGM înregistrează carbohidrați."
     description_1: "Testează-ți abilitățile de predicție a glucozei!"
     description_2: "Fă clic pe grafic sau desenează linii pentru a prezice valorile viitoare ale glucozei."
     description_3: "Jocul îți va arăta cât de precise sunt predicțiile tale comparativ cu măsurătorile reale."
@@ -346,6 +347,15 @@ ro:
     warning: "Te rugăm să nu reîncepi doar pentru că nu ești mulțumit de predicțiile tale — repornirea denaturează datele de cercetare și afectează rezultatele studiului."
     continue_btn: "Continuă"
     start_over_btn: "Reîncepe"
+    your_code: "Codul tău de reluare (pentru a continua pe alt dispozitiv): %{code}"
+
+  resume_code:
+    landing_prompt: "Continui pe un dispozitiv nou? Introdu codul de reluare:"
+    placeholder: "Cod de reluare"
+    redeem_btn: "Reia"
+    not_found: "Nu am găsit o sesiune pentru acel cod. Verifică-l și încearcă din nou."
+    copy_link: "🔗 Copiază linkul de reluare"
+    copied: "✓ Link copiat!"
 
   session_expired:
     title: "Sesiune expirată"

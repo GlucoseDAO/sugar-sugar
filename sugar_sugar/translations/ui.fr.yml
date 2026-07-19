@@ -178,6 +178,7 @@ fr:
     current_data_source: "Source de données actuelle :"
     weight_label: "Poids"
     no_carbs_note: "Cette plage horaire de repas ne contient aucune donnée de glucides enregistrée."
+    carbs_info_note: "Les marqueurs de glucides n'apparaissent que si ton jeu de données les inclut. Vérifie les horodatages — tous les exports CGM ne consignent pas les glucides."
     description_1: "Teste tes compétences en prédiction de la glycémie !"
     description_2: "Clique sur le graphique ou trace des lignes pour prédire les valeurs futures de glycémie."
     description_3: "Le jeu te montrera la précision de tes prédictions par rapport aux mesures réelles."
@@ -326,6 +327,15 @@ fr:
     warning: "Merci de ne pas recommencer simplement parce que tu n'es pas satisfait de tes prédictions — recommencer fausse les données de recherche et compromet les résultats de l'étude."
     continue_btn: "Continuer"
     start_over_btn: "Recommencer"
+    your_code: "Ton code de reprise (pour continuer sur un autre appareil) : %{code}"
+
+  resume_code:
+    landing_prompt: "Tu continues sur un nouvel appareil ? Entre ton code de reprise :"
+    placeholder: "Code de reprise"
+    redeem_btn: "Reprendre"
+    not_found: "Nous n'avons pas trouvé de session pour ce code. Vérifie-le et réessaie."
+    copy_link: "🔗 Copier le lien de reprise"
+    copied: "✓ Lien copié !"
 
   session_expired:
     title: "Session expirée"

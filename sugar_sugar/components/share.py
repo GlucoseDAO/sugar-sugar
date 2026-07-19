@@ -601,6 +601,7 @@ def build_synthesis_figure(
     figure_height: Optional[int] = None,
     show_legend_in_figure: bool = True,
     show_format_row_annotations: bool = True,
+    show_round_labels: bool = False,
 ) -> go.Figure:
     """Per-slot percent error in the next hour (one subplot per data source.
 
@@ -831,7 +832,7 @@ def build_synthesis_figure(
                     ),
                     row=row_idx, col=1,
                 )
-                _show_label: bool = (
+                _show_label: bool = show_round_labels and (
                     SHARE_ROUND_LABELS == "all"
                     or (SHARE_ROUND_LABELS == "single" and n_fmt <= 1)
                 )

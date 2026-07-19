@@ -146,7 +146,11 @@ def load_loop_chronological_data(file_path: Path) -> tuple[pl.DataFrame, pl.Data
                     _parse_loop_numeric("Bolus Insulin (U)").alias("insulin_value"),
                 ]
             )
-            .filter(pl.col("time").is_not_null() & pl.col("insulin_value").is_not_null())
+            .filter(
+                pl.col("time").is_not_null()
+                & pl.col("insulin_value").is_not_null()
+                & (pl.col("insulin_value") != 0)
+            )
         )
         basal_events = (
             raw_df.filter(_non_empty_str("Basal Rate (U/h)"))
@@ -158,7 +162,11 @@ def load_loop_chronological_data(file_path: Path) -> tuple[pl.DataFrame, pl.Data
                     _parse_loop_numeric("Basal Rate (U/h)").alias("insulin_value"),
                 ]
             )
-            .filter(pl.col("time").is_not_null() & pl.col("insulin_value").is_not_null())
+            .filter(
+                pl.col("time").is_not_null()
+                & pl.col("insulin_value").is_not_null()
+                & (pl.col("insulin_value") != 0)
+            )
         )
 
         events_df = pl.concat([carb_events, bolus_events, basal_events], how="vertical").sort("time")
@@ -195,6 +203,10 @@ def _adapt_events_df(events_df: pl.DataFrame) -> pl.DataFrame:
                 .cast(pl.Float64, strict=False)
                 .alias("insulin_value"),
             ]
+        )
+        .filter(
+            (pl.col("event_type") != "Insulin")
+            | (pl.col("insulin_value").is_not_null() & (pl.col("insulin_value") != 0))
         )
         .sort("time")
     )

@@ -23,6 +23,63 @@ _MISSING_FIELDS_STYLE: dict[str, str] = {
 }
 
 
+def _truthy_consent_flag(value: Any) -> bool:
+    if value is True:
+        return True
+    if value is False or value is None:
+        return False
+    if isinstance(value, (int, float)):
+        return value != 0
+    text = str(value).strip().lower()
+    return text in {"1", "true", "yes", "on"}
+
+
+def prior_upload_data_consent(user_info: Optional[dict[str, Any]]) -> bool:
+    """True if upload/CGM-data usage consent is already established for this session.
+
+    Sources (any one is enough — do not re-ask on prediction / format switch):
+    - landing/startup flags: ``consent_use_uploaded_data`` / ``consent_upload_own_data``
+    - a successful CGM upload already on the session (``uploaded_data_path``)
+    - any completed own-data round (current run or archived ``runs_by_format``)
+    - any archived B/C run that recorded upload consent or completed rounds
+    """
+    info = user_info or {}
+    if _truthy_consent_flag(info.get("consent_use_uploaded_data")):
+        return True
+    if _truthy_consent_flag(info.get("consent_upload_own_data")):
+        return True
+    if info.get("uploaded_data_path"):
+        return True
+
+    for round_info in info.get("rounds") or []:
+        if isinstance(round_info, dict) and round_info.get("is_example_data") is False:
+            return True
+
+    for fmt, runs in (info.get("runs_by_format") or {}).items():
+        for run in runs or []:
+            if not isinstance(run, dict):
+                continue
+            if _truthy_consent_flag(run.get("consent_use_uploaded_data")):
+                return True
+            for round_info in run.get("rounds") or []:
+                if isinstance(round_info, dict) and round_info.get("is_example_data") is False:
+                    return True
+            # Already finished a B/C game this session => upload consent was required.
+            if str(fmt) in ("B", "C") and int(run.get("rounds_played") or len(run.get("rounds") or [])) > 0:
+                return True
+    return False
+
+
+def stamp_upload_data_consent(user_info: dict[str, Any]) -> dict[str, Any]:
+    """Persist upload-consent flags when any prior evidence exists."""
+    if prior_upload_data_consent(user_info):
+        user_info["consent_use_uploaded_data"] = True
+        if not _truthy_consent_flag(user_info.get("consent_upload_own_data")):
+            # Keep the landing optional flag aligned once usage consent is known.
+            user_info["consent_upload_own_data"] = True
+    return user_info
+
+
 def import_controls_children(locale: str) -> list[Any]:
     """Startup-stage 'import your CGM data' block: CSV upload + Nightscout fetch.
 
@@ -185,6 +242,7 @@ def validate_startup_form(
     wants_contact: bool,
     locale: Optional[str],
     wizard_step: Optional[int] = None,
+    prior_upload_consent: bool = False,
 ) -> StartupValidationResult:
     """Validate startup fields for a wizard step (0-5) or the full form (``wizard_step=None``)."""
     age_error, age_in_range = _age_field_errors(age, locale)
@@ -200,7 +258,10 @@ def validate_startup_form(
     )
 
     needs_data_consent = format_value in ("B", "C")
-    has_data_consent = bool(data_usage_consent and "agree" in data_usage_consent)
+    has_data_consent = (
+        bool(data_usage_consent and "agree" in data_usage_consent)
+        or bool(prior_upload_consent)
+    )
     data_usage_error = (
         t("ui.startup.data_usage_consent_required", locale=locale)
         if needs_data_consent and not has_data_consent
@@ -314,6 +375,7 @@ def _step_hint_children(
     wants_contact: bool,
     locale: Optional[str],
     current_step: int,
+    prior_upload_consent: bool = False,
 ) -> Any:
     if 1 <= current_step <= 4:
         return validate_startup_form(
@@ -331,6 +393,7 @@ def _step_hint_children(
             wants_contact=wants_contact,
             locale=locale,
             wizard_step=current_step,
+            prior_upload_consent=prior_upload_consent,
         ).hint_children()
     if current_step == 0:
         return ""
@@ -347,6 +410,7 @@ def _step_hint_children(
         uses_cgm=uses_cgm,
         cgm_duration=cgm_duration,
         wants_contact=wants_contact,
+        prior_upload_consent=prior_upload_consent,
         locale=locale,
     ).hint_children()
 
@@ -733,14 +797,20 @@ class StartupPage(html.Div):
         @app.callback(
             [Output('data-usage-consent-container', 'style'),
              Output('data-usage-consent', 'value')],
-            [Input('format-dropdown', 'value')],
+            [Input('format-dropdown', 'value'),
+             Input('user-info-store', 'data')],
             [State('data-usage-consent', 'value')],
         )
         def toggle_data_usage_consent(
             format_value: Optional[str],
+            user_info: Optional[dict[str, Any]],
             current_value: Optional[list[str]],
         ) -> tuple[dict[str, str], list[str]]:
             if format_value in ('B', 'C'):
+                # Landing/mobile may already have recorded upload consent — pre-tick
+                # so the user is not asked twice before Start.
+                if prior_upload_data_consent(user_info):
+                    return {'display': 'block', 'marginBottom': '20px'}, ['agree']
                 return {'display': 'block', 'marginBottom': '20px'}, list(current_value or [])
             return {'display': 'none', 'marginBottom': '20px'}, []
 
@@ -749,10 +819,14 @@ class StartupPage(html.Div):
         # user-info-store; handle_start_button carries them forward and the game
         # loads the window from that path (see resolve_dataset_identity). Consent
         # (for B/C) is required before we persist any personal data.
-        def _consent_ok(format_value: Optional[str], consent_value: Optional[list[str]]) -> bool:
+        def _consent_ok(
+            format_value: Optional[str],
+            consent_value: Optional[list[str]],
+            user_info: Optional[dict[str, Any]] = None,
+        ) -> bool:
             if format_value not in ('B', 'C'):
                 return True
-            return bool(consent_value and 'agree' in consent_value)
+            return bool(consent_value and 'agree' in consent_value) or prior_upload_data_consent(user_info)
 
         @app.callback(
             [Output('user-info-store', 'data', allow_duplicate=True),
@@ -781,7 +855,7 @@ class StartupPage(html.Div):
             if not contents:
                 raise dash.exceptions.PreventUpdate
             locale = normalize_locale(interface_language)
-            if not _consent_ok(format_value, consent_value):
+            if not _consent_ok(format_value, consent_value, user_info):
                 return no_update, _import_status_msg(t("ui.startup.import_needs_consent", locale=locale), ok=False)
             decoded = decode_upload_bytes(contents)
             if decoded is None:
@@ -838,7 +912,7 @@ class StartupPage(html.Div):
             if not n_clicks:
                 raise dash.exceptions.PreventUpdate
             locale = normalize_locale(interface_language)
-            if not _consent_ok(format_value, consent_value):
+            if not _consent_ok(format_value, consent_value, user_info):
                 return no_update, _import_status_msg(t("ui.startup.import_needs_consent", locale=locale), ok=False)
             if not (url and url.strip()):
                 return no_update, _import_status_msg(t("ui.startup.import_needs_url", locale=locale), ok=False)
@@ -997,6 +1071,7 @@ class StartupPage(html.Div):
                 cgm_duration=cgm_duration,
                 wants_contact=wants_contact,
                 locale=interface_language,
+                prior_upload_consent=prior_upload_data_consent(user_info),
             )
             if is_mobile:
                 if 1 <= current_step <= 4:
@@ -1015,6 +1090,7 @@ class StartupPage(html.Div):
                         wants_contact=wants_contact,
                         locale=interface_language,
                         current_step=current_step,
+                        prior_upload_consent=prior_upload_data_consent(user_info),
                     )
                 elif current_step == 0:
                     hint = ""
@@ -1259,6 +1335,7 @@ class StartupPage(html.Div):
                     wants_contact=wants_contact,
                     locale=interface_language,
                     wizard_step=step,
+                    prior_upload_consent=prior_upload_data_consent(user_info),
                 )
                 if not step_validation.step_complete:
                     return True, "ui button startup-next-disabled", hint_hidden

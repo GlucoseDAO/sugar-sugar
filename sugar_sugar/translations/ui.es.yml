@@ -178,6 +178,7 @@ es:
     current_data_source: "Fuente de datos actual:"
     weight_label: "Peso"
     no_carbs_note: "Esta franja horaria de comida no incluye datos de carbohidratos registrados."
+    carbs_info_note: "Los marcadores de carbohidratos solo aparecen si tu conjunto de datos los incluye. Revisa las marcas de tiempo — no todas las exportaciones de CGM registran carbohidratos."
     description_1: "¡Pon a prueba tus habilidades de predicción de glucosa!"
     description_2: "Haz clic en el gráfico o dibuja líneas para predecir los valores futuros de glucosa."
     description_3: "El juego te mostrará qué tan precisas son tus predicciones en comparación con las mediciones reales."
@@ -326,6 +327,15 @@ es:
     warning: "Por favor, no empieces de nuevo solo porque no estés satisfecho con tus predicciones; reiniciar sesga los datos de investigación y debilita los resultados del estudio."
     continue_btn: "Continuar"
     start_over_btn: "Empezar de nuevo"
+    your_code: "Tu código de reanudación (para continuar en otro dispositivo): %{code}"
+
+  resume_code:
+    landing_prompt: "¿Continúas en un dispositivo nuevo? Introduce tu código de reanudación:"
+    placeholder: "Código de reanudación"
+    redeem_btn: "Reanudar"
+    not_found: "No encontramos una sesión para ese código. Compruébalo e inténtalo de nuevo."
+    copy_link: "🔗 Copiar enlace de reanudación"
+    copied: "✓ ¡Enlace copiado!"
 
   session_expired:
     title: "Sesión expirada"

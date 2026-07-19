@@ -174,8 +174,8 @@ def test_producer_callback_arities_have_no_full_df() -> None:
     """Other producers whose Output lists lost full-df: confirm their return
     arity matches (these fire without a Dash callback context)."""
     # handle_example_data_button: 8 outputs (full-df dropped).
-    assert len(handle_example_data_button(0)) == 8  # no-click early return
-    assert len(handle_example_data_button(1)) == 8  # active path
+    assert len(handle_example_data_button(0, None)) == 8  # no-click early return
+    assert len(handle_example_data_button(1, None)) == 8  # active path
 
     # initialize_data_on_url_change: 6 outputs (full-df dropped).
     assert len(initialize_data_on_url_change("/about", None, None)) == 6  # non-prediction
