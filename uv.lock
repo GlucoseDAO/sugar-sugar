@@ -24,11 +24,11 @@ wheels = [
 
 [[package]]
 name = "annotated-types"
-version = "0.7.0"
+version = "0.8.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/ee/67/531ea369ba64dcff5ec9c3402f9f51bf748cec26dde048a2f973a4eea7f5/annotated_types-0.7.0.tar.gz", hash = "sha256:aff07c09a53a08bc8cfccb9c85b05f1aa9a2a6f23728d790723543408344ce89", size = 16081, upload-time = "2024-05-20T21:33:25.928Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5f/56/a8120250d128bed162cd73c76d45f6ef9991f3e068f62a8ee060afa3104a/annotated_types-0.8.0.tar.gz", hash = "sha256:13b2beaad985e05e2d6407ee4c4f35590b11f8d693a258a561055cac8f64cab7", size = 15893, upload-time = "2026-07-23T20:16:13.995Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/78/b6/6307fbef88d9b5ee7421e68d78a9f162e0da4900bc5f5793f6d3d0e34fb8/annotated_types-0.7.0-py3-none-any.whl", hash = "sha256:1f02e8b43a8fbbc3f3e0d4f0f4bfc8131bcb4eebe8849b8e5c773f3a1c582a53", size = 13643, upload-time = "2024-05-20T21:33:24.1Z" },
+    { url = "https://files.pythonhosted.org/packages/99/91/8acff4f5e50511b911bbccb72b8628a49c68ce14148cd9f6431094859a90/annotated_types-0.8.0-py3-none-any.whl", hash = "sha256:f072f4d804ea359e4eaf198b1af7a8b0943881a87f31bb764f8bf219bb9419e0", size = 13427, upload-time = "2026-07-23T20:16:12.938Z" },
 ]
 
 [[package]]
@@ -82,14 +82,14 @@ wheels = [
 
 [[package]]
 name = "cgm-format"
-version = "0.8.3"
+version = "0.8.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "polars" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4e/64/353c8265d03dcb9cd929b593fc7d801316c5d999880d6308bd2859468ffd/cgm_format-0.8.3.tar.gz", hash = "sha256:d628ed0cf6bc6b1422a774410e9a1233b153a5522eb869a468187bfc9d30c13c", size = 277087, upload-time = "2026-07-18T22:18:29.767Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f7/4a/70cec7271ec3bf8b777afdfe121a8a64d901aa604863f66962be8c62a1e5/cgm_format-0.8.4.tar.gz", hash = "sha256:0fb598f310bbf6914426cd41ba8f08f08157e200a1cde23f450c57b58876eeb1", size = 308513, upload-time = "2026-07-23T21:40:37.132Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/87/f4/bd3777303b30cdb74ec9ab573e1cfa5febae4b34cd25d6f118c96b50c3bf/cgm_format-0.8.3-py3-none-any.whl", hash = "sha256:83f6d4350b1efb78ce1432c5f3c3bec03d910459fb80c42f3cf7496147dcaa1c", size = 91845, upload-time = "2026-07-18T22:18:28.028Z" },
+    { url = "https://files.pythonhosted.org/packages/09/23/2702790953cee6a3601aa029a2f51d91570b9aadb48728732e3089219c90/cgm_format-0.8.4-py3-none-any.whl", hash = "sha256:1945af4c46e25356ae35b9d5787c0380e36490b707c227e2f48b1f47a8947625", size = 95023, upload-time = "2026-07-23T21:40:35.236Z" },
 ]
 
 [package.optional-dependencies]
@@ -1737,7 +1737,7 @@ wheels = [
 
 [[package]]
 name = "sugar-sugar"
-version = "0.2.4"
+version = "0.2.5"
 source = { editable = "." }
 dependencies = [
     { name = "cgm-format", extra = ["cli"] },
@@ -1766,7 +1766,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cgm-format", extras = ["cli"], specifier = ">=0.8.3" },
+    { name = "cgm-format", extras = ["cli"], specifier = ">=0.8.4" },
     { name = "dash", specifier = ">=4.1.0" },
     { name = "dash-ag-grid", specifier = ">=35.2.0" },
     { name = "dash-bootstrap-components", specifier = ">=2.0.4" },
