@@ -36,7 +36,7 @@ def get_next_study_number() -> int:
     if not path.exists():
         return 0
 
-    with path.open("r", newline="", encoding="utf-8") as file_handle:
+    with path.open("r", newline="", encoding="utf-8", errors="replace") as file_handle:
         reader = csv.DictReader(file_handle)
         numbers: list[int] = []
         for row in reader:
@@ -50,7 +50,7 @@ def consent_row_exists(study_id: str) -> bool:
     path = consent_csv_path()
     if not path.exists():
         return False
-    with path.open("r", newline="", encoding="utf-8") as file_handle:
+    with path.open("r", newline="", encoding="utf-8", errors="replace") as file_handle:
         reader = csv.DictReader(file_handle)
         for row in reader:
             if (row.get("study_id") or "") == study_id:
@@ -81,7 +81,7 @@ def append_consent_agreement_row(row: dict[str, Any]) -> None:
                 writer.writerow(normalized)
             return
 
-        with path.open("r", newline="", encoding="utf-8") as file_handle:
+        with path.open("r", newline="", encoding="utf-8", errors="replace") as file_handle:
             reader = csv.DictReader(file_handle)
             existing_fieldnames = list(reader.fieldnames or [])
             existing_rows = list(reader)
@@ -141,7 +141,7 @@ def upsert_consent_agreement_fields(study_id: str, updates: dict[str, Any]) -> N
             append_consent_agreement_row({"study_id": sid, **normalized_updates})
             return
 
-        with path.open("r", newline="", encoding="utf-8") as file_handle:
+        with path.open("r", newline="", encoding="utf-8", errors="replace") as file_handle:
             reader = csv.DictReader(file_handle)
             fieldnames = list(reader.fieldnames or [])
             rows = list(reader)

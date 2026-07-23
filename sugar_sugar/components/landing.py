@@ -10,6 +10,7 @@ import dash
 import dash_bootstrap_components as dbc
 from dash import dcc, html, no_update
 from dash.dependencies import Input, Output, State
+from eliot import start_action
 
 from sugar_sugar.consent_notice_text import consent_notice_children
 from sugar_sugar.consent import ensure_consent_agreement_row, get_next_study_number
@@ -440,23 +441,31 @@ class LandingPage(html.Div):
             from sugar_sugar import resume_store
             info["resume_code"] = info.get("resume_code") or resume_store.new_code()
 
-            if info.get("number") is None:
-                info["number"] = get_next_study_number()
-
-            ensure_consent_agreement_row(
-                {
-                    "study_id": info["study_id"],
-                    "number": info.get("number", ""),
-                    "timestamp": info["consent_timestamp"],
-                    "gdpr_consent": gdpr_consented,
-                    "upload_own_data": upload_own_data,
-                    "play_only": play_only,
-                    "participate_in_study": info["consent_participate_in_study"],
-                    "receive_results_later": receive_results,
-                    "keep_up_to_date": keep_updated,
-                    "no_selection": no_selection,
-                }
-            )
+            # CSV bookkeeping must never block the consent gate: if the stats /
+            # consent CSVs are unreadable (e.g. a stray non-UTF-8 byte from an
+            # earlier write -- this 500'd the landing "Continue" in production),
+            # log and proceed. Consent itself lives in user-info-store regardless.
+            try:
+                if info.get("number") is None:
+                    info["number"] = get_next_study_number()
+                ensure_consent_agreement_row(
+                    {
+                        "study_id": info["study_id"],
+                        "number": info.get("number", ""),
+                        "timestamp": info["consent_timestamp"],
+                        "gdpr_consent": gdpr_consented,
+                        "upload_own_data": upload_own_data,
+                        "play_only": play_only,
+                        "participate_in_study": info["consent_participate_in_study"],
+                        "receive_results_later": receive_results,
+                        "keep_up_to_date": keep_updated,
+                        "no_selection": no_selection,
+                    }
+                )
+            except Exception:
+                with start_action(action_type=u"landing_consent_csv_failed",
+                                  study_id=str(info.get("study_id") or "")):
+                    pass
 
             return "/startup", info, None
 

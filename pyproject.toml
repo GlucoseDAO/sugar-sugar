@@ -1,6 +1,6 @@
 [project]
 name = "sugar-sugar"
-version = "0.2.3"
+version = "0.2.4"
 description = "A data access and visualization tool for glucose monitoring data"
 authors = [
     {name = "Anton Kulaga", email = "Antonkulaga@gmail.com"},
