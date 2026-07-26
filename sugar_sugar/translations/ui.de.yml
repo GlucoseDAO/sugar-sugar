@@ -48,6 +48,7 @@ de:
     consent_required_error: "Bitte bestätige, dass du 18+ bist und das Einwilligungsformular gelesen hast, um fortzufahren."
     next_hint: "Als Nächstes: kurzes Formular ausfüllen und dann CGM‑Daten hochladen (oder Beispieldaten verwenden)."
     take_me_in: "Los geht's"
+    games_played_so_far: "Bisher gespielte Spiele"
 
   about:
     title: "Über Sugar Sugar"

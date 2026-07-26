@@ -48,6 +48,7 @@ ro:
     consent_required_error: "Te rugăm să confirmi că ai 18+ ani și ai citit formularul de consimțământ pentru a continua."
     next_hint: "Urmează: vei completa un formular scurt, apoi vei încărca date CGM (sau vei folosi setul exemplu)."
     take_me_in: "Intră în joc"
+    games_played_so_far: "Jocuri jucate până acum"
 
   about:
     title: "Despre Sugar Sugar"

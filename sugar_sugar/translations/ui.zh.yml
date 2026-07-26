@@ -48,6 +48,7 @@ zh:
     consent_required_error: "请确认您已年满 18 岁并阅读了同意书以继续。"
     next_hint: "下一步：您将填写一份简短的表格，然后上传 CGM 数据（或使用示例数据集）。"
     take_me_in: "开始"
+    games_played_so_far: "迄今游玩次数"
 
   consent_form:
     title: "同意通知"

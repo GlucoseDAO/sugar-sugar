@@ -142,6 +142,24 @@ body .ui.large.menu {
   cursor: pointer;
 }
 
+/* Games-played counter: beat `body :not(h1..h6) { font-size: 16px !important }`. */
+#landing-page .games-played-title {
+  font-size: 38px !important;
+  font-weight: 800 !important;
+  line-height: 1.15 !important;
+  margin: 0 0 12px 0 !important;
+  color: #334155 !important;
+}
+
+#landing-page .games-played-count {
+  font-size: 70px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  margin: 0 !important;
+  color: #1565c0 !important;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Info page styling (About, Contact, Demo pages) */
 .info-page {
   min-height: 100vh;

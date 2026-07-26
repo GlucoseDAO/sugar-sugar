@@ -50,6 +50,7 @@ es:
     consent_required_error: "Por favor confirma que eres mayor de 18 años y has leído el formulario de consentimiento para continuar."
     next_hint: "Siguiente: completarás un breve formulario y luego subirás tus datos de CGM (o usarás el conjunto de datos de ejemplo)."
     take_me_in: "Entrar"
+    games_played_so_far: "Partidas jugadas hasta ahora"
 
   consent_form:
     title: "Aviso de consentimiento"

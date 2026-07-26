@@ -820,6 +820,22 @@ html.mobile-device .landing-mobile-cta.ui.button {
   text-decoration: none !important;
 }
 
+html.mobile-device .games-played-counter {
+  display: block !important;
+  width: 100% !important;
+  box-sizing: border-box;
+  padding: 22px 20px !important;
+}
+
+/* Mobile title is 32px → label 24px (3/4), number 40px. */
+html.mobile-device #landing-page .games-played-title {
+  font-size: 24px !important;
+}
+
+html.mobile-device #landing-page .games-played-count {
+  font-size: 40px !important;
+}
+
 html.mobile-device #startup-next:disabled,
 html.mobile-device #startup-next[disabled] {
   background: #9ca3af !important;

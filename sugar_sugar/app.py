@@ -3381,15 +3381,11 @@ def _pick_milestone(current_round: int, max_rounds: int, min_useful: int, locale
 
 
 def _build_progress_bar(current_round: int, max_rounds: int, min_useful: int, locale: str) -> html.Div:
-    """Two-phase segmented progress bar: green up to min_useful, gold for stretch."""
+    """Segmented progress bar; filled segments stay green for every round."""
     segments: list[html.Div] = []
     for i in range(1, max_rounds + 1):
-        is_min_phase = i <= min_useful
         filled = i <= current_round
-        if filled:
-            bg = "#4CBB17" if is_min_phase else "#D4A017"
-        else:
-            bg = "#e0e0e0" if is_min_phase else "#f5f0e0"
+        bg = "#4CBB17" if filled else "#e0e0e0"
         border_right = "2px solid white" if i < max_rounds else "none"
         border_left = "3px solid #888" if i == min_useful + 1 else "none"
         segments.append(html.Div(
@@ -3411,7 +3407,7 @@ def _build_progress_bar(current_round: int, max_rounds: int, min_useful: int, lo
         ),
         html.Span(
             t("ui.ending.progress.stretch_goal", locale=locale, total=max_rounds),
-            style={"fontSize": "13px", "color": "#9e7c16", "fontWeight": "600"},
+            style={"fontSize": "13px", "color": "#4a5568", "fontWeight": "600"},
         ),
     ], disable_n_clicks=True, style={
         "display": "flex",

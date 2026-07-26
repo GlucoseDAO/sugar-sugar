@@ -17,6 +17,56 @@ from sugar_sugar.consent import ensure_consent_agreement_row, get_next_study_num
 from sugar_sugar.i18n import t, t_list
 from sugar_sugar.config import STORAGE_TYPE
 
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+_PREDICTION_RANKING_CSV = _PROJECT_ROOT / "data" / "input" / "prediction_ranking.csv"
+
+
+def count_prediction_ranking_rows() -> int:
+    """Number of completed games = data rows in ``prediction_ranking.csv``."""
+    if not _PREDICTION_RANKING_CSV.exists() or _PREDICTION_RANKING_CSV.stat().st_size == 0:
+        return 0
+    with _PREDICTION_RANKING_CSV.open(encoding="utf-8") as f:
+        # Skip header; count non-empty data lines.
+        next(f, None)
+        return sum(1 for line in f if line.strip())
+
+
+def games_played_counter(locale: str) -> html.Div:
+    """Landing social-proof counter; animates 0 → N via assets/games-played-counter.js.
+
+    Uses ``h2`` so the global ``body :not(h1..h6) { font-size: 16px !important }``
+    rule in ``lang.css`` cannot shrink the text. Final sizes live in ``lang.css``.
+    """
+    count = count_prediction_ranking_rows()
+    return html.Div(
+        [
+            html.H2(
+                t("ui.landing.games_played_so_far", locale=locale),
+                className="games-played-title",
+                disable_n_clicks=True,
+            ),
+            html.H2(
+                "0",
+                className="games-played-count",
+                disable_n_clicks=True,
+                **{"data-target": str(count)},
+            ),
+        ],
+        className="games-played-counter",
+        disable_n_clicks=True,
+        style={
+            "marginBottom": "22px",
+            "padding": "28px 40px",
+            "background": "rgba(255,255,255,0.75)",
+            "border": "1px solid rgba(15, 23, 42, 0.10)",
+            "borderRadius": "18px",
+            "display": "block",
+            "width": "100%",
+            "boxSizing": "border-box",
+            "textAlign": "center",
+        },
+    )
+
 
 @lru_cache(maxsize=4)
 def _image_data_uri(path: Path) -> Optional[str]:
@@ -164,6 +214,7 @@ class LandingPage(html.Div):
                                 "lineHeight": "1.4",
                             },
                         ),
+                        games_played_counter(locale),
                         html.Div(
                             [
                                 html.H3(
@@ -490,6 +541,11 @@ class LandingPageMobile(html.Div):
                 html.Div(
                     t("ui.landing.tagline", locale=locale),
                     style={"fontSize": "16px", "color": "#334155", "marginBottom": "14px", "lineHeight": "1.4"},
+                ),
+                html.Div(
+                    games_played_counter(locale),
+                    style={"textAlign": "center"},
+                    disable_n_clicks=True,
                 ),
                 html.Div(
                     [

@@ -48,6 +48,7 @@ en:
     consent_required_error: "Please confirm you are 18+ and have read the consent form to continue."
     next_hint: "Next: you'll fill in a short form, then upload CGM data (or use the sample dataset)."
     take_me_in: "Take me in"
+    games_played_so_far: "Games played so far"
 
   consent_form:
     title: "Consent notice"
