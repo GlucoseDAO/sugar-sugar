@@ -1,13 +1,31 @@
-import plotly.graph_objs as go
-import polars as pl
+import base64
+from functools import lru_cache
+from pathlib import Path
 from typing import Any, Optional
 from datetime import datetime
+
+import plotly.graph_objs as go
+import polars as pl
 from dash import dcc, Output, Input, State
 from dash import Dash, html
 from dash.exceptions import PreventUpdate
 from eliot import start_action
+
 from sugar_sugar.config import PREDICTION_HOUR_OFFSET, STORAGE_TYPE
 from sugar_sugar.i18n import normalize_locale, t
+
+_ASSETS_IMAGES = Path(__file__).resolve().parents[2] / "assets" / "images"
+
+# Insulin / carbs: SVG layout images (plotly.js ignores custom path:// markers).
+_ICON_EVENT_TYPES: frozenset[str] = frozenset({"Insulin", "Carbohydrates"})
+
+
+@lru_cache(maxsize=4)
+def _svg_data_uri(filename: str) -> str:
+    path = _ASSETS_IMAGES / filename
+    raw = path.read_bytes()
+    b64 = base64.b64encode(raw).decode("ascii")
+    return f"data:image/svg+xml;base64,{b64}"
 
 
 class GlucoseChart(html.Div):
@@ -17,14 +35,33 @@ class GlucoseChart(html.Div):
         "high": {"fill": "rgba(255, 255, 200, 0.5)", "line": "rgba(200, 200, 0, 0.5)"},
         "dangerous_high": {"fill": "rgba(255, 200, 200, 0.5)", "line": "rgba(200, 0, 0, 0.5)"}
     }
-    
-    EVENT_STYLES = {
-        'Insulin': {'symbol': 'triangle-down', 'color': 'purple', 'size': 20},
-        'Exercise': {'symbol': 'star', 'color': 'orange', 'size': 20},
-        'Carbohydrates': {'symbol': 'square', 'color': 'green', 'size': 20}
+
+    EVENT_STYLES: dict[str, dict[str, Any]] = {
+        "Insulin": {
+            "icon": "syringe.svg",
+            "color": "#7b1fa2",
+            # Data-coordinate icon box (~2× the earlier layout-image size).
+            "icon_size_x": 2.8,
+            "icon_size_y_frac": 0.12,
+        },
+        "Exercise": {
+            "symbol": "star",
+            "color": "orange",
+            "size": 20,
+        },
+        "Carbohydrates": {
+            "icon": "apple.svg",
+            "color": "#2e7d32",
+            "icon_size_x": 2.6,
+            "icon_size_y_frac": 0.11,
+        },
     }
 
-    def __init__(self, id: str = 'glucose-chart', hide_last_hour: bool = False) -> None:
+    def __init__(
+        self,
+        id: str = "glucose-chart",
+        hide_last_hour: bool = False,
+    ) -> None:
         super().__init__(
             [
                 dcc.Store(id=f"{id}-df-store", data=None, storage_type=STORAGE_TYPE),
@@ -358,111 +395,300 @@ class GlucoseChart(html.Div):
                             hoverinfo='skip'
                         ))
 
+    def _event_xy_for_time(self, event_time: datetime) -> tuple[float, float]:
+        """Map an event timestamp onto chart (x index, y glucose) coordinates."""
+        f = self._display_factor
+        df_times = self._current_df.get_column("time")
+        before_idx: Optional[int] = None
+        after_idx: Optional[int] = None
+        for i, time_val in enumerate(df_times):
+            if time_val <= event_time:
+                before_idx = i
+            if time_val >= event_time and after_idx is None:
+                after_idx = i
+        if before_idx is None:
+            before_idx = 0
+        if after_idx is None:
+            after_idx = len(df_times) - 1
+
+        if df_times[before_idx] == event_time or before_idx == after_idx:
+            x_pos = float(before_idx)
+            glucose_value = float(self._current_df.get_column("gl")[before_idx]) * f
+        else:
+            before_time = df_times[before_idx].timestamp()
+            after_time = df_times[after_idx].timestamp()
+            factor = (event_time.timestamp() - before_time) / (after_time - before_time)
+            x_pos = float(before_idx) + factor
+            before_glucose = float(self._current_df.get_column("gl")[before_idx])
+            after_glucose = float(self._current_df.get_column("gl")[after_idx])
+            glucose_value = (before_glucose + (after_glucose - before_glucose) * factor) * f
+        return x_pos, glucose_value
+
     def _add_event_markers(self, figure: go.Figure, *, locale: str) -> None:
-        """Adds event markers (insulin, exercise, carbs) to the figure."""
+        """Adds event markers (insulin syringe, exercise, carb apple) to the figure.
+
+        Insulin/carbs use SVG ``layout_image`` markers (plotly.js does not render
+        custom ``path://`` symbols from Python). On the prediction page
+        (``hide_last_hour``), those icons appear only in known history — never
+        in the last hour — so they cannot tip the draw. Results show all.
+        """
         if self._current_events.height == 0:
             return
-        f = self._display_factor
-            
-        # Filter events to only those within the current time window
+
         start_time = self._current_df.get_column("time")[0]
         end_time = self._current_df.get_column("time")[-1]
-        
         window_events = self._current_events.filter(
-            (pl.col("time") >= start_time) & 
-            (pl.col("time") <= end_time)
+            (pl.col("time") >= start_time) & (pl.col("time") <= end_time)
         )
-        
+
+        # First index of the hidden / predicted hour (same as prediction_boundary).
+        known_end_idx = len(self._current_df) - PREDICTION_HOUR_OFFSET
+
         legend_name_by_type: dict[str, str] = {
             "Insulin": t("ui.chart.event_insulin", locale=locale),
             "Exercise": t("ui.chart.event_exercise", locale=locale),
             "Carbohydrates": t("ui.chart.event_carbohydrates", locale=locale),
         }
 
-        # Add traces for each event type
-        for event_type, style in self.EVENT_STYLES.items():
+        y_min, y_max = self._calculate_y_axis_range()
+        y_span = max(y_max - y_min, 1.0)
+
+        # Collect insulin/carb icons first so near-identical x positions can stack.
+        icon_markers: list[dict[str, Any]] = []
+        for event_type in ("Insulin", "Carbohydrates"):
+            style = self.EVENT_STYLES[event_type]
             events = window_events.filter(pl.col("event_type") == event_type)
             if event_type == "Insulin":
                 events = events.filter(
                     pl.col("insulin_value").is_not_null() & (pl.col("insulin_value") != 0)
                 )
-            if events.height > 0:
-                event_times = events.get_column("time")
-                y_positions = []
-                hover_texts = []
-                x_positions = []
-                
-                for event_time in event_times:
-                    # Find the glucose readings before and after the event
-                    df_times = self._current_df.get_column("time")
-                    
-                    # Find indices of surrounding glucose readings
-                    before_idx = None
-                    after_idx = None
-                    
-                    for i, time_val in enumerate(df_times):
-                        if time_val <= event_time:
-                            before_idx = i
-                        if time_val >= event_time and after_idx is None:
-                            after_idx = i
-                    
-                    # Handle edge cases and interpolation
-                    if before_idx is None:
-                        before_idx = 0
-                    if after_idx is None:
-                        after_idx = len(df_times) - 1
-                    
-                    # Calculate position and glucose value
-                    if df_times[before_idx] == event_time:
-                        x_pos = before_idx
-                        glucose_value = float(self._current_df.get_column("gl")[before_idx]) * f
-                    elif before_idx == after_idx:
-                        x_pos = before_idx
-                        glucose_value = float(self._current_df.get_column("gl")[before_idx]) * f
-                    else:
-                        # Interpolate position and glucose value
-                        before_time = df_times[before_idx].timestamp()
-                        after_time = df_times[after_idx].timestamp()
-                        event_timestamp = event_time.timestamp()
-                        
-                        factor = (event_timestamp - before_time) / (after_time - before_time)
-                        x_pos = before_idx + factor
-                        
-                        before_glucose = self._current_df.get_column("gl")[before_idx]
-                        after_glucose = self._current_df.get_column("gl")[after_idx]
-                        glucose_value = float(before_glucose + (after_glucose - before_glucose) * factor) * f
-                    
-                    y_positions.append(glucose_value)
-                    x_positions.append(x_pos)
-                    
-                    # Create hover text
-                    event_row = events.filter(pl.col("time") == event_time)
-                    if event_type == 'Insulin':
-                        hover_text = t(
-                            "ui.chart.hover_insulin",
-                            locale=locale,
-                            value=event_row.get_column('insulin_value')[0],
-                            time=event_time.strftime('%H:%M'),
-                        )
-                    else:
-                        hover_text = f"{event_type}<br>{event_time.strftime('%H:%M')}"
-                    hover_texts.append(hover_text)
-                
-                figure.add_trace(go.Scatter(
+            if events.height == 0:
+                continue
+            for event_time in events.get_column("time"):
+                x_pos, glucose_value = self._event_xy_for_time(event_time)
+                if self.hide_last_hour and x_pos > float(known_end_idx):
+                    continue
+                event_row = events.filter(pl.col("time") == event_time)
+                if event_type == "Insulin":
+                    hover = t(
+                        "ui.chart.hover_insulin",
+                        locale=locale,
+                        value=event_row.get_column("insulin_value")[0],
+                        time=event_time.strftime("%H:%M"),
+                    )
+                else:
+                    hover = (
+                        f"{legend_name_by_type[event_type]}"
+                        f"<br>{event_time.strftime('%H:%M')}"
+                    )
+                icon_markers.append(
+                    {
+                        "event_type": event_type,
+                        "x": x_pos,
+                        "y": glucose_value,
+                        "hover": hover,
+                        "style": style,
+                    }
+                )
+
+        self._stack_icon_markers(icon_markers, y_span=y_span, y_max=y_max)
+        icon_legend_entries = self._draw_icon_markers(
+            figure, icon_markers, legend_name_by_type=legend_name_by_type
+        )
+
+        # Exercise keeps a normal Plotly marker (no SVG stacking).
+        exercise_style = self.EVENT_STYLES["Exercise"]
+        exercise_events = window_events.filter(pl.col("event_type") == "Exercise")
+        if exercise_events.height > 0:
+            x_positions = []
+            y_positions = []
+            hover_texts = []
+            for event_time in exercise_events.get_column("time"):
+                x_pos, glucose_value = self._event_xy_for_time(event_time)
+                x_positions.append(x_pos)
+                y_positions.append(glucose_value)
+                hover_texts.append(
+                    f"{legend_name_by_type['Exercise']}"
+                    f"<br>{event_time.strftime('%H:%M')}"
+                )
+            figure.add_trace(
+                go.Scatter(
                     x=x_positions,
                     y=y_positions,
-                    mode='markers',
-                    name=legend_name_by_type.get(event_type, event_type),
+                    mode="markers",
+                    name=legend_name_by_type["Exercise"],
                     marker=dict(
-                        symbol=style['symbol'],
-                        size=style['size'],
-                        color=style['color'],
-                        line=dict(width=2, color='white'),
-                        opacity=0.8
+                        symbol=str(exercise_style["symbol"]),
+                        size=int(exercise_style["size"]),
+                        color=str(exercise_style["color"]),
+                        line=dict(width=2, color="white"),
+                        opacity=0.9,
                     ),
                     text=hover_texts,
-                    hoverinfo='text'
-                ))
+                    hoverinfo="text",
+                )
+            )
+
+        self._add_icon_legend(figure, icon_legend_entries)
+
+    @staticmethod
+    def _stack_icon_markers(
+        markers: list[dict[str, Any]],
+        *,
+        y_span: float,
+        y_max: float,
+    ) -> None:
+        """Offset overlapping insulin/carb icons so they stack vertically in place.
+
+        Mutates each marker's ``y`` (display position). Markers whose x positions
+        fall within ~half an icon width are treated as one stack.
+        """
+        if len(markers) < 2:
+            return
+
+        # Sort left-to-right, stable type order (Insulin below Carbs when tied).
+        type_order = {"Insulin": 0, "Carbohydrates": 1}
+        markers.sort(
+            key=lambda m: (m["x"], type_order.get(str(m["event_type"]), 9))
+        )
+
+        overlap_x = 1.2  # ~half of typical icon_size_x — treat as same column
+        stacks: list[list[dict[str, Any]]] = []
+        for marker in markers:
+            if stacks and abs(marker["x"] - stacks[-1][0]["x"]) <= overlap_x:
+                stacks[-1].append(marker)
+            else:
+                stacks.append([marker])
+
+        for stack in stacks:
+            if len(stack) == 1:
+                continue
+            # Step ≈ one icon height so markers sit fully above each other.
+            step = y_span * max(
+                float(m["style"]["icon_size_y_frac"]) for m in stack
+            )
+            base_y = float(stack[0]["y"])
+            stack_x = sum(float(m["x"]) for m in stack) / len(stack)
+            # Prefer stacking upward; flip the whole column if it would clip.
+            direction = 1.0
+            if base_y + (len(stack) - 1) * step + step * 0.5 > y_max:
+                direction = -1.0
+            for i, marker in enumerate(stack):
+                marker["x"] = stack_x
+                marker["y"] = base_y + direction * i * step
+
+    def _draw_icon_markers(
+        self,
+        figure: go.Figure,
+        markers: list[dict[str, Any]],
+        *,
+        legend_name_by_type: dict[str, str],
+    ) -> list[tuple[str, str]]:
+        """Render stacked SVG icons + hover targets; return legend entries."""
+        if not markers:
+            return []
+
+        y_min, y_max = self._calculate_y_axis_range()
+        y_span = max(y_max - y_min, 1.0)
+        legend_entries: list[tuple[str, str]] = []
+        seen_types: set[str] = set()
+
+        by_type: dict[str, list[dict[str, Any]]] = {}
+        for marker in markers:
+            by_type.setdefault(str(marker["event_type"]), []).append(marker)
+
+        for event_type in ("Insulin", "Carbohydrates"):
+            group = by_type.get(event_type)
+            if not group:
+                continue
+            style = group[0]["style"]
+            icon_uri = _svg_data_uri(str(style["icon"]))
+            icon_size_x = float(style["icon_size_x"])
+            icon_size_y = y_span * float(style["icon_size_y_frac"])
+            x_positions = [float(m["x"]) for m in group]
+            y_positions = [float(m["y"]) for m in group]
+            hover_texts = [str(m["hover"]) for m in group]
+            for x_pos, y_pos in zip(x_positions, y_positions):
+                figure.add_layout_image(
+                    dict(
+                        source=icon_uri,
+                        x=x_pos,
+                        y=y_pos,
+                        xref="x",
+                        yref="y",
+                        sizex=icon_size_x,
+                        sizey=icon_size_y,
+                        xanchor="center",
+                        yanchor="middle",
+                        sizing="contain",
+                        layer="above",
+                    )
+                )
+            legend_name = legend_name_by_type.get(event_type, event_type)
+            figure.add_trace(
+                go.Scatter(
+                    x=x_positions,
+                    y=y_positions,
+                    mode="markers",
+                    name=legend_name,
+                    showlegend=False,
+                    marker=dict(
+                        symbol="circle",
+                        size=28,
+                        color=str(style["color"]),
+                        opacity=0.0,
+                        line=dict(width=0),
+                    ),
+                    text=hover_texts,
+                    hoverinfo="text",
+                )
+            )
+            if event_type not in seen_types:
+                legend_entries.append((icon_uri, legend_name))
+                seen_types.add(event_type)
+
+        return legend_entries
+
+    @staticmethod
+    def _add_icon_legend(
+        figure: go.Figure,
+        entries: list[tuple[str, str]],
+    ) -> None:
+        """Paper-coord SVG + label so the legend matches the chart icons."""
+        if not entries:
+            return
+        # Right-aligned row above the plot (alongside the horizontal Plotly legend).
+        slot = 0.16
+        right = 0.98
+        start_x = right - slot * (len(entries) - 1)
+        for i, (uri, label) in enumerate(entries):
+            x = start_x + i * slot
+            figure.add_layout_image(
+                dict(
+                    source=uri,
+                    xref="paper",
+                    yref="paper",
+                    x=x - 0.06,
+                    y=1.08,
+                    sizex=0.035,
+                    sizey=0.07,
+                    xanchor="center",
+                    yanchor="middle",
+                    sizing="contain",
+                    layer="above",
+                )
+            )
+            figure.add_annotation(
+                xref="paper",
+                yref="paper",
+                x=x - 0.038,
+                y=1.08,
+                text=label,
+                showarrow=False,
+                xanchor="left",
+                yanchor="middle",
+                font=dict(size=12, color="#333"),
+            )
 
     @classmethod
     def build_static_figure(
@@ -485,7 +711,8 @@ class GlucoseChart(html.Div):
             locale: UI locale string.
             prediction_boundary: Index of the first *predicted* point. When
                 supplied a vertical dashed line is drawn there and both regions
-                are labelled.
+                are labelled. Results figures keep ``hide_last_hour=False`` so
+                insulin/carb markers appear across the full window.
         """
         instance = cls.__new__(cls)
         instance.hide_last_hour = False
@@ -558,14 +785,15 @@ class GlucoseChart(html.Div):
                 showgrid=True,
                 range=y_range
             ),
-            margin=dict(l=50, r=20, t=36, b=50),
+            # Extra top margin so insulin/carb SVG legend icons (paper y≈1.08) fit.
+            margin=dict(l=50, r=20, t=72, b=50),
             showlegend=True,
             legend=dict(
                 orientation='h',
                 yanchor='top',
-                y=1.06,
-                xanchor='center',
-                x=0.5,
+                y=1.08,
+                xanchor='left',
+                x=0.0,
             ),
             dragmode='drawline',
             hovermode='closest',

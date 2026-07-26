@@ -1500,7 +1500,10 @@ app.clientside_callback(
 
 
 # Create component instances
-glucose_chart = GlucoseChart(id='glucose-graph', hide_last_hour=True)  # Hide last hour in prediction page
+glucose_chart = GlucoseChart(
+    id='glucose-graph',
+    hide_last_hour=True,  # Hide last hour in prediction page
+)
 prediction_table = PredictionTableComponent()
 metrics_component = MetricsComponent()
 submit_component = SubmitComponent()
@@ -3091,7 +3094,10 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
         }, id='prediction-units-row'),
         html.Div([
             html.Div(
-                GlucoseChart(id='glucose-graph', hide_last_hour=True),
+                GlucoseChart(
+                    id='glucose-graph',
+                    hide_last_hour=True,
+                ),
                 id='prediction-glucose-chart-container',
                 style={'display': 'none'} if b_gated else None,
             ),

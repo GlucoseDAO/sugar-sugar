@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- Vector syringe (needle down) — insulin event marker -->
+  <g stroke="#7b1fa2" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <path fill="#ce93d8" d="M18 6h12v4H18z"/>
+    <rect x="17" y="10" width="14" height="18" rx="2" fill="#e1bee7"/>
+    <path fill="none" d="M21 16h6M21 21h6"/>
+    <path fill="none" d="M24 28v10"/>
+    <path fill="none" d="M20 38h8"/>
+    <path fill="none" d="M24 38v6"/>
+    <path fill="none" d="M20 4h8"/>
+  </g>
+</svg>

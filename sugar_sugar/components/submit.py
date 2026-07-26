@@ -159,7 +159,7 @@ class SubmitComponent(html.Div):
         """Rewrite corrupted rows in-place using the known desired write order."""
         if not path.exists():
             return
-        with path.open('r', newline='') as fh:
+        with path.open('r', newline='', encoding='utf-8', errors='replace') as fh:
             reader = csv.DictReader(fh)
             header = list(reader.fieldnames or [])
             rows = list(reader)
@@ -194,7 +194,7 @@ class SubmitComponent(html.Div):
         if not changed:
             return
         tmp_path = path.with_suffix('.tmp')
-        with tmp_path.open('w', newline='') as fh:
+        with tmp_path.open('w', newline='', encoding='utf-8') as fh:
             writer = csv.DictWriter(fh, fieldnames=header)
             writer.writeheader()
             for row in repaired:
@@ -208,7 +208,7 @@ class SubmitComponent(html.Div):
             return 0
         
         try:
-            with csv_file_path.open('r', newline='') as file_handle:
+            with csv_file_path.open('r', newline='', encoding='utf-8', errors='replace') as file_handle:
                 reader = csv.DictReader(file_handle)
                 numbers = [int(row['number']) for row in reader if row['number'].isdigit()]
                 return max(numbers) + 1 if numbers else 0
@@ -437,7 +437,7 @@ class SubmitComponent(html.Div):
             final_fieldnames = desired_fieldnames
 
             if file_exists:
-                with path.open('r', newline='') as file_handle:
+                with path.open('r', newline='', encoding='utf-8', errors='replace') as file_handle:
                     reader = csv.DictReader(file_handle)
                     existing_fieldnames = reader.fieldnames or []
                     existing_rows = list(reader)
@@ -455,7 +455,7 @@ class SubmitComponent(html.Div):
                             upgraded_fieldnames.append(f)
 
                     tmp_path = path.with_suffix('.tmp')
-                    with tmp_path.open('w', newline='') as out_handle:
+                    with tmp_path.open('w', newline='', encoding='utf-8') as out_handle:
                         writer = csv.DictWriter(out_handle, fieldnames=upgraded_fieldnames)
                         writer.writeheader()
                         for old_row in existing_rows:
@@ -471,7 +471,8 @@ class SubmitComponent(html.Div):
                     # No upgrade needed but must still append in the file's existing column order.
                     final_fieldnames = list(existing_fieldnames)
 
-            with path.open('a', newline='') as file_handle:
+            # UTF-8: Windows default (cp1252) cannot store Romanian diacritics (ș, ț, …).
+            with path.open('a', newline='', encoding='utf-8') as file_handle:
                 writer = csv.DictWriter(file_handle, fieldnames=final_fieldnames)
                 if not file_exists:
                     writer.writeheader()
