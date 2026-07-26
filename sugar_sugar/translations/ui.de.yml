@@ -344,6 +344,7 @@ de:
   ending:
     title: "Vorhersage‑Zusammenfassung"
     prediction_results: "Vorhersage‑Ergebnisse"
+    click_here_for_details: "Hier klicken für Details"
     units_line: "Einheiten: %{unit}"
     next_round: "Nächste Runde"
     view_complete_analysis: "Komplette Analyse ansehen"

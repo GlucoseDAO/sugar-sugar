@@ -345,6 +345,7 @@ es:
   ending:
     title: "Resumen de predicción"
     prediction_results: "Resultados de la predicción"
+    click_here_for_details: "Haz clic aquí para ver los detalles"
     units_line: "Unidades: %{unit}"
     next_round: "Siguiente ronda"
     view_complete_analysis: "Ver análisis completo"

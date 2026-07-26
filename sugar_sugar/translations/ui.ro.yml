@@ -365,6 +365,7 @@ ro:
   ending:
     title: "Rezumatul predicției"
     prediction_results: "Rezultatele predicției"
+    click_here_for_details: "Click aici pentru detalii"
     units_line: "Unități: %{unit}"
     next_round: "Runda următoare"
     view_complete_analysis: "Vezi analiza completă"

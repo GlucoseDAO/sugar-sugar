@@ -145,13 +145,31 @@ class MetricsComponent(html.Div):
             ]
 
     @staticmethod
-    def create_ending_metrics_display(stored_metrics: Optional[dict[str, Any]], *, locale: str = "en") -> list[html.Div]:
-        """Create metrics display for the ending page"""
+    def create_ending_metrics_display(
+        stored_metrics: Optional[dict[str, Any]],
+        *,
+        locale: str = "en",
+        include_title: bool = True,
+    ) -> list[Any]:
+        """Create metrics display for the ending page.
+
+        When ``include_title`` is False the H3 is omitted (e.g. foldable summary
+        already shows the title).
+        """
         print(f"DEBUG: create_ending_metrics_display called with stored metrics: {bool(stored_metrics)}")
-        
+
+        title: list[Any] = []
+        if include_title:
+            title = [
+                html.H3(t("ui.metrics.title_accuracy_metrics", locale=locale), style={
+                    'textAlign': 'center',
+                    'fontSize': 'clamp(20px, 3vw, 28px)',
+                    'marginBottom': 'clamp(10px, 2vh, 20px)',
+                }),
+            ]
+
         if not stored_metrics:
-            return [
-                html.H3(t("ui.metrics.title_accuracy_metrics", locale=locale), style={'textAlign': 'center'}),
+            return title + [
                 html.Div(
                     t("ui.metrics.no_metrics_available", locale=locale),
                     style={
@@ -159,67 +177,61 @@ class MetricsComponent(html.Div):
                         'fontStyle': 'italic',
                         'fontSize': '16px',
                         'padding': '10px',
-                        'textAlign': 'center'
-                    }
+                        'textAlign': 'center',
+                    },
                 )
             ]
-        
-        # Create metrics display from stored data
-        return [
-            html.H3(t("ui.metrics.title_accuracy_metrics", locale=locale), style={
-                'textAlign': 'center',
-                'fontSize': 'clamp(20px, 3vw, 28px)',  # Responsive font size
-                'marginBottom': 'clamp(10px, 2vh, 20px)'
-            }),
+
+        return title + [
             html.Div([
                 html.Div([
                     html.Div([
                         html.Strong(f"{metric}", style={
-                            'fontSize': 'clamp(14px, 2.5vw, 18px)',  # Responsive font size
+                            'fontSize': 'clamp(14px, 2.5vw, 18px)',
                             'display': 'block',
-                            'marginBottom': '8px'
+                            'marginBottom': '8px',
                         }),
-                        html.Div(f"{data['value']:.2f}" + ("%" if metric == "MAPE" else ""), 
+                        html.Div(f"{data['value']:.2f}" + ("%" if metric == "MAPE" else ""),
                                style={
-                                   'fontSize': 'clamp(18px, 3vw, 24px)',  # Responsive font size
-                                   'color': '#2c5282', 
+                                   'fontSize': 'clamp(18px, 3vw, 24px)',
+                                   'color': '#2c5282',
                                    'margin': '5px 0',
-                                   'fontWeight': 'bold'
+                                   'fontWeight': 'bold',
                                }),
                         html.Div(_metric_description(metric, locale=locale),
                                style={
-                                   'fontSize': 'clamp(12px, 2vw, 16px)',  # Responsive font size 
+                                   'fontSize': 'clamp(12px, 2vw, 16px)',
                                    'color': '#4a5568',
-                                   'lineHeight': '1.4'
-                               })
+                                   'lineHeight': '1.4',
+                               }),
                     ], style={
-                        'padding': 'clamp(10px, 2vw, 15px)',  # Responsive padding
-                        'margin': 'clamp(5px, 1vw, 10px)',  # Responsive margin
+                        'padding': 'clamp(10px, 2vw, 15px)',
+                        'margin': 'clamp(5px, 1vw, 10px)',
                         'border': '2px solid #e2e8f0',
                         'borderRadius': '8px',
                         'backgroundColor': '#f8fafc',
-                        'minWidth': 'clamp(150px, 20vw, 250px)',  # Responsive min width
+                        'minWidth': 'clamp(150px, 20vw, 250px)',
                         'flex': '1',
                         'textAlign': 'center',
-                        'boxSizing': 'border-box'
+                        'boxSizing': 'border-box',
                     })
                     for metric, data in stored_metrics.items()
                 ], style={
                     'display': 'flex',
                     'flexWrap': 'wrap',
-                    'gap': 'clamp(8px, 1.5vw, 15px)',  # Responsive gap
+                    'gap': 'clamp(8px, 1.5vw, 15px)',
                     'justifyContent': 'center',
-                    'alignItems': 'stretch'  # Make all metric cards same height
+                    'alignItems': 'stretch',
                 })
             ], style={
                 'border': '2px solid #cbd5e0',
                 'borderRadius': '12px',
-                'padding': 'clamp(10px, 2vw, 20px)',  # Responsive padding
-                'margin': 'clamp(10px, 2vw, 15px)',  # Responsive margin
+                'padding': 'clamp(10px, 2vw, 20px)',
+                'margin': 'clamp(10px, 2vw, 15px)',
                 'backgroundColor': 'white',
                 'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
                 'width': '100%',
-                'boxSizing': 'border-box'
+                'boxSizing': 'border-box',
             })
         ]
 

@@ -343,6 +343,7 @@ uk:
   ending:
     title: "Підсумок прогнозу"
     prediction_results: "Результати прогнозу"
+    click_here_for_details: "Натисни тут, щоб побачити деталі"
     units_line: "Одиниці: %{unit}"
     next_round: "Наступний раунд"
     view_complete_analysis: "Переглянути повний аналіз"

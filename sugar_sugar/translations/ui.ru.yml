@@ -343,6 +343,7 @@ ru:
   ending:
     title: "Итоги предсказания"
     prediction_results: "Результаты предсказания"
+    click_here_for_details: "Нажми сюда, чтобы увидеть детали"
     units_line: "Единицы: %{unit}"
     next_round: "Следующий раунд"
     view_complete_analysis: "Посмотреть полный анализ"

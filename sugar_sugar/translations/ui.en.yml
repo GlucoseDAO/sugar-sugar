@@ -368,6 +368,7 @@ en:
   ending:
     title: "Prediction Summary"
     prediction_results: "Prediction Results"
+    click_here_for_details: "Click here for details"
     units_line: "Units: %{unit}"
     next_round: "Next round"
     view_complete_analysis: "View complete analysis"

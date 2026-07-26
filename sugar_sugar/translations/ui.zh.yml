@@ -343,6 +343,7 @@ zh:
   ending:
     title: "预测总结"
     prediction_results: "预测结果"
+    click_here_for_details: "点击此处查看详情"
     units_line: "单位：%{unit}"
     next_round: "下一轮"
     view_complete_analysis: "查看完整分析"

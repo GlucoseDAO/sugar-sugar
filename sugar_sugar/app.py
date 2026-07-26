@@ -2317,8 +2317,11 @@ def update_prediction_text_on_language_change(
      Output('ending-units-line', 'children'),
      Output('ending-graph-explanation', 'children'),
      Output('ending-prediction-results-title', 'children'),
+     Output('ending-prediction-details-toggle', 'children'),
      Output('ending-prediction-table', 'rowData'),
      Output('ending-prediction-table', 'columnDefs'),
+     Output('ending-metrics-summary', 'children'),
+     Output('ending-metrics-details-toggle', 'children'),
      Output('ending-metrics-container', 'children'),
      Output('ending-local-storage-note', 'children'),
      Output('finish-study-button-ending', 'children'),
@@ -2383,11 +2386,12 @@ def update_ending_text_on_language_change(
         raw_table = _convert_table_data_units(user_info['prediction_table_data'], unit)
         metrics_comp = MetricsComponent()
         stored_metrics = metrics_comp._calculate_metrics_from_table_data(raw_table) if len(raw_table) >= 2 else None
-        metrics_display = MetricsComponent.create_ending_metrics_display(stored_metrics, locale=locale) if stored_metrics else [
-            html.H3(t("ui.metrics.title_accuracy_metrics", locale=locale), style={'textAlign': 'center'}),
+        metrics_display = MetricsComponent.create_ending_metrics_display(
+            stored_metrics, locale=locale, include_title=False,
+        ) if stored_metrics else [
             html.Div(
                 t("ui.metrics.no_metrics_available", locale=locale),
-                style={'color': 'gray', 'fontStyle': 'italic', 'fontSize': '16px', 'padding': '10px', 'textAlign': 'center'}
+                style={'color': 'gray', 'fontStyle': 'italic', 'fontSize': '16px', 'padding': '10px', 'textAlign': 'center'},
             )
         ]
 
@@ -2411,8 +2415,11 @@ def update_ending_text_on_language_change(
         t("ui.ending.units_line", locale=locale, unit=unit),
         t("ui.ending.graph_explanation", locale=locale),
         t("ui.ending.prediction_results", locale=locale),
+        t("ui.ending.click_here_for_details", locale=locale),
         table_data,
         table_columns,
+        t("ui.metrics.title_accuracy_metrics", locale=locale),
+        t("ui.ending.click_here_for_details", locale=locale),
         metrics_display,
         t("ui.ending.local_storage_note", locale=locale),
         finish_button_text,
@@ -3628,8 +3635,9 @@ def create_ending_layout(
         prediction_table_data_display.append(new_row)
 
     # Create metrics display directly
-    metrics_display = MetricsComponent.create_ending_metrics_display(stored_metrics, locale=locale) if stored_metrics else [
-        html.H3(t("ui.metrics.title_accuracy_metrics", locale=locale), style={'textAlign': 'center'}),
+    metrics_display = MetricsComponent.create_ending_metrics_display(
+        stored_metrics, locale=locale, include_title=False,
+    ) if stored_metrics else [
         html.Div(
             t("ui.metrics.no_metrics_available", locale=locale),
             style={
@@ -3637,8 +3645,8 @@ def create_ending_layout(
                 'fontStyle': 'italic',
                 'fontSize': '16px',
                 'padding': '10px',
-                'textAlign': 'center'
-            }
+                'textAlign': 'center',
+            },
         )
     ]
 
@@ -3681,85 +3689,31 @@ def create_ending_layout(
 
     subject_info_line = " — ".join(subject_parts) if subject_parts else ""
 
+    _fold_box_style: dict[str, Any] = {
+        'marginBottom': '20px',
+        'padding': 'clamp(10px, 2vw, 20px)',
+        'backgroundColor': 'white',
+        'borderRadius': '10px',
+        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+        'width': '100%',
+        'boxSizing': 'border-box',
+    }
+    _fold_title_style: dict[str, Any] = {
+        'textAlign': 'center',
+        'marginBottom': '12px',
+        'fontSize': 'clamp(18px, 3vw, 24px)',
+    }
+    _details_button_label = t("ui.ending.click_here_for_details", locale=locale)
+
     return html.Div([
         html.H1(t("ui.ending.title", locale=locale), id='ending-title', style={
-            'textAlign': 'center', 
+            'textAlign': 'center',
             'marginBottom': '20px',
             'fontSize': 'clamp(24px, 4vw, 48px)',
-            'padding': '0 10px'
+            'padding': '0 10px',
         }),
-        html.Div(
-            [
-                html.I(className="close icon"),
-                html.P(t("ui.results_disclaimer.line1", locale=locale), id='ending-disclaimer-line1', style={'margin': '0'}),
-                html.P(t("ui.results_disclaimer.line2", locale=locale), id='ending-disclaimer-line2', style={'margin': '0'}),
-                html.P(t("ui.results_disclaimer.line3", locale=locale), id='ending-disclaimer-line3', style={'margin': '0'}),
-            ],
-            className='ui warning message',
-            disable_n_clicks=True,
-            style={
-                'maxWidth': '900px',
-                'margin': '0 auto 15px auto',
-                'fontSize': '14px',
-                'lineHeight': '1.4',
-            },
-        ),
-        html.Div(
-            t("ui.common.round_of", locale=locale, current=current_round_number, total=max_rounds),
-            id='ending-round-info',
-            disable_n_clicks=True,
-            style={
-                'textAlign': 'center',
-                'marginBottom': '2px',
-                'fontSize': 'clamp(16px, 2.5vw, 22px)',
-                'fontWeight': '600',
-                'color': '#2c5282'
-            }
-        ),
-        _build_gamification_section(
-            current_round=current_round_number,
-            max_rounds=max_rounds,
-            min_useful=min_useful,
-            mae=current_mae,
-            rounds=all_rounds,
-            locale=locale,
-            is_last_round=is_last_round,
-        ),
-        html.Div(
-            subject_info_line,
-            disable_n_clicks=True,
-            style={
-                'textAlign': 'center',
-                'marginBottom': '5px',
-                'color': '#4a5568',
-                'fontSize': '13px',
-                'display': 'block' if subject_info_line else 'none',
-            }
-        ),
-        html.Div(
-            t("ui.ending.units_line", locale=locale, unit=unit),
-            id='ending-units-line',
-            disable_n_clicks=True,
-            style={
-                'textAlign': 'center',
-                'marginBottom': '5px',
-                'color': '#4a5568',
-                'fontSize': '14px'
-            }
-        ),
-        # Graph section - full window with known + predicted lines
+        # 1) Chart + legend first
         html.Div([
-            html.P(
-                t("ui.ending.graph_explanation", locale=locale),
-                id='ending-graph-explanation',
-                style={
-                    'textAlign': 'center',
-                    'color': '#4a5568',
-                    'fontSize': '14px',
-                    'marginBottom': '8px',
-                    'fontStyle': 'italic',
-                },
-            ),
             html.Div(
                 id='ending-glucose-chart-container',
                 children=dcc.Graph(
@@ -3785,69 +3739,159 @@ def create_ending_layout(
                 disable_n_clicks=True,
             )
         ], disable_n_clicks=True, style={
-            'marginBottom': '20px',
+            'marginBottom': '12px',
             'padding': 'clamp(10px, 2vw, 20px)',
             'backgroundColor': 'white',
             'borderRadius': '10px',
             'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
-            'width': '100%',
-            'boxSizing': 'border-box'
-        }),
-        
-        # Prediction table section - only columns with actual predictions
-        html.Div([
-            html.H3(t("ui.ending.prediction_results", locale=locale), id='ending-prediction-results-title', style={
-                'textAlign': 'center', 
-                'marginBottom': '15px',
-                'fontSize': 'clamp(18px, 3vw, 24px)'
-            }),
-            build_readonly_ag_grid(
-                table_id='ending-prediction-table',
-                row_data=prediction_table_data_display,
-                column_defs=build_readonly_column_defs(
-                    [{'name': t("ui.table.metric_header", locale=locale), 'id': 'metric'}] + [
-                        {'name': f'T{i}', 'id': f't{i}', 'type': 'text'}
-                        for i in range(len(prediction_table_data[0]) - 1)
-                        if prediction_table_data
-                        and prediction_table_data[1].get(f't{i}', '-') != '-'
-                    ]
-                ),
-                style={
-                    'width': '100%',
-                    'height': 'auto',
-                    'maxHeight': 'clamp(300px, 40vh, 500px)',
-                    'overflowY': 'auto',
-                    'overflowX': 'auto',
-                },
-                highlight_first_two_rows=True,
-            )
-        ], style={
-            'marginBottom': '20px',
-            'padding': 'clamp(10px, 2vw, 20px)',
-            'backgroundColor': 'white',
-            'borderRadius': '10px',
-            'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
-            'display': 'flex',
-            'flexDirection': 'column',
             'width': '100%',
             'boxSizing': 'border-box',
-            'overflowX': 'auto'
         }),
+        # 2) Source info
         html.Div(
-            metrics_display,
-            id='ending-metrics-container',
+            subject_info_line,
+            id='ending-source-info',
             disable_n_clicks=True,
             style={
-                'padding': 'clamp(10px, 2vw, 20px)',
-                'backgroundColor': 'white',
-                'borderRadius': '10px',
-                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
-                'marginBottom': '20px',
-                'width': '100%',
-                'boxSizing': 'border-box'
-            }
+                'textAlign': 'center',
+                'marginBottom': '5px',
+                'color': '#4a5568',
+                'fontSize': '13px',
+                'display': 'block' if subject_info_line else 'none',
+            },
         ),
-        
+        # 3) Graphic info (units + explanation)
+        html.Div(
+            t("ui.ending.units_line", locale=locale, unit=unit),
+            id='ending-units-line',
+            disable_n_clicks=True,
+            style={
+                'textAlign': 'center',
+                'marginBottom': '5px',
+                'color': '#4a5568',
+                'fontSize': '14px',
+            },
+        ),
+        html.P(
+            t("ui.ending.graph_explanation", locale=locale),
+            id='ending-graph-explanation',
+            style={
+                'textAlign': 'center',
+                'color': '#4a5568',
+                'fontSize': '14px',
+                'marginBottom': '12px',
+                'fontStyle': 'italic',
+            },
+        ),
+        # 4) Round number
+        html.Div(
+            t("ui.common.round_of", locale=locale, current=current_round_number, total=max_rounds),
+            id='ending-round-info',
+            disable_n_clicks=True,
+            style={
+                'textAlign': 'center',
+                'marginBottom': '2px',
+                'fontSize': 'clamp(16px, 2.5vw, 22px)',
+                'fontWeight': '600',
+                'color': '#2c5282',
+            },
+        ),
+        # 5) Warning / disclaimer
+        html.Div(
+            [
+                html.I(className="close icon"),
+                html.P(t("ui.results_disclaimer.line1", locale=locale), id='ending-disclaimer-line1', style={'margin': '0'}),
+                html.P(t("ui.results_disclaimer.line2", locale=locale), id='ending-disclaimer-line2', style={'margin': '0'}),
+                html.P(t("ui.results_disclaimer.line3", locale=locale), id='ending-disclaimer-line3', style={'margin': '0'}),
+            ],
+            className='ui warning message',
+            disable_n_clicks=True,
+            style={
+                'maxWidth': '900px',
+                'margin': '0 auto 15px auto',
+                'fontSize': '14px',
+                'lineHeight': '1.4',
+            },
+        ),
+        # 6) Progress / gamification, then foldable table + metrics
+        _build_gamification_section(
+            current_round=current_round_number,
+            max_rounds=max_rounds,
+            min_useful=min_useful,
+            mae=current_mae,
+            rounds=all_rounds,
+            locale=locale,
+            is_last_round=is_last_round,
+        ),
+        html.Div(
+            [
+                html.H3(
+                    t("ui.ending.prediction_results", locale=locale),
+                    id='ending-prediction-results-title',
+                    style=_fold_title_style,
+                ),
+                html.Details(
+                    [
+                        html.Summary(
+                            _details_button_label,
+                            id='ending-prediction-details-toggle',
+                            className='ending-fold-button',
+                        ),
+                        build_readonly_ag_grid(
+                            table_id='ending-prediction-table',
+                            row_data=prediction_table_data_display,
+                            column_defs=build_readonly_column_defs(
+                                [{'name': t("ui.table.metric_header", locale=locale), 'id': 'metric'}] + [
+                                    {'name': f'T{i}', 'id': f't{i}', 'type': 'text'}
+                                    for i in range(len(prediction_table_data[0]) - 1)
+                                    if prediction_table_data
+                                    and prediction_table_data[1].get(f't{i}', '-') != '-'
+                                ]
+                            ),
+                            style={
+                                'width': '100%',
+                                'height': 'auto',
+                                'maxHeight': 'clamp(300px, 40vh, 500px)',
+                                'overflowY': 'auto',
+                                'overflowX': 'auto',
+                                'marginTop': '12px',
+                            },
+                            highlight_first_two_rows=True,
+                        ),
+                    ],
+                    className='ending-fold',
+                ),
+            ],
+            disable_n_clicks=True,
+            style={**_fold_box_style, 'overflowX': 'auto'},
+        ),
+        html.Div(
+            [
+                html.H3(
+                    t("ui.metrics.title_accuracy_metrics", locale=locale),
+                    id='ending-metrics-summary',
+                    style=_fold_title_style,
+                ),
+                html.Details(
+                    [
+                        html.Summary(
+                            _details_button_label,
+                            id='ending-metrics-details-toggle',
+                            className='ending-fold-button',
+                        ),
+                        html.Div(
+                            metrics_display,
+                            id='ending-metrics-container',
+                            disable_n_clicks=True,
+                            style={'marginTop': '8px'},
+                        ),
+                    ],
+                    className='ending-fold',
+                ),
+            ],
+            disable_n_clicks=True,
+            style=_fold_box_style,
+        ),
         html.Div(
             t("ui.ending.local_storage_note", locale=locale),
             id='ending-local-storage-note',
