@@ -463,6 +463,8 @@ es:
             a: "Cada ronda dura unos 2-3 minutos. Una sesión completa (12 rondas) dura unos 30 minutos, pero puedes dividirla en varias visitas."
           - q: "¿Puedo parar a mitad de camino y reanudarlo más tarde?"
             a: "Sí. El juego guarda tu progreso localmente en el navegador. Si 12 rondas te parecen demasiado para una sola sesión, cierra la pestaña y vuelve más tarde: se te ofrecerá continuar desde donde lo dejaste. Unas pocas rondas ya son útiles, pero cada ronda extra mejora la calidad de los datos."
+          - q: "¿Se puede jugar más de una vez?"
+            a: "Sí, siempre que cada partida sea una sesión distinta. La habilidad para predecir puede mejorar con la práctica, así que los resultados no están fijados: la precisión puede subir poco a poco en intentos sucesivos. Empezar una sesión nueva (en lugar de continuar la misma) mantiene esos intentos separados para poder capturar esa mejora a lo largo del tiempo."
           - q: "¿Qué pasa si no me gustan mis resultados? ¿Debo reiniciar?"
             a: "Por favor, no reinicies solo porque no estés satisfecho con tu precisión. La gente prefiere naturalmente quedarse con las puntuaciones buenas y descartar las malas, pero eso sesgaría el estudio y haría que los resultados fueran menos válidos desde el punto de vista científico. Si te sientes decepcionado, lo mejor es continuar con otra ronda en lugar de reiniciar tu progreso."
           - q: "¿Cuáles son las métricas de precisión?"

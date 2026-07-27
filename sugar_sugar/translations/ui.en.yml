@@ -486,6 +486,8 @@ en:
             a: "Each round takes about 2–3 minutes. A full session (12 rounds) is around 30 minutes, but you can split it across multiple visits."
           - q: "Can I stop partway through and resume later?"
             a: "Yes. The game saves your progress locally in the browser. If 12 rounds feel like too much in one sitting, close the tab and come back — you will be offered to continue from where you left off. At least a few rounds are useful, but every extra round improves the data quality."
+          - q: "Can a person play more than once?"
+            a: "Yes — as long as each playthrough is a separate session. Prediction skill can improve with practice, so results are not fixed; accuracy may rise gradually across successive attempts. Starting a new session (rather than continuing the same one) keeps those attempts distinct so that improvement can be captured over time."
           - q: "What if I do not like my results? Should I restart?"
             a: "Please do not restart just because you are unhappy with your accuracy. People naturally prefer to keep good scores and discard bad ones, but that would skew the study and make the results less scientifically valid. If you feel disappointed, the best thing is to continue with another round rather than resetting your progress."
           - q: "What are the accuracy metrics?"

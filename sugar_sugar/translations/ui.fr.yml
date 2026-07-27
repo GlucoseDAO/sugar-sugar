@@ -463,6 +463,8 @@ fr:
             a: "Chaque manche prend environ 2 à 3 minutes. Une session complète (12 manches) dure environ 30 minutes, mais tu peux la répartir sur plusieurs visites."
           - q: "Puis-je m'arrêter en cours de route et reprendre plus tard ?"
             a: "Oui. Le jeu enregistre ta progression localement dans le navigateur. Si 12 manches te semblent trop lourdes en une seule séance, ferme l'onglet et reviens plus tard — on te proposera de continuer là où tu t'étais arrêté. Quelques manches suffisent à être utiles, mais chaque manche supplémentaire améliore la qualité des données."
+          - q: "Peut-on jouer plusieurs fois ?"
+            a: "Oui — à condition que chaque partie soit une session distincte. L'habileté à prédire peut s'améliorer avec la pratique, donc les résultats ne sont pas figés : la précision peut progresser peu à peu d'une tentative à l'autre. Démarrer une nouvelle session (plutôt que de continuer la même) permet de garder ces tentatives séparées et de capturer cette amélioration dans le temps."
           - q: "Et si je n'aime pas mes résultats ? Dois-je recommencer ?"
             a: "Merci de ne pas recommencer simplement parce que tu n'es pas satisfait de ta précision. Les gens préfèrent naturellement garder les bons scores et écarter les mauvais, mais cela fausserait l'étude et rendrait les résultats moins valables scientifiquement. Si tu te sens déçu, la meilleure chose à faire est de continuer avec une autre manche plutôt que de réinitialiser ta progression."
           - q: "Quelles sont les métriques de précision ?"

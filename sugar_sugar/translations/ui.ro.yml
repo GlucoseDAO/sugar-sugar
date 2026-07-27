@@ -483,6 +483,8 @@ ro:
             a: "Fiecare rundă durează aproximativ 2–3 minute. O sesiune completă (12 runde) durează aproximativ 30 de minute, dar o poți împărți în mai multe vizite."
           - q: "Pot să mă opresc la jumătate și să reiau mai târziu?"
             a: "Da. Jocul îți salvează progresul local în browser. Dacă 12 runde par prea multe într-o singură sesiune, închide tab-ul și revino — ți se va oferi posibilitatea de a continua de unde ai rămas. Chiar și câteva runde sunt utile, dar fiecare rundă suplimentară îmbunătățește calitatea datelor."
+          - q: "Poate o persoană să joace de mai multe ori?"
+            a: "Da — cu condiția ca fiecare parcurgere să fie o sesiune separată. Abilitatea de a prezice se poate îmbunătăți cu practica, deci rezultatele nu sunt fixe; precizia poate crește treptat pe parcursul unor încercări succesive. Începerea unei sesiuni noi (în loc să continui aceeași) păstrează aceste încercări distincte, astfel încât îmbunătățirea să poată fi surprinsă în timp."
           - q: "Ce fac dacă nu îmi plac rezultatele? Ar trebui să reîncep?"
             a: "Te rugăm să nu reîncepi doar pentru că nu ești mulțumit de precizia ta. Oamenii tind natural să păstreze scorurile bune și să le respingă pe cele proaste — dar asta ar distorsiona studiul și ar face rezultatele mai puțin valide din punct de vedere științific. Dacă ești dezamăgit, cel mai bine este să continui cu o altă rundă, nu să îți resetezi progresul."
           - q: "Care sunt metricele de acuratețe?"

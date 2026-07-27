@@ -462,6 +462,8 @@ de:
             a: "Jede Runde dauert etwa 2–3 Minuten. Eine vollständige Sitzung (12 Runden) beträgt ca. 30 Minuten, kann aber auf mehrere Besuche aufgeteilt werden."
           - q: "Kann ich zwischendrin aufhören und später weitermachen?"
             a: "Ja. Das Spiel speichert deinen Fortschritt lokal im Browser. Wenn 12 Runden in einer Sitzung zu viel erscheinen, schließe den Tab und komme wieder — du wirst angeboten, dort weiterzumachen, wo du aufgehört hast. Bereits wenige Runden sind wertvoll, aber jede weitere Runde verbessert die Datenqualität."
+          - q: "Kann man mehrmals spielen?"
+            a: "Ja — solange jeder Durchlauf eine eigene Sitzung ist. Die Vorhersagefähigkeit kann mit Übung besser werden, daher sind Ergebnisse nicht festgeschrieben; die Genauigkeit kann über aufeinanderfolgende Versuche schrittweise steigen. Eine neue Sitzung zu starten (statt dieselbe fortzusetzen) hält diese Versuche getrennt, sodass sich diese Verbesserung über die Zeit abbilden lässt."
           - q: "Was, wenn mir meine Ergebnisse nicht gefallen? Soll ich neu starten?"
             a: "Bitte starte nicht neu, nur weil du mit deiner Genauigkeit unzufrieden bist. Menschen neigen natürlich dazu, gute Ergebnisse zu behalten und schlechte zu verwerfen — das würde die Studie aber verzerren und die Ergebnisse wissenschaftlich weniger valide machen. Am besten ist es, mit einer weiteren Runde fortzufahren."
           - q: "Was sind die Genauigkeitsmetriken?"
