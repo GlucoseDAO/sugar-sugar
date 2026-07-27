@@ -253,7 +253,7 @@ OG_PREVIEW_VERSION: int = 1
 OG_PREVIEW_SIZE: tuple[int, int] = (1200, 630)
 # Bump when the share-card PNG design changes so FB/X/LinkedIn re-fetch the
 # image instead of serving a stale crop from their own caches.
-SHARE_CARD_IMAGE_VERSION: int = 2
+SHARE_CARD_IMAGE_VERSION: int = 3
 PUBLIC_ROUTES: tuple[tuple[str, str, str], ...] = (
     ("/", "Sugar Sugar", SITE_DESCRIPTION),
     ("/about", "About Sugar Sugar", "Learn why the Sugar Sugar glucose prediction study matters."),
@@ -341,6 +341,87 @@ def _rank_from_ranking_csv(
     if matches.height == 0:
         return None
     return int(matches.get_column('rank_idx')[0]) + 1, total
+
+
+def _leaderboard_snapshot(
+    ranking_path: Path,
+    *,
+    study_id: str,
+    format_filter: Optional[str],
+    mode: str,
+    top_n: int = 5,
+) -> Optional[dict[str, Any]]:
+    """Build a compact leaderboard view for ``study_id``.
+
+    Returns ``None`` when the CSV is missing/empty. Otherwise:
+      ``{rank, total, mae, top: [{rank, mae, is_you}, ...]}``
+    Ranks on ``overall_mae_mgdl`` ascending. Player identities stay anonymous.
+    """
+    if not ranking_path.exists():
+        return None
+    try:
+        ranking_df = pl.read_csv(ranking_path)
+    except Exception:
+        return None
+    if 'study_id' not in ranking_df.columns or 'overall_mae_mgdl' not in ranking_df.columns:
+        return None
+
+    cols: list[str] = ['study_id', 'overall_mae_mgdl']
+    if 'format' in ranking_df.columns:
+        cols.append('format')
+    if 'timestamp' in ranking_df.columns:
+        cols.append('timestamp')
+    df2 = ranking_df.select([c for c in cols if c in ranking_df.columns])
+    df2 = df2.with_columns(pl.col('overall_mae_mgdl').cast(pl.Float64, strict=False)).filter(
+        pl.col('overall_mae_mgdl').is_not_null()
+    )
+    if format_filter and 'format' in df2.columns:
+        df2 = df2.filter(pl.col('format') == format_filter)
+
+    if mode == "latest" and 'timestamp' in df2.columns:
+        df2 = df2.with_columns(
+            pl.col('timestamp').str.strptime(pl.Datetime, format='%Y-%m-%d %H:%M:%S', strict=False).alias('_ts')
+        )
+        df_pick = (
+            df2.sort(['study_id', '_ts'])
+            .group_by('study_id')
+            .agg(pl.last('overall_mae_mgdl').alias('overall_mae_mgdl'))
+        )
+    else:
+        df_pick = df2.group_by('study_id').agg(pl.col('overall_mae_mgdl').min().alias('overall_mae_mgdl'))
+
+    total = df_pick.height
+    if total == 0:
+        return None
+
+    df_sorted = df_pick.sort(['overall_mae_mgdl', 'study_id']).with_row_index('rank_idx')
+    top_rows = df_sorted.head(max(1, top_n))
+    top: list[dict[str, Any]] = []
+    for row in top_rows.iter_rows(named=True):
+        top.append(
+            {
+                "rank": int(row["rank_idx"]) + 1,
+                "mae": float(row["overall_mae_mgdl"]),
+                "is_you": bool(study_id) and str(row["study_id"]) == study_id,
+            }
+        )
+
+    user_rank: Optional[int] = None
+    user_mae: Optional[float] = None
+    if study_id:
+        matches = df_sorted.filter(pl.col('study_id') == study_id)
+        if matches.height > 0:
+            user_rank = int(matches.get_column('rank_idx')[0]) + 1
+            user_mae = float(matches.get_column('overall_mae_mgdl')[0])
+            if not any(entry["is_you"] for entry in top):
+                top.append({"rank": user_rank, "mae": user_mae, "is_you": True})
+
+    return {
+        "rank": user_rank,
+        "total": total,
+        "mae": user_mae,
+        "top": top,
+    }
 
 
 def compute_share_rankings(study_id: str, played_formats: list[str]) -> dict[str, Any]:
@@ -4101,6 +4182,228 @@ def _count_valid_pairs_from_table_data(table_data: list[dict[str, str]]) -> int:
     return count
 
 
+def _format_mae_for_unit(mae_mgdl: float, *, unit: str) -> str:
+    """Format an MAE stored in mg/dL for the active display unit."""
+    value = mae_mgdl / 18.0 if unit == "mmol/L" else mae_mgdl
+    return f"{value:.2f}"
+
+
+def _build_final_leaderboard(
+    *,
+    overall: Optional[dict[str, Any]],
+    per_format: list[tuple[str, dict[str, Any]]],
+    locale: str,
+    unit: str,
+) -> html.Div:
+    """Leaderboard: previous card look on the left, top table on the right."""
+    from sugar_sugar.components.share import compute_percentile
+
+    hero_inner: list[Any] = []
+    if overall and overall.get("rank") is not None and overall.get("total"):
+        rank = int(overall["rank"])
+        total = int(overall["total"])
+        pct = compute_percentile(rank, total)
+        hero_inner.extend(
+            [
+                html.Div(
+                    t("ui.final.your_place", locale=locale),
+                    className="final-leaderboard-hero-label",
+                    disable_n_clicks=True,
+                ),
+                html.Div(
+                    t("ui.final.your_place_value", locale=locale, rank=rank, total=total),
+                    className="final-leaderboard-hero-rank",
+                    disable_n_clicks=True,
+                ),
+            ]
+        )
+        if pct is not None:
+            hero_inner.append(
+                html.Div(
+                    t("ui.final.top_percentile", locale=locale, pct=pct),
+                    className="final-leaderboard-hero-pct",
+                    disable_n_clicks=True,
+                )
+            )
+        if overall.get("mae") is not None:
+            hero_inner.append(
+                html.Div(
+                    t(
+                        "ui.final.your_mae",
+                        locale=locale,
+                        mae=_format_mae_for_unit(float(overall["mae"]), unit=unit),
+                        unit=unit,
+                    ),
+                    className="final-leaderboard-hero-mae",
+                    disable_n_clicks=True,
+                )
+            )
+    elif overall and overall.get("total"):
+        hero_inner.append(
+            html.Div(
+                t("ui.final.no_ranking_yet", locale=locale),
+                className="final-leaderboard-empty",
+                disable_n_clicks=True,
+            )
+        )
+
+    left_children: list[Any] = []
+    if hero_inner:
+        left_children.append(
+            html.Div(hero_inner, className="final-leaderboard-hero", disable_n_clicks=True)
+        )
+
+    format_chips: list[Any] = []
+    for fmt, board in per_format:
+        if not board or board.get("rank") is None:
+            continue
+        format_chips.append(
+            html.Div(
+                t(
+                    "ui.final.ranking_format_line",
+                    locale=locale,
+                    format=_format_label(fmt, locale=locale),
+                    rank=int(board["rank"]),
+                    total=int(board["total"]),
+                ),
+                className="final-leaderboard-format-chip",
+                disable_n_clicks=True,
+            )
+        )
+    if format_chips:
+        left_children.append(
+            html.Div(
+                [
+                    html.Div(
+                        t("ui.final.format_ranks", locale=locale),
+                        className="final-leaderboard-format-label",
+                        disable_n_clicks=True,
+                    ),
+                    html.Div(format_chips, className="final-leaderboard-format-chips", disable_n_clicks=True),
+                ],
+                className="final-leaderboard-formats",
+                disable_n_clicks=True,
+            )
+        )
+
+    table_rows: list[Any] = []
+    top_entries = list((overall or {}).get("top") or [])
+    for entry in top_entries:
+        is_you = bool(entry.get("is_you"))
+        player_label = (
+            t("ui.final.you", locale=locale)
+            if is_you
+            else t("ui.final.player_n", locale=locale, n=int(entry["rank"]))
+        )
+        table_rows.append(
+            html.Div(
+                [
+                    html.Span(str(int(entry["rank"])), className="final-leaderboard-cell rank"),
+                    html.Span(
+                        player_label,
+                        className=(
+                            "final-leaderboard-cell player you-label"
+                            if is_you
+                            else "final-leaderboard-cell player"
+                        ),
+                    ),
+                    html.Span(
+                        _format_mae_for_unit(float(entry["mae"]), unit=unit),
+                        className="final-leaderboard-cell mae",
+                    ),
+                ],
+                className="final-leaderboard-row you" if is_you else "final-leaderboard-row",
+                disable_n_clicks=True,
+            )
+        )
+
+    right_children: list[Any] = []
+    if table_rows:
+        right_children.append(
+            html.Div(
+                [
+                    html.Div(
+                        t("ui.final.top_predictors", locale=locale),
+                        className="final-leaderboard-board-title",
+                        disable_n_clicks=True,
+                    ),
+                    html.Div(
+                        [
+                            html.Span(t("ui.final.col_rank", locale=locale), className="final-leaderboard-cell rank"),
+                            html.Span(t("ui.final.col_player", locale=locale), className="final-leaderboard-cell player"),
+                            html.Span(
+                                t("ui.final.col_mae", locale=locale, unit=unit),
+                                className="final-leaderboard-cell mae",
+                            ),
+                        ],
+                        className="final-leaderboard-row head",
+                        disable_n_clicks=True,
+                    ),
+                    html.Div(table_rows, className="final-leaderboard-rows", disable_n_clicks=True),
+                ],
+                className="final-leaderboard-board",
+                disable_n_clicks=True,
+            )
+        )
+
+    # Two columns (inline styles so layout does not depend on asset cache):
+    # left  = your placement / #rank / top% / MAE / data-source ranks
+    # right = full player list (anonymous Player N + highlighted You)
+    split: Optional[html.Div] = None
+    if left_children or right_children:
+        split = html.Div(
+            [
+                html.Div(
+                    left_children,
+                    className="final-leaderboard-left",
+                    disable_n_clicks=True,
+                    style={
+                        "flex": "0 1 380px",
+                        "minWidth": "240px",
+                        "maxWidth": "420px",
+                        "display": "flex",
+                        "flexDirection": "column",
+                        "gap": "12px",
+                    },
+                ),
+                html.Div(
+                    right_children,
+                    className="final-leaderboard-right",
+                    disable_n_clicks=True,
+                    style={"flex": "1 1 320px", "minWidth": "260px"},
+                ),
+            ],
+            className="final-leaderboard-split",
+            disable_n_clicks=True,
+            style={
+                "display": "flex",
+                "flexWrap": "wrap",
+                "gap": "22px",
+                "alignItems": "flex-start",
+                "justifyContent": "center",
+            },
+        )
+
+    children: list[Any] = [
+        html.H3(
+            t("ui.final.ranking_title", locale=locale),
+            id="final-ranking-title",
+            className="final-leaderboard-title",
+        ),
+    ]
+    if split is not None:
+        children.append(split)
+
+    has_content = bool(left_children or right_children)
+    return html.Div(
+        children,
+        id="final-ranking-list",
+        className="final-leaderboard",
+        disable_n_clicks=True,
+        style={"display": "block" if has_content else "none"},
+    )
+
+
 def _convert_table_data_units(table_data: list[dict[str, str]], glucose_unit: str) -> list[dict[str, str]]:
     """Convert table display values between mg/dL and mmol/L (display only)."""
     if glucose_unit != 'mmol/L':
@@ -4189,88 +4492,33 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
     switch_data_consent_value: list[str] = []
     played_formats: list[str] = sorted(already_played, key=lambda x: FORMAT_ORDER.get(str(x), 999))
 
-    def _rank_info(
-        ranking_path: Path,
-        *,
-        format_filter: Optional[str],
-        mode: str,
-    ) -> Optional[tuple[int, int]]:
-        """Return (rank, total) by overall MAE (mg/dL) for this study_id."""
-        if not study_id or not ranking_path.exists():
-            return None
-        try:
-            ranking_df = pl.read_csv(ranking_path)
-        except Exception:
-            return None
-        if 'study_id' not in ranking_df.columns or 'overall_mae_mgdl' not in ranking_df.columns:
-            return None
-
-        cols: list[str] = ['study_id', 'overall_mae_mgdl']
-        if 'format' in ranking_df.columns:
-            cols.append('format')
-        if 'timestamp' in ranking_df.columns:
-            cols.append('timestamp')
-        df2 = ranking_df.select([c for c in cols if c in ranking_df.columns])
-        df2 = df2.with_columns(pl.col('overall_mae_mgdl').cast(pl.Float64, strict=False)).filter(
-            pl.col('overall_mae_mgdl').is_not_null()
-        )
-        if format_filter and 'format' in df2.columns:
-            df2 = df2.filter(pl.col('format') == format_filter)
-
-        if mode == "latest" and 'timestamp' in df2.columns:
-            df2 = df2.with_columns(
-                pl.col('timestamp').str.strptime(pl.Datetime, format='%Y-%m-%d %H:%M:%S', strict=False).alias('_ts')
-            )
-            df_pick = (
-                df2.sort(['study_id', '_ts'])
-                .group_by('study_id')
-                .agg(pl.last('overall_mae_mgdl').alias('overall_mae_mgdl'))
-            )
-        else:
-            # Default: keep the best (lowest MAE) per study_id.
-            df_pick = df2.group_by('study_id').agg(pl.col('overall_mae_mgdl').min().alias('overall_mae_mgdl'))
-
-        total = df_pick.height
-        if total == 0:
-            return None
-
-        df_sorted = df_pick.sort(['overall_mae_mgdl', 'study_id'])
-        matches = df_sorted.with_row_index('rank_idx').filter(pl.col('study_id') == study_id)
-        if matches.height == 0:
-            return None
-        rank = int(matches.get_column('rank_idx')[0]) + 1
-        return rank, total
-
-    ranking_lines: list[str] = []
+    per_format_boards: list[tuple[str, dict[str, Any]]] = []
     for fmt in played_formats:
         if fmt not in ("A", "B", "C"):
             continue
-        info = _rank_info(
+        board = _leaderboard_snapshot(
             project_root / 'data' / 'input' / f'prediction_ranking_{fmt}.csv',
+            study_id=study_id,
             format_filter=fmt,
             mode="best",
         )
-        if info:
-            rank, total = info
-            ranking_lines.append(
-                t(
-                    "ui.final.ranking_format_line",
-                    locale=locale,
-                    format=_format_label(fmt, locale=locale),
-                    rank=rank,
-                    total=total,
-                )
-            )
+        if board is not None:
+            per_format_boards.append((fmt, board))
 
     # Always show cumulative overall ranking ("ALL"), updated after each finished run.
-    info = _rank_info(
+    overall_board = _leaderboard_snapshot(
         project_root / 'data' / 'input' / 'prediction_ranking.csv',
+        study_id=study_id,
         format_filter="ALL",
         mode="latest",
     )
-    if info:
-        rank, total = info
-        ranking_lines.append(t("ui.final.ranking_overall_line", locale=locale, rank=rank, total=total))
+
+    leaderboard = _build_final_leaderboard(
+        overall=overall_board,
+        per_format=per_format_boards,
+        locale=locale,
+        unit=unit,
+    )
 
     metrics_component_final = MetricsComponent()
     aggregate_table_data = _convert_table_data_units(_build_aggregate_table_data(rounds), unit)
@@ -4321,50 +4569,18 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
             'padding': '0 10px'
         }),
         html.Div(
-            [
-                html.I(className="close icon"),
-                html.P(t("ui.results_disclaimer.line1", locale=locale), id='final-disclaimer-line1', style={'margin': '0'}),
-                html.P(t("ui.results_disclaimer.line2", locale=locale), id='final-disclaimer-line2', style={'margin': '0'}),
-                html.P(t("ui.results_disclaimer.line3", locale=locale), id='final-disclaimer-line3', style={'margin': '0'}),
-            ],
-            className='ui warning message',
-            disable_n_clicks=True,
-            style={
-                'maxWidth': '900px',
-                'margin': '0 auto 15px auto',
-                'fontSize': '14px',
-                'lineHeight': '1.4',
-            },
-        ),
-        html.Div(
             t("ui.final.rounds_played", locale=locale, played=len(rounds), total=max_rounds),
             id='final-rounds-played',
             disable_n_clicks=True,
             style={
                 'textAlign': 'center',
-                'marginBottom': '20px',
+                'marginBottom': '16px',
                 'fontSize': 'clamp(16px, 2.5vw, 22px)',
                 'fontWeight': '600',
                 'color': '#2c5282'
             }
         ),
-        html.Div(
-            [
-                html.H3(t("ui.final.ranking_title", locale=locale), id='final-ranking-title', style={'textAlign': 'center', 'marginBottom': '10px'}),
-                html.Ul([html.Li(line) for line in ranking_lines], id='final-ranking-list', style={'margin': '0 auto', 'maxWidth': '760px'}),
-            ],
-            disable_n_clicks=True,
-            style={
-                'marginBottom': '15px',
-                'color': '#4a5568',
-                'fontSize': '14px',
-                'display': 'block' if ranking_lines else 'none',
-                'padding': 'clamp(10px, 2vw, 16px)',
-                'backgroundColor': 'white',
-                'borderRadius': '10px',
-                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
-            },
-        ),
+        leaderboard,
         html.Div(
             (
                 t(
@@ -4399,50 +4615,86 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
                 'boxSizing': 'border-box'
             }
         ),
-        html.Div([
-            html.H3(t("ui.final.per_round_metrics", locale=locale), id='final-per-round-title', style={
-                'textAlign': 'center',
-                'marginBottom': '15px',
-                'fontSize': 'clamp(18px, 3vw, 24px)'
-            }),
-            html.Div(
-                t("ui.ending.units_line", locale=locale, unit=unit),
-                id='final-units-line',
-                style={
-                    'textAlign': 'center',
-                    'marginBottom': '10px',
-                    'color': '#4a5568',
-                    'fontSize': '14px'
-                }
-            ),
-            build_readonly_ag_grid(
-                table_id='final-rounds-table',
-                row_data=round_rows,
-                column_defs=build_readonly_column_defs(
-                    [
-                        {'name': 'Round', 'id': 'Round', 'type': 'numeric'},
-                        {'name': 'Pairs', 'id': 'Pairs', 'type': 'numeric'},
-                        {'name': 'MAE', 'id': 'MAE', 'type': 'numeric'},
-                        {'name': 'MSE', 'id': 'MSE', 'type': 'numeric'},
-                        {'name': 'RMSE', 'id': 'RMSE', 'type': 'numeric'},
-                        {'name': 'MAPE', 'id': 'MAPE', 'type': 'numeric'},
-                    ],
-                    fixed_decimal_fields={'MAE', 'MSE', 'RMSE', 'MAPE'},
+        html.Div(
+            [
+                html.H3(
+                    t("ui.final.per_round_metrics", locale=locale),
+                    id='final-per-round-title',
+                    style={
+                        'textAlign': 'center',
+                        'marginBottom': '12px',
+                        'fontSize': 'clamp(18px, 3vw, 24px)',
+                    },
                 ),
-                style={
-                    'width': '100%',
-                    'overflowX': 'auto',
-                },
-            )
-        ], disable_n_clicks=True, style={
-            'marginBottom': '20px',
-            'padding': 'clamp(10px, 2vw, 20px)',
-            'backgroundColor': 'white',
-            'borderRadius': '10px',
-            'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
-            'width': '100%',
-            'boxSizing': 'border-box'
-        }),
+                html.Details(
+                    [
+                        html.Summary(
+                            t("ui.ending.click_here_for_details", locale=locale),
+                            id='final-per-round-details-toggle',
+                            className='ending-fold-button',
+                        ),
+                        html.Div(
+                            t("ui.ending.units_line", locale=locale, unit=unit),
+                            id='final-units-line',
+                            style={
+                                'textAlign': 'center',
+                                'margin': '12px 0 10px 0',
+                                'color': '#4a5568',
+                                'fontSize': '14px',
+                            },
+                        ),
+                        build_readonly_ag_grid(
+                            table_id='final-rounds-table',
+                            row_data=round_rows,
+                            column_defs=build_readonly_column_defs(
+                                [
+                                    {'name': 'Round', 'id': 'Round', 'type': 'numeric'},
+                                    {'name': 'Pairs', 'id': 'Pairs', 'type': 'numeric'},
+                                    {'name': 'MAE', 'id': 'MAE', 'type': 'numeric'},
+                                    {'name': 'MSE', 'id': 'MSE', 'type': 'numeric'},
+                                    {'name': 'RMSE', 'id': 'RMSE', 'type': 'numeric'},
+                                    {'name': 'MAPE', 'id': 'MAPE', 'type': 'numeric'},
+                                ],
+                                fixed_decimal_fields={'MAE', 'MSE', 'RMSE', 'MAPE'},
+                            ),
+                            style={
+                                'width': '100%',
+                                'overflowX': 'auto',
+                                'marginTop': '8px',
+                            },
+                        ),
+                    ],
+                    className='ending-fold',
+                ),
+            ],
+            disable_n_clicks=True,
+            style={
+                'marginBottom': '20px',
+                'padding': 'clamp(10px, 2vw, 20px)',
+                'backgroundColor': 'white',
+                'borderRadius': '10px',
+                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+                'width': '100%',
+                'boxSizing': 'border-box',
+            },
+        ),
+        # Disclaimer after results (same idea as /ending: chart/results first).
+        html.Div(
+            [
+                html.I(className="close icon"),
+                html.P(t("ui.results_disclaimer.line1", locale=locale), id='final-disclaimer-line1', style={'margin': '0'}),
+                html.P(t("ui.results_disclaimer.line2", locale=locale), id='final-disclaimer-line2', style={'margin': '0'}),
+                html.P(t("ui.results_disclaimer.line3", locale=locale), id='final-disclaimer-line3', style={'margin': '0'}),
+            ],
+            className='ui warning message',
+            disable_n_clicks=True,
+            style={
+                'maxWidth': '900px',
+                'margin': '0 auto 20px auto',
+                'fontSize': '14px',
+                'lineHeight': '1.4',
+            },
+        ),
         html.Div(
             [
                 html.H3(

@@ -176,6 +176,168 @@ body .ui.large.menu {
   margin-bottom: 4px;
 }
 
+/* Final-page leaderboard — two columns as sketched:
+   left = your result card (previous look) + format chips; right = others table. */
+.final-leaderboard {
+  margin: 0 auto 20px auto;
+  max-width: 1000px;
+  width: 100%;
+  padding: clamp(14px, 2.4vw, 22px);
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+  box-sizing: border-box;
+}
+.final-leaderboard-title {
+  text-align: center;
+  margin: 0 0 16px 0;
+  font-size: clamp(20px, 3vw, 26px) !important;
+  color: #1e3a5f;
+}
+.final-leaderboard-split {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 22px;
+  align-items: flex-start;
+  justify-content: center;
+}
+.final-leaderboard-left {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 0 1 380px;
+  min-width: 240px;
+  max-width: 420px;
+}
+.final-leaderboard-right {
+  flex: 1 1 320px;
+  min-width: 260px;
+}
+.final-leaderboard-hero {
+  text-align: center;
+  padding: 14px 12px 16px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #eef5ff 0%, #f8fbff 100%);
+  border: 1px solid rgba(33, 133, 208, 0.18);
+}
+.final-leaderboard-hero-label {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #4a5568;
+  margin-bottom: 4px;
+}
+.final-leaderboard-hero-rank {
+  font-size: clamp(28px, 5vw, 40px) !important;
+  font-weight: 800 !important;
+  color: #1d4ed8;
+  line-height: 1.1;
+  margin-bottom: 6px;
+}
+.final-leaderboard-hero-pct {
+  display: inline-block;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: #0f766e;
+  background: rgba(15, 118, 110, 0.1);
+  border-radius: 999px;
+  padding: 4px 10px;
+  margin-bottom: 6px;
+}
+.final-leaderboard-hero-mae {
+  font-size: 14px !important;
+  color: #4a5568;
+  margin-top: 4px;
+}
+.final-leaderboard-empty {
+  text-align: center;
+  color: #64748b;
+  font-style: italic;
+  margin-bottom: 8px;
+}
+.final-leaderboard-formats {
+  width: 100%;
+}
+.final-leaderboard-format-label {
+  text-align: center;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: #475569;
+  margin-bottom: 8px;
+}
+.final-leaderboard-format-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.final-leaderboard-format-chip {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #1e3a5f;
+  background: #f1f5f9;
+  border: 1px solid rgba(75, 95, 130, 0.18);
+  border-radius: 999px;
+  padding: 6px 12px;
+}
+.final-leaderboard-board-title {
+  text-align: center;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  color: #1e3a5f;
+  margin: 0 0 10px 0;
+}
+.final-leaderboard-row {
+  display: grid;
+  grid-template-columns: 48px 1fr 110px;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 14px !important;
+}
+.final-leaderboard-row.head {
+  font-weight: 700 !important;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 12px !important;
+  padding-bottom: 4px;
+}
+.final-leaderboard-row.you {
+  background: #e8f1fb;
+  border: 1px solid rgba(33, 133, 208, 0.28);
+  font-weight: 700 !important;
+}
+.final-leaderboard-row.you .you-label {
+  font-size: 16px !important;
+  font-weight: 800 !important;
+  color: #1d4ed8;
+}
+.final-leaderboard-cell.rank {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800 !important;
+  color: #1d4ed8;
+}
+.final-leaderboard-cell.mae {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #334155;
+}
+.final-leaderboard-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+@media (max-width: 720px) {
+  .final-leaderboard-left,
+  .final-leaderboard-right {
+    flex: 1 1 100% !important;
+    max-width: 100% !important;
+  }
+}
+
 /* Games-played counter: beat `body :not(h1..h6) { font-size: 16px !important }`. */
 #landing-page .games-played-title {
   font-size: 38px !important;

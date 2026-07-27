@@ -491,7 +491,8 @@ def _qrcode_png_data_uri(target_url: str) -> str:
 #   - Left column:  subtitle, name, stat lines, encouragement quote.
 #   - Right column: the synthesis chart (per-panel format labels are OFF here to
 #                   avoid the "Generic data" annotation overlapping the card text).
-#   - Footer band:  ranking lines (left) + QR (right), full width, bottom.
+#   - Footer band:  placement hero (left — same specifics as /final left
+#                   column: place, #rank, top %, MAE, format ranks) + QR.
 SHARE_CARD_WIDTH: int = 1200
 SHARE_CARD_HEIGHT: int = 630
 
@@ -1036,9 +1037,9 @@ def build_share_card_figure(
     In Plotly, ``paper`` is the *inner* plot, so the synthesis chart is pinned to
     the right column (``xaxis.domain``/``yaxis.domain``) and all text lives in the
     top title band, the left column (stats + quote), and the bottom footer
-    (ranking + QR). The per-panel "Generic / My data" labels are disabled here so
-    they cannot overlap the card text. Fonts are sized for legibility in a social
-    thumbnail (title ~34pt, stats ~19pt).
+    (placement hero + QR). The placement hero mirrors the /final left column
+    (your place, #rank/total, top %, MAE, per-source ranks) — not the full
+    player table. Fonts are sized for legibility in a social thumbnail.
     """
     loc: str = normalize_locale(locale)
     rounds: list[dict[str, Any]] = list(share_record.get("rounds") or [])
@@ -1053,8 +1054,6 @@ def build_share_card_figure(
     accuracy_str: str = f"{_format_number(accuracy)}%" if not math.isnan(accuracy) else "?"
     mard_str: str = f"{_format_number(mard)}%" if not math.isnan(mard) else "?"
     rounds_played: int = int(stats.get("rounds_played") or 0)
-    best_entry: Optional[dict[str, Any]] = _best_ranking_entry(share_record)
-    percentile: Optional[int] = best_entry.get("percentile") if best_entry else None
     encourage: str = encouragement_text(stats, loc, seed=seed)
     generated_at: Optional[str] = _format_generated_at(share_record, locale=loc)
     play_url: str = _play_url_from_share(share_url)
@@ -1133,13 +1132,9 @@ def build_share_card_figure(
             f"<b>{_format_number(rmse)}</b> mg/dL {rmse_label}",
         ]),
     ]
-    last_stat: str = f"<b>{rounds_played}</b> {rounds_label}"
-    if percentile is not None:
-        last_stat = bullet.join([
-            last_stat,
-            f"<b>{t('ui.share.stat_percentile', locale=loc, percentile=f'{percentile}%')}</b>",
-        ])
-    stat_lines.append(last_stat)
+    # Rounds only here — place / Top % / MAE live in the placement hero below
+    # (same left-column specifics as /final), so we do not duplicate percentile.
+    stat_lines.append(f"<b>{rounds_played}</b> {rounds_label}")
 
     y_stats_top: float = 0.735 if name else 0.785
     stat_step: float = 0.066
@@ -1164,61 +1159,134 @@ def build_share_card_figure(
         font=dict(size=19, color="rgba(30,58,138,1)"),
     )
 
-    # ---- Footer band (full width, bottom): ranking left, QR right ----
+    # ---- Footer band: placement hero (matches /final left column) + QR ----
     rankings: dict[str, Any] = dict(share_record.get("rankings") or {})
     per_format_entries: list[dict[str, Any]] = list(rankings.get("per_format") or [])
     overall_entry: Optional[dict[str, Any]] = (
         rankings.get("overall") if isinstance(rankings.get("overall"), dict) else None
     )
-    ranking_lines: list[str] = []
+
+    place_y: float = 0.400
+    place_x: float = left_x
+    o_rank: Optional[int] = None
+    o_total: Optional[int] = None
     if overall_entry is not None:
         try:
             o_rank = int(overall_entry.get("rank"))
             o_total = int(overall_entry.get("total"))
-            ranking_lines.append(
-                t("ui.final.ranking_overall_line", locale=loc, rank=o_rank, total=o_total)
-            )
+            if o_rank <= 0 or o_total <= 0:
+                o_rank = None
+                o_total = None
         except (TypeError, ValueError):
-            pass
-    for entry in per_format_entries:
-        try:
-            r = int(entry.get("rank"))
-            total = int(entry.get("total"))
-        except (TypeError, ValueError):
-            continue
-        fmt = str(entry.get("format") or "")
-        # Compact card-only form. The full web-page translation
-        # ("Ranking (Generic + My Data): ...") is too long in several locales
-        # and can collide with the QR column in a 1200x630 social thumbnail.
-        ranking_lines.append(f"{_resolve_format_label(fmt, locale=loc)}: {r} / {total}")
+            o_rank = None
+            o_total = None
 
-    rank_title_y: float = 0.360
-    rank_first_line_y: float = 0.300
-    _rank_bottom_limit: float = 0.05  # keep clear of generated_at at y=0.02
-    shown_ranking: list[str] = ranking_lines[:4]
-    if shown_ranking:
-        n_rank: int = len(shown_ranking)
-        rank_step: float = min(
-            0.052,
-            (rank_first_line_y - _rank_bottom_limit) / float(max(n_rank - 1, 1)),
+    if o_rank is not None and o_total is not None:
+        fig.add_annotation(
+            xref="paper", yref="paper",
+            x=place_x, y=place_y,
+            xanchor="left", yanchor="top",
+            text=t("ui.final.your_place", locale=loc).upper(),
+            showarrow=False,
+            font=dict(size=12, color="rgba(74,85,104,1)"),
         )
         fig.add_annotation(
             xref="paper", yref="paper",
-            x=left_x, y=rank_title_y,
+            x=place_x, y=place_y - 0.032,
             xanchor="left", yanchor="top",
-            text=f"<b>{t('ui.final.ranking_title', locale=loc)}</b>",
+            text=f"<b>{t('ui.final.your_place_value', locale=loc, rank=o_rank, total=o_total)}</b>",
             showarrow=False,
-            font=dict(size=20, color="rgba(21,101,192,1)"),
+            font=dict(size=30, color="rgba(29,78,216,1)"),
         )
-        for idx, line in enumerate(shown_ranking):
-            em_o, em_c = ("<b>", "</b>") if idx == 0 else ("", "")
+        overall_pct: Optional[int] = compute_percentile(o_rank, o_total)
+        line_y: float = place_y - 0.100
+        if overall_pct is not None:
             fig.add_annotation(
                 xref="paper", yref="paper",
-                x=left_x, y=rank_first_line_y - idx * rank_step,
+                x=place_x, y=line_y,
                 xanchor="left", yanchor="top",
-                text=f"{em_o}{line}{em_c}",
+                text=f"<b>{t('ui.final.top_percentile', locale=loc, pct=overall_pct)}</b>",
                 showarrow=False,
-                font=dict(size=16 if idx == 0 else 14, color="rgba(15,23,42,1)"),
+                font=dict(size=15, color="rgba(15,118,110,1)"),
+            )
+            line_y -= 0.040
+        if not math.isnan(mae):
+            fig.add_annotation(
+                xref="paper", yref="paper",
+                x=place_x, y=line_y,
+                xanchor="left", yanchor="top",
+                text=t(
+                    "ui.final.your_mae",
+                    locale=loc,
+                    mae=_format_number(mae, digits=2),
+                    unit="mg/dL",
+                ),
+                showarrow=False,
+                font=dict(size=14, color="rgba(74,85,104,1)"),
+            )
+            line_y -= 0.040
+
+        format_chip_lines: list[str] = []
+        for entry in per_format_entries[:3]:
+            try:
+                r = int(entry.get("rank"))
+                total = int(entry.get("total"))
+            except (TypeError, ValueError):
+                continue
+            if r <= 0 or total <= 0:
+                continue
+            fmt = str(entry.get("format") or "")
+            # Compact chip text — full "Ranking (…)" strings collide with the QR.
+            format_chip_lines.append(
+                f"{_resolve_format_label(fmt, locale=loc)}: {r} / {total}"
+            )
+        if format_chip_lines:
+            fig.add_annotation(
+                xref="paper", yref="paper",
+                x=place_x, y=line_y,
+                xanchor="left", yanchor="top",
+                text=f"<b>{t('ui.final.format_ranks', locale=loc)}</b>",
+                showarrow=False,
+                font=dict(size=12, color="rgba(71,85,105,1)"),
+            )
+            line_y -= 0.032
+            chip_step: float = min(
+                0.034,
+                max(0.026, (line_y - 0.055) / float(max(len(format_chip_lines), 1))),
+            )
+            for idx, chip in enumerate(format_chip_lines):
+                fig.add_annotation(
+                    xref="paper", yref="paper",
+                    x=place_x, y=line_y - idx * chip_step,
+                    xanchor="left", yanchor="top",
+                    text=chip,
+                    showarrow=False,
+                    font=dict(size=13, color="rgba(30,58,95,1)"),
+                )
+    elif per_format_entries:
+        # No overall yet — still show per-source ranks in the same footer slot.
+        fig.add_annotation(
+            xref="paper", yref="paper",
+            x=place_x, y=place_y,
+            xanchor="left", yanchor="top",
+            text=f"<b>{t('ui.final.format_ranks', locale=loc)}</b>",
+            showarrow=False,
+            font=dict(size=14, color="rgba(71,85,105,1)"),
+        )
+        for idx, entry in enumerate(per_format_entries[:3]):
+            try:
+                r = int(entry.get("rank"))
+                total = int(entry.get("total"))
+            except (TypeError, ValueError):
+                continue
+            fmt = str(entry.get("format") or "")
+            fig.add_annotation(
+                xref="paper", yref="paper",
+                x=place_x, y=place_y - 0.040 - idx * 0.036,
+                xanchor="left", yanchor="top",
+                text=f"{_resolve_format_label(fmt, locale=loc)}: {r} / {total}",
+                showarrow=False,
+                font=dict(size=14, color="rgba(15,23,42,1)"),
             )
 
     # QR beside the ranking in the whitespace between left text and graph.
@@ -1247,8 +1315,7 @@ def build_share_card_figure(
         )
     )
     if generated_at:
-        # Placed under the chart (not the left ranking column) so it never
-        # collides with a 4-line ranking block.
+        # Placed under the chart so it never collides with the placement hero.
         fig.add_annotation(
             xref="paper", yref="paper",
             x=left_x, y=0.02,
@@ -1515,76 +1582,6 @@ def create_share_layout(
         disable_n_clicks=True,
     )
 
-    # ---------- Ranking block: Overall first, per-format after ----------
-    rankings: dict[str, Any] = dict(share_record.get("rankings") or {})
-    per_format_entries: list[dict[str, Any]] = list(rankings.get("per_format") or [])
-    overall_entry: Optional[dict[str, Any]] = (
-        rankings.get("overall") if isinstance(rankings.get("overall"), dict) else None
-    )
-
-    ranking_lines: list[Any] = []
-    if overall_entry is not None:
-        try:
-            o_rank = int(overall_entry.get("rank"))
-            o_total = int(overall_entry.get("total"))
-            ranking_lines.append(
-                html.Li(
-                    t("ui.final.ranking_overall_line", locale=loc, rank=o_rank, total=o_total),
-                    style={"marginBottom": "6px", "fontWeight": "700"},
-                    disable_n_clicks=True,
-                )
-            )
-        except (TypeError, ValueError):
-            pass
-    for entry in per_format_entries:
-        fmt = str(entry.get("format") or "")
-        try:
-            rank = int(entry.get("rank"))
-            total = int(entry.get("total"))
-        except (TypeError, ValueError):
-            continue
-        ranking_lines.append(
-            html.Li(
-                t(
-                    "ui.final.ranking_format_line",
-                    locale=loc,
-                    format=_resolve_format_label(fmt, locale=loc),
-                    rank=rank, total=total,
-                ),
-                style={"marginBottom": "4px"},
-                disable_n_clicks=True,
-            )
-        )
-
-    ranking_card: Optional[html.Div] = None
-    if ranking_lines:
-        ranking_card = html.Div(
-            [
-                html.H3(
-                    t("ui.final.ranking_title", locale=loc),
-                    className="share-ranking-hero-title",
-                    disable_n_clicks=True,
-                ),
-                html.Ul(
-                    ranking_lines,
-                    className="share-ranking-hero-list",
-                    disable_n_clicks=True,
-                ),
-            ],
-            className="share-ranking-hero",
-            style={
-                "background": "white",
-                "borderRadius": "14px",
-                "padding": "18px 22px",
-                "boxShadow": "0 4px 14px rgba(15,23,42,0.08)",
-                "flex": "1 1 280px",
-                "minWidth": "0",
-                "maxWidth": "540px",
-                "textAlign": "left",
-            },
-            disable_n_clicks=True,
-        )
-
     played_formats: list[str] = list(share_record.get("played_formats") or [])
     if not played_formats:
         derived: set[str] = {str(r.get("format") or "") for r in rounds}
@@ -1780,16 +1777,7 @@ def create_share_layout(
     if played_line is not None:
         main_stack.append(played_line)
     main_stack.append(synthesis_card)
-    if ranking_card is not None:
-        main_stack.append(
-            html.Div(
-                [ranking_card, qr_block],
-                className="share-ranking-qr-row",
-                disable_n_clicks=True,
-            )
-        )
-    else:
-        main_stack.append(qr_block)
+    main_stack.append(qr_block)
     main_stack.extend(
         [
             action_buttons,
