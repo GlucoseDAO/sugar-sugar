@@ -290,6 +290,7 @@ uk:
     title: "Рівні глюкози (%{start}–%{end})"
     source_suffix: " — Джерело: %{source}"
     x_axis: "Час"
+    y_axis_label: "Глюкоза"
     y_axis: "Глюкоза (%{unit})"
     trace_glucose: "Глюкоза"
     trace_predictions: "Точки прогнозу"

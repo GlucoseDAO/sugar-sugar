@@ -2303,7 +2303,7 @@ def update_prediction_text_on_language_change(
         t("ui.header.upload_button", locale=locale),
         t("ui.header.use_example_data", locale=locale),
         t("ui.header.time_window_label", locale=locale),
-        t("ui.prediction.units_label", locale=locale),
+        t("ui.chart.y_axis_label", locale=locale),
         t("ui.startup.data_usage_consent_label", locale=locale),
         t("ui.common.finish_exit", locale=locale),
         t("ui.header.nightscout_load_button", locale=locale),
@@ -3075,29 +3075,36 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
             disable_n_clicks=True,
         ),
         html.Div([
-            html.Div(t("ui.prediction.units_label", locale=locale), id='prediction-units-label', style={'fontWeight': '600', 'marginRight': '10px'}),
-            dbc.RadioItems(
-                id='glucose-unit-selector',
-                options=[
-                    {'label': 'mg/dL', 'value': 'mg/dL'},
-                    {'label': 'mmol/L', 'value': 'mmol/L'}
-                ],
-                value='mg/dL',
-                inline=True
-            ),
-        ], style={
-            'display': 'flex',
-            'justifyContent': 'center',
-            'alignItems': 'center',
-            'gap': '10px',
-            'marginBottom': '10px'
-        }, id='prediction-units-row'),
-        html.Div([
             html.Div(
-                GlucoseChart(
-                    id='glucose-graph',
-                    hide_last_hour=True,
-                ),
+                [
+                    # Sits on the chart near the y-axis: horizontal "Glucose Level"
+                    # continued by the mg/dL ↔ mmol/L toggle (same ids/callbacks).
+                    html.Div(
+                        [
+                            html.Span(
+                                t("ui.chart.y_axis_label", locale=locale),
+                                id='prediction-units-label',
+                                className='chart-yaxis-units-label',
+                            ),
+                            dbc.RadioItems(
+                                id='glucose-unit-selector',
+                                options=[
+                                    {'label': 'mg/dL', 'value': 'mg/dL'},
+                                    {'label': 'mmol/L', 'value': 'mmol/L'},
+                                ],
+                                value='mg/dL',
+                                inline=True,
+                                className='chart-unit-toggle',
+                            ),
+                        ],
+                        id='prediction-units-row',
+                        className='chart-yaxis-units',
+                    ),
+                    GlucoseChart(
+                        id='glucose-graph',
+                        hide_last_hour=True,
+                    ),
+                ],
                 id='prediction-glucose-chart-container',
                 style={'display': 'none'} if b_gated else None,
             ),

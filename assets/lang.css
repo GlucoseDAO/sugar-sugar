@@ -358,4 +358,101 @@ body .ui.large.menu {
   margin-top: 18px;
 }
 
+/* Prediction chart: slim y-axis unit strip.
+   One horizontal row (label + mg/dL + mmol/L) rotated -90° so it reads
+   up the axis as a single thin line — not a bulky side panel. */
+#prediction-glucose-chart-container {
+  position: relative;
+}
+
+#prediction-units-row.chart-yaxis-units {
+  position: absolute;
+  z-index: 6;
+  left: 0;
+  top: 50%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(75, 95, 130, 0.28);
+  border-radius: 999px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+  pointer-events: auto;
+  white-space: nowrap;
+  transform: translate(-42%, -50%) rotate(-90deg);
+  transform-origin: center center;
+}
+
+#prediction-units-row .chart-yaxis-units-label {
+  display: inline-block;
+  margin: 0;
+  padding: 0 2px 0 0;
+  writing-mode: horizontal-tb;
+  transform: none;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: #2c5282;
+  white-space: nowrap;
+}
+
+#prediction-units-row #glucose-unit-selector.chart-unit-toggle,
+#prediction-units-row .chart-unit-toggle {
+  display: flex !important;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  width: auto;
+}
+
+#prediction-units-row .chart-unit-toggle .form-check {
+  position: relative;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin: 0 !important;
+  padding: 4px 8px;
+  min-width: 0;
+  box-sizing: border-box;
+  border-radius: 999px;
+  border: 1px solid rgba(75, 95, 130, 0.22);
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+#prediction-units-row .chart-unit-toggle .form-check:has(input:checked) {
+  background: #e8f1fb;
+  border-color: #2185d0;
+  box-shadow: inset 0 0 0 1px rgba(33, 133, 208, 0.25);
+}
+
+#prediction-units-row .chart-unit-toggle .form-check-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+
+#prediction-units-row .chart-unit-toggle .form-check-label {
+  position: relative;
+  z-index: 0;
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #1a365d;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 

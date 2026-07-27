@@ -312,6 +312,7 @@ ro:
     title: "Niveluri de glucoză (%{start} – %{end})"
     source_suffix: " - Sursa: %{source}"
     x_axis: "Timp"
+    y_axis_label: "Nivelul glucozei"
     y_axis: "Nivelul glucozei (%{unit})"
     trace_glucose: "Nivelul glucozei"
     trace_predictions: "Puncte de predicție"

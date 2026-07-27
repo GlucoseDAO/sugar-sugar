@@ -290,6 +290,7 @@ zh:
     title: "血糖水平（%{start} 到 %{end}）"
     source_suffix: " - 来源：%{source}"
     x_axis: "时间"
+    y_axis_label: "血糖水平"
     y_axis: "血糖水平 (%{unit})"
     trace_glucose: "血糖水平"
     trace_predictions: "预测点"

@@ -2199,3 +2199,90 @@ html.route-prediction.mobile-device #submit-button {
     max-width: 92% !important;
   }
 }
+
+/* --- Y-axis unit chip (final override) ------------------------------------
+   Units live on the chart as one rotated strip (label + pills in a row,
+   rotate -90°) so it stays a thin vertical line beside the axis. */
+@media (orientation: landscape) and (pointer: coarse) {
+  html.route-prediction.mobile-device #prediction-source-plaque {
+    right: 6px !important;
+  }
+  html.route-prediction.mobile-device #prediction-units-row,
+  html.route-prediction.mobile-device #prediction-units-row.chart-yaxis-units {
+    position: absolute !important;
+    top: 50% !important;
+    left: 0 !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 5px !important;
+    margin: 0 !important;
+    padding: 4px 7px !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+    border: 1px solid rgba(75, 95, 130, 0.35) !important;
+    border-radius: 999px !important;
+    box-shadow: 0 1px 3px rgba(25, 45, 75, 0.18) !important;
+    z-index: 6 !important;
+    font-size: inherit !important;
+    white-space: nowrap !important;
+    transform: translate(-42%, -50%) rotate(-90deg) !important;
+    transform-origin: center center !important;
+  }
+  html.route-prediction.mobile-device #prediction-units-row .chart-yaxis-units-label {
+    writing-mode: horizontal-tb !important;
+    transform: none !important;
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    color: #2c5282 !important;
+    letter-spacing: 0.02em !important;
+    white-space: nowrap !important;
+  }
+  html.route-prediction.mobile-device #glucose-unit-selector,
+  html.route-prediction.mobile-device #prediction-units-row #glucose-unit-selector {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 4px !important;
+    width: auto !important;
+    height: auto !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+  html.route-prediction.mobile-device #glucose-unit-selector .form-check {
+    margin: 0 !important;
+    padding: 4px 7px !important;
+    min-width: 0 !important;
+    width: auto !important;
+    justify-content: center !important;
+    border-radius: 999px !important;
+  }
+  html.route-prediction.mobile-device #glucose-unit-selector .form-check-label {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+  }
+}
+
+@media (orientation: portrait) and (pointer: coarse) {
+  html.route-prediction.mobile-device #prediction-units-row.chart-yaxis-units {
+    position: absolute !important;
+    top: 50% !important;
+    left: 0 !important;
+    right: auto !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    align-self: auto !important;
+    z-index: 6 !important;
+    transform: translate(-42%, -50%) rotate(-90deg) !important;
+    transform-origin: center center !important;
+  }
+}

@@ -292,6 +292,7 @@ fr:
     title: "Niveaux de glucose (%{start} à %{end})"
     source_suffix: " - Source : %{source}"
     x_axis: "Heure"
+    y_axis_label: "Niveau de glucose"
     y_axis: "Niveau de glucose (%{unit})"
     trace_glucose: "Niveau de glucose"
     trace_predictions: "Points de prédiction"

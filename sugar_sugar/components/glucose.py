@@ -776,7 +776,13 @@ class GlucoseChart(html.Div):
                 range=[-0.5, len(self._current_df) - 0.5]
             ),
             yaxis=dict(
-                title=t("ui.chart.y_axis", locale=locale, unit=self._display_unit),
+                # On /prediction the HTML unit chip beside the axis owns the label;
+                # results/static figures keep the classic "Glucose Level (unit)" title.
+                title=(
+                    ""
+                    if self.hide_last_hour
+                    else t("ui.chart.y_axis", locale=locale, unit=self._display_unit)
+                ),
                 fixedrange=True,
                 showspikes=True,
                 spikemode='across',
@@ -786,7 +792,13 @@ class GlucoseChart(html.Div):
                 range=y_range
             ),
             # Extra top margin so insulin/carb SVG legend icons (paper y≈1.08) fit.
-            margin=dict(l=50, r=20, t=72, b=50),
+            # Prediction leaves room on the left for the unit chip near the axis.
+            margin=dict(
+                l=56 if self.hide_last_hour else 50,
+                r=20,
+                t=72,
+                b=50,
+            ),
             showlegend=True,
             legend=dict(
                 orientation='h',

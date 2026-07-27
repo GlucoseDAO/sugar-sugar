@@ -290,6 +290,7 @@ ru:
     title: "Уровни глюкозы (с %{start} по %{end})"
     source_suffix: " - Источник: %{source}"
     x_axis: "Время"
+    y_axis_label: "Уровень глюкозы"
     y_axis: "Уровень глюкозы (%{unit})"
     trace_glucose: "Уровень глюкозы"
     trace_predictions: "Точки предсказания"

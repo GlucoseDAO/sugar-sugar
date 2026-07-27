@@ -315,6 +315,7 @@ en:
     title: "Glucose Levels (%{start} to %{end})"
     source_suffix: " - Source: %{source}"
     x_axis: "Time"
+    y_axis_label: "Glucose Level"
     y_axis: "Glucose Level (%{unit})"
     trace_glucose: "Glucose Level"
     trace_predictions: "Prediction Points"

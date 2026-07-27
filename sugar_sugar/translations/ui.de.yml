@@ -291,6 +291,7 @@ de:
     title: "Glukosewerte (%{start} bis %{end})"
     source_suffix: " - Quelle: %{source}"
     x_axis: "Zeit"
+    y_axis_label: "Glukose"
     y_axis: "Glukose (%{unit})"
     trace_glucose: "Glukose"
     trace_predictions: "Vorhersagepunkte"
