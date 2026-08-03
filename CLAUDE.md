@@ -52,6 +52,32 @@ Avoid excessive try-catch blocks
 
 Dash `debug=True` uses Werkzeug's auto-reloader, which forks a child process that re-imports the entire module. Any runtime mutations to `app.layout` are lost on reload. To pass configuration that must survive the fork (e.g. `uv run chart --prefill`), use environment variables read at module-level import time, not post-layout mutations.
 
+### Never put a whole dataset in a `dcc.Store` — the client re-uploads it every callback
+
+A store's value is not just "state on the client": the browser sends the value of **every**
+`Input`/`State` store a callback declares along with each `_dash-update-component` POST. A big
+store therefore costs its full size *in upload bandwidth, per interaction*, on top of the
+localStorage write (synchronous, ~5 MB quota per origin).
+
+**Production incident 2026-07-28:** `events-df` was filled with the *whole subject's* event log.
+Rounds 1–6 landed on small generic sources and felt fine; round 7 drew `loop_467`
+(62,308 events → **3.4 MB** of JSON) and the game became unusable — "extremely slow, it takes
+many seconds for every click", then a 48 s timeout on the public monitor. The CSV parse itself was
+never the problem (0.2 s, cached in `_load_dataset_cached`); the per-click 3.4 MB upload was.
+Fixed by `events_within_window` / `events_store_for_window` in `app.py`: every writer of
+`events-df` trims events to the current window's first/last timestamp. This is lossless —
+`GlucoseChart._add_event_markers`, `window_has_carb_events` and `create_ending_layout` all filter
+to that same span anyway. `compact_events_store` (fires on navigation) shrinks oversized stores
+left in localStorage by an older build. `handle_time_slider` re-trims whenever the window moves,
+so window and events never drift apart.
+
+**Rules:** keep client stores window-sized; the full dataset stays server-side behind
+`load_dataset` (per-worker LRU) and is re-sliced on demand — this is the same reasoning that
+removed the `full-df` store. When adding a store, check its worst-case size against the *largest*
+generic subject (`data/subjects/loop_467`, 9 MB CSV), not `example.csv` (260 KB). And remember
+sync gunicorn workers hold a worker for the whole request body read, so one slow client's upload
+blocks other players: `serve --threads N` (or `GUNICORN_THREADS`) switches to gthread if needed.
+
 ### localStorage hydration race condition
 
 `dcc.Store` with `storage_type='local'` hydrates **asynchronously** after the initial server render. Each store hydrates independently — there is no guaranteed order. A callback triggered by one store hydrating as `Input` may read other stores via `State` before they have hydrated, seeing the server-default value (`None` or whatever `data=` was in the layout) instead of the persisted value.

@@ -59,11 +59,15 @@ SHARE_ROUND_LABELS: str = os.getenv("SHARE_ROUND_LABELS", "single").strip().lowe
 DEBUG_MODE: bool = _env_bool("DEBUG_MODE", "false")
 DASH_DEBUG: bool = _env_bool("DASH_DEBUG", DEBUG_MODE)
 
-# Bump this integer on every deploy that changes clientside callback JS.
+# Bump this integer on every deploy that changes clientside callback JS, OR that
+# changes the Output list of an existing callback / removes one -- a browser still
+# holding the old /_dash-dependencies POSTs the old output key and the server 500s
+# with "Callback function not found for output ...".
 # Dash computes its client-side fingerprint from the layout JSON, NOT from
 # clientside callback content, so browsers cache old JS and survive server
 # restarts without re-fetching /_dash-dependencies. Including this value in
 # the layout as a dcc.Store forces the fingerprint to change and triggers a
 # full client reload for every connected browser on the next server restart.
-DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "16"))
+# 17: handle_time_slider gained an events-df Output (window-trimmed events store).
+DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "17"))
 

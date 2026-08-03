@@ -484,6 +484,38 @@ def events_dataframe_to_store_dict(df_in: pl.DataFrame) -> Dict[str, List[Any]]:
     }
 
 
+def events_within_window(events_df: pl.DataFrame, window_df: pl.DataFrame) -> pl.DataFrame:
+    """Trim events to the time span of the window that is being played.
+
+    PERFORMANCE (production freeze, 2026-07-28): the `events-df` store used to
+    receive the WHOLE subject's event log -- 62k rows / 3.4 MB of JSON for
+    `loop_467`, the largest generic source. It is a `storage_type='local'` store,
+    so that payload was written to localStorage and, worse, re-uploaded by the
+    browser with every callback request that lists `events-df` as Input/State
+    (`auto_snapshot_session`, the chart figure, the source-metadata line). On a
+    normal home uplink 3.4 MB is seconds per click, which is exactly what
+    players saw the moment a round landed on a big subject: "extremely slow, it
+    takes many seconds for every click", then a hard timeout.
+
+    Every consumer already filters events to the window's first/last timestamp
+    (`GlucoseChart._add_event_markers`, `window_has_carb_events`,
+    `create_ending_layout`), so trimming here is lossless.
+    """
+    if events_df.height == 0 or 'time' not in events_df.columns:
+        return events_df
+    if window_df.height == 0 or 'time' not in window_df.columns:
+        return events_df.clear()
+    window_times = window_df.get_column('time')
+    return events_df.filter(
+        (pl.col('time') >= window_times[0]) & (pl.col('time') <= window_times[-1])
+    )
+
+
+def events_store_for_window(events_df: pl.DataFrame, window_df: pl.DataFrame) -> Dict[str, List[Any]]:
+    """Window-trimmed events as a session-store dictionary (see events_within_window)."""
+    return events_dataframe_to_store_dict(events_within_window(events_df, window_df))
+
+
 def get_random_data_window(
     full_df: pl.DataFrame,
     points: int,
@@ -672,7 +704,7 @@ if _chart_prefill:
             )
 
 example_initial_df_store = dataframe_to_store_dict(_init_window_df)
-example_events_df_store = events_dataframe_to_store_dict(_init_events_df)
+example_events_df_store = events_store_for_window(_init_events_df, _init_window_df)
 example_initial_slider_value = _init_start
 
 # ---------------------------------------------------------------------------
@@ -1363,7 +1395,7 @@ def _staging_ending_args() -> tuple[dict, dict, dict[str, Any]]:
     })
     return (
         dataframe_to_store_dict(window_df),
-        events_dataframe_to_store_dict(events_df),
+        events_store_for_window(events_df, window_df),
         info,
     )
 
@@ -5347,7 +5379,7 @@ def handle_next_round_button(
             user_info,
             chart_mode,
             convert_df_to_dict(new_df),
-            convert_events_df_to_dict(events_df),
+            events_store_for_window(events_df, new_df),
             is_example,
             source_name,
             False,  # let slider init set it from initial-slider-value
@@ -5816,7 +5848,7 @@ def handle_switch_format(
                 info,
                 chart_mode,
                 convert_df_to_dict(new_df),
-                convert_events_df_to_dict(events_df),
+                events_store_for_window(events_df, new_df),
                 True,
                 source_name,
                 False,
@@ -5837,7 +5869,7 @@ def handle_switch_format(
                 info,
                 chart_mode,
                 convert_df_to_dict(new_df),
-                convert_events_df_to_dict(events_df),
+                events_store_for_window(events_df, new_df),
                 False,
                 source_name,
                 False,
@@ -6559,7 +6591,7 @@ def initialize_data_on_url_change(
 
     return (
         convert_df_to_dict(df),
-        convert_events_df_to_dict(events_df),
+        events_store_for_window(events_df, df),
         is_example,
         source_name,
         False,
@@ -6784,7 +6816,7 @@ def handle_file_upload(
         return (
             current_time,
             convert_df_to_dict(new_df),
-            convert_events_df_to_dict(new_events_df),
+            events_store_for_window(new_events_df, new_df),
             False,  # is_example_data = False for uploaded files
             str(filename or ""),  # store the original filename
             False,  # reset randomization flag for new data
@@ -6893,7 +6925,7 @@ def handle_nightscout_load(
         return (
             current_time,
             convert_df_to_dict(new_df),
-            convert_events_df_to_dict(new_events_df),
+            events_store_for_window(new_events_df, new_df),
             False,
             ns_label,
             False,
@@ -6941,7 +6973,7 @@ def handle_example_data_button(
         
         return (current_time,
                convert_df_to_dict(new_df),
-               convert_events_df_to_dict(new_events_df),
+               events_store_for_window(new_events_df, new_df),
                True,  # is_example_data = True for generic data
                source_name,
                False,  # reset randomization flag for new data
@@ -6952,7 +6984,8 @@ def handle_example_data_button(
 # Separate callback for time slider
 @app.callback(
     [Output('last-click-time', 'data', allow_duplicate=True),
-     Output('current-window-df', 'data', allow_duplicate=True)],
+     Output('current-window-df', 'data', allow_duplicate=True),
+     Output('events-df', 'data', allow_duplicate=True)],
     [Input('time-slider', 'value')],
     [State('user-info-store', 'data'),
      State('current-window-df', 'data')],
@@ -6962,7 +6995,7 @@ def handle_time_slider(
     slider_value: Optional[int],
     user_info: Optional[Dict[str, Any]],
     current_df_data: Optional[Dict[str, List[Any]]],
-) -> Tuple[int, Dict[str, List[Any]]]:
+) -> Tuple[Any, Any, Any]:
     """Handle time slider changes (slices the window server-side from the dataset).
 
     The re-slice comes from ``load_dataset`` which zeroes the ``prediction`` column
@@ -6974,14 +7007,17 @@ def handle_time_slider(
     seed). Guard: if the freshly-sliced window covers the same timestamps as the
     current one, no-op so those predictions survive. A genuine move to a different
     window still returns a fresh (legitimately zeroed) window.
+
+    Moving the window also re-trims the events store to it (see
+    ``events_within_window``) so the two never drift apart.
     """
     if slider_value is None or not user_info:
-        return no_update, no_update
+        return no_update, no_update, no_update
 
     with start_action(action_type=u"handle_time_slider", slider_value=slider_value):
         current_time = int(time.time() * 1000)
 
-        full_df, _ = load_dataset(resolve_dataset_identity(user_info))
+        full_df, events_df = load_dataset(resolve_dataset_identity(user_info))
 
         # Ensure we don't go beyond the available data
         points = max(MIN_POINTS, min(MAX_POINTS, DEFAULT_POINTS))
@@ -6995,9 +7031,46 @@ def handle_time_slider(
         # Same window as already displayed (slider mount / persistence re-fire) ->
         # preserve the current window (and its predictions) instead of clobbering.
         if current_df_data and current_df_data.get('time') == new_dict.get('time'):
-            return no_update, no_update
+            return no_update, no_update, no_update
 
-        return current_time, new_dict
+        return current_time, new_dict, events_store_for_window(events_df, new_df)
+
+
+@app.callback(
+    Output('events-df', 'data', allow_duplicate=True),
+    [Input('url', 'pathname')],
+    [State('events-df', 'data'),
+     State('current-window-df', 'data')],
+    prevent_initial_call=True,
+)
+def compact_events_store(
+    pathname: Optional[str],
+    events_data: Optional[Dict[str, List[Any]]],
+    window_data: Optional[Dict[str, List[Any]]],
+) -> Any:
+    """Trim a whole-subject events store left in localStorage by an older build.
+
+    New rounds already store only the window's events, but a session that was
+    mid-game across the deploy keeps the multi-megabyte store in localStorage and
+    re-uploads it with every callback that reads `events-df` -- the slowness this
+    fixes would persist for the rest of that round. Navigation is a cheap, always
+    reached moment to shrink it; sessions that are already trimmed no-op.
+    """
+    if not events_data or not window_data:
+        raise PreventUpdate
+    event_times: list[Any] = events_data.get('time') or []
+    window_times: list[Any] = window_data.get('time') or []
+    if not event_times or not window_times:
+        raise PreventUpdate
+    columns = list(events_data.values())
+    if any(len(column) != len(event_times) for column in columns):
+        raise PreventUpdate
+    # Store timestamps are fixed-width ISO strings, so string order is chronological.
+    start, end = window_times[0], window_times[-1]
+    keep = [i for i, stamp in enumerate(event_times) if start <= stamp <= end]
+    if len(keep) == len(event_times):
+        raise PreventUpdate
+    return {key: [values[i] for i in keep] for key, values in events_data.items()}
 
 # Separate callback for glucose graph interactions (only active on prediction page)
 @app.callback(
@@ -7408,7 +7481,12 @@ def convert_df_to_dict(df: pl.DataFrame) -> Dict[str, List[Any]]:
     }
 
 def convert_events_df_to_dict(df: pl.DataFrame) -> Dict[str, List[Any]]:
-    """Convert an events Polars DataFrame to a session-store dictionary."""
+    """Convert an events Polars DataFrame to a session-store dictionary.
+
+    Do NOT use this to write the `events-df` store -- it would ship the frame as
+    given, and a whole-subject event log there is what froze production on
+    2026-07-28. Use ``events_store_for_window`` so the payload stays window-sized.
+    """
     return {
         'time': df.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
         'event_type': df.get_column('event_type').to_list(),
@@ -7791,6 +7869,7 @@ def serve(
     host: Optional[str] = typer.Option(None, "--host", help="Host gunicorn should bind"),
     port: Optional[int] = typer.Option(None, "--port", help="Port gunicorn should bind"),
     workers: Optional[int] = typer.Option(None, "--workers", "-w", help="Gunicorn worker count"),
+    threads: Optional[int] = typer.Option(None, "--threads", help="Threads per worker (>1 switches gunicorn to gthread)"),
     timeout: Optional[int] = typer.Option(None, "--timeout", help="Gunicorn worker timeout in seconds"),
     staging: bool = typer.Option(False, "--staging", help="Enable prod+ staging test routes under /staging/*"),
 ) -> None:
@@ -7803,6 +7882,13 @@ def serve(
     bind_port: int = DASH_PORT if port is None else port
     worker_count: int = workers if workers is not None else int(os.getenv("WEB_CONCURRENCY", os.getenv("GUNICORN_WORKERS", "2")))
     worker_timeout: int = timeout if timeout is not None else int(os.getenv("GUNICORN_TIMEOUT", "120"))
+    # Sync workers serve exactly one request each, start to finish -- including the
+    # time spent reading a slow client's request body. So `workers` is the hard
+    # ceiling on concurrent players, and one slow upload stalls everyone (a public
+    # monitor timed out during the 2026-07-28 slowdown, not just the player).
+    # >1 makes gunicorn use its gthread worker; default stays 1 so behaviour is
+    # unchanged unless the deployment opts in via --threads / GUNICORN_THREADS.
+    thread_count: int = threads if threads is not None else int(os.getenv("GUNICORN_THREADS", "1"))
     bind: str = f"{bind_host}:{bind_port}"
     command: list[str] = [
         "gunicorn",
@@ -7811,6 +7897,8 @@ def serve(
         bind,
         "--workers",
         str(worker_count),
+        "--threads",
+        str(thread_count),
         "--timeout",
         str(worker_timeout),
         "--access-logfile",
@@ -7825,6 +7913,7 @@ def serve(
         host=bind_host,
         port=bind_port,
         workers=worker_count,
+        threads=thread_count,
         timeout=worker_timeout,
     ):
         os.execvp(command[0], command)
