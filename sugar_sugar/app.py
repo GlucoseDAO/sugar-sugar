@@ -7083,7 +7083,7 @@ def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optiona
             .alias("prediction")
         )
 
-        return current_time, convert_df_to_dict(df)
+        return current_time, convert_df_to_dict(anchor_predictions_at_boundary(df))
 
     elif relayout_data and 'shapes' in relayout_data:
         shapes = relayout_data['shapes']
@@ -7152,7 +7152,7 @@ def handle_graph_interactions(click_data: Optional[Dict], relayout_data: Optiona
                     .alias("prediction")
                 )
 
-                return current_time, convert_df_to_dict(df)
+                return current_time, convert_df_to_dict(anchor_predictions_at_boundary(df))
 
     return no_update, no_update
 
@@ -7358,6 +7358,44 @@ def reset_upload_on_example_data(
         # Reset upload component by clearing contents and filename
         # This allows the same file to be uploaded again after switching to example data
         return example_msg, new_max, None, None
+
+def anchor_predictions_at_boundary(df: pl.DataFrame) -> pl.DataFrame:
+    """Make the drawn prediction path start where the known glucose line ends.
+
+    The boundary slot (first index of the hidden hour) is shared by the last
+    known glucose point and the first predictable point. A stroke that starts
+    later leaves that slot empty, so the red prediction line looked detached
+    from the blue line for some draws and joined for others. Anchoring fills
+    the boundary slot with the ground truth there -- the same rule the very
+    first stroke already applies -- and linearly interpolates the slots up to
+    the user's first drawn point, exactly like ``create_intermediate_predictions``
+    does inside a stroke.
+    """
+    boundary_idx = len(df) - PREDICTION_HOUR_OFFSET
+    if not 0 <= boundary_idx < len(df):
+        return df
+    predictions = df.get_column("prediction").to_list()
+    if predictions[boundary_idx] not in (0.0, None):
+        return df
+    first_drawn_idx = next(
+        (i for i in range(boundary_idx + 1, len(predictions))
+         if predictions[i] not in (0.0, None)),
+        None,
+    )
+    if first_drawn_idx is None:
+        return df
+    anchor_value = df.get_column("gl")[boundary_idx]
+    if anchor_value is None:
+        return df
+    anchor_value = float(anchor_value)
+    first_value = float(predictions[first_drawn_idx])
+    steps = first_drawn_idx - boundary_idx
+    for offset in range(steps):
+        predictions[boundary_idx + offset] = (
+            anchor_value + (first_value - anchor_value) * (offset / steps)
+        )
+    return df.with_columns(pl.Series("prediction", predictions, dtype=pl.Float64))
+
 
 def convert_df_to_dict(df: pl.DataFrame) -> Dict[str, List[Any]]:
     """Convert a Polars DataFrame to a session-store dictionary."""

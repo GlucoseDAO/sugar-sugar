@@ -29,8 +29,9 @@ def disabled_flags(options: list[dict]) -> list[bool]:
         # current format preserved if valid
         (True, "B", ["A", "B", "C"], "B", [False, False, False]),
         (False, "B", ["A", "B", "C"], "A", [False, True, True]),
-        # encourage C when becoming eligible and previously using A
-        (True, "A", ["A", "B", "C"], "C", [False, False, False]),
+        # a CGM owner who picked A keeps it: playing the generic data without
+        # uploading must stay possible (C is only ever suggested, never forced)
+        (True, "A", ["A", "B", "C"], "A", [False, False, False]),
         # drop back to A if eligibility lost from B/C
         (False, "C", ["A", "B", "C"], "A", [False, True, True]),
     ],

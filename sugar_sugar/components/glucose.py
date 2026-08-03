@@ -383,6 +383,23 @@ class GlucoseChart(html.Div):
                     customdata=custom_data
                 ))
 
+                # Always join the prediction path to the last known glucose point.
+                # `anchor_predictions_at_boundary` normally fills the boundary slot
+                # while drawing, but restored / staging / prefilled windows can still
+                # start later, and a detached red line reads as a broken prediction.
+                boundary_idx = len(self._current_df) - PREDICTION_HOUR_OFFSET
+                if 0 <= boundary_idx < len(self._current_df) and float(x_positions[0]) > boundary_idx:
+                    known_value = self._current_df.get_column("gl")[boundary_idx]
+                    if known_value is not None:
+                        figure.add_trace(go.Scatter(
+                            x=[boundary_idx, x_positions[0]],
+                            y=[float(known_value) * f, predictions[0]],
+                            mode='lines',
+                            line=dict(color='red', width=2),
+                            showlegend=False,
+                            hoverinfo='skip'
+                        ))
+
                 # Add connecting lines between predictions
                 if len(predictions) >= 2:
                     for i in range(len(predictions) - 1):

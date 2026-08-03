@@ -427,6 +427,14 @@ def _compute_format_options(
 dropdown scroller.  Formats B and C are disabled unless ``uses_cgm`` is True.
     The returned ``value`` is used to update the component's value according to
 eligibility and previous selection.
+
+    An already-selected format is never overridden except when it became
+    ineligible (B/C without a CGM). C is only ever *suggested*, on the first
+    computation that has a CGM answer and no format yet -- a CGM owner who picks
+    A on purpose (play the generic data, don't upload mine) must keep it. The
+    old "eligible and currently A -> force C" rule made that impossible: any
+    later re-fire of the callback (language switch, persistence hydration on
+    reload) silently yanked them back to C and into the upload gate.
     """
     allow_all = uses_cgm is True
     options: list[dict[str, Any]] = [
@@ -448,9 +456,6 @@ eligibility and previous selection.
 
     if not current_format:
         return options, ('C' if allow_all else 'A')
-    if allow_all and current_format == 'A':
-        # Encourage option C once eligible.
-        return options, 'C'
     if not allow_all and current_format in ('B', 'C'):
         return options, 'A'
     return options, current_format
@@ -792,7 +797,12 @@ class StartupPage(html.Div):
             current_format: Optional[str],
         ) -> tuple[list[dict[str, Any]], Optional[str]]:
             # delegate to helper so we can unit-test behaviour independently
-            return _compute_format_options(uses_cgm, interface_language, current_format)
+            options, value = _compute_format_options(uses_cgm, interface_language, current_format)
+            # Initial call: `persistence` restores the dropdown value client-side,
+            # so only refresh the option labels/eligibility and leave it alone.
+            if getattr(dash.callback_context, 'triggered_id', None) is None:
+                return options, no_update
+            return options, value
 
         @app.callback(
             [Output('data-usage-consent-container', 'style'),
