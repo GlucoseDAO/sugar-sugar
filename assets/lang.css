@@ -337,6 +337,75 @@ body .ui.large.menu {
     max-width: 100% !important;
   }
 }
+.final-leaderboard-board-subtitle {
+  text-align: center;
+  font-size: 12px !important;
+  color: #64748b;
+  margin: -6px 0 10px 0;
+}
+
+/* ---- Highscore page (/highscore) ------------------------------------- */
+.highscore-page {
+  max-width: 1040px;
+}
+.highscore-subtitle {
+  color: #475569;
+  margin-bottom: 14px;
+}
+.highscore-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.highscore-stat {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #1e3a5f;
+  background: #f1f5f9;
+  border: 1px solid rgba(75, 95, 130, 0.18);
+  border-radius: 999px;
+  padding: 5px 12px;
+}
+.highscore-hero-wrap {
+  max-width: 420px;
+  margin: 0 auto 18px auto;
+}
+.highscore-card {
+  margin: 0 auto 18px auto;
+  max-width: 560px;
+}
+.highscore-section-title {
+  text-align: center;
+  margin: 6px 0 14px 0;
+  font-size: clamp(18px, 2.6vw, 22px) !important;
+  color: #1e3a5f;
+}
+.highscore-format-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+.highscore-format-grid .highscore-card {
+  margin: 0;
+  max-width: none;
+}
+/* `.final-leaderboard-row.head` sets 12px, but the global
+   `body :not(h1..h6) { font-size: 16px !important }` rule in this file wins on
+   the cell spans themselves (inheritance loses to !important), which pushed the
+   `MAE (mg/dL)` header onto a second line in narrow cards.  Scoped to the
+   highscore page so `/final` keeps its current look. */
+.highscore-page .final-leaderboard-row.head .final-leaderboard-cell {
+  font-size: 12px !important;
+}
+.highscore-empty {
+  margin: 24px 0;
+}
+.highscore-actions {
+  text-align: center;
+  margin: 22px 0 8px 0;
+}
 
 /* Games-played counter: beat `body :not(h1..h6) { font-size: 16px !important }`. */
 #landing-page .games-played-title {

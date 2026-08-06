@@ -12,6 +12,7 @@ es:
     contact_us: "Contáctanos"
     video_instructions: "Instrucciones en video"
     faq: "Preguntas frecuentes (FAQ)"
+    highscore: "Clasificación"
 
   language:
     choose: "Idioma"
@@ -385,6 +386,17 @@ es:
       minimum_goal: "Mínimo: %{min_useful}"
       stretch_goal: "Objetivo: %{total}"
       bonus_rounds: "Rondas extra"
+
+  highscore:
+    title: "Clasificación"
+    subtitle: "Clasificación anónima de todas las partidas terminadas. Un error absoluto medio (MAE) más bajo significa una predicción mejor."
+    overall_board: "General"
+    by_data_source: "Por fuente de datos"
+    lower_is_better: "Un MAE más bajo es mejor"
+    players_count: "%{total} jugadores"
+    games_played: "%{count} partidas jugadas"
+    empty: "Todavía no hay partidas terminadas. Juega una partida completa y serás el primero en la clasificación."
+    play_now: "Jugar ahora"
 
   final:
     title: "Análisis completo"

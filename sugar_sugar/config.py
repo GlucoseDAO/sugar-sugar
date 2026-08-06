@@ -69,5 +69,6 @@ DASH_DEBUG: bool = _env_bool("DASH_DEBUG", DEBUG_MODE)
 # the layout as a dcc.Store forces the fingerprint to change and triggers a
 # full client reload for every connected browser on the next server restart.
 # 17: handle_time_slider gained an events-df Output (window-trimmed events store).
-DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "17"))
+# 18: navbar gained the Highscore item (/highscore page) on desktop + mobile.
+DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "18"))
 

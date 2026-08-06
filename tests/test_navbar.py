@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sugar_sugar.components.navbar import LANGUAGES, NavBar
+from sugar_sugar.components.navbar import LANGUAGES, MobileNavBar, NavBar
 from sugar_sugar.i18n import t
 
 
@@ -18,12 +18,15 @@ def test_navbar_fomantic_menu_structure():
     assert "ui massive blue inverted tabular menu" in navbar.className
 
     children = navbar.children
-    # 5 left links + 1 right menu div = 6
-    assert len(children) == 6
-    game_item, study_item, faq_item, video_item, contact_item, right_menu = children
+    # 6 left links + 1 right menu div = 7
+    assert len(children) == 7
+    game_item, highscore_item, study_item, faq_item, video_item, contact_item, right_menu = children
 
     assert game_item.href == "/"
     assert t("ui.common.game", locale="en") == game_item.children
+
+    assert highscore_item.href == "/highscore"
+    assert t("ui.common.highscore", locale="en") == highscore_item.children
 
     assert study_item.href == "/about"
     assert t("ui.common.the_study", locale="en") == study_item.children
@@ -45,7 +48,7 @@ def test_navbar_fomantic_menu_structure():
 def test_navbar_game_always_visible():
     """Game item is always shown, including on landing page."""
     navbar = NavBar(locale="en", current_page="/")
-    assert len(navbar.children) == 6
+    assert len(navbar.children) == 7
     game_item = navbar.children[0]
     assert game_item.href == "/"
     assert "active" in game_item.className
@@ -61,11 +64,30 @@ def test_navbar_game_active_on_game_flow_pages():
 
 def test_navbar_active_page_highlighted():
     navbar = NavBar(locale="en", current_page="/about")
-    study_item = navbar.children[1]
+    study_item = navbar.children[2]
     assert "active" in study_item.className
 
     game_item = navbar.children[0]
     assert "active" not in game_item.className
+
+
+def test_navbar_highscore_active_and_not_a_game_page():
+    """The Highscore tab lights up on /highscore, and Game stays inactive there."""
+    navbar = NavBar(locale="en", current_page="/highscore")
+    game_item, highscore_item = navbar.children[0], navbar.children[1]
+    assert "active" in highscore_item.className
+    assert "active" not in game_item.className
+
+
+def test_mobile_navbar_contains_highscore_link():
+    """The burger drawer exposes the same /highscore destination as the desktop bar."""
+    navbar = MobileNavBar(locale="en", current_page="/highscore")
+    drawer = navbar.children[1]
+    links = {link.href: link for link in drawer.children}
+    assert "/highscore" in links
+    assert t("ui.common.highscore", locale="en") == links["/highscore"].children
+    assert "active" in links["/highscore"].className
+    assert "active" not in links["/"].className
 
 
 def test_navbar_active_language_in_dropdown():

@@ -12,6 +12,7 @@ en:
     contact_us: "Contact us"
     video_instructions: "Video instructions"
     faq: "FAQ"
+    highscore: "Highscore"
 
   language:
     choose: "Language"
@@ -408,6 +409,17 @@ en:
       minimum_goal: "Minimum: %{min_useful}"
       stretch_goal: "Stretch: %{total}"
       bonus_rounds: "Bonus rounds"
+
+  highscore:
+    title: "Highscore"
+    subtitle: "Anonymous ranking of every finished game. Lower mean absolute error (MAE) means a better prediction."
+    overall_board: "Overall"
+    by_data_source: "By data source"
+    lower_is_better: "Lower MAE is better"
+    players_count: "%{total} players"
+    games_played: "%{count} games played"
+    empty: "No finished games yet. Play a full run and you will be the first on the board."
+    play_now: "Play now"
 
   final:
     title: "Complete Analysis"

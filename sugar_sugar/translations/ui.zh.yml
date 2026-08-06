@@ -12,6 +12,7 @@ zh:
     contact_us: "联系我们"
     video_instructions: "视频教程"
     faq: "常见问题"
+    highscore: "排行榜"
 
   language:
     choose: "语言"
@@ -383,6 +384,17 @@ zh:
       minimum_goal: "最低目标：%{min_useful}"
       stretch_goal: "扩展目标：%{total}"
       bonus_rounds: "额外轮次"
+
+  highscore:
+    title: "排行榜"
+    subtitle: "所有已完成游戏的匿名排名。平均绝对误差（MAE）越小，预测越准确。"
+    overall_board: "总榜"
+    by_data_source: "按数据来源"
+    lower_is_better: "MAE 越小越好"
+    players_count: "%{total} 位玩家"
+    games_played: "已完成 %{count} 局游戏"
+    empty: "还没有已完成的游戏。完成一整轮，你就是榜首。"
+    play_now: "开始游戏"
 
   final:
     title: "完整分析"

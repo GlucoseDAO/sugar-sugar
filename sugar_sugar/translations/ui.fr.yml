@@ -12,6 +12,7 @@ fr:
     contact_us: "Contactez-nous"
     video_instructions: "Instructions vidéo"
     faq: "FAQ"
+    highscore: "Classement"
 
   language:
     choose: "Langue"
@@ -385,6 +386,17 @@ fr:
       minimum_goal: "Minimum : %{min_useful}"
       stretch_goal: "Objectif : %{total}"
       bonus_rounds: "Manches bonus"
+
+  highscore:
+    title: "Classement"
+    subtitle: "Classement anonyme de toutes les parties terminées. Une erreur absolue moyenne (MAE) plus faible signifie une meilleure prédiction."
+    overall_board: "Général"
+    by_data_source: "Par source de données"
+    lower_is_better: "Un MAE plus faible est meilleur"
+    players_count: "%{total} joueurs"
+    games_played: "%{count} parties jouées"
+    empty: "Aucune partie terminée pour l'instant. Termine une partie complète et tu seras le premier au classement."
+    play_now: "Jouer maintenant"
 
   final:
     title: "Analyse complète"

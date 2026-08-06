@@ -907,6 +907,32 @@ html.mobile-device .demo-page .demo-fullscreen-button.ui.button {
   border-radius: 12px !important;
 }
 
+/* --- Highscore page (/highscore) ------------------------------------------
+   The leaderboard cards are reused verbatim from `/final`; on a phone they only
+   need to stop being centred fixed-width cards and to give the MAE column less
+   room so `Player N` never truncates. */
+html.mobile-device .highscore-page .highscore-card {
+  max-width: 100% !important;
+  padding: 12px 10px !important;
+}
+html.mobile-device .highscore-page .highscore-format-grid {
+  grid-template-columns: 1fr !important;
+  gap: 14px !important;
+}
+html.mobile-device .highscore-page .final-leaderboard-row {
+  grid-template-columns: 32px 1fr 92px !important;
+  padding: 8px 6px !important;
+}
+html.mobile-device .highscore-page .highscore-hero-wrap {
+  max-width: 100% !important;
+}
+html.mobile-device .highscore-page .highscore-play-button.ui.button {
+  width: 100% !important;
+  padding: 15px 18px !important;
+  font-size: 18px !important;
+  border-radius: 12px !important;
+}
+
 /* --- Contact page: bigger fonts, sized so the team email is the longest
    single line and still fits with a comfortable safety margin -------------- */
 html.mobile-device .contact-page .contact-intro {

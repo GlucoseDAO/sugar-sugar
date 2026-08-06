@@ -195,6 +195,9 @@ def _server_groups(port: int, *, locale: str) -> list[ServerGroup]:
                 Shot("faq", "/faq"),
                 Shot("contact", "/contact"),
                 Shot("demo", "/demo"),
+                # Reads data/input/prediction_ranking*.csv; with empty CSVs this
+                # captures the "no finished games yet" state.
+                Shot("highscore", "/highscore"),
             ],
         ),
         ServerGroup(
@@ -314,6 +317,7 @@ def _server_groups(port: int, *, locale: str) -> list[ServerGroup]:
                         "window.dash_clientside.set_props('data-usage-consent',{value:['agree']});}})()"
                     ),
                 ),
+                Shot("desktop-highscore", "/highscore", settle_s=2.0),
             ],
         ),
     ]

@@ -260,6 +260,11 @@ PUBLIC_ROUTES: tuple[tuple[str, str, str], ...] = (
     ("/faq", "Sugar Sugar FAQ", "Answers to common questions about the Sugar Sugar study and gameplay."),
     ("/demo", "Video Instructions", "Watch how to play the Sugar Sugar glucose prediction game."),
     ("/contact", "Contact GlucoseDAO", "Get in touch with the Sugar Sugar team."),
+    (
+        "/highscore",
+        "Sugar Sugar Highscore",
+        "Anonymous leaderboard of human glucose prediction accuracy, ranked by mean absolute error.",
+    ),
 )
 
 
@@ -2349,6 +2354,8 @@ def update_on_language_change(
         return create_demo_page(locale=locale), warning_content, navbar
     if pathname == '/faq':
         return create_faq_page(locale=locale), warning_content, navbar
+    if pathname == '/highscore':
+        return create_highscore_page(user_info, glucose_unit, locale=locale), warning_content, navbar
     # Landing page
     return _landing_builder(locale=locale), warning_content, navbar
 
@@ -2666,6 +2673,8 @@ def display_page(
             return create_demo_page(locale=locale), warning_content, navbar
         if pathname == '/faq':
             return create_faq_page(locale=locale), warning_content, navbar
+        if pathname == '/highscore':
+            return create_highscore_page(user_info, glucose_unit, locale=locale), warning_content, navbar
         # Default route: landing page
         return (_landing_builder(locale=locale), warning_content, navbar)
 
@@ -4220,14 +4229,17 @@ def _format_mae_for_unit(mae_mgdl: float, *, unit: str) -> str:
     return f"{value:.2f}"
 
 
-def _build_final_leaderboard(
-    *,
+def _leaderboard_hero_children(
     overall: Optional[dict[str, Any]],
-    per_format: list[tuple[str, dict[str, Any]]],
+    *,
     locale: str,
     unit: str,
-) -> html.Div:
-    """Leaderboard: previous card look on the left, top table on the right."""
+) -> list[Any]:
+    """"Your place" card contents for a leaderboard snapshot.
+
+    Shared by ``/final`` and ``/highscore`` so both read identically; returns an
+    empty list when there is no snapshot at all (nothing to show yet).
+    """
     from sugar_sugar.components.share import compute_percentile
 
     hero_inner: list[Any] = []
@@ -4278,6 +4290,90 @@ def _build_final_leaderboard(
                 disable_n_clicks=True,
             )
         )
+    return hero_inner
+
+
+def _leaderboard_board(
+    entries: list[dict[str, Any]],
+    *,
+    title: str,
+    locale: str,
+    unit: str,
+    subtitle: Optional[str] = None,
+) -> Optional[html.Div]:
+    """Anonymous ``# / Player / MAE`` table for a leaderboard snapshot's ``top``.
+
+    Returns ``None`` when there are no entries, so callers can simply drop the
+    board.  Shared by ``/final`` and ``/highscore``.
+    """
+    rows: list[Any] = []
+    for entry in entries:
+        is_you = bool(entry.get("is_you"))
+        player_label = (
+            t("ui.final.you", locale=locale)
+            if is_you
+            else t("ui.final.player_n", locale=locale, n=int(entry["rank"]))
+        )
+        rows.append(
+            html.Div(
+                [
+                    html.Span(str(int(entry["rank"])), className="final-leaderboard-cell rank"),
+                    html.Span(
+                        player_label,
+                        className=(
+                            "final-leaderboard-cell player you-label"
+                            if is_you
+                            else "final-leaderboard-cell player"
+                        ),
+                    ),
+                    html.Span(
+                        _format_mae_for_unit(float(entry["mae"]), unit=unit),
+                        className="final-leaderboard-cell mae",
+                    ),
+                ],
+                className="final-leaderboard-row you" if is_you else "final-leaderboard-row",
+                disable_n_clicks=True,
+            )
+        )
+    if not rows:
+        return None
+
+    children: list[Any] = [
+        html.Div(title, className="final-leaderboard-board-title", disable_n_clicks=True),
+    ]
+    if subtitle:
+        children.append(
+            html.Div(subtitle, className="final-leaderboard-board-subtitle", disable_n_clicks=True)
+        )
+    children.extend(
+        [
+            html.Div(
+                [
+                    html.Span(t("ui.final.col_rank", locale=locale), className="final-leaderboard-cell rank"),
+                    html.Span(t("ui.final.col_player", locale=locale), className="final-leaderboard-cell player"),
+                    html.Span(
+                        t("ui.final.col_mae", locale=locale, unit=unit),
+                        className="final-leaderboard-cell mae",
+                    ),
+                ],
+                className="final-leaderboard-row head",
+                disable_n_clicks=True,
+            ),
+            html.Div(rows, className="final-leaderboard-rows", disable_n_clicks=True),
+        ]
+    )
+    return html.Div(children, className="final-leaderboard-board", disable_n_clicks=True)
+
+
+def _build_final_leaderboard(
+    *,
+    overall: Optional[dict[str, Any]],
+    per_format: list[tuple[str, dict[str, Any]]],
+    locale: str,
+    unit: str,
+) -> html.Div:
+    """Leaderboard: previous card look on the left, top table on the right."""
+    hero_inner: list[Any] = _leaderboard_hero_children(overall, locale=locale, unit=unit)
 
     left_children: list[Any] = []
     if hero_inner:
@@ -4318,65 +4414,13 @@ def _build_final_leaderboard(
             )
         )
 
-    table_rows: list[Any] = []
-    top_entries = list((overall or {}).get("top") or [])
-    for entry in top_entries:
-        is_you = bool(entry.get("is_you"))
-        player_label = (
-            t("ui.final.you", locale=locale)
-            if is_you
-            else t("ui.final.player_n", locale=locale, n=int(entry["rank"]))
-        )
-        table_rows.append(
-            html.Div(
-                [
-                    html.Span(str(int(entry["rank"])), className="final-leaderboard-cell rank"),
-                    html.Span(
-                        player_label,
-                        className=(
-                            "final-leaderboard-cell player you-label"
-                            if is_you
-                            else "final-leaderboard-cell player"
-                        ),
-                    ),
-                    html.Span(
-                        _format_mae_for_unit(float(entry["mae"]), unit=unit),
-                        className="final-leaderboard-cell mae",
-                    ),
-                ],
-                className="final-leaderboard-row you" if is_you else "final-leaderboard-row",
-                disable_n_clicks=True,
-            )
-        )
-
-    right_children: list[Any] = []
-    if table_rows:
-        right_children.append(
-            html.Div(
-                [
-                    html.Div(
-                        t("ui.final.top_predictors", locale=locale),
-                        className="final-leaderboard-board-title",
-                        disable_n_clicks=True,
-                    ),
-                    html.Div(
-                        [
-                            html.Span(t("ui.final.col_rank", locale=locale), className="final-leaderboard-cell rank"),
-                            html.Span(t("ui.final.col_player", locale=locale), className="final-leaderboard-cell player"),
-                            html.Span(
-                                t("ui.final.col_mae", locale=locale, unit=unit),
-                                className="final-leaderboard-cell mae",
-                            ),
-                        ],
-                        className="final-leaderboard-row head",
-                        disable_n_clicks=True,
-                    ),
-                    html.Div(table_rows, className="final-leaderboard-rows", disable_n_clicks=True),
-                ],
-                className="final-leaderboard-board",
-                disable_n_clicks=True,
-            )
-        )
+    board = _leaderboard_board(
+        list((overall or {}).get("top") or []),
+        title=t("ui.final.top_predictors", locale=locale),
+        locale=locale,
+        unit=unit,
+    )
+    right_children: list[Any] = [board] if board is not None else []
 
     # Two columns (inline styles so layout does not depend on asset cache):
     # left  = your placement / #rank / top% / MAE / data-source ranks
@@ -4434,6 +4478,151 @@ def _build_final_leaderboard(
         disable_n_clicks=True,
         style={"display": "block" if has_content else "none"},
     )
+
+
+HIGHSCORE_TOP_N: int = 20
+HIGHSCORE_FORMAT_TOP_N: int = 10
+
+
+def create_highscore_page(
+    user_info: Optional[Dict[str, Any]],
+    glucose_unit: Optional[str],
+    *,
+    locale: str,
+) -> html.Div:
+    """Public highscore page reachable from the navbar (desktop) / burger menu (mobile).
+
+    Reads the same ranking CSVs as ``/final`` (``data/input/prediction_ranking*.csv``),
+    so it renders for a first-time visitor with no session at all.  When a session
+    exists, the visitor's own row is highlighted and a "your place" hero is shown.
+    Players stay anonymous (``Player N``) exactly as on ``/final``.
+    """
+    from sugar_sugar.components.landing import count_prediction_ranking_rows
+
+    unit: str = glucose_unit if glucose_unit in ('mg/dL', 'mmol/L') else 'mg/dL'
+    study_id: str = str((user_info or {}).get('study_id') or '')
+
+    overall: Optional[dict[str, Any]] = _leaderboard_snapshot(
+        project_root / 'data' / 'input' / 'prediction_ranking.csv',
+        study_id=study_id,
+        format_filter="ALL",
+        mode="latest",
+        top_n=HIGHSCORE_TOP_N,
+    )
+    per_format: list[tuple[str, dict[str, Any]]] = []
+    for fmt in ("A", "B", "C"):
+        board = _leaderboard_snapshot(
+            project_root / 'data' / 'input' / f'prediction_ranking_{fmt}.csv',
+            study_id=study_id,
+            format_filter=fmt,
+            mode="best",
+            top_n=HIGHSCORE_FORMAT_TOP_N,
+        )
+        if board is not None:
+            per_format.append((fmt, board))
+
+    children: list[Any] = [
+        html.H1(t("ui.highscore.title", locale=locale), disable_n_clicks=True),
+        html.Div(
+            t("ui.highscore.subtitle", locale=locale),
+            className="highscore-subtitle",
+            disable_n_clicks=True,
+        ),
+        html.Div(
+            [
+                html.Div(
+                    t("ui.highscore.games_played", locale=locale, count=count_prediction_ranking_rows()),
+                    className="highscore-stat",
+                    disable_n_clicks=True,
+                ),
+                html.Div(
+                    t("ui.highscore.players_count", locale=locale, total=int((overall or {}).get("total") or 0)),
+                    className="highscore-stat",
+                    disable_n_clicks=True,
+                ),
+            ],
+            className="highscore-stats",
+            disable_n_clicks=True,
+        ),
+    ]
+
+    hero_inner: list[Any] = _leaderboard_hero_children(overall, locale=locale, unit=unit)
+    if hero_inner:
+        children.append(
+            html.Div(
+                html.Div(hero_inner, className="final-leaderboard-hero", disable_n_clicks=True),
+                className="highscore-hero-wrap",
+                disable_n_clicks=True,
+            )
+        )
+
+    overall_board = _leaderboard_board(
+        list((overall or {}).get("top") or []),
+        title=t("ui.highscore.overall_board", locale=locale),
+        subtitle=t("ui.highscore.lower_is_better", locale=locale),
+        locale=locale,
+        unit=unit,
+    )
+    if overall_board is not None:
+        children.append(
+            html.Div(
+                overall_board,
+                className="final-leaderboard highscore-card",
+                disable_n_clicks=True,
+            )
+        )
+
+    format_cards: list[Any] = []
+    for fmt, board in per_format:
+        card = _leaderboard_board(
+            list(board.get("top") or []),
+            title=_format_label(fmt, locale=locale),
+            subtitle=t("ui.highscore.players_count", locale=locale, total=int(board.get("total") or 0)),
+            locale=locale,
+            unit=unit,
+        )
+        if card is not None:
+            format_cards.append(
+                html.Div(card, className="final-leaderboard highscore-card", disable_n_clicks=True)
+            )
+    if format_cards:
+        children.append(
+            html.Div(
+                [
+                    html.H3(
+                        t("ui.highscore.by_data_source", locale=locale),
+                        className="highscore-section-title",
+                        disable_n_clicks=True,
+                    ),
+                    html.Div(format_cards, className="highscore-format-grid", disable_n_clicks=True),
+                ],
+                className="highscore-formats",
+                disable_n_clicks=True,
+            )
+        )
+
+    if overall_board is None and not format_cards:
+        children.append(
+            html.Div(
+                t("ui.highscore.empty", locale=locale),
+                className="final-leaderboard-empty highscore-empty",
+                disable_n_clicks=True,
+            )
+        )
+
+    children.append(
+        html.Div(
+            dcc.Link(
+                t("ui.highscore.play_now", locale=locale),
+                href="/",
+                className="ui blue button highscore-play-button",
+            ),
+            className="highscore-actions",
+            disable_n_clicks=True,
+        )
+    )
+
+    return html.Div(children, className="info-page highscore-page", disable_n_clicks=True)
 
 
 def _convert_table_data_units(table_data: list[dict[str, str]], glucose_unit: str) -> list[dict[str, str]]:

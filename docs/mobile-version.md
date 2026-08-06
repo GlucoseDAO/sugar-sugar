@@ -24,7 +24,7 @@ future changes have a reference point. All line numbers are approximate.
 | `/ending` | `create_ending_layout` | CSS | needs `full_df` + `prediction_table_data`, else session-expired |
 | `/final` | `create_final_layout` | CSS | needs `user_info`, else session-expired |
 | `/share/<id>` | `create_share_layout` (from disk record) | CSS (`.share-page`) | record must exist, else `create_expired_layout` |
-| `/about` `/faq` `/contact` `/demo` | info-page builders | CSS | — |
+| `/about` `/faq` `/contact` `/demo` `/highscore` | info-page builders | CSS | — |
 | `/staging`, `/staging/{ending,final,share,prediction}` | `_staging_display` / staging routes | CSS | **only when `_STAGING_MODE=1`** (else fall through) |
 
 Builder selection is **server-side** (`_is_mobile_request()` reads the live Flask
@@ -64,9 +64,10 @@ guard lets them through.
 
 | Group | Server | Pages |
 |---|---|---|
-| `entry` | `uv run start` | `/`, `/consent-form` (top+bottom), `/startup` step 1–6, `/about`, `/faq`, `/contact`, `/demo` |
+| `entry` | `uv run start` | `/`, `/consent-form` (top+bottom), `/startup` step 1–6, `/about`, `/faq`, `/contact`, `/demo`, `/highscore` |
 | `result` | `uv run start` + `_STAGING_MODE=1` | `/staging/ending`, `/staging/final`, `/staging/share` (→ `/share/<id>`) |
 | `chart` | `uv run chart --prefill` | `/prediction` portrait + landscape |
+| `desktop` | `uv run start` (desktop UA, 1280px) | `/`, `/startup` (import block), `/highscore` |
 
 Together these cover every onboarding, gameplay, result, and share surface in at least
 one form.

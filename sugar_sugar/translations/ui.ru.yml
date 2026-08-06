@@ -12,6 +12,7 @@ ru:
     contact_us: "Связаться"
     video_instructions: "Видеоинструкции"
     faq: "FAQ"
+    highscore: "Рекорды"
 
   language:
     choose: "Язык"
@@ -383,6 +384,17 @@ ru:
       minimum_goal: "Минимум: %{min_useful}"
       stretch_goal: "Расширенная цель: %{total}"
       bonus_rounds: "Бонусные раунды"
+
+  highscore:
+    title: "Рекорды"
+    subtitle: "Анонимный рейтинг всех завершённых игр. Меньшая средняя абсолютная ошибка (MAE) означает более точный прогноз."
+    overall_board: "Общий"
+    by_data_source: "По источнику данных"
+    lower_is_better: "Меньший MAE — лучше"
+    players_count: "%{total} игроков"
+    games_played: "Сыграно игр: %{count}"
+    empty: "Завершённых игр пока нет. Пройди игру полностью — и ты будешь первым в таблице."
+    play_now: "Играть"
 
   final:
     title: "Полный анализ"

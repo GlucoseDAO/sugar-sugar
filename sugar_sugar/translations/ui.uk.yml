@@ -12,6 +12,7 @@ uk:
     contact_us: "Звʼязатися"
     video_instructions: "Відеоінструкції"
     faq: "ЧаПи"
+    highscore: "Рекорди"
 
   language:
     choose: "Мова"
@@ -383,6 +384,17 @@ uk:
       minimum_goal: "Мінімум: %{min_useful}"
       stretch_goal: "Розширена ціль: %{total}"
       bonus_rounds: "Бонусні раунди"
+
+  highscore:
+    title: "Рекорди"
+    subtitle: "Анонімний рейтинг усіх завершених ігор. Менша середня абсолютна помилка (MAE) означає точніший прогноз."
+    overall_board: "Загальний"
+    by_data_source: "За джерелом даних"
+    lower_is_better: "Менший MAE — краще"
+    players_count: "%{total} гравців"
+    games_played: "Зіграно ігор: %{count}"
+    empty: "Ще немає завершених ігор. Пройди гру повністю — і ти будеш першим у таблиці."
+    play_now: "Грати зараз"
 
   final:
     title: "Повний аналіз"

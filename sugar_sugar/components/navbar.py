@@ -64,6 +64,7 @@ class MobileNavBar(html.Div):
 
     LINKS: list[tuple[str, str, tuple[str, ...]]] = [
         ("ui.common.game", "/", tuple(_GAME_PAGES)),
+        ("ui.common.highscore", "/highscore", ("/highscore",)),
         ("ui.common.the_study", "/about", ("/about",)),
         ("ui.common.faq", "/faq", ("/faq",)),
         ("ui.common.video_instructions", "/demo", ("/demo",)),
@@ -124,7 +125,7 @@ class MobileNavBar(html.Div):
 class NavBar(html.Div):
     """Fomantic UI massive blue inverted tabular menu navbar.
 
-    Left items:  Game | The Study | Video instructions | Contact us
+    Left items:  Game | Highscore | The Study | FAQ | Video instructions | Contact us
     Right items: language dropdown (active flag + dropdown with all languages)
 
     Uses ``dcc.Link`` for navigation so page switches happen via client-side
@@ -155,6 +156,11 @@ class NavBar(html.Div):
                 t("ui.common.game", locale=self._locale),
                 href="/",
                 className=self._active_cls(*_GAME_PAGES),
+            ),
+            dcc.Link(
+                t("ui.common.highscore", locale=self._locale),
+                href="/highscore",
+                className=self._active_cls("/highscore"),
             ),
             dcc.Link(
                 t("ui.common.the_study", locale=self._locale),

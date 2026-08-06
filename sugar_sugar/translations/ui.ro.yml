@@ -12,6 +12,7 @@ ro:
     contact_us: "Contact"
     video_instructions: "Instrucțiuni video"
     faq: "Întrebări frecvente"
+    highscore: "Clasament"
 
   language:
     choose: "Limbă"
@@ -405,6 +406,17 @@ ro:
       minimum_goal: "Minim: %{min_useful}"
       stretch_goal: "Extins: %{total}"
       bonus_rounds: "Runde bonus"
+
+  highscore:
+    title: "Clasament"
+    subtitle: "Clasament anonim al tuturor jocurilor finalizate. O eroare absolută medie (MAE) mai mică înseamnă o predicție mai bună."
+    overall_board: "General"
+    by_data_source: "După sursa de date"
+    lower_is_better: "Un MAE mai mic este mai bun"
+    players_count: "%{total} jucători"
+    games_played: "%{count} jocuri jucate"
+    empty: "Încă nu există jocuri finalizate. Joacă o rundă completă și vei fi primul în clasament."
+    play_now: "Joacă acum"
 
   final:
     title: "Analiză completă"

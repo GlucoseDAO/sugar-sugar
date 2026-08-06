@@ -12,6 +12,7 @@ de:
     contact_us: "Kontakt"
     video_instructions: "Videoanleitungen"
     faq: "FAQ"
+    highscore: "Bestenliste"
 
   language:
     choose: "Sprache"
@@ -384,6 +385,17 @@ de:
       minimum_goal: "Minimum: %{min_useful}"
       stretch_goal: "Ziel: %{total}"
       bonus_rounds: "Bonusrunden"
+
+  highscore:
+    title: "Bestenliste"
+    subtitle: "Anonyme Rangliste aller abgeschlossenen Spiele. Ein kleinerer mittlerer absoluter Fehler (MAE) bedeutet eine bessere Vorhersage."
+    overall_board: "Gesamt"
+    by_data_source: "Nach Datenquelle"
+    lower_is_better: "Kleinerer MAE ist besser"
+    players_count: "%{total} Spieler"
+    games_played: "%{count} gespielte Spiele"
+    empty: "Noch keine abgeschlossenen Spiele. Spiele einen kompletten Durchlauf und du bist der Erste auf der Liste."
+    play_now: "Jetzt spielen"
 
   final:
     title: "Komplette Analyse"
