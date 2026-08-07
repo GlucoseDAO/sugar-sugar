@@ -59,6 +59,8 @@ data/shares/
 # Cross-device resume sessions (server-side savegame blobs)
 data/resume/
 data/output/
+# Per-deployment salt for the leaderboard email_key hash (must never be shared or rotated)
+data/.ranking_salt
 
 # Translations
 *.mo

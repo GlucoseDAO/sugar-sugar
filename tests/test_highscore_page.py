@@ -17,13 +17,24 @@ from sugar_sugar import app as app_module
 from sugar_sugar.app import create_highscore_page
 
 _HEADER = (
-    "study_id,run_id,number,timestamp,format,rounds_played,is_example_data,"
-    "data_source_name,overall_mae_mgdl,overall_mse_mgdl,overall_rmse_mgdl,overall_mape_pct\n"
+    "study_id,run_id,number,timestamp,email_key,nickname,format,rounds_played,"
+    "is_example_data,data_source_name,overall_mae_mgdl,overall_mse_mgdl,"
+    "overall_rmse_mgdl,overall_mape_pct\n"
 )
 
 
-def _row(study_id: str, fmt: str, mae: float, *, ts: str = "2026-08-01 10:00:00") -> str:
-    return f"{study_id},run1,1,{ts},{fmt},12,True,example,{mae},0,0,0\n"
+def _row(
+    study_id: str,
+    fmt: str,
+    mae: float,
+    *,
+    ts: str = "2026-08-01 10:00:00",
+    key: str = "",
+    nickname: str = "",
+) -> str:
+    return (
+        f"{study_id},run1,1,{ts},{key},{nickname},{fmt},12,True,example,{mae},0,0,0\n"
+    )
 
 
 @pytest.fixture()
@@ -134,6 +145,80 @@ def test_highscore_shows_a_board_per_played_data_source(ranking_root: Path) -> N
         app_module._format_label("A", locale="en"),
         app_module._format_label("C", locale="en"),
     ]
+
+
+def test_highscore_shows_nicknames_instead_of_player_n(ranking_root: Path) -> None:
+    overall = ranking_root / "data" / "input" / "prediction_ranking.csv"
+    overall.write_text(
+        _HEADER
+        + _row("s1", "ALL", 9.0, key="hash-ann", nickname="SugarNinja")
+        + _row("s2", "ALL", 18.0),
+        encoding="utf-8",
+    )
+
+    page = create_highscore_page(None, None, locale="en")
+    texts = _texts(page)
+    # Named player by name, unnamed player still anonymous.
+    assert "SugarNinja" in texts
+    assert "Player 1" not in texts
+    assert "Player 2" in texts
+
+
+def test_highscore_never_leaks_the_email_hash(ranking_root: Path) -> None:
+    overall = ranking_root / "data" / "input" / "prediction_ranking.csv"
+    overall.write_text(
+        _HEADER + _row("me", "ALL", 9.0, key="hash-ann", nickname="SugarNinja"),
+        encoding="utf-8",
+    )
+
+    page = create_highscore_page({"study_id": "me", "email": "ann@x.com"}, None, locale="en")
+    joined = " ".join(_texts(page))
+    assert "hash-ann" not in joined
+    assert "ann@x.com" not in joined and "@" not in joined
+
+
+def test_highscore_merges_one_players_sessions_into_a_single_row(ranking_root: Path) -> None:
+    """A player who returns on another device gets one row, not two."""
+    overall = ranking_root / "data" / "input" / "prediction_ranking.csv"
+    overall.write_text(
+        _HEADER
+        + _row("s1", "ALL", 22.0, key="hash-ann", nickname="Ninja", ts="2026-08-01 10:00:00")
+        + _row("s7", "ALL", 14.0, key="hash-ann", nickname="Ninja2", ts="2026-08-02 10:00:00")
+        + _row("s3", "ALL", 19.0),
+        encoding="utf-8",
+    )
+
+    page = create_highscore_page(None, None, locale="en")
+    texts = _texts(page)
+    joined = " ".join(texts)
+    # Two players on the board, the merged one wearing its newest name.
+    assert "2 players" in joined
+    assert "Ninja2" in texts and "Ninja" not in texts
+    assert "14.00" in joined
+
+
+def test_highscore_marks_your_row_with_your_nickname(ranking_root: Path) -> None:
+    overall = ranking_root / "data" / "input" / "prediction_ranking.csv"
+    overall.write_text(
+        _HEADER
+        + _row("me", "ALL", 20.0, nickname="SugarNinja")
+        + _row("other", "ALL", 10.0),
+        encoding="utf-8",
+    )
+
+    page = create_highscore_page({"study_id": "me"}, "mg/dL", locale="en")
+    texts = _texts(page)
+    assert "SugarNinja (You)" in texts
+    assert "final-leaderboard-row you" in _class_names(page)
+
+
+def test_highscore_explains_what_it_stores(ranking_root: Path) -> None:
+    (ranking_root / "data" / "input" / "prediction_ranking.csv").write_text(
+        _HEADER + _row("s1", "ALL", 18.0), encoding="utf-8"
+    )
+    joined = " ".join(_texts(create_highscore_page(None, None, locale="en")))
+    assert "one-way hash" in joined
+    assert "not part of the study data" in joined
 
 
 def test_highscore_converts_mae_to_mmol(ranking_root: Path) -> None:

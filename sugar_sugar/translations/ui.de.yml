@@ -102,6 +102,9 @@ de:
   startup:
     fork_me: "Fork me on GitHub"
     required_fields_note: "* Pflichtfelder"
+    nickname_label: "Spitzname"
+    nickname_placeholder: "Optional — z. B. SugarNinja"
+    nickname_hint: "Optionaler Anzeigename für die öffentliche Bestenliste. Lass das Feld leer, um anonym zu bleiben (Spieler 1, Spieler 2, …). Er ist nicht Teil der Studiendaten."
     email_label: "E‑Mail"
     email_placeholder: "E‑Mail eingeben (optional, außer wenn du Ergebnisse/Updates willst)"
     age_label: "Alter"
@@ -396,6 +399,7 @@ de:
     games_played: "%{count} gespielte Spiele"
     empty: "Noch keine abgeschlossenen Spiele. Spiele einen kompletten Durchlauf und du bist der Erste auf der Liste."
     play_now: "Jetzt spielen"
+    privacy_note: "Spitznamen sind optional und öffentlich. Wenn du eine E-Mail-Adresse angegeben hast, speichert die Bestenliste nur einen Einweg-Hash davon, damit deine Ergebnisse geräteübergreifend erkannt werden — niemals die Adresse selbst und keine weiteren personenbezogenen Daten. Spitznamen sind nicht Teil der Studiendaten."
 
   final:
     title: "Komplette Analyse"
@@ -415,6 +419,11 @@ de:
     col_mae: "MAE (%{unit})"
     you: "Du"
     player_n: "Spieler %{n}"
+    you_named: "%{name} (Du)"
+    nickname_title: "Dein Name in der Bestenliste"
+    nickname_save: "Speichern"
+    nickname_saved: "Gespeichert — die Bestenliste zeigt jetzt deinen Namen."
+    nickname_hint: "Optional und öffentlich. Lass das Feld leer, um anonym zu bleiben."
     no_ranking_yet: "Schließe einen Durchlauf ab, um in der Bestenliste zu erscheinen."
     per_round_metrics: "Metriken pro Runde"
     start_over: "Beenden"

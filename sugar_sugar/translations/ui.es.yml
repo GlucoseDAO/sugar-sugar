@@ -103,6 +103,9 @@ es:
   startup:
     fork_me: "Hazme un fork en GitHub"
     required_fields_note: "* Campos obligatorios"
+    nickname_label: "Apodo"
+    nickname_placeholder: "Opcional — p. ej. SugarNinja"
+    nickname_hint: "Nombre opcional para la clasificación pública. Déjalo vacío para permanecer anónimo (Jugador 1, Jugador 2, …). No forma parte de los datos del estudio."
     email_label: "Correo electrónico"
     email_placeholder: "Ingresa tu correo (opcional a menos que quieras resultados/actualizaciones)"
     age_label: "Edad"
@@ -397,6 +400,7 @@ es:
     games_played: "%{count} partidas jugadas"
     empty: "Todavía no hay partidas terminadas. Juega una partida completa y serás el primero en la clasificación."
     play_now: "Jugar ahora"
+    privacy_note: "Los apodos son opcionales y públicos. Si indicaste un correo electrónico, la clasificación guarda solo un hash unidireccional de él para reconocer tus resultados entre dispositivos, nunca la dirección en sí ni ningún otro dato personal. Los apodos no forman parte de los datos del estudio."
 
   final:
     title: "Análisis completo"
@@ -416,6 +420,11 @@ es:
     col_mae: "MAE (%{unit})"
     you: "Tú"
     player_n: "Jugador %{n}"
+    you_named: "%{name} (Tú)"
+    nickname_title: "Tu nombre en la clasificación"
+    nickname_save: "Guardar"
+    nickname_saved: "Guardado: la clasificación ya muestra tu nombre."
+    nickname_hint: "Opcional y público. Déjalo vacío para permanecer anónimo."
     no_ranking_yet: "Termina una partida para aparecer en la clasificación."
     per_round_metrics: "Métricas por ronda"
     start_over: "Salir"

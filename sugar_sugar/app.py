@@ -81,6 +81,12 @@ from sugar_sugar.config import (
     UMAMI_WEBSITE_ID,
 )
 import sugar_sugar.config as sugar_sugar_config
+from sugar_sugar.nickname import (
+    MAX_NICKNAME_LENGTH,
+    email_key,
+    identity_key,
+    normalize_nickname,
+)
 from sugar_sugar.components.glucose import GlucoseChart
 from sugar_sugar.components.metrics import MetricsComponent
 from sugar_sugar.components.predictions import PredictionTableComponent
@@ -291,76 +297,30 @@ def _format_label(format_code: str, *, locale: str) -> str:
     return code
 
 
-def _rank_from_ranking_csv(
+def _ranking_identities(
     ranking_path: Path,
     *,
-    study_id: str,
     format_filter: Optional[str],
     mode: str,
-) -> Optional[tuple[int, int]]:
-    """Return ``(rank, total)`` for ``study_id`` against the ranking CSV.
+) -> Optional[pl.DataFrame]:
+    """Collapse a ranking CSV to one row per *player*, ranked best-first.
 
-    Extracted from ``create_final_layout`` so the share page can compute and
-    freeze rankings into a share record at save time.  ``mode`` is either
-    ``"best"`` (keep lowest MAE per study_id) or ``"latest"`` (keep most
-    recent MAE by timestamp).  Ranks on ``overall_mae_mgdl`` ascending.
-    """
-    if not study_id or not ranking_path.exists():
-        return None
-    try:
-        ranking_df = pl.read_csv(ranking_path)
-    except Exception:
-        return None
-    if 'study_id' not in ranking_df.columns or 'overall_mae_mgdl' not in ranking_df.columns:
-        return None
+    Returns ``None`` when the CSV is missing, unreadable or has nothing rankable.
+    Otherwise the columns are ``identity``, ``mae``, ``nickname``, ``study_ids``
+    and ``rank_idx`` (0-based).
 
-    cols: list[str] = ['study_id', 'overall_mae_mgdl']
-    if 'format' in ranking_df.columns:
-        cols.append('format')
-    if 'timestamp' in ranking_df.columns:
-        cols.append('timestamp')
-    df2 = ranking_df.select([c for c in cols if c in ranking_df.columns])
-    df2 = df2.with_columns(pl.col('overall_mae_mgdl').cast(pl.Float64, strict=False)).filter(
-        pl.col('overall_mae_mgdl').is_not_null()
-    )
-    if format_filter and 'format' in df2.columns:
-        df2 = df2.filter(pl.col('format') == format_filter)
+    Rows are grouped in two stages, which is what lets one person who played on
+    several devices occupy a single board row:
 
-    if mode == "latest" and 'timestamp' in df2.columns:
-        df2 = df2.with_columns(
-            pl.col('timestamp').str.strptime(pl.Datetime, format='%Y-%m-%d %H:%M:%S', strict=False).alias('_ts')
-        )
-        df_pick = (
-            df2.sort(['study_id', '_ts'])
-            .group_by('study_id')
-            .agg(pl.last('overall_mae_mgdl').alias('overall_mae_mgdl'))
-        )
-    else:
-        df_pick = df2.group_by('study_id').agg(pl.col('overall_mae_mgdl').min().alias('overall_mae_mgdl'))
+    1. Within one ``study_id``, ``mode`` picks the representative score exactly as
+       before -- ``"latest"`` (newest row by timestamp; the overall CSV appends a
+       *cumulative* row per round, so only the newest reflects the whole run) or
+       ``"best"`` (lowest MAE, used for the per-format boards).
+    2. Across the ``study_id``s that share an ``identity`` (see
+       :func:`sugar_sugar.nickname.identity_key`), the **best** of those wins.
 
-    total = df_pick.height
-    if total == 0:
-        return None
-    df_sorted = df_pick.sort(['overall_mae_mgdl', 'study_id'])
-    matches = df_sorted.with_row_index('rank_idx').filter(pl.col('study_id') == study_id)
-    if matches.height == 0:
-        return None
-    return int(matches.get_column('rank_idx')[0]) + 1, total
-
-
-def _leaderboard_snapshot(
-    ranking_path: Path,
-    *,
-    study_id: str,
-    format_filter: Optional[str],
-    mode: str,
-    top_n: int = 5,
-) -> Optional[dict[str, Any]]:
-    """Build a compact leaderboard view for ``study_id``.
-
-    Returns ``None`` when the CSV is missing/empty. Otherwise:
-      ``{rank, total, mae, top: [{rank, mae, is_you}, ...]}``
-    Ranks on ``overall_mae_mgdl`` ascending. Player identities stay anonymous.
+    The displayed nickname is the newest non-empty one anywhere in the identity, so
+    a later run that leaves the field blank never erases a name the player chose.
     """
     if not ranking_path.exists():
         return None
@@ -371,72 +331,214 @@ def _leaderboard_snapshot(
     if 'study_id' not in ranking_df.columns or 'overall_mae_mgdl' not in ranking_df.columns:
         return None
 
-    cols: list[str] = ['study_id', 'overall_mae_mgdl']
-    if 'format' in ranking_df.columns:
-        cols.append('format')
-    if 'timestamp' in ranking_df.columns:
-        cols.append('timestamp')
-    df2 = ranking_df.select([c for c in cols if c in ranking_df.columns])
-    df2 = df2.with_columns(pl.col('overall_mae_mgdl').cast(pl.Float64, strict=False)).filter(
-        pl.col('overall_mae_mgdl').is_not_null()
-    )
-    if format_filter and 'format' in df2.columns:
-        df2 = df2.filter(pl.col('format') == format_filter)
+    has_format = 'format' in ranking_df.columns
+    has_timestamp = 'timestamp' in ranking_df.columns
 
-    if mode == "latest" and 'timestamp' in df2.columns:
-        df2 = df2.with_columns(
-            pl.col('timestamp').str.strptime(pl.Datetime, format='%Y-%m-%d %H:%M:%S', strict=False).alias('_ts')
-        )
-        df_pick = (
-            df2.sort(['study_id', '_ts'])
-            .group_by('study_id')
-            .agg(pl.last('overall_mae_mgdl').alias('overall_mae_mgdl'))
-        )
-    else:
-        df_pick = df2.group_by('study_id').agg(pl.col('overall_mae_mgdl').min().alias('overall_mae_mgdl'))
+    def _optional_text(column: str) -> pl.Expr:
+        """The column as text, or an empty literal for pre-nickname CSV schemas."""
+        source = pl.col(column) if column in ranking_df.columns else pl.lit("")
+        return source.cast(pl.String, strict=False).fill_null("").alias(column)
 
-    total = df_pick.height
-    if total == 0:
+    df = ranking_df.select(
+        pl.col('study_id').cast(pl.String, strict=False).fill_null("").alias('study_id'),
+        pl.col('overall_mae_mgdl').cast(pl.Float64, strict=False).alias('mae'),
+        _optional_text('format'),
+        _optional_text('email_key'),
+        _optional_text('nickname'),
+        _optional_text('timestamp'),
+    ).filter(pl.col('mae').is_not_null())
+
+    if format_filter and has_format:
+        df = df.filter(pl.col('format') == format_filter)
+    if df.height == 0:
         return None
 
-    df_sorted = df_pick.sort(['overall_mae_mgdl', 'study_id']).with_row_index('rank_idx')
-    top_rows = df_sorted.head(max(1, top_n))
+    df = df.with_columns(
+        pl.when(pl.col('email_key') != "")
+        .then(pl.format("e:{}", pl.col('email_key')))
+        .otherwise(pl.format("s:{}", pl.col('study_id')))
+        .alias('identity'),
+        pl.col('timestamp')
+        .str.strptime(pl.Datetime, format='%Y-%m-%d %H:%M:%S', strict=False)
+        .alias('_ts'),
+    )
+
+    if mode == "latest" and has_timestamp:
+        per_study = (
+            df.sort(['identity', 'study_id', '_ts'])
+            .group_by(['identity', 'study_id'])
+            .agg(pl.last('mae').alias('mae'))
+        )
+    else:
+        per_study = df.group_by(['identity', 'study_id']).agg(pl.col('mae').min().alias('mae'))
+
+    identities = per_study.group_by('identity').agg(
+        pl.col('mae').min().alias('mae'),
+        pl.col('study_id').unique().alias('study_ids'),
+    )
+
+    # Newest non-empty nickname wins, so a blank later run cannot clear an earlier name.
+    named = (
+        df.filter(pl.col('nickname') != "")
+        .sort(['identity', '_ts'])
+        .group_by('identity')
+        .agg(pl.last('nickname').alias('nickname'))
+    )
+    identities = identities.join(named, on='identity', how='left').with_columns(
+        pl.col('nickname').cast(pl.String, strict=False).fill_null("")
+    )
+
+    return identities.sort(['mae', 'identity']).with_row_index('rank_idx')
+
+
+def _match_identity(
+    identities: Optional[pl.DataFrame],
+    *,
+    study_id: str,
+    key: str,
+) -> Optional[dict[str, Any]]:
+    """The identity row belonging to the current player, or ``None``.
+
+    Tries the derived identity first, then falls back to ``study_id`` membership so
+    rows written before the player supplied an email still resolve to their owner.
+    """
+    if identities is None or identities.height == 0:
+        return None
+    if key or study_id:
+        hit = identities.filter(pl.col('identity') == identity_key(key=key, study_id=study_id))
+        if hit.height > 0:
+            return hit.row(0, named=True)
+    if study_id:
+        hit = identities.filter(pl.col('study_ids').list.contains(study_id))
+        if hit.height > 0:
+            return hit.row(0, named=True)
+    return None
+
+
+def _rank_from_ranking_csv(
+    ranking_path: Path,
+    *,
+    study_id: str,
+    key: str = "",
+    format_filter: Optional[str],
+    mode: str,
+) -> Optional[tuple[int, int]]:
+    """Return ``(rank, total)`` for one player against the ranking CSV.
+
+    Extracted from ``create_final_layout`` so the share page can compute and
+    freeze rankings into a share record at save time.  ``total`` counts distinct
+    *players*, not rows.  See :func:`_ranking_identities` for the grouping rules.
+    """
+    if not study_id and not key:
+        return None
+    identities = _ranking_identities(ranking_path, format_filter=format_filter, mode=mode)
+    if identities is None:
+        return None
+    match = _match_identity(identities, study_id=study_id, key=key)
+    if match is None:
+        return None
+    return int(match['rank_idx']) + 1, identities.height
+
+
+def _leaderboard_snapshot(
+    ranking_path: Path,
+    *,
+    study_id: str,
+    key: str = "",
+    format_filter: Optional[str],
+    mode: str,
+    top_n: int = 5,
+) -> Optional[dict[str, Any]]:
+    """Build a compact leaderboard view for one player.
+
+    Returns ``None`` when the CSV is missing/empty. Otherwise:
+      ``{rank, total, mae, top: [{rank, mae, nickname, is_you}, ...]}``
+    ``nickname`` is ``""`` for players who never picked one -- the caller falls back
+    to the anonymous ``Player N`` label.  ``study_id`` and the hashed ``key`` are
+    never part of the result.
+    """
+    identities = _ranking_identities(ranking_path, format_filter=format_filter, mode=mode)
+    if identities is None:
+        return None
+
+    you = _match_identity(identities, study_id=study_id, key=key)
+    you_identity: Optional[str] = str(you['identity']) if you is not None else None
+
     top: list[dict[str, Any]] = []
-    for row in top_rows.iter_rows(named=True):
+    for row in identities.head(max(1, top_n)).iter_rows(named=True):
         top.append(
             {
                 "rank": int(row["rank_idx"]) + 1,
-                "mae": float(row["overall_mae_mgdl"]),
-                "is_you": bool(study_id) and str(row["study_id"]) == study_id,
+                "mae": float(row["mae"]),
+                "nickname": str(row["nickname"] or ""),
+                "is_you": you_identity is not None and str(row["identity"]) == you_identity,
             }
         )
 
     user_rank: Optional[int] = None
     user_mae: Optional[float] = None
-    if study_id:
-        matches = df_sorted.filter(pl.col('study_id') == study_id)
-        if matches.height > 0:
-            user_rank = int(matches.get_column('rank_idx')[0]) + 1
-            user_mae = float(matches.get_column('overall_mae_mgdl')[0])
-            if not any(entry["is_you"] for entry in top):
-                top.append({"rank": user_rank, "mae": user_mae, "is_you": True})
+    if you is not None:
+        user_rank = int(you['rank_idx']) + 1
+        user_mae = float(you['mae'])
+        if not any(entry["is_you"] for entry in top):
+            top.append(
+                {
+                    "rank": user_rank,
+                    "mae": user_mae,
+                    "nickname": str(you['nickname'] or ""),
+                    "is_you": True,
+                }
+            )
 
     return {
         "rank": user_rank,
-        "total": total,
+        "total": identities.height,
         "mae": user_mae,
         "top": top,
     }
 
 
-def compute_share_rankings(study_id: str, played_formats: list[str]) -> dict[str, Any]:
-    """Freeze the per-format and overall rankings for a study_id.
+def stored_nickname(*, study_id: str, key: str) -> str:
+    """The nickname already recorded for this player, ``""`` when there is none.
+
+    Used to pre-fill the `/final` box as a *suggestion*: a player returning on a new
+    device (fresh localStorage, same email) sees the name they used last time instead
+    of a blank field.  Saving still only ever stamps the current study's rows.
+    """
+    if not study_id and not key:
+        return ""
+    sources: list[tuple[Path, Optional[str], str]] = [
+        (project_root / 'data' / 'input' / 'prediction_ranking.csv', "ALL", "latest")
+    ]
+    sources.extend(
+        (project_root / 'data' / 'input' / f'prediction_ranking_{fmt}.csv', fmt, "best")
+        for fmt in ("A", "B", "C")
+    )
+    for path, fmt_filter, mode in sources:
+        match = _match_identity(
+            _ranking_identities(path, format_filter=fmt_filter, mode=mode),
+            study_id=study_id,
+            key=key,
+        )
+        if match is not None and str(match['nickname'] or ""):
+            return normalize_nickname(str(match['nickname']))
+    return ""
+
+
+def compute_share_rankings(
+    study_id: str,
+    played_formats: list[str],
+    *,
+    key: str = "",
+) -> dict[str, Any]:
+    """Freeze the per-format and overall rankings for one player.
 
     Returns a dict with:
       - ``per_format``: ``[{format, rank, total}, ...]`` in FORMAT_ORDER order
       - ``overall``: ``{rank, total}`` or ``None``
     Used by the share callback so the share URL always shows the ranks that
-    existed at share time, even if the CSVs are appended to later.
+    existed at share time, even if the CSVs are appended to later.  ``key`` is the
+    hashed email identity, so a player's rows from other devices count as theirs.
     """
     per_format: list[dict[str, Any]] = []
     ordered: list[str] = sorted(
@@ -447,6 +549,7 @@ def compute_share_rankings(study_id: str, played_formats: list[str]) -> dict[str
         info = _rank_from_ranking_csv(
             project_root / 'data' / 'input' / f'prediction_ranking_{fmt}.csv',
             study_id=study_id,
+            key=key,
             format_filter=fmt,
             mode="best",
         )
@@ -458,6 +561,7 @@ def compute_share_rankings(study_id: str, played_formats: list[str]) -> dict[str
     overall_info = _rank_from_ranking_csv(
         project_root / 'data' / 'input' / 'prediction_ranking.csv',
         study_id=study_id,
+        key=key,
         format_filter="ALL",
         mode="latest",
     )
@@ -4309,11 +4413,17 @@ def _leaderboard_board(
     rows: list[Any] = []
     for entry in entries:
         is_you = bool(entry.get("is_you"))
-        player_label = (
-            t("ui.final.you", locale=locale)
-            if is_you
-            else t("ui.final.player_n", locale=locale, n=int(entry["rank"]))
-        )
+        # Optional nickname replaces the anonymous rank-derived label. Players who
+        # picked none keep "Player N" exactly as before.
+        nickname = normalize_nickname(entry.get("nickname"))
+        if is_you:
+            player_label = (
+                t("ui.final.you_named", locale=locale, name=nickname)
+                if nickname
+                else t("ui.final.you", locale=locale)
+            )
+        else:
+            player_label = nickname or t("ui.final.player_n", locale=locale, n=int(entry["rank"]))
         rows.append(
             html.Div(
                 [
@@ -4365,14 +4475,82 @@ def _leaderboard_board(
     return html.Div(children, className="final-leaderboard-board", disable_n_clicks=True)
 
 
-def _build_final_leaderboard(
+def _nickname_editor_children(
+    user_info: Optional[Dict[str, Any]],
+    *,
+    locale: str,
+) -> list[Any]:
+    """The "your name on the leaderboard" box shown on ``/final``.
+
+    Deliberately absent from the public ``/highscore`` page, which is session-free.
+    Its ids are ``final-nickname-*`` rather than the ``/startup`` ``nickname-input``:
+    a Dash callback only fires when *every* one of its components is in the layout,
+    so reusing the id would drag the startup validation callback onto ``/final`` and
+    crash on its missing Outputs.
+
+    The value is a *suggestion* -- the player's own nickname when they have one,
+    otherwise the last name recorded against their hashed email identity, so someone
+    returning on a new device does not have to retype it.
+    """
+    info: Dict[str, Any] = user_info or {}
+    study_id: str = str(info.get('study_id') or '')
+    suggestion: str = normalize_nickname(info.get('nickname')) or stored_nickname(
+        study_id=study_id, key=email_key(info.get('email'))
+    )
+    return [
+        html.Div(
+            t("ui.final.nickname_title", locale=locale),
+            className="final-nickname-title",
+            disable_n_clicks=True,
+        ),
+        html.Div(
+            [
+                dcc.Input(
+                    id='final-nickname-input',
+                    type='text',
+                    value=suggestion,
+                    maxLength=MAX_NICKNAME_LENGTH,
+                    placeholder=t("ui.startup.nickname_placeholder", locale=locale),
+                    # No persistence: a persisted client value would override the
+                    # server-rendered suggestion and defeat the cross-device prefill.
+                    className="final-nickname-input",
+                ),
+                html.Button(
+                    t("ui.final.nickname_save", locale=locale),
+                    id='final-nickname-save',
+                    className="ui small green button final-nickname-save",
+                ),
+            ],
+            className="final-nickname-row",
+            disable_n_clicks=True,
+        ),
+        html.Div(
+            t("ui.final.nickname_hint", locale=locale),
+            className="final-nickname-hint",
+            disable_n_clicks=True,
+        ),
+        html.Div(
+            "",
+            id='final-nickname-status',
+            className="final-nickname-status",
+            disable_n_clicks=True,
+        ),
+    ]
+
+
+def _final_leaderboard_children(
     *,
     overall: Optional[dict[str, Any]],
     per_format: list[tuple[str, dict[str, Any]]],
     locale: str,
     unit: str,
-) -> html.Div:
-    """Leaderboard: previous card look on the left, top table on the right."""
+    user_info: Optional[Dict[str, Any]] = None,
+) -> list[Any]:
+    """Inner children of the ``final-ranking-list`` wrapper.
+
+    Split out of :func:`_build_final_leaderboard` so ``save_final_nickname`` can
+    re-render the board in place after the player renames themselves.
+    """
     hero_inner: list[Any] = _leaderboard_hero_children(overall, locale=locale, unit=unit)
 
     left_children: list[Any] = []
@@ -4422,9 +4600,21 @@ def _build_final_leaderboard(
     )
     right_children: list[Any] = [board] if board is not None else []
 
+    # Only offer the rename box once the player actually has a board presence --
+    # "play only" participants are never written to the ranking CSVs, so a nickname
+    # would have nothing to label.
+    if left_children or right_children:
+        left_children.append(
+            html.Div(
+                _nickname_editor_children(user_info, locale=locale),
+                className="final-nickname-editor",
+                disable_n_clicks=True,
+            )
+        )
+
     # Two columns (inline styles so layout does not depend on asset cache):
-    # left  = your placement / #rank / top% / MAE / data-source ranks
-    # right = full player list (anonymous Player N + highlighted You)
+    # left  = your placement / #rank / top% / MAE / data-source ranks + rename box
+    # right = full player list (nicknames or anonymous Player N + highlighted You)
     split: Optional[html.Div] = None
     if left_children or right_children:
         split = html.Div(
@@ -4469,14 +4659,36 @@ def _build_final_leaderboard(
     ]
     if split is not None:
         children.append(split)
+    return children
 
-    has_content = bool(left_children or right_children)
+
+def _build_final_leaderboard(
+    *,
+    overall: Optional[dict[str, Any]],
+    per_format: list[tuple[str, dict[str, Any]]],
+    locale: str,
+    unit: str,
+    user_info: Optional[Dict[str, Any]] = None,
+) -> html.Div:
+    """Leaderboard: previous card look on the left, top table on the right.
+
+    The sole place the ``final-ranking-list`` id and its visibility style are set --
+    ``save_final_nickname`` swaps only this wrapper's ``children``.
+    """
+    children = _final_leaderboard_children(
+        overall=overall,
+        per_format=per_format,
+        locale=locale,
+        unit=unit,
+        user_info=user_info,
+    )
+    # children[0] is always the title; anything beyond it is real content.
     return html.Div(
         children,
         id="final-ranking-list",
         className="final-leaderboard",
         disable_n_clicks=True,
-        style={"display": "block" if has_content else "none"},
+        style={"display": "block" if len(children) > 1 else "none"},
     )
 
 
@@ -4495,16 +4707,19 @@ def create_highscore_page(
     Reads the same ranking CSVs as ``/final`` (``data/input/prediction_ranking*.csv``),
     so it renders for a first-time visitor with no session at all.  When a session
     exists, the visitor's own row is highlighted and a "your place" hero is shown.
-    Players stay anonymous (``Player N``) exactly as on ``/final``.
+    Players who picked a nickname are shown by it; the rest stay anonymous
+    (``Player N``) exactly as on ``/final``.
     """
     from sugar_sugar.components.landing import count_prediction_ranking_rows
 
     unit: str = glucose_unit if glucose_unit in ('mg/dL', 'mmol/L') else 'mg/dL'
     study_id: str = str((user_info or {}).get('study_id') or '')
+    key: str = email_key((user_info or {}).get('email'))
 
     overall: Optional[dict[str, Any]] = _leaderboard_snapshot(
         project_root / 'data' / 'input' / 'prediction_ranking.csv',
         study_id=study_id,
+        key=key,
         format_filter="ALL",
         mode="latest",
         top_n=HIGHSCORE_TOP_N,
@@ -4514,6 +4729,7 @@ def create_highscore_page(
         board = _leaderboard_snapshot(
             project_root / 'data' / 'input' / f'prediction_ranking_{fmt}.csv',
             study_id=study_id,
+            key=key,
             format_filter=fmt,
             mode="best",
             top_n=HIGHSCORE_FORMAT_TOP_N,
@@ -4622,6 +4838,17 @@ def create_highscore_page(
         )
     )
 
+    # Spells out what this board does and does not keep: an optional public
+    # nickname plus a one-way hash of the email (only if one was given), never the
+    # address and never anything from the study record.
+    children.append(
+        html.Div(
+            t("ui.highscore.privacy_note", locale=locale),
+            className="highscore-privacy-note",
+            disable_n_clicks=True,
+        )
+    )
+
     return html.Div(children, className="info-page highscore-page", disable_n_clicks=True)
 
 
@@ -4713,6 +4940,7 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
     switch_data_consent_value: list[str] = []
     played_formats: list[str] = sorted(already_played, key=lambda x: FORMAT_ORDER.get(str(x), 999))
 
+    leaderboard_key = email_key(user_info.get('email'))
     per_format_boards: list[tuple[str, dict[str, Any]]] = []
     for fmt in played_formats:
         if fmt not in ("A", "B", "C"):
@@ -4720,6 +4948,7 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
         board = _leaderboard_snapshot(
             project_root / 'data' / 'input' / f'prediction_ranking_{fmt}.csv',
             study_id=study_id,
+            key=leaderboard_key,
             format_filter=fmt,
             mode="best",
         )
@@ -4730,6 +4959,7 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
     overall_board = _leaderboard_snapshot(
         project_root / 'data' / 'input' / 'prediction_ranking.csv',
         study_id=study_id,
+        key=leaderboard_key,
         format_filter="ALL",
         mode="latest",
     )
@@ -4739,6 +4969,7 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
         per_format=per_format_boards,
         locale=locale,
         unit=unit,
+        user_info=user_info,
     )
 
     metrics_component_final = MetricsComponent()
@@ -5093,7 +5324,8 @@ def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) ->
     [Output('url', 'pathname'),
      Output('user-info-store', 'data')],
     [Input('start-button', 'n_clicks')],
-    [State('email-input', 'value'),
+    [State('nickname-input', 'value'),
+     State('email-input', 'value'),
      State('age-input', 'value'),
      State('gender-dropdown', 'value'),
      State('cgm-dropdown', 'value'),
@@ -5107,7 +5339,8 @@ def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) ->
      State('user-info-store', 'data')],
     prevent_initial_call=True
 )
-def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Optional[int | float],
+def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
+                       email: Optional[str], age: Optional[int | float],
                        gender: Optional[str], uses_cgm: Optional[bool], cgm_duration_years: Optional[float],
                        format_value: Optional[str], data_usage_consent: Optional[list[str]],
                        diabetic: Optional[bool], diabetic_type: Optional[str],
@@ -5175,6 +5408,8 @@ def handle_start_button(n_clicks: Optional[int], email: Optional[str], age: Opti
             # Stable cross-device resume code (server-side savegame key).
             'resume_code': info.get('resume_code') or resume_store.new_code(),
             'email': email or info.get('email') or '',
+            # Optional public leaderboard label -- display only, never study data.
+            'nickname': normalize_nickname(nickname) or info.get('nickname') or '',
             'age': age,
             'gender': gender,
             'uses_cgm': uses_cgm_bool,
@@ -5659,6 +5894,88 @@ def handle_back_to_final_from_upload(n_clicks: Optional[int]) -> Tuple[str, Dict
 
 
 @app.callback(
+    [Output('final-nickname-status', 'children'),
+     Output('user-info-store', 'data', allow_duplicate=True),
+     Output('final-ranking-list', 'children', allow_duplicate=True)],
+    Input('final-nickname-save', 'n_clicks'),
+    [State('final-nickname-input', 'value'),
+     State('user-info-store', 'data'),
+     State('glucose-unit', 'data'),
+     State('interface-language', 'data')],
+    prevent_initial_call=True,
+)
+def save_final_nickname(
+    n_clicks: Optional[int],
+    raw_nickname: Optional[str],
+    user_info: Optional[Dict[str, Any]],
+    glucose_unit: Optional[str],
+    interface_language: Optional[str],
+) -> Tuple[str, Dict[str, Any], list[Any]]:
+    """Persist the leaderboard nickname typed on ``/final`` and re-render the board.
+
+    Writes it onto **this study's** ranking rows only, so a returning player who picks
+    a different name leaves their earlier study entries as they were.  The nickname is
+    a public display label and never enters the study record.
+    """
+    if not n_clicks or not user_info:
+        raise PreventUpdate
+
+    locale = normalize_locale(interface_language)
+    unit = glucose_unit if glucose_unit in ('mg/dL', 'mmol/L') else 'mg/dL'
+    nickname = normalize_nickname(raw_nickname)
+    study_id = str(user_info.get('study_id') or '')
+    key = email_key(user_info.get('email'))
+
+    with start_action(action_type=u"save_final_nickname", named=bool(nickname)) as action:
+        updated_info: Dict[str, Any] = dict(user_info)
+        updated_info['nickname'] = nickname
+        rows_changed = submit_component.set_study_nickname(
+            study_id=study_id, key=key, nickname=nickname
+        )
+        action.log(message_type=u"nickname_saved", rows_changed=rows_changed)
+
+    # Re-read the CSVs so the board shows the new name without a page reload.
+    runs_by_format: dict[str, list[dict[str, Any]]] = dict(updated_info.get('runs_by_format') or {})
+    already_played: set[str] = {str(fmt) for fmt, runs in runs_by_format.items() if runs}
+    if updated_info.get('rounds'):
+        already_played.add(str(updated_info.get('format') or 'A'))
+
+    per_format_boards: list[tuple[str, dict[str, Any]]] = []
+    for fmt in sorted(already_played, key=lambda x: FORMAT_ORDER.get(str(x), 999)):
+        if fmt not in ("A", "B", "C"):
+            continue
+        board = _leaderboard_snapshot(
+            project_root / 'data' / 'input' / f'prediction_ranking_{fmt}.csv',
+            study_id=study_id,
+            key=key,
+            format_filter=fmt,
+            mode="best",
+        )
+        if board is not None:
+            per_format_boards.append((fmt, board))
+
+    overall_board = _leaderboard_snapshot(
+        project_root / 'data' / 'input' / 'prediction_ranking.csv',
+        study_id=study_id,
+        key=key,
+        format_filter="ALL",
+        mode="latest",
+    )
+
+    return (
+        t("ui.final.nickname_saved", locale=locale),
+        updated_info,
+        _final_leaderboard_children(
+            overall=overall_board,
+            per_format=per_format_boards,
+            locale=locale,
+            unit=unit,
+            user_info=updated_info,
+        ),
+    )
+
+
+@app.callback(
     [Output('url', 'pathname', allow_duplicate=True),
      Output('user-info-store', 'data', allow_duplicate=True),
      Output('glucose-chart-mode', 'data', allow_duplicate=True),
@@ -5802,7 +6119,9 @@ def handle_share_results_button(
         played_formats.discard("")
 
         study_id: str = str(user_info.get("study_id") or "")
-        rankings: dict[str, Any] = compute_share_rankings(study_id, sorted(played_formats))
+        rankings: dict[str, Any] = compute_share_rankings(
+            study_id, sorted(played_formats), key=email_key(user_info.get("email"))
+        )
 
         # Strip the share record to JSON-safe primitives so it survives a
         # round-trip through JSON on disk.  `prediction_table_data` is already

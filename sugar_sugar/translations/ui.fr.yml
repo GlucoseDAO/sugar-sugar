@@ -103,6 +103,9 @@ fr:
   startup:
     fork_me: "Forkez-moi sur GitHub"
     required_fields_note: "* Champs obligatoires"
+    nickname_label: "Pseudo"
+    nickname_placeholder: "Facultatif — p. ex. SugarNinja"
+    nickname_hint: "Nom d'affichage facultatif pour le classement public. Laisse le champ vide pour rester anonyme (Joueur 1, Joueur 2, …). Il ne fait pas partie des données de l'étude."
     email_label: "E-mail"
     email_placeholder: "Saisis ton e-mail (facultatif sauf si tu veux tes résultats/mises à jour)"
     age_label: "Âge"
@@ -397,6 +400,7 @@ fr:
     games_played: "%{count} parties jouées"
     empty: "Aucune partie terminée pour l'instant. Termine une partie complète et tu seras le premier au classement."
     play_now: "Jouer maintenant"
+    privacy_note: "Les pseudos sont facultatifs et publics. Si tu as indiqué une adresse e-mail, le classement n'en conserve qu'une empreinte à sens unique afin de reconnaître tes résultats d'un appareil à l'autre — jamais l'adresse elle-même ni aucune autre donnée personnelle. Les pseudos ne font pas partie des données de l'étude."
 
   final:
     title: "Analyse complète"
@@ -416,6 +420,11 @@ fr:
     col_mae: "MAE (%{unit})"
     you: "Toi"
     player_n: "Joueur %{n}"
+    you_named: "%{name} (Toi)"
+    nickname_title: "Ton nom au classement"
+    nickname_save: "Enregistrer"
+    nickname_saved: "Enregistré — le classement affiche maintenant ton nom."
+    nickname_hint: "Facultatif et public. Laisse le champ vide pour rester anonyme."
     no_ranking_yet: "Termine une partie pour apparaître au classement."
     per_round_metrics: "Métriques par manche"
     start_over: "Quitter"

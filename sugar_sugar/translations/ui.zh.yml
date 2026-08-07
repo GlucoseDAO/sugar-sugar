@@ -101,6 +101,9 @@ zh:
   startup:
     fork_me: "在 GitHub 上 Fork 我"
     required_fields_note: "* 必填项"
+    nickname_label: "昵称"
+    nickname_placeholder: "可选 — 例如 SugarNinja"
+    nickname_hint: "在公开排行榜上显示的可选名称。留空即保持匿名（玩家 1、玩家 2……）。它不属于研究数据。"
     email_label: "电子邮件"
     email_placeholder: "输入您的电子邮件（可选，除非您想要结果/更新）"
     age_label: "年龄"
@@ -395,6 +398,7 @@ zh:
     games_played: "已完成 %{count} 局游戏"
     empty: "还没有已完成的游戏。完成一整轮，你就是榜首。"
     play_now: "开始游戏"
+    privacy_note: "昵称是可选的，且会公开显示。如果你填写了电子邮件，排行榜只保存它的单向哈希值，用于在不同设备上识别你的成绩，绝不保存邮件地址本身，也不保存其他个人数据。昵称不属于研究数据。"
 
   final:
     title: "完整分析"
@@ -414,6 +418,11 @@ zh:
     col_mae: "MAE (%{unit})"
     you: "你"
     player_n: "玩家 %{n}"
+    you_named: "%{name}（你）"
+    nickname_title: "你在排行榜上的名字"
+    nickname_save: "保存"
+    nickname_saved: "已保存 — 排行榜现在显示你的名字。"
+    nickname_hint: "可选且公开。留空即保持匿名。"
     no_ranking_yet: "完成一轮游戏后即可出现在排行榜上。"
     per_round_metrics: "每轮指标"
     start_over: "退出"

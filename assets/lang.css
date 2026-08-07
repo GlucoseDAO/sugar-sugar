@@ -406,6 +406,61 @@ body .ui.large.menu {
   text-align: center;
   margin: 22px 0 8px 0;
 }
+/* What the board stores: optional public nickname + a one-way email hash, never
+   the address and nothing from the study record. Small print, still legible. */
+.highscore-privacy-note {
+  max-width: 620px;
+  margin: 18px auto 0 auto;
+  text-align: center;
+  font-size: 12px !important;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+/* ---- Nickname editor (left column of the /final leaderboard) ---------- */
+.final-nickname-editor {
+  background: #f8fafc;
+  border: 1px solid rgba(75, 95, 130, 0.18);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.final-nickname-title {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: #1e3a5f;
+  margin-bottom: 8px;
+}
+.final-nickname-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.final-nickname-editor .final-nickname-input,
+.final-nickname-editor input.dash-input-element {
+  flex: 1 1 150px;
+  min-width: 0;
+  padding: 7px 9px;
+  font-size: 14px !important;
+  border: 1px solid rgba(75, 95, 130, 0.3);
+  border-radius: 6px;
+}
+.final-nickname-editor .dash-input-container {
+  flex: 1 1 150px;
+  min-width: 0;
+  margin: 0;
+}
+.final-nickname-hint,
+.final-nickname-status {
+  font-size: 12px !important;
+  line-height: 1.45;
+  color: #64748b;
+  margin-top: 8px;
+}
+.final-nickname-status:not(:empty) {
+  color: #15803d;
+  font-weight: 600 !important;
+}
 
 /* Games-played counter: beat `body :not(h1..h6) { font-size: 16px !important }`. */
 #landing-page .games-played-title {

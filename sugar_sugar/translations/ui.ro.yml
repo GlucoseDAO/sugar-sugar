@@ -102,6 +102,9 @@ ro:
   startup:
     fork_me: "Fork pe GitHub"
     required_fields_note: "* Câmpuri obligatorii"
+    nickname_label: "Pseudonim"
+    nickname_placeholder: "Opțional — de ex. SugarNinja"
+    nickname_hint: "Nume opțional afișat în clasamentul public. Lasă câmpul gol ca să rămâi anonim (Jucător 1, Jucător 2, …). Nu face parte din datele studiului."
     email_label: "Email"
     email_placeholder: "Introdu emailul (opțional, cu excepția cazului în care vrei rezultate/actualizări)"
     age_label: "Vârstă"
@@ -417,6 +420,7 @@ ro:
     games_played: "%{count} jocuri jucate"
     empty: "Încă nu există jocuri finalizate. Joacă o rundă completă și vei fi primul în clasament."
     play_now: "Joacă acum"
+    privacy_note: "Pseudonimele sunt opționale și publice. Dacă ai indicat o adresă de email, clasamentul păstrează doar un hash unidirecțional al acesteia, ca rezultatele tale să fie recunoscute pe mai multe dispozitive — niciodată adresa în sine și nicio altă informație personală. Pseudonimele nu fac parte din datele studiului."
 
   final:
     title: "Analiză completă"
@@ -436,6 +440,11 @@ ro:
     col_mae: "MAE (%{unit})"
     you: "Tu"
     player_n: "Jucător %{n}"
+    you_named: "%{name} (Tu)"
+    nickname_title: "Numele tău în clasament"
+    nickname_save: "Salvează"
+    nickname_saved: "Salvat — clasamentul afișează acum numele tău."
+    nickname_hint: "Opțional și public. Lasă câmpul gol ca să rămâi anonim."
     no_ranking_yet: "Finalizează o rundă de joc ca să apari în clasament."
     per_round_metrics: "Metrici pe rundă"
     start_over: "Ieșire"

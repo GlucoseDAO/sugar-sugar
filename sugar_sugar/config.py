@@ -51,6 +51,12 @@ SHARE_NOISE: float = float(os.getenv("SHARE_NOISE", "0.30"))
 SHARE_FORMATS: str = os.getenv("SHARE_FORMATS", "A")
 SHARE_NAME: str = os.getenv("SHARE_NAME", "Dev Tester")
 
+# Salt for the one-way `email_key` that groups a player's ranking rows across devices.
+# The ranking CSVs store this hash, never the address. MUST stay stable for the lifetime
+# of a deployment -- changing it re-splits every existing player into a new identity.
+# Leave unset and sugar_sugar/nickname.py persists a random salt to data/.ranking_salt.
+RANKING_EMAIL_SALT: str = os.getenv("RANKING_EMAIL_SALT", "").strip()
+
 # Round labels on the synthesis chart: "single" (only when one format),
 # "none" (never), "all" (always show, even with multiple formats).
 SHARE_ROUND_LABELS: str = os.getenv("SHARE_ROUND_LABELS", "single").strip().lower()
@@ -70,5 +76,6 @@ DASH_DEBUG: bool = _env_bool("DASH_DEBUG", DEBUG_MODE)
 # full client reload for every connected browser on the next server restart.
 # 17: handle_time_slider gained an events-df Output (window-trimmed events store).
 # 18: navbar gained the Highscore item (/highscore page) on desktop + mobile.
-DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "18"))
+# 19: optional leaderboard nicknames -- fill_form_data gained a nickname-input Output.
+DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "19"))
 

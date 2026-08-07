@@ -11,6 +11,7 @@ from sugar_sugar.config import PREDICTION_HOUR_OFFSET, STORAGE_TYPE
 from sugar_sugar.components.metrics import MetricsComponent
 from sugar_sugar.data import load_glucose_data
 from sugar_sugar.i18n import t, normalize_locale
+from sugar_sugar.nickname import email_key, normalize_nickname
 
 # Dataset used for the example/generic format and the format-C even rounds.
 _EXAMPLE_DATASET_PATH: Path = Path("data/example.csv")
@@ -200,6 +201,59 @@ class SubmitComponent(html.Div):
             for row in repaired:
                 writer.writerow({k: row.get(k, '') for k in header})
         tmp_path.replace(path)
+
+    def set_study_nickname(self, *, study_id: str, key: str, nickname: str) -> int:
+        """Stamp `nickname` onto this study's ranking rows only; backfill their `email_key`.
+
+        Matches on ``study_id`` alone -- deliberately **never** on ``email_key`` -- so a
+        returning player who picks a different name does not rewrite the rows of their
+        earlier study entries.  One nickname per study; the previous one survives in the
+        CSV and is what `stored_nickname` later offers as a suggestion.
+
+        Needed because the `/final` box is edited *after* `save_statistics` has already
+        written the run's rows.  Returns the number of rows changed.
+        """
+        cleaned = normalize_nickname(nickname)
+        if not study_id:
+            return 0
+
+        changed_total = 0
+        paths = [self._ranking_csv_path, *self._ranking_by_format_paths.values()]
+        for path in paths:
+            if not path.exists():
+                continue
+            with path.open('r', newline='', encoding='utf-8', errors='replace') as file_handle:
+                reader = csv.DictReader(file_handle)
+                header = list(reader.fieldnames or [])
+                rows = list(reader)
+            if not header:
+                continue
+
+            # Files written before nicknames existed lack the columns entirely.
+            upgraded_header = header + [c for c in ('email_key', 'nickname') if c not in header]
+
+            changed = 0
+            for row in rows:
+                if str(row.get('study_id') or '') != study_id:
+                    continue
+                row['nickname'] = cleaned
+                if key and not str(row.get('email_key') or ''):
+                    row['email_key'] = key
+                changed += 1
+
+            if changed == 0 and upgraded_header == header:
+                continue
+
+            tmp_path = path.with_suffix('.tmp')
+            with tmp_path.open('w', newline='', encoding='utf-8') as out_handle:
+                writer = csv.DictWriter(out_handle, fieldnames=upgraded_header)
+                writer.writeheader()
+                for row in rows:
+                    writer.writerow({column: row.get(column, '') for column in upgraded_header})
+            tmp_path.replace(path)
+            changed_total += changed
+
+        return changed_total
 
     def _get_next_number(self) -> int:
         """Get the next number for the prediction statistics."""
@@ -490,12 +544,19 @@ class SubmitComponent(html.Div):
             }
         )
 
-        # Write ranking row for fast leaderboard lookups
+        # Write ranking row for fast leaderboard lookups.
+        # `email_key` is a one-way hash used only to merge one player's rows across
+        # devices; `nickname` is an optional public display label. Neither the address
+        # nor the nickname belongs to the study record -- see sugar_sugar/nickname.py.
+        leaderboard_identity = email_key(user_info.get('email'))
+        leaderboard_nickname = normalize_nickname(user_info.get('nickname'))
         ranking_row = {
             'study_id': study_id,
             'run_id': str(user_info.get('run_id') or ''),
             'number': data['number'],
             'timestamp': data['timestamp'],
+            'email_key': leaderboard_identity,
+            'nickname': leaderboard_nickname,
             'format': data['format'],
             'rounds_played': rounds_played,
             'is_example_data': data['is_example_data'],
@@ -554,6 +615,8 @@ class SubmitComponent(html.Div):
             'run_id': str(uuid.uuid4()),
             'number': data['number'],
             'timestamp': data['timestamp'],
+            'email_key': leaderboard_identity,
+            'nickname': leaderboard_nickname,
             'format': "ALL",
             'rounds_played': total_rounds_played,
             'is_example_data': (not any_uploaded),

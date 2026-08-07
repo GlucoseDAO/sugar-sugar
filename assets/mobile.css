@@ -870,6 +870,29 @@ html.mobile-device #startup-page .Select {
   margin-bottom: 16px !important;
 }
 
+/* --- Nickname editor on /final -------------------------------------------
+   The generic mobile rule above forces every input (and its dcc.Input wrapper)
+   to `display:block; width:100% !important`, so the input + Save flex row would
+   wrap anyway.  Stack it deliberately instead: full-width field, then a
+   full-width, finger-sized Save button under it. */
+html.mobile-device .final-nickname-row {
+  flex-direction: column;
+  align-items: stretch;
+}
+html.mobile-device .final-nickname-editor .dash-input-container {
+  overflow: visible !important;
+  height: auto !important;
+  margin-bottom: 0 !important;
+}
+html.mobile-device .final-nickname-editor input.dash-input-element {
+  min-height: 44px;
+  font-size: 16px !important; /* < 16px makes iOS Safari zoom on focus */
+}
+html.mobile-device .final-nickname-save {
+  width: 100%;
+  min-height: 44px;
+}
+
 /* Number fields (age, CGM/diabetes duration): Dash renders its own
    `.dash-input-stepper` -/+ buttons inside the input wrapper.  Once the input
    is forced full-width (display:block) on mobile, those steppers wrap to a

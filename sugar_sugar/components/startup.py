@@ -9,6 +9,7 @@ from sugar_sugar.components.landing import consent_controls_children
 from sugar_sugar.components.submit import _is_mobile_ua
 from sugar_sugar.i18n import t
 from sugar_sugar.config import STORAGE_TYPE
+from sugar_sugar.nickname import MAX_NICKNAME_LENGTH
 from flask import has_request_context, request as flask_request
 
 MAX_AGE: int = 130
@@ -483,6 +484,25 @@ class StartupPage(html.Div):
                         html.P(t("ui.startup.required_fields_note", locale=locale), style={'color': '#666', 'fontSize': '16px', 'fontStyle': 'italic', 'marginBottom': '20px', 'textAlign': 'right'})
                     ]),
                     
+                    # Optional public leaderboard label. No asterisk, and deliberately
+                    # not an Input of update_form_validation -- it never gates Start.
+                    html.Div([
+                        html.Label(t("ui.startup.nickname_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a', 'display': 'inline-block'}),
+                    ], style={'marginBottom': '10px'}),
+                    dcc.Input(
+                        id='nickname-input',
+                        type='text',
+                        maxLength=MAX_NICKNAME_LENGTH,
+                        placeholder=t("ui.startup.nickname_placeholder", locale=locale),
+                        persistence=True,
+                        persistence_type=STORAGE_TYPE,
+                        style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '6px'}
+                    ),
+                    html.Small(
+                        t("ui.startup.nickname_hint", locale=locale),
+                        style={'color': '#666', 'fontSize': '15px', 'display': 'block', 'marginBottom': '20px'}
+                    ),
+
                     html.Div([
                         html.Label(t("ui.startup.email_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a', 'display': 'inline-block'}),
                         html.Span(id='email-required', children=' *', style={'color': '#d32f2f', 'fontSize': '22px', 'fontWeight': 'bold'})
@@ -1202,7 +1222,8 @@ class StartupPage(html.Div):
         # Note: diabetic-type-dropdown and diabetes-duration-input are handled
         # by their respective callback when diabetic-dropdown changes
         @app.callback(
-            [Output('email-input', 'value'),
+            [Output('nickname-input', 'value'),
+             Output('email-input', 'value'),
              Output('age-input', 'value'),
              Output('gender-dropdown', 'value'),
              Output('cgm-dropdown', 'value'),
@@ -1211,11 +1232,12 @@ class StartupPage(html.Div):
             [Input('test-me-button', 'n_clicks')],
             prevent_initial_call=True
         )
-        def fill_form_data(n_clicks: Optional[int]) -> tuple[str, int, str, bool, bool, str]:
+        def fill_form_data(n_clicks: Optional[int]) -> tuple[str, str, int, str, bool, bool, str]:
             if n_clicks:
                 # Fill the form with realistic test data and tick consent checkbox
                 # Note: diabetic-type and diabetes-duration will be auto-filled by existing callbacks
                 return (
+                    'Test Player',            # nickname (optional leaderboard label)
                     'test.user@example.com',  # email
                     28,                       # age
                     'F',                      # gender (Female)
@@ -1224,7 +1246,9 @@ class StartupPage(html.Div):
                     'San Francisco, CA'       # location
                 )
 
-            return no_update, no_update, no_update, no_update, no_update, no_update
+            return (
+                no_update, no_update, no_update, no_update, no_update, no_update, no_update
+            )
 
         # ---- Mobile startup wizard step navigation (StartupPageMobile) ----
         # The `mobile-step-*`, `startup-prev`, `startup-next`, `startup-progress`
@@ -1484,7 +1508,20 @@ class StartupPageMobile(html.Div):
         ]
 
         # --- Step 1: identity (pure required fields, no conditional cascade) ---
+        # The optional nickname belongs HERE, not in step_consent (mobile-step-0):
+        # it is a public display label, not study data, and must not read as a
+        # consent item.
         step0 = [
+            _m_label(t("ui.startup.nickname_label", locale=locale)),
+            dcc.Input(
+                id='nickname-input', type='text', maxLength=MAX_NICKNAME_LENGTH,
+                placeholder=t("ui.startup.nickname_placeholder", locale=locale),
+                persistence=True, persistence_type=STORAGE_TYPE, style=_M_INPUT,
+            ),
+            html.Small(
+                t("ui.startup.nickname_hint", locale=locale),
+                style={'color': '#64748b', 'fontSize': '13px', 'display': 'block', 'marginBottom': '10px'},
+            ),
             _m_label(t("ui.startup.email_label", locale=locale), 'email-required'),
             dcc.Input(
                 id='email-input', type='email',

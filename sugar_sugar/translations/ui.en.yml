@@ -101,6 +101,9 @@ en:
   startup:
     fork_me: "Fork me on GitHub"
     required_fields_note: "* Required fields"
+    nickname_label: "Nickname"
+    nickname_placeholder: "Optional — e.g. SugarNinja"
+    nickname_hint: "Optional display name for the public highscore board. Leave it blank to stay anonymous (Player 1, Player 2, …). It is not part of the study data."
     email_label: "Email"
     email_placeholder: "Enter your email (optional unless you want results/updates)"
     age_label: "Age"
@@ -420,6 +423,7 @@ en:
     games_played: "%{count} games played"
     empty: "No finished games yet. Play a full run and you will be the first on the board."
     play_now: "Play now"
+    privacy_note: "Nicknames are optional and public. If you gave an email address, the board stores only a one-way hash of it so your results are recognised across devices — never the address itself and no other personal data. Nicknames are not part of the study data."
 
   final:
     title: "Complete Analysis"
@@ -439,6 +443,11 @@ en:
     col_mae: "MAE (%{unit})"
     you: "You"
     player_n: "Player %{n}"
+    you_named: "%{name} (You)"
+    nickname_title: "Your name on the leaderboard"
+    nickname_save: "Save"
+    nickname_saved: "Saved — the board now shows your name."
+    nickname_hint: "Optional and public. Leave it blank to stay anonymous."
     no_ranking_yet: "Finish a run to appear on the leaderboard."
     per_round_metrics: "Per-round metrics"
     start_over: "Exit"
