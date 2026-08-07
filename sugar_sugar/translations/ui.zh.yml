@@ -390,11 +390,12 @@ zh:
 
   highscore:
     title: "排行榜"
-    subtitle: "所有已完成游戏的匿名排名。平均绝对误差（MAE）越小，预测越准确。"
+    subtitle: "每一局完成的游戏都保留自己的名次——刷新成绩后，旧成绩仍然留在榜上。平均绝对误差（MAE）越小，预测越准确。"
     overall_board: "总榜"
     by_data_source: "按数据来源"
     lower_is_better: "MAE 越小越好"
     players_count: "%{total} 位玩家"
+    scores_count: "%{total} 条成绩"
     games_played: "已完成 %{count} 局游戏"
     empty: "还没有已完成的游戏。完成一整轮，你就是榜首。"
     play_now: "开始游戏"
@@ -415,6 +416,7 @@ zh:
     top_predictors: "顶尖预测者"
     col_rank: "#"
     col_player: "玩家"
+    col_rounds: "回合"
     col_mae: "MAE (%{unit})"
     you: "你"
     player_n: "玩家 %{n}"

@@ -943,8 +943,9 @@ html.mobile-device .highscore-page .highscore-format-grid {
   gap: 14px !important;
 }
 html.mobile-device .highscore-page .final-leaderboard-row {
-  grid-template-columns: 32px 1fr 92px !important;
-  padding: 8px 6px !important;
+  grid-template-columns: 28px 1fr 42px 74px !important;
+  padding: 8px 4px !important;
+  gap: 6px !important;
 }
 html.mobile-device .highscore-page .highscore-hero-wrap {
   max-width: 100% !important;

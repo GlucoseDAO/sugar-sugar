@@ -189,6 +189,8 @@ consent_agreement.csv
 prediction_ranking_A.csv
 prediction_ranking_B.csv
 prediction_ranking_C.csv
+# Pristine pre-conversion copies taken by backfill_leaderboard_identity
+*.pre-nickname.bak
 
 logs/*
 !logs/.gitkeep

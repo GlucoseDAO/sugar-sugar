@@ -290,7 +290,9 @@ body .ui.large.menu {
 }
 .final-leaderboard-row {
   display: grid;
-  grid-template-columns: 48px 1fr 110px;
+  /* # / player / rounds / MAE -- the rounds column is what distinguishes the
+     several slots one player can hold on an arcade-style board. */
+  grid-template-columns: 44px 1fr 62px 96px;
   gap: 8px;
   align-items: center;
   padding: 8px 10px;
@@ -319,6 +321,11 @@ body .ui.large.menu {
   font-variant-numeric: tabular-nums;
   font-weight: 800 !important;
   color: #1d4ed8;
+}
+.final-leaderboard-cell.rounds {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #64748b;
 }
 .final-leaderboard-cell.mae {
   text-align: right;

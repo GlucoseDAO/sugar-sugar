@@ -392,11 +392,12 @@ fr:
 
   highscore:
     title: "Classement"
-    subtitle: "Classement anonyme de toutes les parties terminées. Une erreur absolue moyenne (MAE) plus faible signifie une meilleure prédiction."
+    subtitle: "Chaque partie terminée garde sa propre place — bats ton score et l'ancien reste au classement. Une erreur absolue moyenne (MAE) plus faible signifie une meilleure prédiction."
     overall_board: "Général"
     by_data_source: "Par source de données"
     lower_is_better: "Un MAE plus faible est meilleur"
     players_count: "%{total} joueurs"
+    scores_count: "%{total} scores"
     games_played: "%{count} parties jouées"
     empty: "Aucune partie terminée pour l'instant. Termine une partie complète et tu seras le premier au classement."
     play_now: "Jouer maintenant"
@@ -417,6 +418,7 @@ fr:
     top_predictors: "Meilleurs prédicteurs"
     col_rank: "#"
     col_player: "Joueur"
+    col_rounds: "Manches"
     col_mae: "MAE (%{unit})"
     you: "Toi"
     player_n: "Joueur %{n}"

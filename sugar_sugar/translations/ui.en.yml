@@ -415,11 +415,12 @@ en:
 
   highscore:
     title: "Highscore"
-    subtitle: "Anonymous ranking of every finished game. Lower mean absolute error (MAE) means a better prediction."
+    subtitle: "Every finished game keeps its own place — beat your score and the old one stays on the board. Lower mean absolute error (MAE) means a better prediction."
     overall_board: "Overall"
     by_data_source: "By data source"
     lower_is_better: "Lower MAE is better"
     players_count: "%{total} players"
+    scores_count: "%{total} scores"
     games_played: "%{count} games played"
     empty: "No finished games yet. Play a full run and you will be the first on the board."
     play_now: "Play now"
@@ -440,6 +441,7 @@ en:
     top_predictors: "Top predictors"
     col_rank: "#"
     col_player: "Player"
+    col_rounds: "Rounds"
     col_mae: "MAE (%{unit})"
     you: "You"
     player_n: "Player %{n}"

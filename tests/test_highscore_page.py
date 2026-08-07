@@ -31,9 +31,11 @@ def _row(
     ts: str = "2026-08-01 10:00:00",
     key: str = "",
     nickname: str = "",
+    rounds: int = 12,
 ) -> str:
     return (
-        f"{study_id},run1,1,{ts},{key},{nickname},{fmt},12,True,example,{mae},0,0,0\n"
+        f"{study_id},run1,1,{ts},{key},{nickname},{fmt},{rounds},True,example,"
+        f"{mae},0,0,0\n"
     )
 
 
@@ -177,8 +179,8 @@ def test_highscore_never_leaks_the_email_hash(ranking_root: Path) -> None:
     assert "ann@x.com" not in joined and "@" not in joined
 
 
-def test_highscore_merges_one_players_sessions_into_a_single_row(ranking_root: Path) -> None:
-    """A player who returns on another device gets one row, not two."""
+def test_highscore_keeps_every_finished_game_on_the_board(ranking_root: Path) -> None:
+    """Arcade rules: beating your own score does not remove the old one."""
     overall = ranking_root / "data" / "input" / "prediction_ranking.csv"
     overall.write_text(
         _HEADER
@@ -191,10 +193,25 @@ def test_highscore_merges_one_players_sessions_into_a_single_row(ranking_root: P
     page = create_highscore_page(None, None, locale="en")
     texts = _texts(page)
     joined = " ".join(texts)
-    # Two players on the board, the merged one wearing its newest name.
+    # Three slots, both of the one player's scores still standing...
+    assert "14.00" in joined and "22.00" in joined and "19.00" in joined
+    assert texts.index("Ninja2") < texts.index("Ninja")
+    # ...but only two distinct people behind them.
     assert "2 players" in joined
-    assert "Ninja2" in texts and "Ninja" not in texts
-    assert "14.00" in joined
+
+
+def test_highscore_shows_the_rounds_behind_each_score(ranking_root: Path) -> None:
+    """The column that tells one player's several slots apart."""
+    overall = ranking_root / "data" / "input" / "prediction_ranking.csv"
+    overall.write_text(
+        _HEADER
+        + _row("s1", "ALL", 14.0, key="k", nickname="Ninja", rounds=24, ts="2026-08-02 10:00:00")
+        + _row("s1", "ALL", 20.0, key="k", nickname="Ninja", rounds=12, ts="2026-08-01 10:00:00"),
+        encoding="utf-8",
+    )
+    texts = _texts(create_highscore_page(None, None, locale="en"))
+    assert "Rounds" in texts
+    assert "24" in texts and "12" in texts
 
 
 def test_highscore_marks_your_row_with_your_nickname(ranking_root: Path) -> None:

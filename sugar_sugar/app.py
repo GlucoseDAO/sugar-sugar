@@ -297,30 +297,40 @@ def _format_label(format_code: str, *, locale: str) -> str:
     return code
 
 
-def _ranking_identities(
+def _identity_expr() -> pl.Expr:
+    """Dataframe form of :func:`sugar_sugar.nickname.identity_key`.
+
+    Single definition so the arcade board (`_ranking_entries`) and the per-player
+    aggregation (`_ranking_identities`) can never drift apart on what counts as
+    "the same person".
+    """
+    return (
+        pl.when(pl.col('email_key') != "")
+        .then(pl.format("e:{}", pl.col('email_key')))
+        .otherwise(pl.format("s:{}", pl.col('study_id')))
+        .alias('identity')
+    )
+
+
+def _ranking_entries(
     ranking_path: Path,
     *,
     format_filter: Optional[str],
-    mode: str,
 ) -> Optional[pl.DataFrame]:
-    """Collapse a ranking CSV to one row per *player*, ranked best-first.
+    """Every finished game in a ranking CSV as its own board slot, best-first.
+
+    Arcade rules: a score you set keeps its place forever.  Nothing is merged or
+    collapsed, so a player who finished several games occupies several slots and an
+    earlier, worse score is still visible below a later, better one.  Scores are
+    never hidden -- that was the confusing part.
 
     Returns ``None`` when the CSV is missing, unreadable or has nothing rankable.
-    Otherwise the columns are ``identity``, ``mae``, ``nickname``, ``study_ids``
-    and ``rank_idx`` (0-based).
+    Otherwise: ``identity``, ``study_id``, ``email_key``, ``mae``, ``rounds``,
+    ``nickname``, ``rank_idx`` (0-based).
 
-    Rows are grouped in two stages, which is what lets one person who played on
-    several devices occupy a single board row:
-
-    1. Within one ``study_id``, ``mode`` picks the representative score exactly as
-       before -- ``"latest"`` (newest row by timestamp; the overall CSV appends a
-       *cumulative* row per round, so only the newest reflects the whole run) or
-       ``"best"`` (lowest MAE, used for the per-format boards).
-    2. Across the ``study_id``s that share an ``identity`` (see
-       :func:`sugar_sugar.nickname.identity_key`), the **best** of those wins.
-
-    The displayed nickname is the newest non-empty one anywhere in the identity, so
-    a later run that leaves the field blank never erases a name the player chose.
+    Ties break on the earlier timestamp, so whoever got there first sits higher.
+    Each slot keeps the nickname stored on its own row -- the name that score was
+    set under, not whatever the player is called now.
     """
     if not ranking_path.exists():
         return None
@@ -332,16 +342,20 @@ def _ranking_identities(
         return None
 
     has_format = 'format' in ranking_df.columns
-    has_timestamp = 'timestamp' in ranking_df.columns
 
     def _optional_text(column: str) -> pl.Expr:
         """The column as text, or an empty literal for pre-nickname CSV schemas."""
         source = pl.col(column) if column in ranking_df.columns else pl.lit("")
         return source.cast(pl.String, strict=False).fill_null("").alias(column)
 
+    def _optional_int(column: str) -> pl.Expr:
+        source = pl.col(column) if column in ranking_df.columns else pl.lit(None)
+        return source.cast(pl.Int64, strict=False).alias(column)
+
     df = ranking_df.select(
         pl.col('study_id').cast(pl.String, strict=False).fill_null("").alias('study_id'),
         pl.col('overall_mae_mgdl').cast(pl.Float64, strict=False).alias('mae'),
+        _optional_int('rounds_played').alias('rounds'),
         _optional_text('format'),
         _optional_text('email_key'),
         _optional_text('nickname'),
@@ -354,33 +368,106 @@ def _ranking_identities(
         return None
 
     df = df.with_columns(
-        pl.when(pl.col('email_key') != "")
-        .then(pl.format("e:{}", pl.col('email_key')))
-        .otherwise(pl.format("s:{}", pl.col('study_id')))
-        .alias('identity'),
+        # Identity does not merge slots here; it only answers "is this row mine?" and
+        # feeds the nickname suggestion, which is what carries a name across devices.
+        _identity_expr(),
         pl.col('timestamp')
         .str.strptime(pl.Datetime, format='%Y-%m-%d %H:%M:%S', strict=False)
         .alias('_ts'),
     )
 
-    if mode == "latest" and has_timestamp:
+    return df.sort(['mae', '_ts', 'study_id'], nulls_last=True).with_row_index('rank_idx')
+
+
+def _own_entries(
+    entries: Optional[pl.DataFrame],
+    *,
+    study_id: str,
+    key: str,
+) -> Optional[pl.DataFrame]:
+    """The slots belonging to the current player -- there may be several.
+
+    Matches on the hashed email (so slots set on another device are recognised as
+    yours) *or* on ``study_id``, which also covers rows written before the player
+    supplied an email.
+    """
+    if entries is None or entries.height == 0:
+        return None
+    predicate: Optional[pl.Expr] = None
+    if study_id:
+        predicate = pl.col('study_id') == study_id
+    if key:
+        by_key = pl.col('email_key') == key
+        predicate = by_key if predicate is None else (predicate | by_key)
+    if predicate is None:
+        return None
+    mine = entries.filter(predicate)
+    return mine if mine.height > 0 else None
+
+
+def _ranking_identities(
+    ranking_path: Path,
+    *,
+    format_filter: Optional[str],
+    mode: str,
+) -> Optional[pl.DataFrame]:
+    """Collapse a ranking CSV to one row per *player*.
+
+    NOT used by `/highscore` or `/final`: those boards are arcade-style, one slot per
+    finished game (`_ranking_entries`).  This is the per-player rollup kept for the
+    planned individual stats page -- "your best, across every device you played on".
+    Covered by ``tests/test_ranking_identity.py`` so it cannot rot before then.
+
+    Columns: ``identity``, ``mae``, ``rounds``, ``nickname``, ``games``,
+    ``study_ids``.  Rows are grouped in two stages:
+
+    1. Within one ``study_id``, ``mode`` picks the representative score --
+       ``"latest"`` (newest row by timestamp; the overall CSV's rows are *cumulative*,
+       so only the newest covers the whole play) or ``"best"`` (lowest MAE).
+    2. Across the ``study_id``s sharing an ``identity``, the **best** of those wins.
+
+    The reported nickname is the newest non-empty one anywhere in the identity, so a
+    later blank run never erases a name the player chose.
+    """
+    entries = _ranking_entries(ranking_path, format_filter=format_filter)
+    if entries is None:
+        return None
+
+    if mode == "latest":
         per_study = (
-            df.sort(['identity', 'study_id', '_ts'])
+            entries.sort(['identity', 'study_id', '_ts'], nulls_last=False)
             .group_by(['identity', 'study_id'])
-            .agg(pl.last('mae').alias('mae'))
+            .agg(
+                pl.last('mae').alias('mae'),
+                pl.last('rounds').alias('rounds'),
+                pl.len().alias('games'),
+            )
         )
     else:
-        per_study = df.group_by(['identity', 'study_id']).agg(pl.col('mae').min().alias('mae'))
+        per_study = (
+            entries.sort(['identity', 'study_id', 'mae'], nulls_last=True)
+            .group_by(['identity', 'study_id'])
+            .agg(
+                pl.first('mae').alias('mae'),
+                pl.first('rounds').alias('rounds'),
+                pl.len().alias('games'),
+            )
+        )
 
-    identities = per_study.group_by('identity').agg(
-        pl.col('mae').min().alias('mae'),
-        pl.col('study_id').unique().alias('study_ids'),
+    identities = (
+        per_study.sort(['identity', 'mae'], nulls_last=True)
+        .group_by('identity')
+        .agg(
+            pl.first('mae').alias('mae'),
+            pl.first('rounds').alias('rounds'),
+            pl.col('games').sum().alias('games'),
+            pl.col('study_id').unique().alias('study_ids'),
+        )
     )
 
-    # Newest non-empty nickname wins, so a blank later run cannot clear an earlier name.
     named = (
-        df.filter(pl.col('nickname') != "")
-        .sort(['identity', '_ts'])
+        entries.filter(pl.col('nickname') != "")
+        .sort(['identity', '_ts'], nulls_last=False)
         .group_by('identity')
         .agg(pl.last('nickname').alias('nickname'))
     )
@@ -388,7 +475,7 @@ def _ranking_identities(
         pl.col('nickname').cast(pl.String, strict=False).fill_null("")
     )
 
-    return identities.sort(['mae', 'identity']).with_row_index('rank_idx')
+    return identities.sort(['mae', 'identity'], nulls_last=True).with_row_index('rank_idx')
 
 
 def _match_identity(
@@ -397,10 +484,11 @@ def _match_identity(
     study_id: str,
     key: str,
 ) -> Optional[dict[str, Any]]:
-    """The identity row belonging to the current player, or ``None``.
+    """The aggregated row for one player in a :func:`_ranking_identities` frame.
 
-    Tries the derived identity first, then falls back to ``study_id`` membership so
-    rows written before the player supplied an email still resolve to their owner.
+    Companion to that helper, so likewise not wired into the boards yet.  Tries the
+    derived identity first, then falls back to ``study_id`` membership so rows
+    written before the player supplied an email still resolve to their owner.
     """
     if identities is None or identities.height == 0:
         return None
@@ -421,23 +509,22 @@ def _rank_from_ranking_csv(
     study_id: str,
     key: str = "",
     format_filter: Optional[str],
-    mode: str,
 ) -> Optional[tuple[int, int]]:
-    """Return ``(rank, total)`` for one player against the ranking CSV.
+    """Return ``(best_rank, total_slots)`` for one player against the ranking CSV.
 
-    Extracted from ``create_final_layout`` so the share page can compute and
-    freeze rankings into a share record at save time.  ``total`` counts distinct
-    *players*, not rows.  See :func:`_ranking_identities` for the grouping rules.
+    Extracted from ``create_final_layout`` so the share page can compute and freeze
+    rankings into a share record at save time.  ``total`` counts board slots (one
+    per finished game); the rank is the player's *best* slot.
     """
     if not study_id and not key:
         return None
-    identities = _ranking_identities(ranking_path, format_filter=format_filter, mode=mode)
-    if identities is None:
+    entries = _ranking_entries(ranking_path, format_filter=format_filter)
+    if entries is None:
         return None
-    match = _match_identity(identities, study_id=study_id, key=key)
-    if match is None:
+    mine = _own_entries(entries, study_id=study_id, key=key)
+    if mine is None:
         return None
-    return int(match['rank_idx']) + 1, identities.height
+    return int(mine.get_column('rank_idx').min()) + 1, entries.height
 
 
 def _leaderboard_snapshot(
@@ -446,83 +533,98 @@ def _leaderboard_snapshot(
     study_id: str,
     key: str = "",
     format_filter: Optional[str],
-    mode: str,
+    mode: str = "",
     top_n: int = 5,
 ) -> Optional[dict[str, Any]]:
     """Build a compact leaderboard view for one player.
 
     Returns ``None`` when the CSV is missing/empty. Otherwise:
-      ``{rank, total, mae, top: [{rank, mae, nickname, is_you}, ...]}``
-    ``nickname`` is ``""`` for players who never picked one -- the caller falls back
-    to the anonymous ``Player N`` label.  ``study_id`` and the hashed ``key`` are
-    never part of the result.
+      ``{rank, total, players, mae, top: [{rank, mae, rounds, nickname, is_you}]}``
+
+    ``total`` is the number of board slots and ``rank`` the player's best one;
+    ``players`` counts distinct people, which is only used for the stat chips.
+    ``nickname`` is ``""`` for slots set anonymously -- the caller falls back to the
+    ``Player N`` label.  ``study_id`` and the hashed ``key`` are never returned.
     """
-    identities = _ranking_identities(ranking_path, format_filter=format_filter, mode=mode)
-    if identities is None:
+    entries = _ranking_entries(ranking_path, format_filter=format_filter)
+    if entries is None:
         return None
 
-    you = _match_identity(identities, study_id=study_id, key=key)
-    you_identity: Optional[str] = str(you['identity']) if you is not None else None
+    mine = _own_entries(entries, study_id=study_id, key=key)
+    my_ranks: set[int] = (
+        set(mine.get_column('rank_idx').to_list()) if mine is not None else set()
+    )
 
     top: list[dict[str, Any]] = []
-    for row in identities.head(max(1, top_n)).iter_rows(named=True):
+    for row in entries.head(max(1, top_n)).iter_rows(named=True):
+        rounds = row["rounds"]
         top.append(
             {
                 "rank": int(row["rank_idx"]) + 1,
                 "mae": float(row["mae"]),
+                "rounds": int(rounds) if rounds is not None else None,
                 "nickname": str(row["nickname"] or ""),
-                "is_you": you_identity is not None and str(row["identity"]) == you_identity,
+                "is_you": int(row["rank_idx"]) in my_ranks,
             }
         )
 
     user_rank: Optional[int] = None
     user_mae: Optional[float] = None
-    if you is not None:
-        user_rank = int(you['rank_idx']) + 1
-        user_mae = float(you['mae'])
+    if mine is not None:
+        best = mine.sort('rank_idx').row(0, named=True)
+        user_rank = int(best['rank_idx']) + 1
+        user_mae = float(best['mae'])
         if not any(entry["is_you"] for entry in top):
             top.append(
                 {
                     "rank": user_rank,
                     "mae": user_mae,
-                    "nickname": str(you['nickname'] or ""),
+                    "rounds": int(best['rounds']) if best['rounds'] is not None else None,
+                    "nickname": str(best['nickname'] or ""),
                     "is_you": True,
                 }
             )
 
     return {
         "rank": user_rank,
-        "total": identities.height,
+        "total": entries.height,
+        "players": int(entries.get_column('identity').n_unique()),
         "mae": user_mae,
         "top": top,
     }
 
 
 def stored_nickname(*, study_id: str, key: str) -> str:
-    """The nickname already recorded for this player, ``""`` when there is none.
+    """The nickname this player last set, ``""`` when there is none.
 
     Used to pre-fill the `/final` box as a *suggestion*: a player returning on a new
     device (fresh localStorage, same email) sees the name they used last time instead
-    of a blank field.  Saving still only ever stamps the current study's rows.
+    of a blank field.  Existing board slots keep the name they were set under.
     """
     if not study_id and not key:
         return ""
-    sources: list[tuple[Path, Optional[str], str]] = [
-        (project_root / 'data' / 'input' / 'prediction_ranking.csv', "ALL", "latest")
+    sources: list[tuple[Path, Optional[str]]] = [
+        (project_root / 'data' / 'input' / 'prediction_ranking.csv', "ALL")
     ]
     sources.extend(
-        (project_root / 'data' / 'input' / f'prediction_ranking_{fmt}.csv', fmt, "best")
+        (project_root / 'data' / 'input' / f'prediction_ranking_{fmt}.csv', fmt)
         for fmt in ("A", "B", "C")
     )
-    for path, fmt_filter, mode in sources:
-        match = _match_identity(
-            _ranking_identities(path, format_filter=fmt_filter, mode=mode),
-            study_id=study_id,
-            key=key,
+    newest: Optional[str] = None
+    newest_ts: Any = None
+    for path, fmt_filter in sources:
+        mine = _own_entries(
+            _ranking_entries(path, format_filter=fmt_filter), study_id=study_id, key=key
         )
-        if match is not None and str(match['nickname'] or ""):
-            return normalize_nickname(str(match['nickname']))
-    return ""
+        if mine is None:
+            continue
+        named = mine.filter(pl.col('nickname') != "").sort('_ts', nulls_last=False)
+        if named.height == 0:
+            continue
+        candidate = named.row(named.height - 1, named=True)
+        if newest_ts is None or (candidate['_ts'] is not None and candidate['_ts'] > newest_ts):
+            newest, newest_ts = str(candidate['nickname']), candidate['_ts']
+    return normalize_nickname(newest) if newest else ""
 
 
 def compute_share_rankings(
@@ -551,7 +653,6 @@ def compute_share_rankings(
             study_id=study_id,
             key=key,
             format_filter=fmt,
-            mode="best",
         )
         if info is not None:
             rank, total = info
@@ -563,7 +664,6 @@ def compute_share_rankings(
         study_id=study_id,
         key=key,
         format_filter="ALL",
-        mode="latest",
     )
     if overall_info is not None:
         rank, total = overall_info
@@ -978,7 +1078,6 @@ if _is_share_mode:
             _tmp_ranking_dir / csv_name,
             study_id=_share_study_id,
             format_filter=fmt_filter,
-            mode="best",
         )
 
     _share_per_format: list[dict[str, Any]] = []
@@ -4413,8 +4512,8 @@ def _leaderboard_board(
     rows: list[Any] = []
     for entry in entries:
         is_you = bool(entry.get("is_you"))
-        # Optional nickname replaces the anonymous rank-derived label. Players who
-        # picked none keep "Player N" exactly as before.
+        # Optional nickname replaces the anonymous rank-derived label. Slots set
+        # anonymously keep "Player N" exactly as before.
         nickname = normalize_nickname(entry.get("nickname"))
         if is_you:
             player_label = (
@@ -4424,6 +4523,7 @@ def _leaderboard_board(
             )
         else:
             player_label = nickname or t("ui.final.player_n", locale=locale, n=int(entry["rank"]))
+        rounds = entry.get("rounds")
         rows.append(
             html.Div(
                 [
@@ -4435,6 +4535,12 @@ def _leaderboard_board(
                             if is_you
                             else "final-leaderboard-cell player"
                         ),
+                    ),
+                    # Arcade boards keep every score, so one player can hold several
+                    # slots; the round count is what tells those slots apart.
+                    html.Span(
+                        "-" if rounds is None else str(int(rounds)),
+                        className="final-leaderboard-cell rounds",
                     ),
                     html.Span(
                         _format_mae_for_unit(float(entry["mae"]), unit=unit),
@@ -4461,6 +4567,10 @@ def _leaderboard_board(
                 [
                     html.Span(t("ui.final.col_rank", locale=locale), className="final-leaderboard-cell rank"),
                     html.Span(t("ui.final.col_player", locale=locale), className="final-leaderboard-cell player"),
+                    html.Span(
+                        t("ui.final.col_rounds", locale=locale),
+                        className="final-leaderboard-cell rounds",
+                    ),
                     html.Span(
                         t("ui.final.col_mae", locale=locale, unit=unit),
                         className="final-leaderboard-cell mae",
@@ -4721,7 +4831,6 @@ def create_highscore_page(
         study_id=study_id,
         key=key,
         format_filter="ALL",
-        mode="latest",
         top_n=HIGHSCORE_TOP_N,
     )
     per_format: list[tuple[str, dict[str, Any]]] = []
@@ -4731,7 +4840,6 @@ def create_highscore_page(
             study_id=study_id,
             key=key,
             format_filter=fmt,
-            mode="best",
             top_n=HIGHSCORE_FORMAT_TOP_N,
         )
         if board is not None:
@@ -4751,8 +4859,10 @@ def create_highscore_page(
                     className="highscore-stat",
                     disable_n_clicks=True,
                 ),
+                # `total` counts board slots (one per finished game) and would just
+                # restate games_played; `players` is the distinct-people count.
                 html.Div(
-                    t("ui.highscore.players_count", locale=locale, total=int((overall or {}).get("total") or 0)),
+                    t("ui.highscore.players_count", locale=locale, total=int((overall or {}).get("players") or 0)),
                     className="highscore-stat",
                     disable_n_clicks=True,
                 ),
@@ -4793,7 +4903,8 @@ def create_highscore_page(
         card = _leaderboard_board(
             list(board.get("top") or []),
             title=_format_label(fmt, locale=locale),
-            subtitle=t("ui.highscore.players_count", locale=locale, total=int(board.get("total") or 0)),
+            # One slot per finished game on this source, so count scores not players.
+            subtitle=t("ui.highscore.scores_count", locale=locale, total=int(board.get("total") or 0)),
             locale=locale,
             unit=unit,
         )
@@ -4950,7 +5061,6 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
             study_id=study_id,
             key=leaderboard_key,
             format_filter=fmt,
-            mode="best",
         )
         if board is not None:
             per_format_boards.append((fmt, board))
@@ -4961,7 +5071,6 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
         study_id=study_id,
         key=leaderboard_key,
         format_filter="ALL",
-        mode="latest",
     )
 
     leaderboard = _build_final_leaderboard(
@@ -5949,7 +6058,6 @@ def save_final_nickname(
             study_id=study_id,
             key=key,
             format_filter=fmt,
-            mode="best",
         )
         if board is not None:
             per_format_boards.append((fmt, board))
@@ -5959,7 +6067,6 @@ def save_final_nickname(
         study_id=study_id,
         key=key,
         format_filter="ALL",
-        mode="latest",
     )
 
     return (

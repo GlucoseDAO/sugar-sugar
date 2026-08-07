@@ -5,6 +5,7 @@ import polars as pl
 from datetime import datetime
 import uuid
 import csv
+import shutil
 from pathlib import Path
 from eliot import start_action
 from sugar_sugar.config import PREDICTION_HOUR_OFFSET, STORAGE_TYPE
@@ -26,6 +27,30 @@ def _is_mobile_ua(ua: Optional[str]) -> bool:
         return False
     lc = ua.lower()
     return any(keyword in lc for keyword in _MOBILE_UA_KEYWORDS)
+
+
+# `SubmitComponent()` is also constructed per prediction-page render
+# (create_prediction_layout), so the one-shot ranking migration is gated to run
+# once per process rather than on every render -- it reads five CSVs.
+_IDENTITY_BACKFILL_DONE: bool = False
+
+# Suffix for the pristine copy taken before a ranking CSV is first converted.
+# Gitignored via `*.pre-nickname.bak`.
+_BACKUP_SUFFIX: str = ".pre-nickname.bak"
+
+
+def _backup_before_conversion(path: Path) -> Optional[Path]:
+    """Copy ``path`` aside once, before it is first converted.
+
+    Deliberately **never overwrites** an existing backup: a later boot would copy
+    already-converted content over it and destroy the only pristine record.  So the
+    first run wins and the original survives every subsequent restart.
+    """
+    backup = path.with_name(path.name + _BACKUP_SUFFIX)
+    if backup.exists():
+        return None
+    shutil.copy2(path, backup)
+    return backup
 
 class SubmitComponent(html.Div):
     def __init__(self, *, locale: str = "en") -> None:
@@ -54,6 +79,11 @@ class SubmitComponent(html.Div):
         if legacy_csv_path.exists() and not self._stats_csv_path.exists():
             legacy_csv_path.replace(self._stats_csv_path)
         self._repair_misaligned_csv_rows()
+        global _IDENTITY_BACKFILL_DONE
+        if not _IDENTITY_BACKFILL_DONE:
+            # Set first: a failure must surface loudly at boot, not retry per request.
+            _IDENTITY_BACKFILL_DONE = True
+            self.backfill_leaderboard_identity()
         super().__init__([
             html.Div(
                 id="prediction-progress-label",
@@ -201,6 +231,122 @@ class SubmitComponent(html.Div):
             for row in repaired:
                 writer.writerow({k: row.get(k, '') for k in header})
         tmp_path.replace(path)
+
+    def _email_keys_by_study(self) -> dict[str, str]:
+        """``study_id`` -> derived ``email_key``, read from the statistics CSV.
+
+        `prediction_statistics.csv` has always stored the address, so this only
+        derives the hash the ranking CSVs need -- no new information is written
+        anywhere, and the address itself never moves.  When one study_id has
+        several rows the most recent non-empty address wins, since that is the
+        one a future run would hash.
+        """
+        if not self._stats_csv_path.exists():
+            return {}
+        with self._stats_csv_path.open('r', newline='', encoding='utf-8', errors='replace') as file_handle:
+            reader = csv.DictReader(file_handle)
+            fieldnames = reader.fieldnames or []
+            if 'study_id' not in fieldnames or 'email' not in fieldnames:
+                return {}
+            keys: dict[str, str] = {}
+            for row in reader:
+                study_id = str(row.get('study_id') or '').strip()
+                key = email_key(row.get('email'))
+                if study_id and key:
+                    keys[study_id] = key
+        return keys
+
+    def backfill_leaderboard_identity(self) -> int:
+        """Convert pre-nickname ranking CSVs on first run. Idempotent.
+
+        Two things happen:
+
+        1. Every ranking CSV gains the ``email_key`` / ``nickname`` columns, so the
+           schema is uniform from boot rather than only after the next finished game.
+        2. Rows with a blank ``email_key`` get theirs derived from the address the
+           statistics CSV already holds for that ``study_id``.
+
+        (2) is what lets a player recognise their own history.  Board placement is
+        arcade-style -- every finished game keeps its own slot and nothing is ever
+        merged -- but a historical row carries only a ``study_id``, so on a new
+        device (fresh localStorage, new study_id, same email) the player's own past
+        scores would read as somebody else's: not highlighted, not counted as their
+        placement, and invisible to the `/final` nickname suggestion.  Backfilling
+        links them without moving, merging or removing a single slot.
+
+        A row that already has an ``email_key`` is never relabelled, and a study_id
+        with no recorded address keeps a blank key (its slots then belong to that
+        session alone, exactly as an anonymous player's do).  Returns the number of
+        rows stamped.
+        """
+        with start_action(action_type=u"backfill_leaderboard_identity") as action:
+            email_keys = self._email_keys_by_study()
+            stamped = 0
+            upgraded_files = 0
+            backups: list[str] = []
+            for path in [self._ranking_csv_path, *self._ranking_by_format_paths.values()]:
+                rows_changed, schema_changed, backup = self._backfill_identity_csv(
+                    path, email_keys
+                )
+                stamped += rows_changed
+                upgraded_files += int(schema_changed)
+                if backup is not None:
+                    backups.append(backup.name)
+            action.log(
+                message_type=u"ranking_identity_backfilled",
+                known_study_ids=len(email_keys),
+                rows_stamped=stamped,
+                files_upgraded=upgraded_files,
+                backups=backups,
+            )
+        return stamped
+
+    @staticmethod
+    def _backfill_identity_csv(
+        path: Path, email_keys: dict[str, str]
+    ) -> tuple[int, bool, Optional[Path]]:
+        """Add the identity columns to one ranking CSV and fill blank keys.
+
+        Returns ``(rows_stamped, schema_changed, backup_path)``.  Writes nothing when
+        there is nothing to do, so this is safe to run on every boot -- and takes a
+        pristine ``*.pre-nickname.bak`` copy before its first write, so a botched
+        conversion can be undone by hand.
+        """
+        if not path.exists():
+            return 0, False, None
+        with path.open('r', newline='', encoding='utf-8', errors='replace') as file_handle:
+            reader = csv.DictReader(file_handle)
+            header = list(reader.fieldnames or [])
+            rows = list(reader)
+        if not header:
+            return 0, False, None
+
+        upgraded_header = header + [c for c in ('email_key', 'nickname') if c not in header]
+        schema_changed = upgraded_header != header
+
+        stamped = 0
+        for row in rows:
+            if str(row.get('email_key') or '').strip():
+                continue  # already has an identity -- never relabel it
+            key = email_keys.get(str(row.get('study_id') or '').strip(), '')
+            if key:
+                row['email_key'] = key
+                stamped += 1
+
+        if stamped == 0 and not schema_changed:
+            return 0, False, None
+
+        # Snapshot the original before the first conversion touches it.
+        backup = _backup_before_conversion(path)
+
+        tmp_path = path.with_suffix('.tmp')
+        with tmp_path.open('w', newline='', encoding='utf-8') as out_handle:
+            writer = csv.DictWriter(out_handle, fieldnames=upgraded_header)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow({column: row.get(column, '') for column in upgraded_header})
+        tmp_path.replace(path)
+        return stamped, schema_changed, backup
 
     def set_study_nickname(self, *, study_id: str, key: str, nickname: str) -> int:
         """Stamp `nickname` onto this study's ranking rows only; backfill their `email_key`.

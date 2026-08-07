@@ -391,11 +391,12 @@ de:
 
   highscore:
     title: "Bestenliste"
-    subtitle: "Anonyme Rangliste aller abgeschlossenen Spiele. Ein kleinerer mittlerer absoluter Fehler (MAE) bedeutet eine bessere Vorhersage."
+    subtitle: "Jedes beendete Spiel behält seinen eigenen Platz — übertriff dein Ergebnis, und das alte bleibt trotzdem in der Liste. Ein kleinerer mittlerer absoluter Fehler (MAE) bedeutet eine bessere Vorhersage."
     overall_board: "Gesamt"
     by_data_source: "Nach Datenquelle"
     lower_is_better: "Kleinerer MAE ist besser"
     players_count: "%{total} Spieler"
+    scores_count: "%{total} Ergebnisse"
     games_played: "%{count} gespielte Spiele"
     empty: "Noch keine abgeschlossenen Spiele. Spiele einen kompletten Durchlauf und du bist der Erste auf der Liste."
     play_now: "Jetzt spielen"
@@ -416,6 +417,7 @@ de:
     top_predictors: "Beste Vorhersagen"
     col_rank: "#"
     col_player: "Spieler"
+    col_rounds: "Runden"
     col_mae: "MAE (%{unit})"
     you: "Du"
     player_n: "Spieler %{n}"

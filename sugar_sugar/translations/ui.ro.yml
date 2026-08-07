@@ -412,11 +412,12 @@ ro:
 
   highscore:
     title: "Clasament"
-    subtitle: "Clasament anonim al tuturor jocurilor finalizate. O eroare absolută medie (MAE) mai mică înseamnă o predicție mai bună."
+    subtitle: "Fiecare joc terminat își păstrează propriul loc — depășește-ți rezultatul, iar cel vechi rămâne în clasament. O eroare absolută medie (MAE) mai mică înseamnă o predicție mai bună."
     overall_board: "General"
     by_data_source: "După sursa de date"
     lower_is_better: "Un MAE mai mic este mai bun"
     players_count: "%{total} jucători"
+    scores_count: "%{total} rezultate"
     games_played: "%{count} jocuri jucate"
     empty: "Încă nu există jocuri finalizate. Joacă o rundă completă și vei fi primul în clasament."
     play_now: "Joacă acum"
@@ -437,6 +438,7 @@ ro:
     top_predictors: "Cei mai buni predictori"
     col_rank: "#"
     col_player: "Jucător"
+    col_rounds: "Runde"
     col_mae: "MAE (%{unit})"
     you: "Tu"
     player_n: "Jucător %{n}"
