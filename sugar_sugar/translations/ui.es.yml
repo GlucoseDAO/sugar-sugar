@@ -343,6 +343,10 @@ es:
     copy_link: "🔗 Copiar enlace de reanudación"
     copied: "✓ ¡Enlace copiado!"
 
+  restoring:
+    title: "Restaurando tu partida…"
+    text: "Estamos recuperando tu sesión guardada. Si no ocurre nada, usa el botón de abajo."
+
   session_expired:
     title: "Sesión expirada"
     text: "Por favor, empieza de nuevo desde el principio."

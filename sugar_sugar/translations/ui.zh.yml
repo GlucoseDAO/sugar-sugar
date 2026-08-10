@@ -341,6 +341,10 @@ zh:
     copy_link: "🔗 复制恢复链接"
     copied: "✓ 链接已复制！"
 
+  restoring:
+    title: "正在恢复你的游戏…"
+    text: "正在载入你保存的会话。如果没有反应，请使用下方的按钮。"
+
   session_expired:
     title: "会话已过期"
     text: "请从头开始。"

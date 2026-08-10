@@ -77,5 +77,5 @@ DASH_DEBUG: bool = _env_bool("DASH_DEBUG", DEBUG_MODE)
 # 17: handle_time_slider gained an events-df Output (window-trimmed events store).
 # 18: navbar gained the Highscore item (/highscore page) on desktop + mobile.
 # 19: optional leaderboard nicknames -- fill_form_data gained a nickname-input Output.
-DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "19"))
+DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "20"))
 

@@ -366,6 +366,10 @@ en:
     copy_link: "🔗 Copy resume link"
     copied: "✓ Link copied!"
 
+  restoring:
+    title: "Restoring your game…"
+    text: "Picking your saved session back up. If nothing happens, use the button below."
+
   session_expired:
     title: "Session Expired"
     text: "Please start over from the beginning."

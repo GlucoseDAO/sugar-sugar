@@ -342,6 +342,10 @@ de:
     copy_link: "🔗 Fortsetzungslink kopieren"
     copied: "✓ Link kopiert!"
 
+  restoring:
+    title: "Spiel wird wiederhergestellt…"
+    text: "Deine gespeicherte Sitzung wird geladen. Falls nichts passiert, nutze die Schaltfläche unten."
+
   session_expired:
     title: "Sitzung abgelaufen"
     text: "Bitte von vorne beginnen."

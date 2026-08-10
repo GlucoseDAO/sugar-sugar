@@ -343,6 +343,10 @@ fr:
     copy_link: "🔗 Copier le lien de reprise"
     copied: "✓ Lien copié !"
 
+  restoring:
+    title: "Restauration de votre partie…"
+    text: "Nous reprenons votre session enregistrée. Si rien ne se passe, utilisez le bouton ci-dessous."
+
   session_expired:
     title: "Session expirée"
     text: "Merci de recommencer depuis le début."

@@ -1938,6 +1938,17 @@ app.layout = html.Div([
     # Current step index for the mobile startup wizard (StartupPageMobile).
     # Memory: wizard position resets per page load, like page-restore-done.
     dcc.Store(id='startup-step', data=0, storage_type='memory'),
+    # One-shot signal that the localStorage-backed game stores have hydrated, so
+    # `display_page` can re-render a game route it first rendered too early (a
+    # cold load lands before hydration -- see _restoring_layout). Memory: a fresh
+    # page load must start over at False.
+    dcc.Store(id='game-stores-hydrated', data=False, storage_type='memory'),
+    # Server-side truth about whether the drawing chart is actually on screen.
+    # The `route-prediction` <html> class (and every prediction-only CSS rule,
+    # incl. the `:not(.route-prediction)` mobile overflow/tap-reliability
+    # releases) is keyed on this, NOT on the pathname alone -- the URL can say
+    # /prediction while the rendered content is something else entirely.
+    dcc.Store(id='prediction-chart-rendered', data=False, storage_type='memory'),
     # Clientside location-autocomplete init ping (see assets/location-autocomplete.js).
     dcc.Store(id='location-autocomplete-ping', data=0, storage_type='memory'),
 
@@ -2016,9 +2027,15 @@ app.clientside_callback(
 # scroller so the surrounding UI remains readable.
 app.clientside_callback(
     """
-    function(pathname) {
+    function(pathname, chartRendered) {
         var root = document.documentElement;
-        var isPrediction = (pathname === '/prediction');
+        // Both conditions, deliberately: the pathname drops the class the instant
+        // we navigate away, and `chartRendered` (server-side truth, see
+        // mark_prediction_chart_rendered) withholds it until the chart is really
+        // on screen. The URL alone once stamped it onto a consent form rendered
+        // at /prediction, releasing the mobile overflow cap and tap-reliability
+        // rules that are scoped `:not(.route-prediction)`.
+        var isPrediction = (pathname === '/prediction') && !!chartRendered;
         if (root) {
             if (isPrediction) { root.classList.add('route-prediction'); }
             else { root.classList.remove('route-prediction'); }
@@ -2055,7 +2072,8 @@ app.clientside_callback(
     }
     """,
     Output('viewport-sink', 'children'),
-    Input('url', 'pathname'),
+    [Input('url', 'pathname'),
+     Input('prediction-chart-rendered', 'data')],
     prevent_initial_call=False,
 )
 
@@ -2448,6 +2466,114 @@ def update_prediction_uploaded_data_consent_ui(
 
 _STATEFUL_PAGES = frozenset({'/prediction', '/ending'})
 
+# Game routes whose content is rebuilt from localStorage-backed stores, so they
+# cannot be rendered correctly until those stores have hydrated.
+_GAME_ROUTES: frozenset[str] = frozenset({'/prediction', '/ending', '/final'})
+
+# How long the restoring placeholder waits for hydration before giving up and
+# routing to landing (ticks of `session-restore-poll`, 250 ms each).
+_RESTORE_POLL_MS: int = 250
+_RESTORE_GIVE_UP_TICKS: int = 16  # ~4 s; hydration normally lands in well under one tick.
+
+
+def _game_stores_ready(
+    pathname: Optional[str],
+    user_info: Optional[Dict[str, Any]],
+    current_df_data: Optional[Dict],
+) -> bool:
+    """True when the stores needed to rebuild *pathname* have hydrated.
+
+    ``dcc.Store(storage_type='local')`` values arrive **after** the first server
+    render, and `display_page` reads them as ``State`` (it must -- making
+    user-info-store an Input would re-render, and so destroy, the live chart on
+    every round). So a *full page load* whose URL is already a game route (an
+    Android tab restore days later, a pull-to-refresh on the chart, a bookmark,
+    F5) renders with ``user_info=None``.
+
+    That used to fall through `display_page` to the **landing page** -- which on
+    mobile leads straight into the consent wizard -- and nothing ever re-rendered,
+    because `page-content` only changes when `url.pathname` changes and
+    `restore_page_on_load` bails out for any pathname other than ``/``. A player
+    resuming mid-study was silently dumped back into the consent form with her
+    session intact in localStorage (reported: Samsung/Android portrait, 3 days
+    after saving a session).
+    """
+    if pathname not in _GAME_ROUTES:
+        return True
+    if not user_info:
+        return False
+    if pathname == '/ending':
+        # /ending also reads the played window back out of the client store.
+        return bool(current_df_data)
+    return True
+
+
+def _renders_prediction_chart(
+    pathname: Optional[str],
+    user_info: Optional[Dict[str, Any]],
+) -> bool:
+    """True when `display_page` will actually render the drawing chart.
+
+    Single source of truth shared with `mark_prediction_chart_rendered`, which
+    drives the ``route-prediction`` <html> class. Keep the two in step: the class
+    must never be stamped on non-chart content (see that callback for why).
+    """
+    return bool(
+        pathname == '/prediction'
+        and user_info
+        and user_info.get('consent_completed')
+    )
+
+
+def _restoring_layout(*, locale: str) -> html.Div:
+    """Neutral "restoring your session" placeholder for an un-hydrated game route.
+
+    Rendered instead of the landing page / "session expired" screen while the
+    localStorage stores catch up (see `_game_stores_ready`). The embedded
+    `session-restore-poll` interval is what re-renders the page once they do --
+    deliberately scoped to this layout, since a Dash callback only fires while
+    every component it references is in the DOM. That makes it impossible for the
+    re-render to fire mid-game and reset the chart.
+    """
+    return html.Div(
+        [
+            html.H2(
+                t("ui.restoring.title", locale=locale),
+                style={'textAlign': 'center', 'marginTop': '50px'},
+                disable_n_clicks=True,
+            ),
+            html.P(
+                t("ui.restoring.text", locale=locale),
+                style={'textAlign': 'center', 'marginBottom': '30px', 'color': '#475569'},
+                disable_n_clicks=True,
+            ),
+            html.Div(
+                html.A(
+                    t("ui.common.go_to_start", locale=locale),
+                    href="/",
+                    style={
+                        'backgroundColor': '#007bff',
+                        'color': 'white',
+                        'padding': '15px 30px',
+                        'textDecoration': 'none',
+                        'borderRadius': '5px',
+                        'fontSize': '18px',
+                    },
+                ),
+                style={'textAlign': 'center'},
+                disable_n_clicks=True,
+            ),
+            dcc.Interval(
+                id='session-restore-poll',
+                interval=_RESTORE_POLL_MS,
+                n_intervals=0,
+                max_intervals=_RESTORE_GIVE_UP_TICKS,
+            ),
+        ],
+        id='session-restoring',
+        disable_n_clicks=True,
+    )
+
 # Keyword list mirrors the clientside `mobile-device` class setter.  Kept here so
 # the server-side layout branch (display_page / update_on_language_change) can pick
 # the mobile builder for structurally-different pages (startup wizard, landing).
@@ -2762,7 +2888,8 @@ def update_ending_text_on_language_change(
     [Output('page-content', 'children'),
      Output('mobile-warning', 'children'),
      Output('navbar-container', 'children')],
-    [Input('url', 'pathname')],
+    [Input('url', 'pathname'),
+     Input('game-stores-hydrated', 'data')],
     [State('interface-language', 'data'),
      State('user-info-store', 'data'),
      State('current-window-df', 'data'),
@@ -2773,6 +2900,7 @@ def update_ending_text_on_language_change(
 )
 def display_page(
     pathname: Optional[str],
+    stores_hydrated: Optional[bool],
     interface_language: Optional[str],
     user_info: Optional[Dict[str, Any]],
     current_df_data: Optional[Dict],
@@ -2793,6 +2921,13 @@ def display_page(
                 return staging_layout, warning_content, navbar
         if pathname == "/consent-form":
             return ConsentFormPage(locale=locale), warning_content, navbar
+        # Hydration guard: on a full page load the localStorage stores arrive after
+        # this first render, so a game route would otherwise be rebuilt from empty
+        # state -- landing/consent for /prediction, "session expired" for
+        # /ending and /final. Hold a neutral placeholder instead; its poll flips
+        # `game-stores-hydrated`, which re-runs this callback with real data.
+        if not _game_stores_ready(pathname, user_info, current_df_data):
+            return _restoring_layout(locale=locale), warning_content, navbar
         # Consent guard: mandatory consent (acknowledge + GDPR) must have been
         # recorded before the game flow is reachable. `consent_completed` is set
         # by handle_landing_continue (desktop) and the mobile wizard's Start
@@ -2801,7 +2936,9 @@ def display_page(
         # handle_start_button would skip its own check).
         consent_done = bool(user_info and user_info.get('consent_completed'))
         if pathname == '/prediction' and user_info:
-            if not consent_done:
+            # Same predicate as `mark_prediction_chart_rendered`, so the
+            # `route-prediction` CSS class can never disagree with what is drawn.
+            if not _renders_prediction_chart(pathname, user_info):
                 # No consent on record -> send the user to the consent entry.
                 return (_landing_builder(locale=locale), warning_content, navbar)
             format_value = str(user_info.get("format") or "A")
@@ -6638,6 +6775,18 @@ def restore_page_on_load(
         raise PreventUpdate
 
     if not last_page or last_page == "/":
+        # Hydration ORDER, not just hydration: `last-visited-page` sits *after*
+        # user-info-store / current-window-df in the layout, so it hydrates later
+        # and this callback's first firing routinely carries a populated session
+        # with `last_page` still None. Marking the restore "done" there burned the
+        # one-shot guard: when last-visited-page finally arrived the callback was
+        # already spent, so no dialog and no redirect ever happened and the player
+        # was left on the landing page -- whose only mobile CTA walks into the
+        # consent wizard. Wait for the next firing instead whenever the session
+        # stores already hold data; only a genuinely empty localStorage (nothing
+        # hydrated anywhere) means "fresh visitor, nothing to restore".
+        if user_info or current_df_data:
+            raise PreventUpdate
         return no_update, True, no_update, True
 
     if pathname and pathname != "/":
@@ -6690,6 +6839,69 @@ def restore_page_on_load(
             "resume_code": (user_info or {}).get("resume_code"),
         }
         return dialog_data, True, no_update, True
+
+
+@app.callback(
+    [Output('game-stores-hydrated', 'data'),
+     Output('url', 'pathname', allow_duplicate=True)],
+    [Input('session-restore-poll', 'n_intervals')],
+    [State('user-info-store', 'data'),
+     State('current-window-df', 'data'),
+     State('url', 'pathname')],
+    prevent_initial_call=True,
+)
+def resolve_session_restore(
+    n_intervals: Optional[int],
+    user_info: Optional[Dict[str, Any]],
+    current_df_data: Optional[Dict],
+    pathname: Optional[str],
+) -> Tuple[Any, Any]:
+    """Finish (or abandon) the restore that `_restoring_layout` is showing.
+
+    `session-restore-poll` lives **only inside that placeholder**, so this
+    callback is inert on every other page -- in particular it can never fire
+    while the chart is up and force a `display_page` re-render mid-round.
+
+    As soon as the stores this route needs have hydrated, flip
+    `game-stores-hydrated` so `display_page` re-renders the real page. If they
+    never arrive (localStorage genuinely empty -- e.g. someone deep-links to
+    /prediction without a session), give up after `_RESTORE_GIVE_UP_TICKS` and
+    route to landing rather than spin forever.
+    """
+    if _game_stores_ready(pathname, user_info, current_df_data):
+        return True, no_update
+    if int(n_intervals or 0) >= _RESTORE_GIVE_UP_TICKS:
+        with start_action(action_type=u"session_restore_gave_up", pathname=pathname):
+            return no_update, "/"
+    raise PreventUpdate
+
+
+@app.callback(
+    Output('prediction-chart-rendered', 'data'),
+    [Input('url', 'pathname'),
+     Input('game-stores-hydrated', 'data')],
+    [State('user-info-store', 'data')],
+    prevent_initial_call=False,
+)
+def mark_prediction_chart_rendered(
+    pathname: Optional[str],
+    stores_hydrated: Optional[bool],
+    user_info: Optional[Dict[str, Any]],
+) -> bool:
+    """Publish whether the drawing chart is really on screen (route-class truth).
+
+    The `route-prediction` class used to be stamped from the pathname alone. When
+    the URL said /prediction but `display_page` had rendered something else (the
+    un-hydrated cold load above, or the consent bounce), every prediction-only
+    mobile rule then applied to that foreign content -- including the two
+    `:not(.route-prediction)` *releases*: the `#page-content *  { max-width:100% }`
+    overflow cap (without it a form page overflows and the browser zooms the whole
+    page out) and `touch-action: manipulation` (without it Android waits ~300 ms
+    per tap for a double-tap-zoom and swallows taps, the documented "Next worked
+    on the 4th click"). Net effect: a consent form the player could tick but not
+    submit. Keyed on the render decision, that combination cannot recur.
+    """
+    return _renders_prediction_chart(pathname, user_info)
 
 
 # --- In-session redirect: "Game" navbar link → last game page ---
@@ -6806,6 +7018,10 @@ def render_resume_dialog(
         'display': 'flex',
         'gap': '16px',
         'justifyContent': 'center',
+        # Wrap on narrow phones: two 140px buttons + the gap don't fit inside the
+        # 90vw card on a ~360px portrait screen, and an overflowing element makes
+        # the browser expand the layout viewport and zoom the whole page out.
+        'flexWrap': 'wrap',
     }
 
     warning_style = {

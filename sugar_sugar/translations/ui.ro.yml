@@ -363,6 +363,10 @@ ro:
     copy_link: "🔗 Copiază linkul de reluare"
     copied: "✓ Link copiat!"
 
+  restoring:
+    title: "Îți restaurăm jocul…"
+    text: "Reluăm sesiunea salvată. Dacă nu se întâmplă nimic, folosește butonul de mai jos."
+
   session_expired:
     title: "Sesiune expirată"
     text: "Te rugăm să reîncepi de la început."
