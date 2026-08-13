@@ -41,8 +41,7 @@ es:
     about_study_title: "Sobre el estudio"
     about_study_text: "Estamos estudiando qué tan precisos son los humanos al predecir las tendencias de la glucosa y qué patrones notan los usuarios experimentados de CGM. Si eliges participar, tu juego y tus datos de CGM subidos pueden ser utilizados para investigaciones posteriores."
     your_choices_title: "Tus opciones"
-    your_choices_text: "Por defecto, asumimos que aceptas participar en el estudio. Si solo quieres jugar, marca la primera casilla."
-    consent_play_only: "Solo quiero jugar (no guardar mis datos de CGM / juego)"
+    your_choices_text: "Al continuar aceptas participar en el estudio. Tu partida puede guardarse para investigación."
     consent_receive_results: "Quiero recibir mis resultados más tarde"
     consent_keep_updated: "Mantenme al día sobre las novedades del proyecto"
     consent_acknowledge_label: "Tengo 18 años o más y he leído los términos y condiciones."
@@ -524,7 +523,7 @@ es:
       - title: "Datos y privacidad"
         items:
           - q: "¿Se almacena alguno de mis datos?"
-            a: "Hasta que elijas enviar, todo se queda en tu propio navegador. No se envía nada a nuestros servidores a menos que des tu consentimiento activo y envíes los resultados. Si seleccionas \"Solo quiero jugar\", ningún dato sale nunca de tu dispositivo."
+            a: "Hasta que elijas enviar, todo se queda en tu propio navegador. No se envía nada a nuestros servidores a menos que des tu consentimiento activo y envíes los resultados."
           - q: "¿Qué datos se recopilan si doy mi consentimiento?"
             a: "Datos de juego (predicciones dibujadas, métricas de precisión), opcionalmente tu archivo CGM subido y un cuestionario corto (edad, experiencia con CGM, estado de la diabetes, etc.)."
           - q: "¿Se comparten mis datos de CGM con terceros?"

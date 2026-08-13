@@ -39,8 +39,7 @@ en:
     about_study_title: "About the study"
     about_study_text: "We're studying how accurate humans are at predicting glucose trends, and what patterns experienced CGM users notice. If you choose to participate, your gameplay and uploaded CGM data may be used for further research."
     your_choices_title: "Your choices"
-    your_choices_text: "By default, we assume you agree to participate in the study. If you only want to play, check the first box."
-    consent_play_only: "I just want to play (do not store my CGM / gameplay data)"
+    your_choices_text: "By continuing you agree to participate in the study. Your gameplay may be stored for research."
     consent_receive_results: "I want to receive my results later"
     consent_keep_updated: "Keep me up to date about project updates"
     consent_acknowledge_label: "I am 18+ years old and I have read the terms and conditions."
@@ -547,7 +546,7 @@ en:
       - title: "Data and privacy"
         items:
           - q: "Is any of my data stored?"
-            a: "Until you choose to submit, everything stays in your own browser. Nothing is sent to our servers unless you actively consent and submit results. If you select \"I just want to play\", no data ever leaves your device."
+            a: "Until you choose to submit, everything stays in your own browser. Nothing is sent to our servers unless you actively consent and submit results."
           - q: "What data is collected if I consent?"
             a: "Gameplay data (drawn predictions, accuracy metrics), optionally your uploaded CGM file, and a short questionnaire (age, CGM experience, diabetes status, etc.)."
           - q: "Is my CGM data shared with third parties?"

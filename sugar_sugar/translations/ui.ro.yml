@@ -39,8 +39,7 @@ ro:
     about_study_title: "Despre studiu"
     about_study_text: "Studiem cât de precis pot oamenii să prezică tendințele glucozei și ce tipare observă utilizatorii CGM cu experiență. Dacă alegi să participi, jocul tău și datele CGM încărcate pot fi folosite pentru cercetare ulterioară."
     your_choices_title: "Opțiunile tale"
-    your_choices_text: "Implicit, presupunem că ești de acord să participi la studiu. Dacă vrei doar să joci, bifează prima căsuță."
-    consent_play_only: "Vreau doar să joc (nu stocați datele mele CGM / de joc)"
+    your_choices_text: "Continuând, ești de acord să participi la studiu. Jocul tău poate fi stocat pentru cercetare."
     consent_receive_results: "Vreau să primesc rezultatele mai târziu"
     consent_keep_updated: "Țineți-mă la curent cu actualizările proiectului"
     consent_acknowledge_label: "Am 18+ ani și am citit termenii și condițiile."
@@ -544,7 +543,7 @@ ro:
       - title: "Date și confidențialitate"
         items:
           - q: "Sunt stocate datele mele?"
-            a: "Până când alegi să trimiți, totul rămâne în propriul tău browser. Nimic nu este trimis la serverele noastre decât dacă îți dai consimțământul activ și trimiți rezultate. Dacă selectezi \"Vreau doar să joc\", nicio dată nu va părăsi dispozitivul tău."
+            a: "Până când alegi să trimiți, totul rămâne în propriul tău browser. Nimic nu este trimis la serverele noastre decât dacă îți dai consimțământul activ și trimiți rezultate."
           - q: "Ce date sunt colectate dacă îmi dau consimțământul?"
             a: "Date de joc (predicții desenate, metrici de acuratețe), opțional fișierul tău CGM încărcat și un scurt chestionar (vârstă, experiență CGM, status diabet etc.)."
           - q: "Sunt partajate datele mele CGM cu terțe părți?"

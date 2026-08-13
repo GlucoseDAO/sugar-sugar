@@ -1,11 +1,90 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import csv
 from eliot import start_action
+
+
+def resolve_optional_consents(
+    *,
+    receive_results: bool,
+    keep_updated: bool,
+) -> tuple[bool, bool, bool]:
+    """Return ``(play_only, participate_in_study, no_selection)``.
+
+    The play-only checkbox is gone: ticking 18+ and GDPR *is* study consent.
+    Optional boxes (email results, updates, upload) are extras, not a gate.
+    ``play_only`` stays in the return tuple / CSV column as always-False so
+    existing writers and historical rows keep a stable schema.
+    """
+    play_only = False
+    participate = True
+    no_selection = not (receive_results or keep_updated)
+    return play_only, participate, no_selection
+
+
+def apply_optional_consent_choices(
+    info: dict[str, Any],
+    *,
+    receive_results: bool,
+    keep_updated: bool,
+    upload_own_data: bool,
+) -> dict[str, Any]:
+    """Stamp resolved optional-consent flags onto ``info`` and return it."""
+    play_only, participate, no_selection = resolve_optional_consents(
+        receive_results=receive_results,
+        keep_updated=keep_updated,
+    )
+    info["consent_play_only"] = play_only
+    info["consent_participate_in_study"] = participate
+    info["consent_receive_results_later"] = receive_results
+    info["consent_keep_up_to_date"] = keep_updated
+    info["consent_no_selection"] = no_selection
+    info["consent_upload_own_data"] = upload_own_data
+    if upload_own_data:
+        info["consent_use_uploaded_data"] = True
+    return info
+
+
+def reconcile_stored_consents(user_info: dict[str, Any]) -> dict[str, Any]:
+    """Force leftover ``consent_play_only=True`` off so old sessions still save.
+
+    Sessions that consented when the play-only box existed can still have that
+    flag in localStorage. Re-resolving at Start and at the save boundary
+    writes those games without asking the player to re-tick boxes.
+    """
+    return apply_optional_consent_choices(
+        user_info,
+        receive_results=bool(user_info.get("consent_receive_results_later")),
+        keep_updated=bool(user_info.get("consent_keep_up_to_date")),
+        upload_own_data=bool(
+            user_info.get("consent_upload_own_data")
+            or user_info.get("consent_use_uploaded_data")
+        ),
+    )
+
+
+def should_persist_study_data(user_info: Optional[dict[str, Any]]) -> bool:
+    """True when this session should write (or update) stats + ranking CSVs.
+
+    Written at Start (demographics, even with zero rounds) and again after
+    every submitted round so a player who closes the tab without Exit is
+    still in the study files. Same ``study_id`` upserts in place. There is
+    no 6- or 12-round minimum and no play-only opt-out. ``uv run chart``
+    skips writes via ``_CHART_MODE``.
+    """
+    if os.environ.get("_CHART_MODE") == "1":
+        return False
+    if not user_info:
+        return False
+    if not user_info.get("consent_completed"):
+        return False
+    reconcile_stored_consents(user_info)
+    return True
 
 
 def consent_csv_path() -> Path:

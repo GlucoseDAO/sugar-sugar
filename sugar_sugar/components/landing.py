@@ -13,7 +13,11 @@ from dash.dependencies import Input, Output, State
 from eliot import start_action
 
 from sugar_sugar.consent_notice_text import consent_notice_children
-from sugar_sugar.consent import ensure_consent_agreement_row, get_next_study_number
+from sugar_sugar.consent import (
+    apply_optional_consent_choices,
+    ensure_consent_agreement_row,
+    get_next_study_number,
+)
 from sugar_sugar.i18n import t, t_list
 from sugar_sugar.config import STORAGE_TYPE
 
@@ -83,7 +87,7 @@ def consent_controls_children(locale: str) -> list[Any]:
     """The inner children of the ``consent-notice-scroll`` block.
 
     Shared verbatim between the desktop ``LandingPage`` and the mobile
-    ``LandingPageMobile`` so the consent text + the six consent checklists
+    ``LandingPageMobile`` so the consent text + the five consent checklists
     (with their stable ids the callbacks target) never drift apart.
     """
     return [
@@ -121,14 +125,6 @@ def consent_controls_children(locale: str) -> list[Any]:
             persistence=True,
             persistence_type=STORAGE_TYPE,
             style={"fontSize": "16px", "marginBottom": "10px"},
-        ),
-        dbc.Checklist(
-            id="consent-play-only",
-            options=[{"label": f" {t('ui.landing.consent_play_only', locale=locale)}", "value": "play_only"}],
-            value=[],
-            persistence=True,
-            persistence_type=STORAGE_TYPE,
-            style={"fontSize": "16px"},
         ),
         dbc.Checklist(
             id="consent-receive-results",
@@ -426,7 +422,6 @@ class LandingPage(html.Div):
                 State("consent-acknowledge", "value"),
                 State("consent-gdpr", "value"),
                 State("consent-upload-own-data", "value"),
-                State("consent-play-only", "value"),
                 State("consent-receive-results", "value"),
                 State("consent-keep-updated", "value"),
                 State("user-info-store", "data"),
@@ -439,7 +434,6 @@ class LandingPage(html.Div):
             acknowledge_value: Optional[list[str]],
             gdpr_value: Optional[list[str]],
             upload_own_data_value: Optional[list[str]],
-            play_only_value: Optional[list[str]],
             receive_results_value: Optional[list[str]],
             keep_updated_value: Optional[list[str]],
             user_info: Optional[dict[str, Any]],
@@ -464,24 +458,17 @@ class LandingPage(html.Div):
 
                 info["study_id"] = str(uuid.uuid4())
 
-            any_selected = bool(play_only_value) or bool(receive_results_value) or bool(keep_updated_value)
-            no_selection = not any_selected
-
             upload_own_data = bool(upload_own_data_value and "upload_own_data" in upload_own_data_value)
-            play_only = bool(play_only_value and "play_only" in play_only_value)
             receive_results = bool(receive_results_value and "receive_results" in receive_results_value)
             keep_updated = bool(keep_updated_value and "keep_updated" in keep_updated_value)
 
             info["consent_gdpr"] = gdpr_consented
-            info["consent_upload_own_data"] = upload_own_data
-            if upload_own_data:
-                info["consent_use_uploaded_data"] = True
-            info["consent_play_only"] = play_only
-            # If user didn't select anything, record that they did not consent to participate.
-            info["consent_participate_in_study"] = (not play_only) and (not no_selection)
-            info["consent_receive_results_later"] = receive_results
-            info["consent_keep_up_to_date"] = keep_updated
-            info["consent_no_selection"] = no_selection
+            apply_optional_consent_choices(
+                info,
+                receive_results=receive_results,
+                keep_updated=keep_updated,
+                upload_own_data=upload_own_data,
+            )
             info["consent_timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             # Explicit, unambiguous marker that mandatory consent (acknowledge +
             # GDPR) was completed. `display_page` guards /startup (desktop) and
@@ -505,12 +492,12 @@ class LandingPage(html.Div):
                         "number": info.get("number", ""),
                         "timestamp": info["consent_timestamp"],
                         "gdpr_consent": gdpr_consented,
-                        "upload_own_data": upload_own_data,
-                        "play_only": play_only,
-                        "participate_in_study": info["consent_participate_in_study"],
+                        "upload_own_data": bool(info.get("consent_upload_own_data")),
+                        "play_only": bool(info.get("consent_play_only")),
+                        "participate_in_study": bool(info.get("consent_participate_in_study")),
                         "receive_results_later": receive_results,
                         "keep_up_to_date": keep_updated,
-                        "no_selection": no_selection,
+                        "no_selection": bool(info.get("consent_no_selection")),
                     }
                 )
             except Exception:

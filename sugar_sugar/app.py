@@ -87,6 +87,12 @@ from sugar_sugar.nickname import (
     identity_key,
     normalize_nickname,
 )
+from sugar_sugar.consent import (
+    apply_optional_consent_choices,
+    reconcile_stored_consents,
+    should_persist_study_data,
+    upsert_consent_agreement_fields,
+)
 from sugar_sugar.components.glucose import GlucoseChart
 from sugar_sugar.components.metrics import MetricsComponent
 from sugar_sugar.components.predictions import PredictionTableComponent
@@ -1873,8 +1879,8 @@ if _is_chart_mode:
         "is_example_data": _chart_is_example,
         # Format B starts with no data (upload gate); keep Source empty until upload.
         "data_source_name": "" if _chart_format == "B" else _chart_source,
-        "consent_play_only": True,
-        "consent_participate_in_study": False,
+        "consent_play_only": False,
+        "consent_participate_in_study": True,
         "consent_receive_results_later": False,
         "consent_keep_up_to_date": False,
         "consent_no_selection": False,
@@ -4848,8 +4854,8 @@ def _final_leaderboard_children(
     right_children: list[Any] = [board] if board is not None else []
 
     # Only offer the rename box once the player actually has a board presence --
-    # "play only" participants are never written to the ranking CSVs, so a nickname
-    # would have nothing to label.
+    # a session with no submitted rounds is never written to the ranking CSVs,
+    # so a nickname would have nothing to label.
     if left_children or right_children:
         left_children.append(
             html.Div(
@@ -5702,7 +5708,7 @@ def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
         if "consent_play_only" not in info:
             info["consent_play_only"] = False
         if "consent_participate_in_study" not in info:
-            info["consent_participate_in_study"] = False
+            info["consent_participate_in_study"] = True
         if "consent_receive_results_later" not in info:
             info["consent_receive_results_later"] = False
         if "consent_keep_up_to_date" not in info:
@@ -5711,6 +5717,9 @@ def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
             info["consent_no_selection"] = True
         if "consent_timestamp" not in info:
             info["consent_timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # Leftover localStorage may still have consent_play_only=True from the
+        # removed checkbox; force it off so this Start persists the game.
+        reconcile_stored_consents(info)
 
         # Ensure consent CSV always has a row for this study_id (even when users bypass landing).
         consent_row: Dict[str, Any] = {
@@ -5727,6 +5736,24 @@ def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
             "consent_use_uploaded_data": bool(info.get("consent_use_uploaded_data", False)),
         }
         ensure_consent_agreement_row(consent_row)
+        # Stamp resolved flags so the consent CSV matches what we will persist
+        # (clears leftover play_only=True from older sessions).
+        upsert_consent_agreement_fields(
+            str(info["study_id"]),
+            {
+                "play_only": bool(info.get("consent_play_only", False)),
+                "participate_in_study": bool(info.get("consent_participate_in_study", False)),
+                "no_selection": bool(info.get("consent_no_selection", True)),
+                "receive_results_later": bool(info.get("consent_receive_results_later", False)),
+                "keep_up_to_date": bool(info.get("consent_keep_up_to_date", False)),
+                "upload_own_data": bool(info.get("consent_upload_own_data", False)),
+            },
+        )
+        # Capture the starter immediately -- people who open /prediction and
+        # never submit (or never hit Exit) still leave a study row.
+        if should_persist_study_data(info):
+            submit_component.save_statistics(info)
+            info["statistics_saved"] = True
         return '/prediction', info
     return no_update, no_update
 
@@ -5736,7 +5763,6 @@ def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
     [Input('consent-acknowledge', 'value'),
      Input('consent-gdpr', 'value'),
      Input('consent-upload-own-data', 'value'),
-     Input('consent-play-only', 'value'),
      Input('consent-receive-results', 'value'),
      Input('consent-keep-updated', 'value')],
     [State('user-info-store', 'data')],
@@ -5746,7 +5772,6 @@ def record_mobile_consent(
     acknowledge_value: Optional[list[str]],
     gdpr_value: Optional[list[str]],
     upload_own_data_value: Optional[list[str]],
-    play_only_value: Optional[list[str]],
     receive_results_value: Optional[list[str]],
     keep_updated_value: Optional[list[str]],
     existing_user_info: Optional[Dict[str, Any]],
@@ -5788,27 +5813,21 @@ def record_mobile_consent(
     if not info.get("study_id"):
         info["study_id"] = str(uuid.uuid4())
 
-    any_selected = bool(play_only_value) or bool(receive_results_value) or bool(keep_updated_value)
-    no_selection = not any_selected
     upload_own_data = bool(upload_own_data_value and "upload_own_data" in upload_own_data_value)
-    play_only = bool(play_only_value and "play_only" in play_only_value)
     receive_results = bool(receive_results_value and "receive_results" in receive_results_value)
     keep_updated = bool(keep_updated_value and "keep_updated" in keep_updated_value)
 
-    info.update({
-        "consent_gdpr": gdpr_consented,
-        "consent_upload_own_data": upload_own_data,
-        "consent_use_uploaded_data": bool(info.get("consent_use_uploaded_data")) or upload_own_data,
-        "consent_play_only": play_only,
-        "consent_participate_in_study": (not play_only) and (not no_selection),
-        "consent_receive_results_later": receive_results,
-        "consent_keep_up_to_date": keep_updated,
-        "consent_no_selection": no_selection,
-        "consent_timestamp": info.get("consent_timestamp") or datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "consent_completed": True,
-        # Stable cross-device resume code, assigned at consent like on desktop.
-        "resume_code": info.get("resume_code") or resume_store.new_code(),
-    })
+    info["consent_gdpr"] = gdpr_consented
+    apply_optional_consent_choices(
+        info,
+        receive_results=receive_results,
+        keep_updated=keep_updated,
+        upload_own_data=upload_own_data or bool(info.get("consent_use_uploaded_data")),
+    )
+    info["consent_timestamp"] = info.get("consent_timestamp") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    info["consent_completed"] = True
+    # Stable cross-device resume code, assigned at consent like on desktop.
+    info["resume_code"] = info.get("resume_code") or resume_store.new_code()
     return info
 
 
@@ -5881,7 +5900,6 @@ def handle_submit_button(
         user_info["last_submit_n_clicks"] = int(n_clicks)
 
         rounds: list[dict[str, Any]] = user_info.get('rounds') or []
-        max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS)
         round_number = len(rounds) + 1
         
         # Store the window position information for the ending page
@@ -5926,9 +5944,9 @@ def handle_submit_button(
         print(f"DEBUG: Submit button - Found {prediction_count} predictions in current_df")
         print(f"DEBUG: Submit button - Sample predictions: {current_df.filter(pl.col('prediction') != 0.0).select(['time', 'prediction']).head(5).to_dicts()}")
 
-        # Save exactly once when finishing the study (round 12 or user exits early)
-        play_only = bool(user_info.get('consent_play_only'))
-        if (not play_only) and round_number >= max_rounds and not bool(user_info.get('statistics_saved')):
+        # Upsert after every submitted round so a closed tab without Exit
+        # still leaves the incomplete game in the study CSVs.
+        if should_persist_study_data(user_info):
             submit_component.save_statistics(user_info)
             user_info['statistics_saved'] = True
         
@@ -6083,8 +6101,7 @@ def handle_finish_study_from_prediction(
     if not rounds:
         return '/final', user_info, {'hide_last_hour': True}
 
-    play_only = bool(user_info.get('consent_play_only')) if user_info else False
-    if (not play_only) and not bool(user_info.get('statistics_saved')):
+    if should_persist_study_data(user_info):
         with start_action(action_type=u"handle_finish_study_from_prediction"):
             submit_component.save_statistics(user_info)
             user_info['statistics_saved'] = True
@@ -6118,8 +6135,7 @@ def handle_finish_study_from_ending(
     if not rounds:
         return '/final', user_info, {'hide_last_hour': True}
 
-    play_only = bool(user_info.get('consent_play_only')) if user_info else False
-    if (not play_only) and not bool(user_info.get('statistics_saved')):
+    if should_persist_study_data(user_info):
         with start_action(action_type=u"handle_finish_study_from_ending"):
             submit_component.save_statistics(user_info)
             user_info['statistics_saved'] = True

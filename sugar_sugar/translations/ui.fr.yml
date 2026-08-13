@@ -41,8 +41,7 @@ fr:
     about_study_title: "À propos de l'étude"
     about_study_text: "Nous étudions la précision avec laquelle les humains prédisent les tendances de la glycémie, et les schémas que remarquent les utilisateurs expérimentés de CGM. Si tu choisis de participer, ta partie et les données CGM que tu téléverses pourront être utilisées pour des recherches ultérieures."
     your_choices_title: "Tes choix"
-    your_choices_text: "Par défaut, nous supposons que tu acceptes de participer à l'étude. Si tu veux seulement jouer, coche la première case."
-    consent_play_only: "Je veux seulement jouer (ne pas stocker mes données CGM / de jeu)"
+    your_choices_text: "En continuant, tu acceptes de participer à l'étude. Ta partie pourra être conservée pour la recherche."
     consent_receive_results: "Je souhaite recevoir mes résultats plus tard"
     consent_keep_updated: "Tiens-moi au courant des mises à jour du projet"
     consent_acknowledge_label: "J'ai 18 ans ou plus et j'ai lu les conditions générales."
@@ -524,7 +523,7 @@ fr:
       - title: "Données et confidentialité"
         items:
           - q: "Mes données sont-elles stockées ?"
-            a: "Tant que tu ne choisis pas de soumettre, tout reste dans ton propre navigateur. Rien n'est envoyé à nos serveurs à moins que tu ne consentes activement et que tu ne soumettes tes résultats. Si tu sélectionnes \"Je veux seulement jouer\", aucune donnée ne quitte jamais ton appareil."
+            a: "Tant que tu ne choisis pas de soumettre, tout reste dans ton propre navigateur. Rien n'est envoyé à nos serveurs à moins que tu ne consentes activement et que tu ne soumettes tes résultats."
           - q: "Quelles données sont collectées si je consens ?"
             a: "Données de jeu (prédictions tracées, mesures de précision), éventuellement le fichier CGM que tu as téléversé et un court questionnaire (âge, expérience CGM, statut diabétique, etc.)."
           - q: "Mes données CGM sont-elles partagées avec des tiers ?"

@@ -183,3 +183,55 @@ def test_producer_callback_arities_have_no_full_df() -> None:
     # handle_nightscout_load error path: 8 no-update + status == 9 outputs.
     res = handle_nightscout_load(1, "", None, None, None)
     assert len(res) == 9
+
+
+def test_save_statistics_upserts_incomplete_then_complete(tmp_path: Path) -> None:
+    """Start (0 rounds) then first submit must update the same study_id row."""
+    import csv
+
+    submit = SubmitComponent()
+    submit._stats_csv_path = tmp_path / "prediction_statistics.csv"
+    submit._ranking_csv_path = tmp_path / "prediction_ranking.csv"
+    submit._ranking_by_format_paths = {k: tmp_path / f"r_{k}.csv" for k in ("A", "B", "C")}
+
+    window = _window_with_predictions()
+    times = _times(window)
+    user_info: dict[str, Any] = {
+        "study_id": "forgot-exit",
+        "run_id": "r1",
+        "number": 1,
+        "consent_completed": True,
+        "format": "A",
+        "run_format": "A",
+        "age": 30,
+        "email": "forgot@example.com",
+        "rounds": [],
+    }
+    submit.save_statistics(user_info)
+    with submit._stats_csv_path.open(newline="") as fh:
+        rows = list(csv.DictReader(fh))
+    assert len(rows) == 1
+    assert rows[0]["rounds_played"] == "0"
+    assert not submit._ranking_csv_path.exists()
+
+    user_info["rounds"] = [
+        {
+            "round_number": 1,
+            "prediction_window_size": len(window),
+            "prediction_table_data": _table_data(window),
+            "window_times": times,
+            "format": "A",
+            "is_example_data": True,
+            "data_source_name": "example.csv",
+        }
+    ]
+    submit.save_statistics(user_info)
+    with submit._stats_csv_path.open(newline="") as fh:
+        rows = list(csv.DictReader(fh))
+    assert len(rows) == 1
+    assert rows[0]["study_id"] == "forgot-exit"
+    assert rows[0]["rounds_played"] == "1"
+    with submit._ranking_csv_path.open(newline="") as fh:
+        rank = list(csv.DictReader(fh))
+    assert len(rank) == 1
+    assert rank[0]["rounds_played"] == "1"

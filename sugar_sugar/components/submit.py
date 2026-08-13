@@ -528,7 +528,7 @@ class SubmitComponent(html.Div):
                     'rmse': m['rmse'],
                     'mape': m['mape'],
                 })
-        else:
+        elif user_info.get('prediction_table_data'):
             table_data = user_info.get('prediction_table_data', []) or []
             m = _metrics_from_table(table_data)
             per_round_metrics.append({
@@ -589,8 +589,14 @@ class SubmitComponent(html.Div):
         age = int(user_info.get('age') or 0)
         user_id = 1
         
-        # Prepare the data dictionary
-        rounds_played = len(rounds) if rounds else 1
+        # 0 = started the game but never submitted a round (still stored).
+        # Legacy single-round sessions have table data but no `rounds` list.
+        if rounds:
+            rounds_played = len(rounds)
+        elif user_info.get('prediction_table_data'):
+            rounds_played = 1
+        else:
+            rounds_played = 0
         number = user_info.get("number")
         if number is None or (isinstance(number, str) and number.strip() == ""):
             number = self._get_next_number()
@@ -626,60 +632,63 @@ class SubmitComponent(html.Div):
             'per_round_metrics': str(per_round_metrics),
         }
         
-        def _upgrade_and_append_csv(
+        def _upgrade_and_upsert_csv(
             path: Path,
             row: dict[str, Any],
-            legacy_to_new: dict[str, str]
+            legacy_to_new: dict[str, str],
+            match_key: str = "study_id",
         ) -> None:
-            file_exists = path.exists()
+            """Insert or replace the row for ``match_key`` so incremental saves
+            (Start, each submit, Exit) do not duplicate a session."""
             desired_fieldnames = list(row.keys())
-            # Track the actual file header order so append uses the same column order.
-            final_fieldnames = desired_fieldnames
-
-            if file_exists:
-                with path.open('r', newline='', encoding='utf-8', errors='replace') as file_handle:
+            match_value = str(row.get(match_key, "") or "")
+            existing_fieldnames: list[str] = []
+            existing_rows: list[dict[str, Any]] = []
+            if path.exists():
+                with path.open("r", newline="", encoding="utf-8", errors="replace") as file_handle:
                     reader = csv.DictReader(file_handle)
-                    existing_fieldnames = reader.fieldnames or []
+                    existing_fieldnames = list(reader.fieldnames or [])
                     existing_rows = list(reader)
 
-                needs_upgrade = (
-                    any(field in existing_fieldnames for field in legacy_to_new.keys())
-                    or any(field not in existing_fieldnames for field in desired_fieldnames)
-                )
+            needs_upgrade = (
+                any(field in existing_fieldnames for field in legacy_to_new.keys())
+                or any(field not in existing_fieldnames for field in desired_fieldnames)
+                or not existing_fieldnames
+            )
+            if needs_upgrade:
+                preserved_existing = [f for f in existing_fieldnames if f and f not in legacy_to_new.keys()]
+                fieldnames: list[str] = []
+                for name in preserved_existing + desired_fieldnames:
+                    if name not in fieldnames:
+                        fieldnames.append(name)
+            else:
+                fieldnames = list(existing_fieldnames)
 
-                if needs_upgrade:
-                    preserved_existing = [f for f in existing_fieldnames if f and f not in legacy_to_new.keys()]
-                    upgraded_fieldnames: list[str] = []
-                    for f in preserved_existing + desired_fieldnames:
-                        if f not in upgraded_fieldnames:
-                            upgraded_fieldnames.append(f)
-
-                    tmp_path = path.with_suffix('.tmp')
-                    with tmp_path.open('w', newline='', encoding='utf-8') as out_handle:
-                        writer = csv.DictWriter(out_handle, fieldnames=upgraded_fieldnames)
-                        writer.writeheader()
-                        for old_row in existing_rows:
-                            upgraded_row: dict[str, Any] = {key: old_row.get(key, "") for key in upgraded_fieldnames}
-                            for old_key, new_key in legacy_to_new.items():
-                                if upgraded_row.get(new_key, "") in ("", None) and old_key in old_row:
-                                    upgraded_row[new_key] = old_row.get(old_key, "")
-                            writer.writerow(upgraded_row)
-                    tmp_path.replace(path)
-                    # Use the upgraded schema for the append so column order matches header.
-                    final_fieldnames = upgraded_fieldnames
+            out_rows: list[dict[str, Any]] = []
+            replaced = False
+            for old_row in existing_rows:
+                upgraded_row: dict[str, Any] = {key: old_row.get(key, "") for key in fieldnames}
+                for old_key, new_key in legacy_to_new.items():
+                    if upgraded_row.get(new_key, "") in ("", None) and old_key in old_row:
+                        upgraded_row[new_key] = old_row.get(old_key, "")
+                if match_value and str(upgraded_row.get(match_key, "") or "") == match_value:
+                    out_rows.append({key: row.get(key, upgraded_row.get(key, "")) for key in fieldnames})
+                    replaced = True
                 else:
-                    # No upgrade needed but must still append in the file's existing column order.
-                    final_fieldnames = list(existing_fieldnames)
+                    out_rows.append(upgraded_row)
+            if not replaced:
+                out_rows.append({key: row.get(key, "") for key in fieldnames})
 
-            # UTF-8: Windows default (cp1252) cannot store Romanian diacritics (ș, ț, …).
-            with path.open('a', newline='', encoding='utf-8') as file_handle:
-                writer = csv.DictWriter(file_handle, fieldnames=final_fieldnames)
-                if not file_exists:
-                    writer.writeheader()
-                writer.writerow(row)
+            tmp_path = path.with_suffix(path.suffix + ".tmp")
+            with tmp_path.open("w", newline="", encoding="utf-8") as out_handle:
+                writer = csv.DictWriter(out_handle, fieldnames=fieldnames)
+                writer.writeheader()
+                for out_row in out_rows:
+                    writer.writerow(out_row)
+            tmp_path.replace(path)
 
         # Write full statistics row
-        _upgrade_and_append_csv(
+        _upgrade_and_upsert_csv(
             csv_file_path,
             data,
             legacy_to_new={
@@ -712,20 +721,23 @@ class SubmitComponent(html.Div):
             'overall_rmse_mgdl': overall['rmse'],
             'overall_mape_pct': overall['mape'],
         }
+        # Leaderboard only after at least one submitted round -- a Start-only
+        # stub (forgot before drawing) lives in prediction_statistics only.
+        if rounds_played < 1:
+            return
+
         # Ranking within the current format/category (A, B, or C)
         if version in self._ranking_by_format_paths:
-            _upgrade_and_append_csv(
+            _upgrade_and_upsert_csv(
                 self._ranking_by_format_paths[version],
                 ranking_row,
                 legacy_to_new={},
             )
 
         # Overall (cumulative) ranking across formats played so far.
-        uses_cgm = bool(user_info.get("uses_cgm", False))
-        eligible_formats: set[str] = {"A"} | ({"B", "C"} if uses_cgm else set())
         runs_by_format: dict[str, list[dict[str, Any]]] = dict(user_info.get("runs_by_format") or {})
         played_formats: set[str] = {str(fmt) for fmt, runs in runs_by_format.items() if runs}
-        if rounds_played > 0 and version:
+        if version:
             played_formats.add(version)
         all_rounds: list[dict[str, Any]] = []
         for fmt in sorted(played_formats):
@@ -753,12 +765,12 @@ class SubmitComponent(html.Div):
         data_source_name = next(iter(source_names)) if len(source_names) == 1 else "multiple"
         total_rounds_played = int(
             sum(len(list(run.get("rounds") or [])) for fmt in played_formats for run in (runs_by_format.get(fmt) or []))
-            + (len(rounds) if rounds else 1)
+            + len(rounds)
         )
 
         overall_ranking_row = {
             'study_id': study_id,
-            'run_id': str(uuid.uuid4()),
+            'run_id': str(user_info.get('run_id') or uuid.uuid4()),
             'number': data['number'],
             'timestamp': data['timestamp'],
             'email_key': leaderboard_identity,
@@ -772,7 +784,7 @@ class SubmitComponent(html.Div):
             'overall_rmse_mgdl': overall_all['rmse'],
             'overall_mape_pct': overall_all['mape'],
         }
-        _upgrade_and_append_csv(
+        _upgrade_and_upsert_csv(
             self._ranking_csv_path,
             overall_ranking_row,
             legacy_to_new={},

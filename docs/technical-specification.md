@@ -170,7 +170,7 @@ Full contract: root [README § Resume and study integrity](../README.md#resume-a
 
 | Route | Component | Notes |
 |-------|-----------|-------|
-| `/` | `landing.py` / `LandingPageMobile` | Consent checkboxes, play-only mode, resume code entry |
+| `/` | `landing.py` / `LandingPageMobile` | Consent checkboxes, resume code entry |
 | `/consent-form` | Consent reader iframe | Single scrollbar owned by iframe — do not wrap in outer scroll |
 
 ### Troubleshooting

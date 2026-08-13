@@ -44,10 +44,7 @@ The game has up to 12 rounds. Each round takes about 2–3 minutes; a full sessi
 
 ## Data and privacy
 
-Sugar Sugar supports two modes:
-
-- **Play-only mode**: check **"I just want to play (do not store my CGM / gameplay data)"** on the landing page and the app will not save any study outputs. No data leaves your device.
-- **Study mode** (default): if you do not check play-only, the app may write **consent + study outputs** to CSV for research (predictions vs ground truth, accuracy metrics, anonymised questionnaire responses).
+By completing the consent form (18+ and GDPR) you agree to participate in the study. The app may write **consent + study outputs** to CSV for research (predictions vs ground truth, accuracy metrics, anonymised questionnaire responses).
 
 Until you choose to submit, everything stays in your own browser's localStorage. Nothing is sent to our servers without your active consent.
 
