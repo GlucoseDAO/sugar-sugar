@@ -830,6 +830,43 @@ def resolve_dataset_identity(
     return Path(str(uploaded))
 
 
+def _load_round_one_stores(
+    info: Dict[str, Any],
+) -> tuple[Optional[Dict[str, List[Any]]], Optional[Dict[str, List[Any]]], bool, str, int, bool]:
+    """First /prediction window after Start: own file for B, generic otherwise.
+
+    Returns ``(window, events, is_example, source_name, slider, randomization_initialized)``.
+    B/C without a file stay empty so the upload gate can show.
+    """
+    if _is_upload_gated(info):
+        return None, None, False, "", 0, False
+    fmt = str(info.get("format") or "A")
+    uploaded_path = info.get("uploaded_data_path")
+    if fmt == "B" and uploaded_path:
+        full_df, events_df = load_dataset(Path(str(uploaded_path)))
+        is_example = False
+        source_name = str(
+            info.get("uploaded_data_filename") or info.get("data_source_name") or "uploaded.csv"
+        )
+        df, random_start = get_random_data_window(full_df, DEFAULT_POINTS)
+    else:
+        df, events_df, source_name, random_start = _apply_generic_round_selection(
+            info,
+            info.get("rounds"),
+            DEFAULT_POINTS,
+        )
+        is_example = True
+    df = df.with_columns(pl.lit(0.0).alias("prediction"))
+    return (
+        convert_df_to_dict(df),
+        events_store_for_window(events_df, df),
+        is_example,
+        source_name,
+        random_start,
+        False,
+    )
+
+
 def _is_upload_gated(user_info: Optional[Dict[str, Any]]) -> bool:
     """Whether /prediction must block on an upload right now (hide the chart).
 
@@ -5625,7 +5662,13 @@ def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) ->
 
 @app.callback(
     [Output('url', 'pathname'),
-     Output('user-info-store', 'data')],
+     Output('user-info-store', 'data'),
+     Output('current-window-df', 'data', allow_duplicate=True),
+     Output('events-df', 'data', allow_duplicate=True),
+     Output('is-example-data', 'data', allow_duplicate=True),
+     Output('data-source-name', 'data', allow_duplicate=True),
+     Output('initial-slider-value', 'data', allow_duplicate=True),
+     Output('randomization-initialized', 'data', allow_duplicate=True)],
     [Input('start-button', 'n_clicks')],
     [State('nickname-input', 'value'),
      State('email-input', 'value'),
@@ -5648,7 +5691,7 @@ def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
                        format_value: Optional[str], data_usage_consent: Optional[list[str]],
                        diabetic: Optional[bool], diabetic_type: Optional[str],
                        diabetes_duration: Optional[float], location: Optional[str],
-                       existing_user_info: Optional[Dict[str, Any]] = None) -> Tuple[str, Dict[str, Any]]:
+                       existing_user_info: Optional[Dict[str, Any]] = None) -> tuple[Any, ...]:
     """Handle start button on startup page.
 
     Consent is recorded BEFORE this callback runs -- on desktop by
@@ -5662,7 +5705,7 @@ def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
     navigated nowhere). See record_mobile_consent below for the mobile path.
     """
     if not n_clicks:
-        return no_update, no_update
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
 
     from sugar_sugar.components.startup import (
         _wants_contact_from_user_info,
@@ -5689,8 +5732,9 @@ def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
         locale=None,
         prior_upload_consent=already_upload_consent,
     )
+    _start_idle = (no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update)
     if not validation.form_complete:
-        return no_update, no_update
+        return _start_idle
 
     if age and gender and diabetic is not None and location and format_value:
         from datetime import datetime
@@ -5805,8 +5849,12 @@ def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
         if should_persist_study_data(info):
             submit_component.save_statistics(info)
             info["statistics_saved"] = True
-        return '/prediction', info
-    return no_update, no_update
+        window, events, is_example, source_name, slider, rand_init = _load_round_one_stores(info)
+        info["is_example_data"] = is_example
+        if source_name:
+            info["data_source_name"] = source_name
+        return '/prediction', info, window, events, is_example, source_name, slider, rand_init
+    return _start_idle
 
 
 @app.callback(
@@ -7049,7 +7097,10 @@ def redirect_landing_to_game(
     if not last_page or last_page == "/":
         raise PreventUpdate
 
-    if last_page in ("/prediction", "/ending", "/final") and not user_info:
+    # Exit / Start Over nulls user-info. Do not bounce a cleared session back
+    # onto /startup or /prediction (that reused the old form and a leftover
+    # generic window). In-session "Game" still has user_info populated.
+    if not user_info:
         raise PreventUpdate
 
     if last_page == "/ending":
@@ -7468,13 +7519,15 @@ def redeem_resume_from_input(
      Output('initial-slider-value', 'data', allow_duplicate=True)],
     [Input('url', 'pathname')],
     [State('current-window-df', 'data'),
-     State('user-info-store', 'data')],
+     State('user-info-store', 'data'),
+     State('data-source-name', 'data')],
     prevent_initial_call=True
 )
 def initialize_data_on_url_change(
     pathname: Optional[str],
     current_df_data: Optional[Dict],
     user_info: Optional[Dict[str, Any]],
+    source_name_store: Optional[str] = None,
 ) -> Tuple[
     Optional[Dict[str, List[Any]]],
     Optional[Dict[str, List[Any]]],
@@ -7501,45 +7554,25 @@ def initialize_data_on_url_change(
     if _is_upload_gated(user_info):
         return None, None, False, "", False, 0
 
-    # Window already present — preserve (handles resume and round transitions).
-    if current_df_data is not None:
-        return _no_change
-
-    # First visit to /prediction with no window: load the round-1 dataset. Format B
-    # with a startup import uses the user's own file; A / C-with-import round 1 pick
-    # a random generic window via _apply_generic_round_selection().
-    fmt = str((user_info or {}).get("format") or "A")
-    uploaded_path = (user_info or {}).get("uploaded_data_path")
+    info = dict(user_info or {})
+    fmt = str(info.get("format") or "A")
+    uploaded_path = info.get("uploaded_data_path")
+    expected_own = ""
     if fmt == "B" and uploaded_path:
-        full_df, events_df = load_dataset(Path(str(uploaded_path)))
-        is_example = False
-        source_name = str(
-            (user_info or {}).get("uploaded_data_filename")
-            or (user_info or {}).get("data_source_name")
-            or "uploaded.csv"
-        )
-        df, random_start = get_random_data_window(full_df, DEFAULT_POINTS)
-    else:
-        info_dict: Dict[str, Any] = dict(user_info or {})
-        df, events_df, source_name, random_start = _apply_generic_round_selection(
-            info_dict,
-            info_dict.get("rounds"),
-            DEFAULT_POINTS,
-        )
-        is_example = True
-    df = df.with_columns(pl.lit(0.0).alias('prediction'))
+        expected_own = str(info.get("uploaded_data_filename") or info.get("data_source_name") or "uploaded.csv")
+
+    # Keep an existing window (resume / next-round) unless it is a leftover
+    # generic slice while this session is My Data with a file already imported.
+    if current_df_data is not None:
+        if not expected_own or str(source_name_store or "") == expected_own:
+            return _no_change
+
+    window, events, is_example, source_name, random_start, rand_init = _load_round_one_stores(info)
 
     with start_action(action_type=u"initialize_data_on_url_change") as action:
         action.log(message_type="new_random_start", random_start=random_start, is_example=is_example)
 
-    return (
-        convert_df_to_dict(df),
-        events_store_for_window(events_df, df),
-        is_example,
-        source_name,
-        False,
-        random_start,
-    )
+    return (window, events, is_example, source_name, rand_init, random_start)
 
 # Client-side upload compression. dcc.Upload hands us the file as a base64 data
 # URL; we gzip it in the browser (CompressionStream, Safari 16.4+/Chrome/Firefox)

@@ -822,6 +822,10 @@ class StartupPage(html.Div):
             # so only refresh the option labels/eligibility and leave it alone.
             if getattr(dash.callback_context, 'triggered_id', None) is None:
                 return options, no_update
+            # CGM has not hydrated yet — do not treat that as "no CGM" and
+            # yank a persisted My Data / Mixed selection back to Generic.
+            if uses_cgm is None:
+                return options, no_update
             return options, value
 
         @app.callback(
@@ -835,7 +839,9 @@ class StartupPage(html.Div):
             format_value: Optional[str],
             user_info: Optional[dict[str, Any]],
             current_value: Optional[list[str]],
-        ) -> tuple[dict[str, str], list[str]]:
+        ) -> tuple[Any, Any]:
+            if format_value is None:
+                return no_update, no_update
             if format_value in ('B', 'C'):
                 # Landing/mobile may already have recorded upload consent — pre-tick
                 # so the user is not asked twice before Start.
