@@ -463,6 +463,9 @@ en:
     try_a: "Try Example Data = use generic data"
     try_b: "Try My Data = use own data"
     try_c: "Try Example + My Data = use both generic and own data"
+    try_a_short: "Try Generic Data"
+    try_b_short: "Try My Data"
+    try_c_short: "Try Generic + My Data"
     not_eligible_no_cgm: "B/C are only available if you said you have CGM data."
 
   results_disclaimer:

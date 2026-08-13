@@ -113,6 +113,12 @@ cd sugar-sugar
 uv sync
 ```
 
+The [CGMacros](https://physionet.org/content/cgmacros/1.0.0/) dataset is not in git. Download a local copy (CSVs only by default; add `--photos` for meal images) with:
+
+```bash
+uv run download-cgmacros
+```
+
 ### Chrome / Chromium (for share-card image export)
 
 The share page renders a 1200x630 PNG card using [kaleido](https://github.com/plotly/Kaleido), which needs a Chromium-based browser. On startup the app ensures **Chrome for Testing** is downloaded into `~/.local/share/choreographer/deps/` via `uv run setup-chrome`; it prefers that managed binary over a system/snap Chromium so a broken system browser cannot silently win.

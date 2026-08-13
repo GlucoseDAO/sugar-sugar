@@ -439,6 +439,9 @@ de:
     try_a: "Beispieldaten ausprobieren = generische Daten verwenden"
     try_b: "Meine Daten ausprobieren = eigene Daten verwenden"
     try_c: "Beispiel + meine Daten ausprobieren = generische und eigene Daten verwenden"
+    try_a_short: "Generische Daten"
+    try_b_short: "Meine Daten"
+    try_c_short: "Generisch + Meine"
     not_eligible_no_cgm: "B/C sind nur verfügbar, wenn du angegeben hast, dass du CGM‑Daten hast."
 
   results_disclaimer:

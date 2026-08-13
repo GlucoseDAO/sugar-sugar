@@ -440,6 +440,9 @@ es:
     try_a: "Probar Datos de ejemplo = usar datos genéricos"
     try_b: "Probar Mis datos = usar datos propios"
     try_c: "Probar Ejemplo + Mis datos = usar tanto datos genéricos como propios"
+    try_a_short: "Datos genéricos"
+    try_b_short: "Mis datos"
+    try_c_short: "Genéricos + Míos"
     not_eligible_no_cgm: "B/C solo están disponibles si dijiste que tienes datos de CGM."
 
   results_disclaimer:

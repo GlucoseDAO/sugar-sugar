@@ -440,6 +440,9 @@ fr:
     try_a: "Essayer Données d'exemple = utiliser des données génériques"
     try_b: "Essayer Mes données = utiliser tes propres données"
     try_c: "Essayer Exemple + Mes données = utiliser à la fois des données génériques et les tiennes"
+    try_a_short: "Données génériques"
+    try_b_short: "Mes données"
+    try_c_short: "Génériques + Miennes"
     not_eligible_no_cgm: "B/C ne sont disponibles que si tu as indiqué avoir des données CGM."
 
   results_disclaimer:

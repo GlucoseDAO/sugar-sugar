@@ -4,5 +4,6 @@ __pycache__/
 .git/
 logs/
 data/shares/
+data/cgmmacros/
 .env
 .cursor/

@@ -1041,6 +1041,23 @@ html.mobile-device #ending-graph-explanation,
 html.mobile-device #ending-round-motivation {
   display: none !important;
 }
+html.mobile-device #ending-submit-row {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+}
+html.mobile-device #ending-submit-row.ending-submit-row-last #next-round-button {
+  display: none !important;
+}
+html.mobile-device #ending-submit-row .ending-switch-format-btn {
+  height: 44px !important;
+  min-height: 44px !important;
+  font-size: 14px !important;
+  min-width: 120px;
+}
 
 
 /* --- Consent form page (/consent-form): full-bleed TOS-style reader --------
@@ -2166,6 +2183,15 @@ html.route-prediction.mobile-device #submit-button {
   font-weight: 700 !important;
 }
 #upload-data a { color: #fff; text-decoration: none; }
+
+/* Strip Upload is only on-screen while B/C still need a file. `display:contents`
+   when visible keeps #upload-data a flex/grid sibling of Submit (has-upload CSS). */
+#prediction-upload-slot.prediction-upload-hidden {
+  display: none !important;
+}
+#prediction-upload-slot.prediction-upload-visible {
+  display: contents;
+}
 
 .prediction-upload-gate {
   padding: 28px 24px;

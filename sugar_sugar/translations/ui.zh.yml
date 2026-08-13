@@ -438,6 +438,9 @@ zh:
     try_a: "尝试示例数据 = 使用通用数据"
     try_b: "尝试我的数据 = 使用自己的数据"
     try_c: "尝试示例 + 我的数据 = 同时使用通用数据和自己的数据"
+    try_a_short: "尝试通用数据"
+    try_b_short: "尝试我的数据"
+    try_c_short: "尝试通用 + 我的"
     not_eligible_no_cgm: "只有当您表示拥有 CGM 数据时，B/C 选项才可用。"
 
   results_disclaimer:

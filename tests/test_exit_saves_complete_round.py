@@ -1,4 +1,4 @@
-"""Finish/Exit from /prediction stores a fully drawn round without ranking or /final."""
+"""Finish/Exit from /prediction stores a fully drawn round and opens results."""
 from __future__ import annotations
 
 import csv
@@ -72,16 +72,52 @@ def test_capture_complete_round_on_exit_appends_only_when_drawn() -> None:
     assert incomplete.get("rounds") == []
 
 
-def test_finish_from_prediction_goes_to_landing_not_final() -> None:
-    pathname, info, _mode, last_page = handle_finish_study_from_prediction(
+def test_finish_from_prediction_goes_to_ending_when_round_is_complete() -> None:
+    pathname, info, mode, last_page = handle_finish_study_from_prediction(
         1,
         {"consent_completed": False, "rounds": [], "format": "A", "is_example_data": True},
         dataframe_to_store_dict(_complete_window()),
         0,
     )
+    assert pathname == "/ending"
+    assert last_page == "/ending"
+    assert mode == {"hide_last_hour": False}
+    assert len(info.get("rounds") or []) == 1
+
+
+def test_finish_from_prediction_goes_to_final_when_prior_rounds_exist() -> None:
+    prior = {
+        "round_number": 1,
+        "prediction_table_data": [{"metric": "Actual Glucose"}],
+        "format": "A",
+    }
+    pathname, info, mode, last_page = handle_finish_study_from_prediction(
+        1,
+        {
+            "consent_completed": False,
+            "rounds": [prior],
+            "format": "A",
+            "prediction_table_data": prior["prediction_table_data"],
+        },
+        dataframe_to_store_dict(_incomplete_window()),
+        0,
+    )
+    assert pathname == "/final"
+    assert last_page == "/final"
+    assert mode == {"hide_last_hour": False}
+    assert len(info.get("rounds") or []) == 1
+
+
+def test_finish_from_prediction_goes_to_landing_when_nothing_to_show() -> None:
+    pathname, info, _mode, last_page = handle_finish_study_from_prediction(
+        1,
+        {"consent_completed": False, "rounds": [], "format": "A"},
+        dataframe_to_store_dict(_incomplete_window()),
+        0,
+    )
     assert pathname == "/"
     assert last_page is None
-    assert len(info.get("rounds") or []) == 1
+    assert info.get("rounds") == []
 
 
 def test_save_statistics_can_skip_ranking(tmp_path: Path) -> None:
@@ -132,4 +168,5 @@ def test_prediction_layout_keeps_finish_and_meta_ids() -> None:
     assert "finish-study-button" in ids
     assert "submit-button" in ids
     assert "prediction-submit-row" in ids
+    assert "prediction-upload-slot" in ids
     assert layout.id == "prediction-page"

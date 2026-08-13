@@ -460,6 +460,9 @@ ro:
     try_a: "Încearcă date exemplu = folosește date generice"
     try_b: "Încearcă datele mele = folosește propriile date"
     try_c: "Încearcă date exemplu + datele mele = folosește atât date generice, cât și proprii"
+    try_a_short: "Date generice"
+    try_b_short: "Datele mele"
+    try_c_short: "Generice + ale mele"
     not_eligible_no_cgm: "B/C sunt disponibile doar dacă ai spus că ai date CGM."
 
   results_disclaimer:

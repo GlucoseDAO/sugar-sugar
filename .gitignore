@@ -203,3 +203,8 @@ logs/*
 
 # Local backup archives (see backup/README.md)
 backup/archives/
+
+# Public CGMacros dataset from PhysioNet (not stored in git).
+# Fetch locally with: uv run download-cgmacros
+# https://physionet.org/content/cgmacros/1.0.0/
+data/cgmmacros/

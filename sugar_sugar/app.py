@@ -811,9 +811,8 @@ def resolve_dataset_identity(
             return _dataset_path_for(False, uploaded)
         if fmt == "C":
             # Mirror handle_next_round_button: ODD round -> generic,
-            # EVEN round -> uploaded. Round 1 is always the generic warm-up; from
-            # round 2 an upload is required (see _is_upload_gated), so they alternate
-            # generic/own from there. Before any upload, fall back to generic.
+            # EVEN round -> uploaded. Round 1 is the generic warm-up once a file
+            # exists; before any upload the session is gated (see _is_upload_gated).
             use_generic = round_number % 2 == 1 or not uploaded
             if use_generic:
                 return _resolve_generic_dataset_path(info)
@@ -825,25 +824,23 @@ def resolve_dataset_identity(
 
 
 def _is_upload_gated(user_info: Optional[Dict[str, Any]]) -> bool:
-    """Whether /prediction must block on an upload right now (show the upload gate).
+    """Whether /prediction must block on an upload right now (hide the chart).
 
-    - Format B ("my data only"): gated until a file is uploaded (from round 1).
-    - Format C ("mixed"): round 1 is a generic warm-up (playable); from round 2
-      onward an upload is required, so the user isn't able to play a whole session
-      on generic data and forget to upload.
-    - Formats A / already-uploaded: never gated.
+    Formats B and C need a CGM file. If it was imported at startup, never gate.
+    If the player arrives without one (skipped startup import, or switched from
+    another format), show the gate *before* the graph — then hide it for good
+    once ``uploaded_data_path`` is set. Format A never gates.
     """
     info = user_info or {}
     if info.get("uploaded_data_path"):
         return False
     fmt = str(info.get("format") or "A")
-    if fmt == "B":
-        return True
-    if fmt == "C":
-        rounds = info.get("rounds") or []
-        round_num = int(info.get("current_round_number") or (len(rounds) + 1))
-        return round_num >= 2
-    return False
+    return fmt in ("B", "C")
+
+
+def _prediction_upload_strip_visible(user_info: Optional[Dict[str, Any]]) -> bool:
+    """Show the action-strip Upload control only while a file is still required."""
+    return _is_upload_gated(user_info)
 
 
 def _upload_gate_text(user_info: Optional[Dict[str, Any]], locale: str) -> str:
@@ -1893,6 +1890,12 @@ if _is_chart_mode:
         # Resume code so the /ending copy-resume-link button works in dev/testing.
         "resume_code": resume_store.new_code(),
     }
+    if _chart_format == "C":
+        # Mixed gates until a file exists. Seed one so `uv run chart --format C`
+        # still opens a playable chart (startup import / first-round upload in prod).
+        _seed_upload = str(Path(_chart_file_env) if _chart_file_env else EXAMPLE_DATASET_PATH)
+        _chart_user_info["uploaded_data_path"] = _seed_upload
+        _chart_user_info["uploaded_data_filename"] = Path(_seed_upload).name
 else:
     _chart_user_info = None
 
@@ -2883,9 +2886,9 @@ def update_ending_text_on_language_change(
         finish_button_text,
         t("ui.ending.next_round", locale=locale),
         t("ui.switch_format.title", locale=locale),
-        t("ui.switch_format.try_c", locale=locale),
-        t("ui.switch_format.try_a", locale=locale),
-        t("ui.switch_format.try_b", locale=locale),
+        t("ui.switch_format.try_c_short", locale=locale),
+        t("ui.switch_format.try_a_short", locale=locale),
+        t("ui.switch_format.try_b_short", locale=locale),
         t("ui.resume_code.copy_link", locale=locale),
     )
 
@@ -3458,9 +3461,9 @@ def _fullscreen_button_children(locale: str) -> list[Any]:
 def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[str, Any]) -> html.Div:
     """Create the prediction page layout"""
     show_upload = format_value in ("B", "C")
-    uploaded = bool(user_info.get("uploaded_data_path"))
-    # Upload gate: B from round 1, C from round 2 (see _is_upload_gated).
+    # Gate B/C until a file exists (startup import or first-round upload).
     b_gated = _is_upload_gated(user_info)
+    upload_strip_visible = _prediction_upload_strip_visible(user_info)
     consent_given = _upload_data_consent_given(user_info)
     consent_value = ['agree'] if consent_given else []
     show_consent_ui = _show_prediction_upload_consent(user_info, show_upload=show_upload)
@@ -3602,9 +3605,10 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
                 id='prediction-glucose-chart-container',
                 style={'display': 'none'} if b_gated else None,
             ),
-            # Format B upload gate: shown in place of the chart until the user
+            # Format B/C upload gate: shown in place of the chart until the user
             # uploads their file. The Upload button itself lives in the action strip
-            # below (reachable in both portrait and landscape).
+            # below (reachable in both portrait and landscape) and is hidden once
+            # a file is stored.
             html.Div(
                 _upload_gate_text(user_info, locale),
                 id="prediction-upload-gate",
@@ -3620,20 +3624,27 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
                         className="prediction-fullscreen-button",
                         type="button",
                     ),
-                    # B/C only: relocated CSV upload, styled as a button. It is a
-                    # DIRECT child of the action strip (not nested in SubmitComponent)
-                    # so CSS can lay Fullscreen/Upload/Submit/Finish out as uniformly
-                    # sized siblings -- `display:contents` on #prediction-actions (see
-                    # .has-upload rules in mobile.css) promotes Submit/Finish up to
-                    # this container. Kept out of the header so it stays reachable in
-                    # immersive landscape (where the header is hidden).
-                    make_csv_upload(
-                        locale, style={}, className="prediction-upload-button"
-                    ) if show_upload else None,
+                    # B/C: CSV upload lives in the action strip so it stays
+                    # reachable in landscape. Shown only while a file is still
+                    # required (gate); hidden once uploaded so it does not steal
+                    # chart space. Wrapper stays in the DOM so callbacks keep
+                    # `upload-data` / `header-upload-prompt` wired.
+                    html.Div(
+                        make_csv_upload(
+                            locale, style={}, className="prediction-upload-button"
+                        ) if show_upload else None,
+                        id="prediction-upload-slot",
+                        className=(
+                            "prediction-upload-visible"
+                            if upload_strip_visible
+                            else "prediction-upload-hidden"
+                        ),
+                        disable_n_clicks=True,
+                    ),
                     SubmitComponent(locale=locale),
                 ],
                 id="prediction-mobile-actions",
-                className="has-upload" if show_upload else "",
+                className="has-upload" if upload_strip_visible else "",
             ),
         ], id='prediction-chart-submit-wrap', style={'flex': '1'})
     ], id="prediction-page", className="prediction-page", style={
@@ -3754,7 +3765,7 @@ def show_upload_required_alert(
     interface_language: Optional[str],
 ) -> Optional[html.Div]:
     # Superseded by the dedicated upload gate (prediction-upload-gate), which now
-    # handles both B (round 1) and C (round 2). Kept as an inert Output sink so the
+    # handles B and C until a file is uploaded. Kept as an inert Output sink so the
     # 'upload-required-alert' element stays wired; the Finish/Exit button in the
     # action strip remains available for users who don't want to upload.
     return None
@@ -3765,7 +3776,9 @@ def show_upload_required_alert(
      Output('prediction-upload-gate', 'style'),
      Output('prediction-upload-gate', 'children'),
      Output('prediction-chart-submit-wrap', 'className'),
-     Output('prediction-meta-row', 'className')],
+     Output('prediction-meta-row', 'className'),
+     Output('prediction-upload-slot', 'className'),
+     Output('prediction-mobile-actions', 'className')],
     [Input('url', 'pathname'),
      Input('user-info-store', 'data'),
      Input('interface-language', 'data')],
@@ -3775,8 +3788,8 @@ def toggle_upload_gate(
     pathname: Optional[str],
     user_info: Optional[Dict[str, Any]],
     interface_language: Optional[str],
-) -> Tuple[Dict[str, str], Dict[str, str], Any, str, str]:
-    """Show the format-B upload gate (and hide the chart) until a file is uploaded.
+) -> Tuple[Dict[str, str], Dict[str, str], Any, str, str, str, str]:
+    """Show the B/C upload gate (and hide the chart) until a file is uploaded.
 
     Runs on load as well as navigation so it also catches direct loads / resumes
     onto /prediction, where the persisted example window would otherwise leak a
@@ -3787,6 +3800,9 @@ def toggle_upload_gate(
     force-hide the Source plaque (whose time/metadata reflect the stale example
     seed) even in immersive landscape, where the plaque style is otherwise
     re-shown with ``!important`` and would beat an inline ``display:none``.
+
+    The strip Upload button and ``has-upload`` class follow the same gate: once
+    a file is stored they disappear so the chart keeps the format-A layout.
     """
     if pathname != '/prediction':
         raise PreventUpdate
@@ -3798,6 +3814,8 @@ def toggle_upload_gate(
             _upload_gate_text(user_info, locale),
             'b-gated',
             'prediction-meta-row b-gated',
+            'prediction-upload-visible',
+            'has-upload',
         )
     return (
         {'display': 'block'},
@@ -3805,6 +3823,8 @@ def toggle_upload_gate(
         no_update,
         '',
         'prediction-meta-row',
+        'prediction-upload-hidden',
+        '',
     )
 
 
@@ -4059,6 +4079,45 @@ def _build_gamification_section(
         "boxSizing": "border-box",
         "flexShrink": "0",
     })
+
+
+def _switch_format_button(
+    format_code: str,
+    *,
+    locale: str,
+    visible: bool,
+    short: bool,
+) -> html.Button:
+    """Format-switch CTA. `short` is the compact last-round submit-row label."""
+    code = str(format_code).strip().upper()
+    long_key = f"ui.switch_format.try_{code.lower()}"
+    label_key = f"{long_key}_short" if short else long_key
+    return html.Button(
+        t(label_key, locale=locale),
+        id=f"switch-format-{code.lower()}",
+        className="ui blue button ending-switch-format-btn",
+        title=t(long_key, locale=locale),
+        style={
+            "backgroundColor": "#1d4ed8",
+            "color": "white",
+            "padding": "0 14px",
+            "border": "none",
+            "borderRadius": "8px",
+            "fontSize": "16px",
+            "fontWeight": "700",
+            "cursor": "pointer",
+            "height": "48px",
+            "minHeight": "48px",
+            "display": "inline-flex" if visible else "none",
+            "alignItems": "center",
+            "justifyContent": "center",
+            "lineHeight": "1.2",
+            "margin": "0",
+            "whiteSpace": "nowrap",
+            "flex": "1 1 auto",
+            "maxWidth": "280px",
+        },
+    )
 
 
 def create_ending_layout(
@@ -4344,15 +4403,28 @@ def create_ending_layout(
                         'cursor': 'pointer' if not is_last_round else 'not-allowed',
                         'width': '300px',
                         'height': '60px',
-                        'display': 'inline-flex',
+                        'display': 'none' if is_last_round else 'inline-flex',
                         'alignItems': 'center',
                         'justifyContent': 'center',
                         'lineHeight': '1.2',
                         'margin': '0',
                     }
                 ),
+                _switch_format_button(
+                    "A", locale=locale, short=True,
+                    visible=is_last_round and "A" in switch_targets,
+                ),
+                _switch_format_button(
+                    "B", locale=locale, short=True,
+                    visible=is_last_round and "B" in switch_targets,
+                ),
+                _switch_format_button(
+                    "C", locale=locale, short=True,
+                    visible=is_last_round and "C" in switch_targets,
+                ),
             ],
             id='ending-submit-row',
+            className='ending-submit-row-last' if is_last_round else '',
             disable_n_clicks=True,
             style={
                 'display': 'flex',
@@ -4365,6 +4437,19 @@ def create_ending_layout(
                 'padding': '0 10px',
                 'flexShrink': '0',
             },
+        ),
+        html.Div(id="switch-format-error", disable_n_clicks=True, style={'margin': '0'}),
+        dcc.Checklist(
+            id="switch-data-usage-consent",
+            options=[{'label': t("ui.startup.data_usage_consent_label", locale=locale), 'value': 'agree'}],
+            value=switch_data_consent_value,
+            style={'display': 'none'},
+        ),
+        html.H3(
+            t("ui.switch_format.title", locale=locale),
+            id='ending-switch-format-title',
+            disable_n_clicks=True,
+            style={'display': 'none'},
         ),
         ], id='ending-primary', disable_n_clicks=True),
         html.Div(
@@ -4510,80 +4595,6 @@ def create_ending_layout(
             ],
             disable_n_clicks=True,
             style=_fold_box_style,
-        ),
-        html.Div(
-            [
-                html.H3(
-                    t("ui.switch_format.title", locale=locale),
-                    id='ending-switch-format-title',
-                    style={'textAlign': 'center', 'marginTop': '20px', 'marginBottom': '10px', 'fontSize': 'clamp(18px, 3vw, 24px)'},
-                ),
-                html.Div(id="switch-format-error", style={'marginBottom': '10px'}),
-                dcc.Checklist(
-                    id="switch-data-usage-consent",
-                    options=[{'label': t("ui.startup.data_usage_consent_label", locale=locale), 'value': 'agree'}],
-                    value=switch_data_consent_value,
-                    style={'display': 'none'},
-                ),
-                html.Div(
-                    [
-                        html.Button(
-                            t("ui.switch_format.try_c", locale=locale),
-                            id="switch-format-c",
-                            style={
-                                'backgroundColor': '#1d4ed8',
-                                'color': 'white',
-                                'padding': '12px 18px',
-                                'border': 'none',
-                                'borderRadius': '6px',
-                                'fontSize': '16px',
-                                'cursor': 'pointer',
-                                'display': 'inline-block' if "C" in switch_targets else 'none',
-                            },
-                        ),
-                        html.Button(
-                            t("ui.switch_format.try_a", locale=locale),
-                            id="switch-format-a",
-                            style={
-                                'backgroundColor': '#1d4ed8',
-                                'color': 'white',
-                                'padding': '12px 18px',
-                                'border': 'none',
-                                'borderRadius': '6px',
-                                'fontSize': '16px',
-                                'cursor': 'pointer',
-                                'display': 'inline-block' if "A" in switch_targets else 'none',
-                            },
-                        ),
-                        html.Button(
-                            t("ui.switch_format.try_b", locale=locale),
-                            id="switch-format-b",
-                            style={
-                                'backgroundColor': '#1d4ed8',
-                                'color': 'white',
-                                'padding': '12px 18px',
-                                'border': 'none',
-                                'borderRadius': '6px',
-                                'fontSize': '16px',
-                                'cursor': 'pointer',
-                                'display': 'inline-block' if "B" in switch_targets else 'none',
-                            },
-                        ),
-                    ],
-                    style={'display': 'flex', 'justifyContent': 'center', 'gap': '12px', 'flexWrap': 'wrap'},
-                ),
-            ],
-            disable_n_clicks=True,
-            style={
-                'marginTop': '10px',
-                'padding': 'clamp(10px, 2vw, 20px)',
-                'backgroundColor': 'white',
-                'borderRadius': '10px',
-                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
-                'width': '100%',
-                'boxSizing': 'border-box',
-                'display': 'block' if (is_last_round and switch_targets) else 'none',
-            },
         ),
     ], id="ending-page", className="ending-page", disable_n_clicks=True, style={
         'maxWidth': '100%',
@@ -5741,16 +5752,16 @@ def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
         # Round-1 data-source identity, accounting for a file imported at startup
         # (uploaded_data_path set by handle_startup_csv_upload / _nightscout_import):
         #  - B with an import -> round 1 is the user's own data.
-        #  - B without an import -> gated on /prediction (blank Source until upload).
-        #  - A / C -> round 1 is always the generic warm-up.
+        #  - B/C without an import -> gated on /prediction (blank Source until upload).
+        #  - A, and C with an import -> round 1 is the generic warm-up.
         _startup_uploaded = info.get('uploaded_data_path')
         if format_value == "B" and _startup_uploaded:
             info['is_example_data'] = False
             info['data_source_name'] = str(info.get('uploaded_data_filename') or 'uploaded.csv')
-        elif format_value == "B":
+        elif format_value in ("B", "C") and not _startup_uploaded:
             info['is_example_data'] = True
             info['data_source_name'] = ""
-        else:  # A / C -> generic warm-up
+        else:  # A, or C with a startup import -> generic warm-up
             info['is_example_data'] = True
             info['data_source_name'] = "example.csv"
 
@@ -5911,8 +5922,8 @@ def append_round_from_window(
 ) -> Dict[str, Any]:
     """Append the current chart window as a completed round on ``user_info``.
 
-    Shared by Submit (shows results) and Finish/Exit (stores the round without
-    ranking or the results page).
+    Shared by Submit (shows results) and Finish/Exit (stores the round, then
+    routes to ``/ending`` or ``/final``).
     """
     info: Dict[str, Any] = dict(user_info)
     if 'age' in info:
@@ -6104,11 +6115,8 @@ def handle_next_round_button(
             }
             new_df, random_start = get_random_data_window(full_df, points, used_starts=used_starts)
         else:
-            # Format C ("mixed"): round 1 is a generic warm-up; from round 2 an
-            # upload is REQUIRED, so if none exists yet, show the upload gate instead
-            # of silently continuing on generic data (a whole session of generic was
-            # the reported bug). Once uploaded, interleave: ODD round -> generic,
-            # EVEN round -> own data (so round 2 = own, round 3 = generic, ...).
+            # Format C ("mixed"): a file is required before any graph. Once
+            # uploaded, interleave: ODD round -> generic, EVEN round -> own data.
             uploaded_path = user_info.get("uploaded_data_path")
             if not uploaded_path:
                 # next_round_number is always >= 2 here (round 1 came from init).
@@ -6170,7 +6178,12 @@ def handle_finish_study_from_prediction(
     current_df_data: Optional[Dict[str, Any]],
     slider_value: Optional[int],
 ) -> Tuple[str, Optional[Dict[str, Any]], Dict[str, bool], Optional[str]]:
-    """Exit from the chart: store a fully drawn round, skip results/ranking UI."""
+    """Exit from the chart: keep any fully drawn round, then show results.
+
+    A complete current drawing goes to ``/ending`` (this round vs actual).
+    Prior rounds with an incomplete current drawing go to ``/final`` (overall).
+    Only a session with nothing to show returns to landing.
+    """
     print(f"DEBUG handle_finish_study_from_prediction FIRED: n_clicks={n_clicks}")
     if not n_clicks:
         return no_update, no_update, no_update, no_update
@@ -6178,15 +6191,31 @@ def handle_finish_study_from_prediction(
     with start_action(action_type=u"handle_finish_study_from_prediction", n_clicks=int(n_clicks)):
         pass
 
+    before = len((user_info or {}).get("rounds") or [])
     info = capture_complete_round_on_exit(user_info, current_df_data, slider_value)
-    if should_persist_study_data(info):
-        with start_action(action_type=u"handle_finish_study_from_prediction"):
-            submit_component.save_statistics(info, write_ranking=False)
-            info['statistics_saved'] = True
+    rounds: list[dict[str, Any]] = info.get("rounds") or []
+    current_complete = False
+    if current_df_data:
+        current_complete = hidden_area_is_complete(
+            reconstruct_dataframe_from_dict(current_df_data)
+        )
+    just_captured = len(rounds) > before
+    show_this_round = bool(
+        (just_captured or current_complete)
+        and info.get("prediction_table_data")
+        and current_df_data
+    )
 
-    # Landing, not /final: results and ranking stay behind Submit → /ending → Finish.
-    # Clear last-visited-page so redirect_landing_to_game does not bounce back.
-    return '/', info, {'hide_last_hour': True}, None
+    if should_persist_study_data(info) and rounds:
+        with start_action(action_type=u"handle_finish_study_from_prediction"):
+            submit_component.save_statistics(info, write_ranking=not show_this_round)
+            info["statistics_saved"] = True
+
+    if show_this_round:
+        return "/ending", info, {"hide_last_hour": False}, "/ending"
+    if rounds:
+        return "/final", info, {"hide_last_hour": False}, "/final"
+    return "/", info, {"hide_last_hour": True}, None
 
 
 @app.callback(
@@ -7480,10 +7509,9 @@ def initialize_data_on_url_change(
     if pathname != '/prediction':
         return _no_change
 
-    # Upload gate (B from round 1, C from round 2): don't auto-load a generic
-    # window when the session must block on an upload -- leave the window empty so
-    # the gate shows (handles direct load / resume mid-session). Format C round 1
-    # still falls through to load the generic warm-up window below.
+    # Upload gate (B/C until a file exists): don't auto-load a generic window
+    # when the session must block on an upload -- leave the window empty so the
+    # gate shows (handles direct load / resume mid-session).
     if _is_upload_gated(user_info):
         return None, None, False, "", False, 0
 
@@ -7492,8 +7520,8 @@ def initialize_data_on_url_change(
         return _no_change
 
     # First visit to /prediction with no window: load the round-1 dataset. Format B
-    # with a startup import uses the user's own file; A / C round 1 pick a random
-    # generic window via _apply_generic_round_selection().
+    # with a startup import uses the user's own file; A / C-with-import round 1 pick
+    # a random generic window via _apply_generic_round_selection().
     fmt = str((user_info or {}).get("format") or "A")
     uploaded_path = (user_info or {}).get("uploaded_data_path")
     if fmt == "B" and uploaded_path:
@@ -8178,10 +8206,11 @@ def update_data_source_display(
     if source_name:
         return source_name
     fmt = str((user_info or {}).get("format") or "A")
-    # Format B: keep the Source blank until the user uploads their file.
+    # B/C keep the Source blank until a file is uploaded.
+    if _is_upload_gated(user_info):
+        return ""
     if fmt == "B":
         return ""
-    # Format C plays generic until an upload arrives.
     return "example.csv"
 
 

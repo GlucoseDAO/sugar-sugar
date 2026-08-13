@@ -225,9 +225,9 @@ def _server_groups(port: int, *, locale: str) -> list[ServerGroup]:
             # --no-debug/--no-reloader keeps the harness independent of
             # Werkzeug's debug fork while chart-mode env is still seeded by the
             # chart entry point before app import.
-            # --format C ("mixed"): the prediction page shows the relocated Upload
-            # button (left of Submit) that formats B/C use -- so the default
-            # prediction shots now exercise that control.
+            # --format C ("mixed"): after a file is present the chart uses the
+            # format-A action strip (no Upload button). Use --format B to
+            # screenshot the upload gate.
             cmd=base + [
                 "chart",
                 "--prefill",

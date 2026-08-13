@@ -1026,6 +1026,12 @@ html:not(.mobile-device) #ending-submit-row {
   margin-top: 2px !important;
   flex-shrink: 0;
 }
+html:not(.mobile-device) #ending-submit-row.ending-submit-row-last {
+  flex-wrap: wrap !important;
+}
+html:not(.mobile-device) #ending-submit-row.ending-submit-row-last #next-round-button {
+  display: none !important;
+}
 html:not(.mobile-device) #ending-copy-link-row {
   margin-top: 8px !important;
 }
@@ -1035,6 +1041,22 @@ html:not(.mobile-device) #next-round-button {
   align-items: center !important;
   justify-content: center !important;
   text-align: center !important;
+}
+#ending-submit-row .ending-switch-format-btn {
+  height: 48px !important;
+  min-height: 48px !important;
+  padding: 0 14px !important;
+  margin: 0 !important;
+  border: none !important;
+  border-radius: 8px !important;
+  background-color: #1d4ed8 !important;
+  color: #fff !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+  white-space: nowrap;
+  flex: 1 1 auto;
+  max-width: 280px;
 }
 
 
