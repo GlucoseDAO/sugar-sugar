@@ -934,7 +934,8 @@ html:not(.mobile-device) #submit-button {
   line-height: 1.2 !important;
 }
 html:not(.mobile-device) #finish-study-button,
-#finish-study-button-ending {
+#finish-study-button-ending,
+#restart-button {
   width: 48px !important;
   min-width: 48px !important;
   max-width: 48px !important;
@@ -954,7 +955,8 @@ html:not(.mobile-device) #finish-study-button,
   text-indent: 0 !important;
 }
 html:not(.mobile-device) #finish-study-button::after,
-#finish-study-button-ending::after {
+#finish-study-button-ending::after,
+#restart-button::after {
   content: "×";
   position: absolute;
   inset: 0;
@@ -1042,7 +1044,8 @@ html:not(.mobile-device) #next-round-button {
   justify-content: center !important;
   text-align: center !important;
 }
-#ending-submit-row .ending-switch-format-btn {
+#ending-submit-row .ending-switch-format-btn,
+#final-action-row .ending-switch-format-btn {
   height: 48px !important;
   min-height: 48px !important;
   padding: 0 14px !important;
@@ -1057,6 +1060,37 @@ html:not(.mobile-device) #next-round-button {
   white-space: nowrap;
   flex: 1 1 auto;
   max-width: 280px;
+}
+#final-action-row {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  margin: 0 auto 16px auto;
+  padding: 0 10px;
+  width: 100%;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+#final-action-row #share-results-button {
+  height: 48px !important;
+  min-height: 48px !important;
+  padding: 0 16px !important;
+  margin: 0 !important;
+  border: none !important;
+  border-radius: 8px !important;
+  background-color: #4CBB17 !important;
+  color: #fff !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+  white-space: nowrap;
+  flex: 1 1 auto;
+  max-width: 280px;
+  width: auto !important;
+  min-width: 0;
 }
 
 

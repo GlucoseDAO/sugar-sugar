@@ -1052,11 +1052,37 @@ html.mobile-device #ending-submit-row {
 html.mobile-device #ending-submit-row.ending-submit-row-last #next-round-button {
   display: none !important;
 }
-html.mobile-device #ending-submit-row .ending-switch-format-btn {
+html.mobile-device #ending-submit-row .ending-switch-format-btn,
+html.mobile-device #final-action-row .ending-switch-format-btn {
   height: 44px !important;
   min-height: 44px !important;
   font-size: 14px !important;
   min-width: 120px;
+}
+html.mobile-device #final-action-row {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  margin: 0 auto 12px auto !important;
+  padding: 0 8px !important;
+  overflow-x: auto;
+}
+html.mobile-device #final-action-row #share-results-button {
+  height: 44px !important;
+  min-height: 44px !important;
+  font-size: 14px !important;
+  min-width: 120px;
+  padding: 0 12px !important;
+}
+html.mobile-device #restart-button {
+  width: 44px !important;
+  min-width: 44px !important;
+  max-width: 44px !important;
+  height: 44px !important;
+  flex: 0 0 44px !important;
 }
 
 
