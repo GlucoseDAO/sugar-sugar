@@ -46,7 +46,7 @@ import plotly.graph_objects as go
 import segno
 from plotly.subplots import make_subplots
 from dash import dcc, html
-from sugar_sugar.config import PREDICTION_HOUR_OFFSET, SHARE_ROUND_LABELS
+from sugar_sugar.config import MIN_USEFUL_ROUNDS, PREDICTION_HOUR_OFFSET, SHARE_ROUND_LABELS
 from sugar_sugar.encouragement import encouragement_text
 from sugar_sugar.i18n import normalize_locale, t
 from sugar_sugar.nickname import normalize_nickname
@@ -1338,6 +1338,23 @@ def build_share_card_figure(
                 showarrow=False,
                 font=dict(size=14, color="rgba(15,23,42,1)"),
             )
+    else:
+        fig.add_annotation(
+            xref="paper", yref="paper",
+            x=place_x, y=place_y,
+            xanchor="left", yanchor="top",
+            text=t("ui.share.stat_no_ranking", locale=loc).upper(),
+            showarrow=False,
+            font=dict(size=14, color="rgba(74,85,104,1)"),
+        )
+        fig.add_annotation(
+            xref="paper", yref="paper",
+            x=place_x, y=place_y - 0.040,
+            xanchor="left", yanchor="top",
+            text=t("ui.final.no_ranking_yet", locale=loc, min=MIN_USEFUL_ROUNDS),
+            showarrow=False,
+            font=dict(size=16, color="rgba(15,23,42,1)"),
+        )
 
     # QR beside the ranking in the whitespace between left text and graph.
     # Card is 1200x630, so keep the QR square in *pixels* by giving sizey a

@@ -218,6 +218,25 @@ def test_format_filter_restricts_the_board(ranking_csv: Path) -> None:
     assert snapshot["total"] == 1 and snapshot["top"][0]["mae"] == 20.0
 
 
+def test_short_runs_are_excluded_from_the_board(ranking_csv: Path) -> None:
+    """Fewer than MIN_USEFUL_ROUNDS (exclusive) stays off the leaderboard."""
+    ranking_csv.write_text(
+        _HEADER
+        + _row("short", 1.0, rounds=5)
+        + _row("just", 20.0, rounds=6)
+        + _row("full", 10.0, rounds=12),
+        encoding="utf-8",
+    )
+    snapshot = _snapshot(ranking_csv)
+    assert snapshot is not None
+    assert snapshot["total"] == 2
+    assert [entry["mae"] for entry in snapshot["top"]] == [10.0, 20.0]
+    assert _snapshot(ranking_csv, study_id="short")["rank"] is None
+    assert _rank_from_ranking_csv(
+        ranking_csv, study_id="short", format_filter="ALL"
+    ) is None
+
+
 def test_unrankable_rows_are_dropped(ranking_csv: Path) -> None:
     ranking_csv.write_text(
         _HEADER + _row("s1", 20.0) + "s2,run1,1,2026-08-01 10:00:00,,,ALL,12,True,example,,0,0,0\n",

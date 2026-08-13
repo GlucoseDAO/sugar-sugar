@@ -51,6 +51,12 @@ fr:
     next_hint: "Suivant : tu rempliras un court formulaire, puis tu téléverseras tes données CGM (ou tu utiliseras le jeu de données d'exemple)."
     take_me_in: "Entrer"
     games_played_so_far: "Parties jouées jusqu'à présent"
+    games_played_so_far_count: "%{count} parties jouées jusqu'à présent"
+    gamers_played_so_far_count: "%{count} joueurs jusqu'à présent"
+    games_played_completed: "dont %{count} ont terminé la tâche"
+    completed_the_task_label: "ont terminé la tâche"
+    victors_punchline: "Rejoins les vainqueurs — démarque-toi de la foule"
+    games_slots_line: "%{total} parties, mais seulement %{completed} terminées"
 
   consent_form:
     title: "Avis de consentement"
@@ -396,14 +402,15 @@ fr:
 
   highscore:
     title: "Classement"
-    subtitle: "Chaque partie terminée garde sa propre place — bats ton score et l'ancien reste au classement. Une erreur absolue moyenne (MAE) plus faible signifie une meilleure prédiction."
+    subtitle: "Chaque partie terminée garde sa propre place — bats ton score et l'ancien reste au classement. Seules les parties d'au moins %{min} manches sont classées : plus de manches rendent un MAE bas plus difficile, donc les essais courts restent hors tableau. Une erreur absolue moyenne (MAE) plus faible signifie une meilleure prédiction."
     overall_board: "Général"
     by_data_source: "Par source de données"
     lower_is_better: "Un MAE plus faible est meilleur"
     players_count: "%{total} joueurs"
     scores_count: "%{total} scores"
     games_played: "%{count} parties jouées"
-    empty: "Aucune partie terminée pour l'instant. Termine une partie complète et tu seras le premier au classement."
+    completed_the_task: "%{count} ont terminé la tâche"
+    empty: "Aucune partie classée pour l'instant. Joue au moins %{min} manches et tu seras le premier au classement."
     play_now: "Jouer maintenant"
     privacy_note: "Les pseudos sont facultatifs et publics. Si tu as indiqué une adresse e-mail, le classement n'en conserve qu'une empreinte à sens unique afin de reconnaître tes résultats d'un appareil à l'autre — jamais l'adresse elle-même ni aucune autre donnée personnelle. Les pseudos ne font pas partie des données de l'étude."
 
@@ -431,7 +438,7 @@ fr:
     nickname_save: "Enregistrer"
     nickname_saved: "Enregistré — le classement affiche maintenant ton nom."
     nickname_hint: "Facultatif et public. Laisse le champ vide pour rester anonyme."
-    no_ranking_yet: "Termine une partie pour apparaître au classement."
+    no_ranking_yet: "Joue au moins %{min} manches pour apparaître au classement."
     per_round_metrics: "Métriques par manche"
     start_over: "Quitter"
 

@@ -231,7 +231,125 @@ def test_save_statistics_upserts_incomplete_then_complete(tmp_path: Path) -> Non
     assert len(rows) == 1
     assert rows[0]["study_id"] == "forgot-exit"
     assert rows[0]["rounds_played"] == "1"
+    # Short runs are stored in ranking CSVs too; the public board hides them.
+    assert submit._ranking_csv_path.exists()
     with submit._ranking_csv_path.open(newline="") as fh:
-        rank = list(csv.DictReader(fh))
-    assert len(rank) == 1
-    assert rank[0]["rounds_played"] == "1"
+        ranking_rows = list(csv.DictReader(fh))
+    assert len(ranking_rows) == 1
+    assert ranking_rows[0]["rounds_played"] == "1"
+
+
+def test_save_statistics_keeps_each_format_run(tmp_path: Path) -> None:
+    """Two rounds in A then two in B must leave both format rows on disk."""
+    import csv
+
+    submit = SubmitComponent()
+    submit._stats_csv_path = tmp_path / "prediction_statistics.csv"
+    submit._ranking_csv_path = tmp_path / "prediction_ranking.csv"
+    submit._ranking_by_format_paths = {k: tmp_path / f"r_{k}.csv" for k in ("A", "B", "C")}
+
+    window = _window_with_predictions()
+    times = _times(window)
+    one_round = {
+        "round_number": 1,
+        "prediction_window_size": len(window),
+        "prediction_table_data": _table_data(window),
+        "window_times": times,
+        "is_example_data": True,
+        "data_source_name": "example.csv",
+    }
+    user_info: dict[str, Any] = {
+        "study_id": "multi-format",
+        "run_id": "run-a",
+        "number": 1,
+        "consent_completed": True,
+        "format": "A",
+        "run_format": "A",
+        "age": 30,
+        "email": "fields@example.com",
+        "rounds": [{**one_round, "round_number": i, "format": "A"} for i in (1, 2)],
+    }
+    submit.save_statistics(user_info)
+
+    user_info["run_id"] = "run-b"
+    user_info["format"] = "B"
+    user_info["run_format"] = "B"
+    user_info["rounds"] = [{**one_round, "round_number": i, "format": "B"} for i in (1, 2)]
+    user_info["runs_by_format"] = {
+        "A": [
+            {
+                "run_id": "archive-a",
+                "active_run_id": "run-a",
+                "format": "A",
+                "rounds": [{**one_round, "round_number": i, "format": "A"} for i in (1, 2)],
+                "is_example_data": True,
+                "data_source_name": "example.csv",
+            }
+        ]
+    }
+    submit.save_statistics(user_info)
+
+    with submit._stats_csv_path.open(newline="") as fh:
+        stats = list(csv.DictReader(fh))
+    by_format = {row["format"]: row for row in stats}
+    assert set(by_format) == {"A", "B"}
+    assert by_format["A"]["rounds_played"] == "2"
+    assert by_format["B"]["rounds_played"] == "2"
+    assert by_format["A"]["run_id"] == "run-a"
+    assert by_format["B"]["run_id"] == "run-b"
+
+    with submit._ranking_by_format_paths["A"].open(newline="") as fh:
+        fmt_a = list(csv.DictReader(fh))
+    with submit._ranking_by_format_paths["B"].open(newline="") as fh:
+        fmt_b = list(csv.DictReader(fh))
+    assert len(fmt_a) == 1 and fmt_a[0]["rounds_played"] == "2"
+    assert len(fmt_b) == 1 and fmt_b[0]["rounds_played"] == "2"
+
+    with submit._ranking_csv_path.open(newline="") as fh:
+        overall = list(csv.DictReader(fh))
+    assert len(overall) == 1
+    assert overall[0]["rounds_played"] == "4"
+
+
+def test_save_statistics_writes_ranking_at_min_useful_rounds(tmp_path: Path) -> None:
+    """A full useful run still writes both the format and overall ranking rows."""
+    import csv
+
+    from sugar_sugar.config import MIN_USEFUL_ROUNDS
+
+    submit = SubmitComponent()
+    submit._stats_csv_path = tmp_path / "prediction_statistics.csv"
+    submit._ranking_csv_path = tmp_path / "prediction_ranking.csv"
+    submit._ranking_by_format_paths = {k: tmp_path / f"r_{k}.csv" for k in ("A", "B", "C")}
+
+    window = _window_with_predictions()
+    times = _times(window)
+    one_round = {
+        "round_number": 1,
+        "prediction_window_size": len(window),
+        "prediction_table_data": _table_data(window),
+        "window_times": times,
+        "format": "A",
+        "is_example_data": True,
+        "data_source_name": "example.csv",
+    }
+    user_info: dict[str, Any] = {
+        "study_id": "six-rounds",
+        "run_id": "r1",
+        "number": 1,
+        "consent_completed": True,
+        "format": "A",
+        "run_format": "A",
+        "age": 30,
+        "email": "six@example.com",
+        "rounds": [{**one_round, "round_number": i} for i in range(1, MIN_USEFUL_ROUNDS + 1)],
+    }
+    submit.save_statistics(user_info)
+    with submit._ranking_csv_path.open(newline="") as fh:
+        overall = list(csv.DictReader(fh))
+    with submit._ranking_by_format_paths["A"].open(newline="") as fh:
+        fmt_a = list(csv.DictReader(fh))
+    assert len(overall) == 1
+    assert overall[0]["rounds_played"] == str(MIN_USEFUL_ROUNDS)
+    assert len(fmt_a) == 1
+    assert fmt_a[0]["rounds_played"] == str(MIN_USEFUL_ROUNDS)

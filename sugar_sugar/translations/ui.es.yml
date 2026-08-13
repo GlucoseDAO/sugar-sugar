@@ -51,6 +51,12 @@ es:
     next_hint: "Siguiente: completarás un breve formulario y luego subirás tus datos de CGM (o usarás el conjunto de datos de ejemplo)."
     take_me_in: "Entrar"
     games_played_so_far: "Partidas jugadas hasta ahora"
+    games_played_so_far_count: "%{count} partidas jugadas hasta ahora"
+    gamers_played_so_far_count: "%{count} jugadores hasta ahora"
+    games_played_completed: "de las cuales %{count} completaron la tarea"
+    completed_the_task_label: "completaron la tarea"
+    victors_punchline: "Únete a los vencedores — destaca entre la multitud"
+    games_slots_line: "%{total} partidas, pero solo %{completed} completadas"
 
   consent_form:
     title: "Aviso de consentimiento"
@@ -396,14 +402,15 @@ es:
 
   highscore:
     title: "Clasificación"
-    subtitle: "Cada partida terminada conserva su propio puesto: supera tu resultado y el anterior seguirá en la tabla. Un error absoluto medio (MAE) más bajo significa una mejor predicción."
+    subtitle: "Cada partida terminada conserva su propio puesto: supera tu resultado y el anterior seguirá en la tabla. Solo se clasifican las partidas con al menos %{min} rondas: más rondas hacen más difícil un MAE bajo, así que los intentos cortos no entran. Un error absoluto medio (MAE) más bajo significa una mejor predicción."
     overall_board: "General"
     by_data_source: "Por fuente de datos"
     lower_is_better: "Un MAE más bajo es mejor"
     players_count: "%{total} jugadores"
     scores_count: "%{total} resultados"
     games_played: "%{count} partidas jugadas"
-    empty: "Todavía no hay partidas terminadas. Juega una partida completa y serás el primero en la clasificación."
+    completed_the_task: "%{count} completaron la tarea"
+    empty: "Aún no hay partidas clasificadas. Juega al menos %{min} rondas y serás el primero en la clasificación."
     play_now: "Jugar ahora"
     privacy_note: "Los apodos son opcionales y públicos. Si indicaste un correo electrónico, la clasificación guarda solo un hash unidireccional de él para reconocer tus resultados entre dispositivos, nunca la dirección en sí ni ningún otro dato personal. Los apodos no forman parte de los datos del estudio."
 
@@ -431,7 +438,7 @@ es:
     nickname_save: "Guardar"
     nickname_saved: "Guardado: la clasificación ya muestra tu nombre."
     nickname_hint: "Opcional y público. Déjalo vacío para permanecer anónimo."
-    no_ranking_yet: "Termina una partida para aparecer en la clasificación."
+    no_ranking_yet: "Juega al menos %{min} rondas para aparecer en la clasificación."
     per_round_metrics: "Métricas por ronda"
     start_over: "Salir"
 

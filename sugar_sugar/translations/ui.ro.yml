@@ -49,6 +49,12 @@ ro:
     next_hint: "Urmează: vei completa un formular scurt, apoi vei încărca date CGM (sau vei folosi setul exemplu)."
     take_me_in: "Intră în joc"
     games_played_so_far: "Jocuri jucate până acum"
+    games_played_so_far_count: "%{count} jocuri jucate până acum"
+    gamers_played_so_far_count: "%{count} jucători până acum"
+    games_played_completed: "dintre care %{count} au finalizat sarcina"
+    completed_the_task_label: "au finalizat sarcina"
+    victors_punchline: "Fii printre învingători — ieși în evidență din mulțime"
+    games_slots_line: "%{total} jocuri, dar doar %{completed} finalizate"
 
   about:
     title: "Despre Sugar Sugar"
@@ -416,14 +422,15 @@ ro:
 
   highscore:
     title: "Clasament"
-    subtitle: "Fiecare joc terminat își păstrează propriul loc — depășește-ți rezultatul, iar cel vechi rămâne în clasament. O eroare absolută medie (MAE) mai mică înseamnă o predicție mai bună."
+    subtitle: "Fiecare joc terminat își păstrează propriul loc — depășește-ți rezultatul, iar cel vechi rămâne în clasament. Doar jocurile cu cel puțin %{min} runde sunt clasate: mai multe runde fac un MAE mic mai greu, deci încercările scurte rămân în afara clasamentului. O eroare absolută medie (MAE) mai mică înseamnă o predicție mai bună."
     overall_board: "General"
     by_data_source: "După sursa de date"
     lower_is_better: "Un MAE mai mic este mai bun"
     players_count: "%{total} jucători"
     scores_count: "%{total} rezultate"
     games_played: "%{count} jocuri jucate"
-    empty: "Încă nu există jocuri finalizate. Joacă o rundă completă și vei fi primul în clasament."
+    completed_the_task: "%{count} au finalizat sarcina"
+    empty: "Încă nu există jocuri clasate. Joacă cel puțin %{min} runde și vei fi primul în clasament."
     play_now: "Joacă acum"
     privacy_note: "Pseudonimele sunt opționale și publice. Dacă ai indicat o adresă de email, clasamentul păstrează doar un hash unidirecțional al acesteia, ca rezultatele tale să fie recunoscute pe mai multe dispozitive — niciodată adresa în sine și nicio altă informație personală. Pseudonimele nu fac parte din datele studiului."
 
@@ -451,7 +458,7 @@ ro:
     nickname_save: "Salvează"
     nickname_saved: "Salvat — clasamentul afișează acum numele tău."
     nickname_hint: "Opțional și public. Lasă câmpul gol ca să rămâi anonim."
-    no_ranking_yet: "Finalizează o rundă de joc ca să apari în clasament."
+    no_ranking_yet: "Joacă cel puțin %{min} runde ca să apari în clasament."
     per_round_metrics: "Metrici pe rundă"
     start_over: "Ieșire"
 

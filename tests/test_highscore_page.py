@@ -92,10 +92,24 @@ def _class_names(component: Any) -> list[str]:
     return out
 
 
+def test_highscore_hides_runs_below_the_round_floor(ranking_root: Path) -> None:
+    """A 5-round score is study data, not a board slot."""
+    overall = ranking_root / "data" / "input" / "prediction_ranking.csv"
+    overall.write_text(
+        _HEADER + _row("short", "ALL", 1.0, rounds=5) + _row("full", "ALL", 18.0, rounds=12),
+        encoding="utf-8",
+    )
+    texts = " ".join(_texts(create_highscore_page(None, None, locale="en")))
+    assert "1.00" not in texts
+    assert "18.00" in texts
+    assert "Player 1" in texts
+    assert "Player 2" not in texts
+
+
 def test_highscore_empty_state_without_any_ranking_csv(ranking_root: Path) -> None:
     page = create_highscore_page(None, None, locale="en")
     texts = " ".join(_texts(page))
-    assert "No finished games yet" in texts
+    assert "No ranked games yet" in texts
     assert "Play now" in texts
 
 

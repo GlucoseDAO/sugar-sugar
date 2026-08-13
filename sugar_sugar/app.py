@@ -327,8 +327,10 @@ def _ranking_entries(
 
     Arcade rules: a score you set keeps its place forever.  Nothing is merged or
     collapsed, so a player who finished several games occupies several slots and an
-    earlier, worse score is still visible below a later, better one.  Scores are
-    never hidden -- that was the confusing part.
+    earlier, worse score is still visible below a later, better one.  Runs with
+    fewer than ``MIN_USEFUL_ROUNDS`` (default 6) are excluded -- a short lucky
+    MAE must not outrank a full attempt.  Completers stay unranked on ``/final``
+    and the share card until they reach that floor.
 
     Returns ``None`` when the CSV is missing, unreadable or has nothing rankable.
     Otherwise: ``identity``, ``study_id``, ``email_key``, ``mae``, ``rounds``,
@@ -370,6 +372,11 @@ def _ranking_entries(
 
     if format_filter and has_format:
         df = df.filter(pl.col('format') == format_filter)
+    # Below the useful-round floor (exclusive): 1–5 round rows stay in the CSV
+    # for history but are not ranked. Null rounds (pre-column schemas) stay.
+    df = df.filter(
+        pl.col('rounds').is_null() | (pl.col('rounds') >= MIN_USEFUL_ROUNDS)
+    )
     if df.height == 0:
         return None
 
@@ -4685,7 +4692,7 @@ def _leaderboard_hero_children(
     elif overall and overall.get("total"):
         hero_inner.append(
             html.Div(
-                t("ui.final.no_ranking_yet", locale=locale),
+                t("ui.final.no_ranking_yet", locale=locale, min=MIN_USEFUL_ROUNDS),
                 className="final-leaderboard-empty",
                 disable_n_clicks=True,
             )
@@ -4867,6 +4874,14 @@ def _final_leaderboard_children(
     mounted for the status line.
     """
     hero_inner: list[Any] = _leaderboard_hero_children(overall, locale=locale, unit=unit)
+    if not hero_inner:
+        hero_inner = [
+            html.Div(
+                t("ui.final.no_ranking_yet", locale=locale, min=MIN_USEFUL_ROUNDS),
+                className="final-leaderboard-empty",
+                disable_n_clicks=True,
+            )
+        ]
 
     left_children: list[Any] = []
     if hero_inner:
@@ -4916,12 +4931,14 @@ def _final_leaderboard_children(
     right_children: list[Any] = [board] if board is not None else []
 
     # Only offer the rename box once the player actually has a board presence --
-    # a session with no submitted rounds is never written to the ranking CSVs,
-    # so a nickname would have nothing to label.  Skip it entirely when they
-    # already picked a name at startup; asking again is noise.
+    # short runs stay off the ranking CSVs, so a nickname would have nothing to
+    # label.  Skip it entirely when they already picked a name at startup.
     already_named: bool = bool(normalize_nickname((user_info or {}).get("nickname")))
     show_editor: bool = not already_named if offer_nickname is None else offer_nickname
-    if (left_children or right_children) and show_editor:
+    has_rank: bool = bool(overall and overall.get("rank") is not None) or any(
+        board and board.get("rank") is not None for _, board in per_format
+    )
+    if (left_children or right_children) and show_editor and has_rank:
         left_children.append(
             html.Div(
                 _nickname_editor_children(user_info, locale=locale),
@@ -5028,7 +5045,22 @@ def create_highscore_page(
     Players who picked a nickname are shown by it; the rest stay anonymous
     (``Player N``) exactly as on ``/final``.
     """
-    from sugar_sugar.components.landing import count_prediction_ranking_rows
+    from sugar_sugar.components.landing import (
+        count_people_who_accessed,
+        count_people_who_completed,
+    )
+
+    input_dir: Path = project_root / "data" / "input"
+    accessed: int = count_people_who_accessed(input_dir / "prediction_statistics.csv")
+    completed: int = count_people_who_completed(
+        stats_path=input_dir / "prediction_statistics.csv",
+        ranking_paths=(
+            input_dir / "prediction_ranking.csv",
+            input_dir / "prediction_ranking_A.csv",
+            input_dir / "prediction_ranking_B.csv",
+            input_dir / "prediction_ranking_C.csv",
+        ),
+    )
 
     unit: str = glucose_unit if glucose_unit in ('mg/dL', 'mmol/L') else 'mg/dL'
     study_id: str = str((user_info or {}).get('study_id') or '')
@@ -5056,19 +5088,28 @@ def create_highscore_page(
     children: list[Any] = [
         html.H1(t("ui.highscore.title", locale=locale), disable_n_clicks=True),
         html.Div(
-            t("ui.highscore.subtitle", locale=locale),
+            t("ui.highscore.subtitle", locale=locale, min=MIN_USEFUL_ROUNDS),
             className="highscore-subtitle",
             disable_n_clicks=True,
         ),
         html.Div(
             [
                 html.Div(
-                    t("ui.highscore.games_played", locale=locale, count=count_prediction_ranking_rows()),
+                    t("ui.highscore.games_played", locale=locale, count=accessed),
                     className="highscore-stat",
                     disable_n_clicks=True,
                 ),
-                # `total` counts board slots (one per finished game) and would just
-                # restate games_played; `players` is the distinct-people count.
+                html.Div(
+                    t(
+                        "ui.highscore.completed_the_task",
+                        locale=locale,
+                        count=completed,
+                    ),
+                    className="highscore-stat",
+                    disable_n_clicks=True,
+                ),
+                # `total` counts board slots (one per finished game); `players` is
+                # the distinct-people count among ranked completers.
                 html.Div(
                     t("ui.highscore.players_count", locale=locale, total=int((overall or {}).get("players") or 0)),
                     className="highscore-stat",
@@ -5139,7 +5180,7 @@ def create_highscore_page(
     if overall_board is None and not format_cards:
         children.append(
             html.Div(
-                t("ui.highscore.empty", locale=locale),
+                t("ui.highscore.empty", locale=locale, min=MIN_USEFUL_ROUNDS),
                 className="final-leaderboard-empty highscore-empty",
                 disable_n_clicks=True,
             )

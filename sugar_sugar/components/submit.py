@@ -465,8 +465,11 @@ class SubmitComponent(html.Div):
     def save_statistics(self, user_info: dict[str, Any], *, write_ranking: bool = True) -> None:
         """Save prediction statistics to CSV file.
 
-        This writes a single row for the whole "study entry".
-        If `user_info["rounds"]` is present, statistics are aggregated across rounds.
+        This writes one statistics row per format run (``study_id`` + ``run_id``).
+        Switching A→B must not erase the A row. Archived ``runs_by_format``
+        runs are rewritten on later saves so a mid-session format switch still
+        lands every field, even at 2 rounds. If `user_info["rounds"]` is
+        present, the current run is aggregated across those rounds.
 
         The full dataset is NOT passed in (it no longer lives in a client store).
         Per-round prediction times come from `round_info['window_times']` captured
@@ -474,10 +477,12 @@ class SubmitComponent(html.Div):
         server-side by the round's own identity and sliced. age/user_id come from
         `user_info` (age) and the fixed adapter default (user_id=1).
 
-        ``write_ranking`` is True for Submit and for Finish from ``/ending``
-        (the player completed the round/study procedure). Finish/Exit from the
-        chart still stores the study row but skips the leaderboard so ranking
-        is not awarded for an abandoned game.
+        ``write_ranking`` is True for Submit and for Finish from ``/ending``.
+        Every submitted round is stored in ``prediction_statistics.csv``, one
+        row per ``study_id`` + ``run_id`` (so format A/B/C runs do not overwrite
+        each other). Ranking CSVs get the same rows for bookkeeping; the public
+        board still hides runs below ``MIN_USEFUL_ROUNDS``. Finish/Exit from
+        the chart stores the study row but skips ranking.
         """
         # Consent gate (defense-in-depth): never persist study data for a session
         # that has not completed mandatory consent. The display_page guard already
@@ -688,12 +693,18 @@ class SubmitComponent(html.Div):
             path: Path,
             row: dict[str, Any],
             legacy_to_new: dict[str, str],
-            match_key: str = "study_id",
+            match_keys: tuple[str, ...] = ("study_id",),
         ) -> None:
-            """Insert or replace the row for ``match_key`` so incremental saves
-            (Start, each submit, Exit) do not duplicate a session."""
+            """Insert or replace the row matching all ``match_keys``.
+
+            Incremental saves (Start, each submit, Exit) of the *same* run
+            must not duplicate. Different format runs of the same player
+            (A then B) must not overwrite each other — match ``study_id`` +
+            ``run_id`` for those files.
+            """
             desired_fieldnames = list(row.keys())
-            match_value = str(row.get(match_key, "") or "")
+            match_values = tuple(str(row.get(key, "") or "") for key in match_keys)
+            can_match = all(match_values)
             existing_fieldnames: list[str] = []
             existing_rows: list[dict[str, Any]] = []
             if path.exists():
@@ -723,7 +734,8 @@ class SubmitComponent(html.Div):
                 for old_key, new_key in legacy_to_new.items():
                     if upgraded_row.get(new_key, "") in ("", None) and old_key in old_row:
                         upgraded_row[new_key] = old_row.get(old_key, "")
-                if match_value and str(upgraded_row.get(match_key, "") or "") == match_value:
+                old_values = tuple(str(upgraded_row.get(key, "") or "") for key in match_keys)
+                if can_match and old_values == match_values:
                     out_rows.append({key: row.get(key, upgraded_row.get(key, "")) for key in fieldnames})
                     replaced = True
                 else:
@@ -739,16 +751,120 @@ class SubmitComponent(html.Div):
                     writer.writerow(out_row)
             tmp_path.replace(path)
 
-        # Write full statistics row
+        def _match_keys_for(row: dict[str, Any]) -> tuple[str, ...]:
+            if str(row.get("run_id") or "").strip():
+                return ("study_id", "run_id")
+            return ("study_id", "format")
+
+        _stats_legacy = {
+            'id': 'study_id',
+            'parameters': 'predicted_values',
+            'actual_values': 'real_values',
+            'prediction_time': 'prediction_times',
+        }
+
+        def _stats_row_for_run(
+            *,
+            run_format: str,
+            run_id: str,
+            run_rounds: list[dict[str, Any]],
+            is_example: bool,
+            source_name: str,
+        ) -> tuple[dict[str, Any], dict[str, Optional[float]], int]:
+            """Build a statistics row for one archived (or current) format run."""
+            parameters_run: list[dict[str, Any]] = []
+            actual_values_run: list[dict[str, Any]] = []
+            prediction_times_run: list[dict[str, Any]] = []
+            per_round: list[dict[str, Any]] = []
+            for round_idx, round_info in enumerate(run_rounds, start=1):
+                table_data = round_info.get('prediction_table_data') or []
+                m = _metrics_from_table(table_data)
+                per_round.append({
+                    'round_number': int(round_info.get('round_number') or round_idx),
+                    'mae': m['mae'],
+                    'mse': m['mse'],
+                    'rmse': m['rmse'],
+                    'mape': m['mape'],
+                })
+                if len(table_data) < 2:
+                    continue
+                window_size = int(round_info.get('prediction_window_size') or 0)
+                if window_size <= 0:
+                    continue
+                actual_row = table_data[0]
+                prediction_row = table_data[1]
+                times = _resolve_round_times(round_info, window_size)
+                for i in range(window_size):
+                    time_key = f"t{i}"
+                    pred_str = prediction_row.get(time_key, "-")
+                    act_str = actual_row.get(time_key, "-")
+                    if pred_str != "-" and act_str != "-" and i < len(times):
+                        parameters_run.append({"version": run_format, "round": round_idx, "value": pred_str})
+                        actual_values_run.append({"version": run_format, "round": round_idx, "value": act_str})
+                        prediction_times_run.append({"version": run_format, "round": round_idx, "value": times[i]})
+            overall_m = _metrics_from_table(
+                _build_aggregate_table_data(run_rounds) if run_rounds else []
+            )
+            rounds_n = len(run_rounds)
+            row = {
+                'study_id': study_id,
+                'run_id': run_id,
+                'number': number,
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'email': user_info.get('email', ''),
+                'format': run_format,
+                'is_example_data': is_example,
+                'data_source_name': source_name,
+                'age': age,
+                'user_id': user_id,
+                'gender': user_info.get('gender', ''),
+                'uses_cgm': bool(user_info.get('uses_cgm', False)),
+                'cgm_duration_years': user_info.get('cgm_duration_years', ''),
+                'diabetic': user_info.get('diabetic', ''),
+                'diabetic_type': user_info.get('diabetic_type', ''),
+                'diabetes_duration': user_info.get('diabetes_duration', ''),
+                'location': user_info.get('location', ''),
+                'rounds_played': rounds_n,
+                'predicted_values': str(parameters_run),
+                'real_values': str(actual_values_run),
+                'prediction_times': str(prediction_times_run),
+                'overall_mae_mgdl': overall_m['mae'],
+                'overall_mse_mgdl': overall_m['mse'],
+                'overall_rmse_mgdl': overall_m['rmse'],
+                'overall_mape_pct': overall_m['mape'],
+                'per_round_metrics': str(per_round),
+            }
+            return row, overall_m, rounds_n
+
+        # Archived format runs first, then the current run, so a later save of
+        # the same format (same run_id) wins. Different run_ids stay as rows.
+        runs_by_format: dict[str, list[dict[str, Any]]] = dict(user_info.get("runs_by_format") or {})
+        archived_payloads: list[tuple[dict[str, Any], dict[str, Optional[float]], int]] = []
+        for fmt, runs in runs_by_format.items():
+            for run in runs:
+                archived_rounds = list(run.get("rounds") or [])
+                if not archived_rounds:
+                    continue
+                archive_row, archive_overall, archive_n = _stats_row_for_run(
+                    run_format=str(run.get("format") or fmt),
+                    run_id=str(run.get("active_run_id") or run.get("run_id") or ""),
+                    run_rounds=archived_rounds,
+                    is_example=bool(run.get("is_example_data", True)),
+                    source_name=str(run.get("data_source_name") or ""),
+                )
+                archived_payloads.append((archive_row, archive_overall, archive_n))
+                _upgrade_and_upsert_csv(
+                    csv_file_path,
+                    archive_row,
+                    legacy_to_new=_stats_legacy,
+                    match_keys=_match_keys_for(archive_row),
+                )
+
         _upgrade_and_upsert_csv(
             csv_file_path,
             data,
-            legacy_to_new={
-                'id': 'study_id',
-                'parameters': 'predicted_values',
-                'actual_values': 'real_values',
-                'prediction_time': 'prediction_times',
-            }
+            legacy_to_new=_stats_legacy,
+            match_keys=_match_keys_for(data),
         )
 
         # Write ranking row for fast leaderboard lookups.
@@ -773,22 +889,54 @@ class SubmitComponent(html.Div):
             'overall_rmse_mgdl': overall['rmse'],
             'overall_mape_pct': overall['mape'],
         }
-        # Leaderboard only after at least one submitted round -- a Start-only
-        # stub (forgot before drawing) lives in prediction_statistics only.
-        # Finish/Exit from the chart also skips ranking (write_ranking=False).
-        if rounds_played < 1 or not write_ranking:
+        # Chart Exit skips ranking (write_ranking=False). Start-only stubs
+        # (0 rounds) stay in statistics. Every submitted round is written
+        # here for bookkeeping; the public board still hides short runs.
+        if not write_ranking:
             return
 
-        # Ranking within the current format/category (A, B, or C)
-        if version in self._ranking_by_format_paths:
+        def _ranking_from_stats(
+            stats_row: dict[str, Any],
+            metrics: dict[str, Optional[float]],
+        ) -> dict[str, Any]:
+            return {
+                'study_id': study_id,
+                'run_id': str(stats_row.get('run_id') or ''),
+                'number': data['number'],
+                'timestamp': stats_row.get('timestamp', data['timestamp']),
+                'email_key': leaderboard_identity,
+                'nickname': leaderboard_nickname,
+                'format': stats_row.get('format', ''),
+                'rounds_played': stats_row.get('rounds_played', 0),
+                'is_example_data': stats_row.get('is_example_data', True),
+                'data_source_name': stats_row.get('data_source_name', ''),
+                'overall_mae_mgdl': metrics['mae'],
+                'overall_mse_mgdl': metrics['mse'],
+                'overall_rmse_mgdl': metrics['rmse'],
+                'overall_mape_pct': metrics['mape'],
+            }
+
+        # Per-format ranking: current run plus every archived format run.
+        if version in self._ranking_by_format_paths and rounds_played >= 1:
             _upgrade_and_upsert_csv(
                 self._ranking_by_format_paths[version],
                 ranking_row,
                 legacy_to_new={},
+                match_keys=_match_keys_for(ranking_row),
+            )
+        for archive_row, archive_overall, archive_n in archived_payloads:
+            archive_fmt = str(archive_row.get('format') or '')
+            if archive_fmt not in self._ranking_by_format_paths or archive_n < 1:
+                continue
+            archive_ranking = _ranking_from_stats(archive_row, archive_overall)
+            _upgrade_and_upsert_csv(
+                self._ranking_by_format_paths[archive_fmt],
+                archive_ranking,
+                legacy_to_new={},
+                match_keys=_match_keys_for(archive_ranking),
             )
 
         # Overall (cumulative) ranking across formats played so far.
-        runs_by_format: dict[str, list[dict[str, Any]]] = dict(user_info.get("runs_by_format") or {})
         played_formats: set[str] = {str(fmt) for fmt, runs in runs_by_format.items() if runs}
         if version:
             played_formats.add(version)
@@ -796,7 +944,6 @@ class SubmitComponent(html.Div):
         for fmt in sorted(played_formats):
             for run in (runs_by_format.get(fmt) or []):
                 all_rounds.extend(list(run.get("rounds") or []))
-        # Include the current run (not yet archived)
         all_rounds.extend(rounds if rounds else [])
 
         overall_all_table = _build_aggregate_table_data(all_rounds) if all_rounds else overall_table_data
@@ -818,8 +965,11 @@ class SubmitComponent(html.Div):
         data_source_name = next(iter(source_names)) if len(source_names) == 1 else "multiple"
         total_rounds_played = int(
             sum(len(list(run.get("rounds") or [])) for fmt in played_formats for run in (runs_by_format.get(fmt) or []))
-            + len(rounds)
+            + rounds_played
         )
+
+        if total_rounds_played < 1:
+            return
 
         overall_ranking_row = {
             'study_id': study_id,
@@ -841,6 +991,7 @@ class SubmitComponent(html.Div):
             self._ranking_csv_path,
             overall_ranking_row,
             legacy_to_new={},
+            match_keys=("study_id",),
         )
 
     def register_callbacks(self, app: Dash) -> None:

@@ -49,6 +49,12 @@ de:
     next_hint: "Als Nächstes: kurzes Formular ausfüllen und dann CGM‑Daten hochladen (oder Beispieldaten verwenden)."
     take_me_in: "Los geht's"
     games_played_so_far: "Bisher gespielte Spiele"
+    games_played_so_far_count: "%{count} bisher gespielte Spiele"
+    gamers_played_so_far_count: "%{count} Spieler bisher"
+    games_played_completed: "davon haben %{count} die Aufgabe abgeschlossen"
+    completed_the_task_label: "haben die Aufgabe abgeschlossen"
+    victors_punchline: "Gehöre zu den Siegern — hebe dich von der Menge ab"
+    games_slots_line: "%{total} Spiele, aber nur %{completed} abgeschlossen"
 
   about:
     title: "Über Sugar Sugar"
@@ -395,14 +401,15 @@ de:
 
   highscore:
     title: "Bestenliste"
-    subtitle: "Jedes beendete Spiel behält seinen eigenen Platz — übertriff dein Ergebnis, und das alte bleibt trotzdem in der Liste. Ein kleinerer mittlerer absoluter Fehler (MAE) bedeutet eine bessere Vorhersage."
+    subtitle: "Jedes beendete Spiel behält seinen eigenen Platz — übertriff dein Ergebnis, und das alte bleibt trotzdem in der Liste. Nur Durchläufe mit mindestens %{min} Runden werden gewertet: mehr Runden machen einen niedrigen MAE schwerer, kurze Versuche bleiben außen vor. Ein kleinerer mittlerer absoluter Fehler (MAE) bedeutet eine bessere Vorhersage."
     overall_board: "Gesamt"
     by_data_source: "Nach Datenquelle"
     lower_is_better: "Kleinerer MAE ist besser"
     players_count: "%{total} Spieler"
     scores_count: "%{total} Ergebnisse"
     games_played: "%{count} gespielte Spiele"
-    empty: "Noch keine abgeschlossenen Spiele. Spiele einen kompletten Durchlauf und du bist der Erste auf der Liste."
+    completed_the_task: "%{count} haben die Aufgabe abgeschlossen"
+    empty: "Noch keine gewerteten Spiele. Spiele mindestens %{min} Runden und du bist der Erste auf der Liste."
     play_now: "Jetzt spielen"
     privacy_note: "Spitznamen sind optional und öffentlich. Wenn du eine E-Mail-Adresse angegeben hast, speichert die Bestenliste nur einen Einweg-Hash davon, damit deine Ergebnisse geräteübergreifend erkannt werden — niemals die Adresse selbst und keine weiteren personenbezogenen Daten. Spitznamen sind nicht Teil der Studiendaten."
 
@@ -430,7 +437,7 @@ de:
     nickname_save: "Speichern"
     nickname_saved: "Gespeichert — die Bestenliste zeigt jetzt deinen Namen."
     nickname_hint: "Optional und öffentlich. Lass das Feld leer, um anonym zu bleiben."
-    no_ranking_yet: "Schließe einen Durchlauf ab, um in der Bestenliste zu erscheinen."
+    no_ranking_yet: "Spiele mindestens %{min} Runden, um in der Bestenliste zu erscheinen."
     per_round_metrics: "Metriken pro Runde"
     start_over: "Beenden"
 

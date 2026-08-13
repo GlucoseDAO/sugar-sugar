@@ -49,6 +49,12 @@ en:
     next_hint: "Next: you'll fill in a short form, then upload CGM data (or use the sample dataset)."
     take_me_in: "Take me in"
     games_played_so_far: "Games played so far"
+    games_played_so_far_count: "%{count} games played so far"
+    gamers_played_so_far_count: "%{count} gamers played so far"
+    games_played_completed: "out of which %{count} completed the task"
+    completed_the_task_label: "completed the task"
+    victors_punchline: "Be part of the victors — stand out of the crowd"
+    games_slots_line: "%{total} games, but only %{completed} completed"
 
   consent_form:
     title: "Consent notice"
@@ -419,14 +425,15 @@ en:
 
   highscore:
     title: "Highscore"
-    subtitle: "Every finished game keeps its own place — beat your score and the old one stays on the board. Lower mean absolute error (MAE) means a better prediction."
+    subtitle: "Every finished game keeps its own place — beat your score and the old one stays on the board. Only runs with at least %{min} rounds are ranked: more rounds make a low MAE harder, so short attempts stay off the board. Lower mean absolute error (MAE) means a better prediction."
     overall_board: "Overall"
     by_data_source: "By data source"
     lower_is_better: "Lower MAE is better"
     players_count: "%{total} players"
     scores_count: "%{total} scores"
     games_played: "%{count} games played"
-    empty: "No finished games yet. Play a full run and you will be the first on the board."
+    completed_the_task: "%{count} completed the task"
+    empty: "No ranked games yet. Play at least %{min} rounds and you will be the first on the board."
     play_now: "Play now"
     privacy_note: "Nicknames are optional and public. If you gave an email address, the board stores only a one-way hash of it so your results are recognised across devices — never the address itself and no other personal data. Nicknames are not part of the study data."
 
@@ -454,7 +461,7 @@ en:
     nickname_save: "Save"
     nickname_saved: "Saved — the board now shows your name."
     nickname_hint: "Optional and public. Leave it blank to stay anonymous."
-    no_ranking_yet: "Finish a run to appear on the leaderboard."
+    no_ranking_yet: "Play at least %{min} rounds to appear on the leaderboard."
     per_round_metrics: "Per-round metrics"
     start_over: "Exit"
 

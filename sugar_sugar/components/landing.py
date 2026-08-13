@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import csv
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
@@ -19,20 +20,114 @@ from sugar_sugar.consent import (
     get_next_study_number,
 )
 from sugar_sugar.i18n import t, t_list
-from sugar_sugar.config import STORAGE_TYPE
+from sugar_sugar.config import MIN_USEFUL_ROUNDS, STORAGE_TYPE
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
+_PREDICTION_STATS_CSV = _PROJECT_ROOT / "data" / "input" / "prediction_statistics.csv"
 _PREDICTION_RANKING_CSV = _PROJECT_ROOT / "data" / "input" / "prediction_ranking.csv"
+_RANKING_CSV_PATHS: tuple[Path, ...] = (
+    _PREDICTION_RANKING_CSV,
+    _PROJECT_ROOT / "data" / "input" / "prediction_ranking_A.csv",
+    _PROJECT_ROOT / "data" / "input" / "prediction_ranking_B.csv",
+    _PROJECT_ROOT / "data" / "input" / "prediction_ranking_C.csv",
+)
+
+
+def _count_unique_study_ids(path: Path) -> int:
+    """Distinct ``study_id`` values in a CSV, or non-empty data rows if that column is missing."""
+    if not path.exists() or path.stat().st_size == 0:
+        return 0
+    ids: set[str] = set()
+    rows = 0
+    with path.open(encoding="utf-8", errors="replace", newline="") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            rows += 1
+            study_id = (row.get("study_id") or "").strip()
+            if study_id:
+                ids.add(study_id)
+    return len(ids) if ids else rows
+
+
+def _parse_rounds_played(row: dict[str, str]) -> Optional[int]:
+    raw = (row.get("rounds_played") or "").strip()
+    try:
+        return int(raw)
+    except ValueError:
+        return None
+
+
+def _study_ids_meeting_min_rounds(path: Path, min_rounds: int) -> set[str]:
+    """``study_id`` values whose ``rounds_played`` is at least ``min_rounds``."""
+    if not path.exists() or path.stat().st_size == 0:
+        return set()
+    ids: set[str] = set()
+    with path.open(encoding="utf-8", errors="replace", newline="") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            study_id = (row.get("study_id") or "").strip()
+            if not study_id:
+                continue
+            rounds = _parse_rounds_played(row)
+            if rounds is not None and rounds >= min_rounds:
+                ids.add(study_id)
+    return ids
+
+
+def count_ranking_slots(
+    ranking_path: Optional[Path] = None,
+    *,
+    min_rounds: int = MIN_USEFUL_ROUNDS,
+) -> tuple[int, int]:
+    """``(all slots, completed slots)`` in the overall ranking CSV.
+
+    A slot is one finished-game row. Completers here means ``rounds_played``
+    reached ``min_rounds`` — the same floor the leaderboard uses.
+    """
+    path = ranking_path or _PREDICTION_RANKING_CSV
+    if not path.exists() or path.stat().st_size == 0:
+        return 0, 0
+    total = 0
+    completed = 0
+    with path.open(encoding="utf-8", errors="replace", newline="") as handle:
+        for row in csv.DictReader(handle):
+            total += 1
+            rounds = _parse_rounds_played(row)
+            if rounds is not None and rounds >= min_rounds:
+                completed += 1
+    return total, completed
+
+
+def count_people_who_accessed(stats_path: Optional[Path] = None) -> int:
+    """Everyone who started the game, including abandoned and short runs.
+
+    Source of truth is ``prediction_statistics.csv`` (written at Start, even
+    with zero submitted rounds). Ranking CSVs also keep short runs for
+    bookkeeping; the public board still hides them.
+    """
+    return _count_unique_study_ids(stats_path or _PREDICTION_STATS_CSV)
+
+
+def count_people_who_completed(
+    *,
+    min_rounds: int = MIN_USEFUL_ROUNDS,
+    stats_path: Optional[Path] = None,
+    ranking_paths: Optional[tuple[Path, ...]] = None,
+) -> int:
+    """People who reached ``min_rounds`` in any category (or overall).
+
+    Unions ``prediction_statistics`` with the ranking CSVs so a 6-round run
+    that skipped ranking (chart Exit) still counts as a completed task.
+    """
+    ids: set[str] = _study_ids_meeting_min_rounds(stats_path or _PREDICTION_STATS_CSV, min_rounds)
+    for path in ranking_paths or _RANKING_CSV_PATHS:
+        ids |= _study_ids_meeting_min_rounds(path, min_rounds)
+    return len(ids)
 
 
 def count_prediction_ranking_rows() -> int:
-    """Number of completed games = data rows in ``prediction_ranking.csv``."""
-    if not _PREDICTION_RANKING_CSV.exists() or _PREDICTION_RANKING_CSV.stat().st_size == 0:
-        return 0
-    with _PREDICTION_RANKING_CSV.open(encoding="utf-8") as f:
-        # Skip header; count non-empty data lines.
-        next(f, None)
-        return sum(1 for line in f if line.strip())
+    """Distinct people who started a game. Kept as an alias of :func:`count_people_who_accessed`."""
+    return count_people_who_accessed()
 
 
 def games_played_counter(locale: str) -> html.Div:
@@ -41,19 +136,41 @@ def games_played_counter(locale: str) -> html.Div:
     Uses ``h2`` so the global ``body :not(h1..h6) { font-size: 16px !important }``
     rule in ``lang.css`` cannot shrink the text. Final sizes live in ``lang.css``.
     """
-    count = count_prediction_ranking_rows()
+    accessed = count_people_who_accessed()
+    completed = count_people_who_completed()
+    games_total, games_completed = count_ranking_slots()
     return html.Div(
         [
             html.H2(
-                t("ui.landing.games_played_so_far", locale=locale),
-                className="games-played-title",
+                t("ui.landing.gamers_played_so_far_count", locale=locale, count=accessed),
+                className="games-played-completed",
                 disable_n_clicks=True,
             ),
             html.H2(
                 "0",
                 className="games-played-count",
                 disable_n_clicks=True,
-                **{"data-target": str(count)},
+                **{"data-target": str(completed)},
+            ),
+            html.H2(
+                t("ui.landing.completed_the_task_label", locale=locale),
+                className="games-played-title",
+                disable_n_clicks=True,
+            ),
+            html.H2(
+                t("ui.landing.victors_punchline", locale=locale),
+                className="games-played-punchline",
+                disable_n_clicks=True,
+            ),
+            html.H2(
+                t(
+                    "ui.landing.games_slots_line",
+                    locale=locale,
+                    total=games_total,
+                    completed=games_completed,
+                ),
+                className="games-played-slots",
+                disable_n_clicks=True,
             ),
         ],
         className="games-played-counter",
@@ -188,98 +305,99 @@ class LandingPage(html.Div):
         screenshot_path = project_root / "assets" / "images" / "screenshot.png"
         screenshot_src = _image_data_uri(screenshot_path)
 
-        hero = dbc.Row(
+        screenshot = (
+            html.Img(
+                src=screenshot_src,
+                className="landing-hero-shot",
+                disable_n_clicks=True,
+            )
+            if screenshot_src
+            else html.Div(
+                [
+                    html.Div(
+                        className="fa-solid fa-chart-line",
+                        style={"fontSize": "56px", "color": "#1d4ed8"},
+                    ),
+                    html.Div(
+                        t("ui.landing.preview", locale=locale),
+                        style={"fontWeight": "700", "marginTop": "10px"},
+                    ),
+                ],
+                className="landing-hero-shot-fallback",
+                disable_n_clicks=True,
+            )
+        )
+
+        hero = html.Div(
             [
-                dbc.Col(
-                    [
-                        html.H1(
-                            t("ui.common.app_title", locale=locale),
-                            style={
-                                "fontSize": "56px",
-                                "fontWeight": "800",
-                                "letterSpacing": "-0.02em",
-                                "marginBottom": "10px",
-                            },
-                        ),
-                        html.Div(
-                            t("ui.landing.tagline", locale=locale),
-                            style={
-                                "fontSize": "20px",
-                                "color": "#334155",
-                                "marginBottom": "18px",
-                                "lineHeight": "1.4",
-                            },
-                        ),
-                        games_played_counter(locale),
-                        html.Div(
-                            [
-                                html.H3(
-                                    t("ui.landing.how_it_works", locale=locale),
-                                    style={"fontSize": "22px", "fontWeight": "800", "color": "#1565c0", "marginBottom": "8px"},
-                                ),
-                                html.Ul(
-                                    [html.Li(item) for item in t_list("ui.landing.how_it_works_steps", locale=locale)],
-                                    style={
-                                        "marginBottom": "0",
-                                        "color": "#334155",
-                                        "lineHeight": "1.6",
-                                    },
-                                ),
-                            ],
-                            style={
-                                "background": "rgba(255,255,255,0.75)",
-                                "border": "1px solid rgba(15, 23, 42, 0.10)",
-                                "borderRadius": "14px",
-                                "padding": "14px 16px",
-                                "backdropFilter": "blur(8px)",
-                            },
-                        ),
-                    ],
-                    md=6,
+                html.H1(
+                    t("ui.common.app_title", locale=locale),
+                    style={
+                        "fontSize": "56px",
+                        "fontWeight": "800",
+                        "letterSpacing": "-0.02em",
+                        "marginBottom": "10px",
+                    },
+                    disable_n_clicks=True,
                 ),
-                dbc.Col(
+                html.Div(
+                    t("ui.landing.tagline", locale=locale),
+                    style={
+                        "fontSize": "20px",
+                        "color": "#334155",
+                        "marginBottom": "18px",
+                        "lineHeight": "1.4",
+                    },
+                    disable_n_clicks=True,
+                ),
+                dbc.Row(
                     [
-                        html.Div(
-                            [
-                                html.Img(
-                                    src=screenshot_src,
-                                    style={
-                                        "width": "100%",
-                                        "borderRadius": "14px",
-                                        "border": "1px solid rgba(15, 23, 42, 0.10)",
-                                    },
-                                )
-                                if screenshot_src
-                                else html.Div(
-                                    [
-                                        html.Div(
-                                            className="fa-solid fa-chart-line",
-                                            style={"fontSize": "56px", "color": "#1d4ed8"},
-                                        ),
-                                        html.Div(
-                                            t("ui.landing.preview", locale=locale),
-                                            style={"fontWeight": "700", "marginTop": "10px"},
-                                        ),
-                                    ],
-                                    style={
-                                        "height": "320px",
-                                        "display": "flex",
-                                        "flexDirection": "column",
-                                        "alignItems": "center",
-                                        "justifyContent": "center",
-                                        "background": "rgba(255,255,255,0.75)",
-                                        "border": "1px solid rgba(15, 23, 42, 0.10)",
-                                        "borderRadius": "14px",
-                                    },
-                                )
-                            ],
+                        dbc.Col(
+                            games_played_counter(locale),
+                            md=6,
+                            className="landing-hero-stats-col",
+                        ),
+                        dbc.Col(
+                            html.Div(
+                                screenshot,
+                                className="landing-hero-shot-wrap",
+                                disable_n_clicks=True,
+                            ),
+                            md=6,
+                            className="landing-hero-shot-col",
                         ),
                     ],
-                    md=6,
+                    className="g-4 landing-hero-pair",
+                ),
+                html.Div(
+                    [
+                        html.H3(
+                            t("ui.landing.how_it_works", locale=locale),
+                            style={"fontSize": "22px", "fontWeight": "800", "color": "#1565c0", "marginBottom": "8px"},
+                            disable_n_clicks=True,
+                        ),
+                        html.Ul(
+                            [html.Li(item) for item in t_list("ui.landing.how_it_works_steps", locale=locale)],
+                            style={
+                                "marginBottom": "0",
+                                "color": "#334155",
+                                "lineHeight": "1.6",
+                            },
+                        ),
+                    ],
+                    style={
+                        "background": "rgba(255,255,255,0.75)",
+                        "border": "1px solid rgba(15, 23, 42, 0.10)",
+                        "borderRadius": "14px",
+                        "padding": "14px 16px",
+                        "backdropFilter": "blur(8px)",
+                        "marginTop": "18px",
+                    },
+                    disable_n_clicks=True,
                 ),
             ],
-            className="g-4",
-            style={"alignItems": "center"},
+            className="landing-hero",
+            disable_n_clicks=True,
         )
 
         study_info = dbc.Card(

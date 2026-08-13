@@ -838,6 +838,20 @@ html.mobile-device #landing-page .games-played-count {
   font-size: 40px !important;
 }
 
+html.mobile-device #landing-page .games-played-completed {
+  font-size: 16px !important;
+  margin: 0 0 6px 0 !important;
+}
+
+html.mobile-device #landing-page .games-played-punchline {
+  font-size: 15px !important;
+}
+
+html.mobile-device #landing-page .games-played-slots {
+  font-size: 14px !important;
+  margin-top: 10px !important;
+}
+
 html.mobile-device #startup-next:disabled,
 html.mobile-device #startup-next[disabled] {
   background: #9ca3af !important;

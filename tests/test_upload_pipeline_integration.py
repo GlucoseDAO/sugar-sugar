@@ -233,6 +233,7 @@ def _assert_statistics_saved(
     submit.save_statistics(user_info)
 
     assert submit._stats_csv_path.exists()
+    # Every submitted round is stored in ranking CSVs; the board hides short runs.
     assert submit._ranking_csv_path.exists()
     assert submit._ranking_by_format_paths["B"].exists()
 
