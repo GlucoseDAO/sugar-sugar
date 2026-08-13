@@ -212,6 +212,7 @@ zh:
   share:
     button_share: "分享我的成绩"
     title: "我的 Sugar Sugar 成绩"
+    title_named: "%{name} 的 Sugar Sugar 成绩"
     subtitle: "你能比我更准地预测血糖吗？来试试！"
     download_png: "下载图片"
     download_png_hint: "将成绩卡保存为 PNG，非常适合 Instagram 故事。"

@@ -213,6 +213,7 @@ de:
   share:
     button_share: "Ergebnisse teilen"
     title: "Meine Sugar-Sugar-Ergebnisse"
+    title_named: "Sugar-Sugar-Ergebnisse von %{name}"
     subtitle: "Kannst du Glukose besser vorhersagen als ich? Probier es aus!"
     download_png: "Bild herunterladen"
     download_png_hint: "Speichere die Karte als PNG - perfekt für Instagram-Stories."

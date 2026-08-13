@@ -187,6 +187,17 @@ def _finished_user(study_id: str = "s1") -> dict[str, Any]:
     }
 
 
+def test_editor_hidden_when_startup_already_named(ranking_root: Path) -> None:
+    """Don't ask again on /final if they already typed a nickname at startup."""
+    key = nickname_module.email_key("ann@x.com")
+    _overall(ranking_root).write_text(_HEADER + _row("s1", key=key), encoding="utf-8")
+    user = _finished_user()
+    user["nickname"] = "Ninja"
+    ids = _ids(create_final_layout(user, "mg/dL", locale="en"))
+    assert "final-nickname-input" not in ids
+    assert "final-ranking-list" in ids
+
+
 def test_final_page_renders_the_editor_ids(ranking_root: Path) -> None:
     """All three `final-nickname-*` ids must be in the DOM or the save callback
     silently never fires."""

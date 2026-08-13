@@ -212,6 +212,7 @@ uk:
   share:
     button_share: "Поділитися результатом"
     title: "Мої результати в Sugar Sugar"
+    title_named: "Результати %{name} у Sugar Sugar"
     subtitle: "Передбачиш глюкозу краще за мене? Спробуй!"
     download_png: "Завантажити зображення"
     download_png_hint: "Збережи картку у PNG - чудово для історій в Instagram."

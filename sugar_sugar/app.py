@@ -100,7 +100,7 @@ from sugar_sugar.components.ag_grid import build_readonly_ag_grid, build_readonl
 from sugar_sugar.components.startup import StartupPage, StartupPageMobile
 from sugar_sugar.components.landing import LandingPage, LandingPageMobile
 from sugar_sugar.components.consent_form import ConsentFormPage
-from sugar_sugar.components.submit import SubmitComponent
+from sugar_sugar.components.submit import SubmitComponent, hidden_area_is_complete
 from sugar_sugar.encouragement import pick_bracket
 from sugar_sugar.components.header import HeaderComponent, make_csv_upload
 from sugar_sugar.components.ending import EndingPage
@@ -265,7 +265,7 @@ OG_PREVIEW_VERSION: int = 1
 OG_PREVIEW_SIZE: tuple[int, int] = (1200, 630)
 # Bump when the share-card PNG design changes so FB/X/LinkedIn re-fetch the
 # image instead of serving a stale crop from their own caches.
-SHARE_CARD_IMAGE_VERSION: int = 3
+SHARE_CARD_IMAGE_VERSION: int = 5
 PUBLIC_ROUTES: tuple[tuple[str, str, str], ...] = (
     ("/", "Sugar Sugar", SITE_DESCRIPTION),
     ("/about", "About Sugar Sugar", "Learn why the Sugar Sugar glucose prediction study matters."),
@@ -1107,6 +1107,7 @@ if _is_share_mode:
         "rankings": _share_rankings,
         "user_info": {
             "name": os.environ.get("_SHARE_NAME", SHARE_NAME),
+            "nickname": os.environ.get("_SHARE_NAME", SHARE_NAME),
             "study_id": _share_study_id,
             "format": _share_formats[0],
             "uses_cgm": True,
@@ -1669,6 +1670,7 @@ def _staging_build_share_record(*, rounds_n: int = 6, formats: Optional[list[str
         "rankings": {"per_format": [], "overall": None},
         "user_info": {
             "name": "Staging Tester",
+            "nickname": "Staging Tester",
             "study_id": str(uuid.uuid4()),
             "format": played_formats[0] if played_formats else "A",
             "uses_cgm": True,
@@ -2770,7 +2772,6 @@ def update_prediction_text_on_language_change(
      Output('ending-disclaimer-line1', 'children'),
      Output('ending-disclaimer-line2', 'children'),
      Output('ending-disclaimer-line3', 'children'),
-     Output('ending-round-info', 'children'),
      Output('ending-gamification', 'children'),
      Output('ending-units-line', 'children'),
      Output('ending-graph-explanation', 'children'),
@@ -2860,7 +2861,6 @@ def update_ending_text_on_language_change(
         t("ui.results_disclaimer.line1", locale=locale),
         t("ui.results_disclaimer.line2", locale=locale),
         t("ui.results_disclaimer.line3", locale=locale),
-        t("ui.common.round_of", locale=locale, current=current_round_number, total=max_rounds),
         _build_gamification_section(
             current_round=current_round_number,
             max_rounds=max_rounds,
@@ -3525,21 +3525,47 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
         html.Div(id="upload-required-alert", style={'margin': '0 auto', 'maxWidth': '900px'}),
         html.Div(
             [
-                html.Span(
-                    t("ui.common.round_of", locale=locale, current=1, total=user_info.get("max_rounds", MAX_ROUNDS)).replace("Round", "Prediction Round", 1),
-                    id="prediction-round-tagline",
-                    className="prediction-round-tagline",
-                    style={"display": "none"},
+                html.Div(
+                    [
+                        html.Span(
+                            t("ui.common.round_of", locale=locale, current=1, total=user_info.get("max_rounds", MAX_ROUNDS)).replace("Round", "Prediction Round", 1),
+                            id="prediction-round-tagline",
+                            className="prediction-round-tagline",
+                            style={"display": "none"},
+                        ),
+                        html.Div(id='round-indicator', style={
+                            'textAlign': 'left',
+                            'fontSize': '18px',
+                            'fontWeight': '600',
+                            'color': '#2c5282',
+                            'marginBottom': '0'
+                        }),
+                    ],
+                    id="prediction-round-summary",
+                    disable_n_clicks=True,
                 ),
-                html.Div(id='round-indicator', style={
-                    'textAlign': 'center',
-                    'fontSize': '18px',
-                    'fontWeight': '600',
-                    'color': '#2c5282',
-                    'marginBottom': '10px'
-                }),
+                html.Div(
+                    [
+                        html.Div(
+                            [
+                                html.Label(
+                                    "Source:" if locale == "en" else t("ui.header.current_data_source", locale=locale),
+                                    id='header-data-source-label',
+                                    className="prediction-source-label",
+                                ),
+                                html.Div(id='data-source-display', children=data_source_display, className="prediction-source-name"),
+                                html.Div(id='prediction-chart-meta', className="prediction-source-time"),
+                            ],
+                            className="prediction-source-line",
+                        ),
+                        html.Div(id='generic-source-metadata-display', children="", className="prediction-source-metadata"),
+                    ],
+                    id="prediction-source-plaque",
+                    disable_n_clicks=True,
+                ),
             ],
-            id="prediction-round-summary",
+            id="prediction-meta-row",
+            className="prediction-meta-row",
             disable_n_clicks=True,
         ),
         html.Div([
@@ -3588,25 +3614,6 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
             ),
             html.Div(
                 [
-                    html.Div(
-                        [
-                            html.Label(
-                                "Source:" if locale == "en" else t("ui.header.current_data_source", locale=locale),
-                                id='header-data-source-label',
-                                className="prediction-source-label",
-                            ),
-                            html.Div(id='data-source-display', children=data_source_display, className="prediction-source-name"),
-                            html.Div(id='prediction-chart-meta', className="prediction-source-time"),
-                        ],
-                        className="prediction-source-line",
-                    ),
-                    html.Div(id='generic-source-metadata-display', children="", className="prediction-source-metadata"),
-                ],
-                id="prediction-source-plaque",
-                disable_n_clicks=True,
-            ),
-            html.Div(
-                [
                     html.Button(
                         _fullscreen_button_children(locale),
                         id="prediction-fullscreen-button",
@@ -3629,7 +3636,7 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
                 className="has-upload" if show_upload else "",
             ),
         ], id='prediction-chart-submit-wrap', style={'flex': '1'})
-    ], style={
+    ], id="prediction-page", className="prediction-page", style={
         'margin': '0 auto',
         'padding': '0 20px',
         'display': 'flex',
@@ -3757,7 +3764,8 @@ def show_upload_required_alert(
     [Output('prediction-glucose-chart-container', 'style', allow_duplicate=True),
      Output('prediction-upload-gate', 'style'),
      Output('prediction-upload-gate', 'children'),
-     Output('prediction-chart-submit-wrap', 'className')],
+     Output('prediction-chart-submit-wrap', 'className'),
+     Output('prediction-meta-row', 'className')],
     [Input('url', 'pathname'),
      Input('user-info-store', 'data'),
      Input('interface-language', 'data')],
@@ -3767,7 +3775,7 @@ def toggle_upload_gate(
     pathname: Optional[str],
     user_info: Optional[Dict[str, Any]],
     interface_language: Optional[str],
-) -> Tuple[Dict[str, str], Dict[str, str], Any, str]:
+) -> Tuple[Dict[str, str], Dict[str, str], Any, str, str]:
     """Show the format-B upload gate (and hide the chart) until a file is uploaded.
 
     Runs on load as well as navigation so it also catches direct loads / resumes
@@ -3775,10 +3783,10 @@ def toggle_upload_gate(
     playable generic chart into a "my data only" session. Keyed on user_info (not
     the window store) so it never clobbers a just-uploaded window and never loops.
 
-    The ``b-gated`` class on the chart/submit wrapper lets CSS force-hide the
-    Source plaque (whose time/metadata reflect the stale example seed) even in
-    immersive landscape, where the plaque style is otherwise re-shown with
-    ``!important`` and would beat an inline ``display:none``.
+    The ``b-gated`` class on the chart/submit wrapper and the meta row lets CSS
+    force-hide the Source plaque (whose time/metadata reflect the stale example
+    seed) even in immersive landscape, where the plaque style is otherwise
+    re-shown with ``!important`` and would beat an inline ``display:none``.
     """
     if pathname != '/prediction':
         raise PreventUpdate
@@ -3789,12 +3797,14 @@ def toggle_upload_gate(
             {'display': 'block'},
             _upload_gate_text(user_info, locale),
             'b-gated',
+            'prediction-meta-row b-gated',
         )
     return (
         {'display': 'block'},
         {'display': 'none'},
         no_update,
         '',
+        'prediction-meta-row',
     )
 
 
@@ -3880,7 +3890,7 @@ def _build_progress_bar(current_round: int, max_rounds: int, min_useful: int, lo
             disable_n_clicks=True,
             style={
                 "flex": "1",
-                "height": "22px",
+                "height": "12px",
                 "backgroundColor": bg,
                 "borderRight": border_right,
                 "borderLeft": border_left,
@@ -3891,16 +3901,16 @@ def _build_progress_bar(current_round: int, max_rounds: int, min_useful: int, lo
     labels = html.Div([
         html.Span(
             t("ui.ending.progress.minimum_goal", locale=locale, min_useful=min_useful),
-            style={"fontSize": "13px", "color": "#4a5568", "fontWeight": "600"},
+            style={"fontSize": "11px", "color": "#4a5568", "fontWeight": "600"},
         ),
         html.Span(
             t("ui.ending.progress.stretch_goal", locale=locale, total=max_rounds),
-            style={"fontSize": "13px", "color": "#4a5568", "fontWeight": "600"},
+            style={"fontSize": "11px", "color": "#4a5568", "fontWeight": "600"},
         ),
     ], disable_n_clicks=True, style={
         "display": "flex",
         "justifyContent": "space-between",
-        "marginTop": "4px",
+        "marginTop": "2px",
     })
 
     return html.Div([
@@ -3917,8 +3927,9 @@ def _build_progress_bar(current_round: int, max_rounds: int, min_useful: int, lo
         ),
         labels,
     ], id="ending-progress-bar", disable_n_clicks=True, style={
-        "maxWidth": "550px",
-        "margin": "0 auto 10px auto",
+        "flex": "1",
+        "minWidth": "0",
+        "margin": "0",
     })
 
 
@@ -3932,10 +3943,37 @@ def _build_gamification_section(
     *,
     is_last_round: bool = False,
 ) -> html.Div:
-    """Assemble progress bar, reaction line, milestone, motivation inside one card."""
+    """Assemble progress bar, reaction, and best-round tag inside the blue card."""
     children: list[Any] = []
 
-    children.append(_build_progress_bar(current_round, max_rounds, min_useful, locale))
+    children.append(html.Div(
+        [
+            html.Div(
+                t("ui.common.round_of", locale=locale, current=current_round, total=max_rounds),
+                id='ending-round-info',
+                disable_n_clicks=True,
+                style={
+                    'textAlign': 'left',
+                    'marginBottom': '0',
+                    'fontSize': '16px',
+                    'fontWeight': '600',
+                    'color': '#2c5282',
+                    'whiteSpace': 'nowrap',
+                    'flexShrink': '0',
+                },
+            ),
+            _build_progress_bar(current_round, max_rounds, min_useful, locale),
+        ],
+        disable_n_clicks=True,
+        style={
+            'display': 'flex',
+            'flexDirection': 'row',
+            'alignItems': 'flex-start',
+            'gap': '12px',
+            'width': '100%',
+            'marginBottom': '4px',
+        },
+    ))
 
     reaction = _pick_reaction(mae, current_round, locale)
     personal_best = _is_personal_best(mae, rounds)
@@ -3956,7 +3994,7 @@ def _build_gamification_section(
                 "padding": "2px 10px",
                 "borderRadius": "12px",
                 "border": "1px solid #f0d060",
-                "fontSize": "clamp(14px, 2vw, 17px)",
+                "fontSize": "13px",
             },
         ))
     if not reaction_parts:
@@ -3969,12 +4007,12 @@ def _build_gamification_section(
         disable_n_clicks=True,
         style={
             "textAlign": "center",
-            "fontSize": "clamp(16px, 2.2vw, 20px)",
+            "fontSize": "14px",
             "color": "#2c5282",
             "fontWeight": "500",
-            "marginBottom": "6px",
-            "minHeight": "28px",
-            "lineHeight": "1.5",
+            "marginBottom": "0",
+            "minHeight": "0",
+            "lineHeight": "1.3",
         },
     ))
 
@@ -3985,11 +4023,11 @@ def _build_gamification_section(
         disable_n_clicks=True,
         style={
             "textAlign": "center",
-            "fontSize": "clamp(15px, 2vw, 18px)",
+            "fontSize": "13px",
             "color": "#1b5e20",
             "fontWeight": "700",
-            "marginBottom": "4px",
-            "minHeight": "24px",
+            "marginTop": "2px",
+            "minHeight": "0",
             "display": "block" if milestone else "none",
         },
     ))
@@ -4001,21 +4039,25 @@ def _build_gamification_section(
         style={
             'textAlign': 'center',
             'color': '#4a5568',
-            'fontSize': '13px',
+            'fontSize': '12px',
             'fontStyle': 'italic',
-            'marginTop': '6px',
-            'display': 'none' if is_last_round else 'block',
+            'marginTop': '2px',
+            'lineHeight': '1.3',
+            'display': 'none',
         }
     ))
 
     return html.Div(children, id="ending-gamification", disable_n_clicks=True, style={
-        "maxWidth": "900px",
-        "margin": "10px auto 12px auto",
-        "padding": "16px 24px 12px 24px",
+        "maxWidth": "100%",
+        "margin": "0 auto",
+        "padding": "8px 14px 6px 14px",
         "backgroundColor": "#f0f7ff",
-        "borderRadius": "12px",
+        "borderRadius": "10px",
         "border": "1px solid #c5d9f0",
-        "boxShadow": "0 2px 8px rgba(0,0,0,0.06)",
+        "boxShadow": "0 1px 4px rgba(0,0,0,0.06)",
+        "width": "100%",
+        "boxSizing": "border-box",
+        "flexShrink": "0",
     })
 
 
@@ -4186,14 +4228,29 @@ def create_ending_layout(
     }
     _details_button_label = t("ui.ending.click_here_for_details", locale=locale)
 
+    _finish_label = (
+        t("ui.ending.view_complete_analysis", locale=locale)
+        if is_last_round
+        else t("ui.common.finish_exit", locale=locale)
+    )
     return html.Div([
-        html.H1(t("ui.ending.title", locale=locale), id='ending-title', style={
-            'textAlign': 'center',
-            'marginBottom': '20px',
-            'fontSize': 'clamp(24px, 4vw, 48px)',
-            'padding': '0 10px',
-        }),
-        # 1) Chart + legend first
+        html.H1(
+            t("ui.ending.title", locale=locale),
+            id='ending-title',
+            disable_n_clicks=True,
+            **{"aria-hidden": "true"},
+            style={'display': 'none'},
+        ),
+        html.Div([
+        _build_gamification_section(
+            current_round=current_round_number,
+            max_rounds=max_rounds,
+            min_useful=min_useful,
+            mae=current_mae,
+            rounds=all_rounds,
+            locale=locale,
+            is_last_round=is_last_round,
+        ),
         html.Div([
             html.Div(
                 id='ending-glucose-chart-container',
@@ -4215,69 +4272,137 @@ def create_ending_layout(
                         'displaylogo': False,
                         'editable': False,
                     },
-                    style={'height': '400px'},
+                    style={'height': '100%'},
                 ),
                 disable_n_clicks=True,
-            )
-        ], disable_n_clicks=True, style={
-            'marginBottom': '12px',
-            'padding': 'clamp(10px, 2vw, 20px)',
+                style={'height': '100%', 'flex': '1', 'minHeight': '0'},
+            ),
+            html.P(
+                t("ui.ending.graph_explanation", locale=locale),
+                id='ending-graph-explanation',
+                style={
+                    'textAlign': 'center',
+                    'color': '#4a5568',
+                    'fontSize': '12px',
+                    'margin': '0',
+                    'fontStyle': 'italic',
+                    'lineHeight': '1.3',
+                    'display': 'none',
+                },
+            ),
+        ], id='ending-graph-card', disable_n_clicks=True, style={
+            'marginBottom': '0',
+            'padding': '0',
             'backgroundColor': 'white',
             'borderRadius': '10px',
             'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
             'width': '100%',
             'boxSizing': 'border-box',
+            'flex': '1 1 auto',
+            'minHeight': '0',
+            'display': 'flex',
+            'flexDirection': 'column',
         }),
-        # 2) Source info
         html.Div(
-            subject_info_line,
-            id='ending-source-info',
+            [
+                html.Button(
+                    _finish_label,
+                    id='finish-study-button-ending',
+                    className='ui primary button finish-study-exit',
+                    autoFocus=False,
+                    title=_finish_label,
+                    style={
+                        'backgroundColor': '#007bff',
+                        'color': 'white',
+                        'padding': '0',
+                        'border': 'none',
+                        'borderRadius': '8px',
+                        'cursor': 'pointer',
+                        'width': '48px',
+                        'minWidth': '48px',
+                        'height': '48px',
+                        'display': 'inline-flex',
+                        'alignItems': 'center',
+                        'justifyContent': 'center',
+                        'lineHeight': '1',
+                        'margin': '0',
+                        'flexShrink': '0',
+                    }
+                ),
+                html.Button(
+                    t("ui.ending.next_round", locale=locale),
+                    id='next-round-button',
+                    className="ui green button",
+                    disabled=is_last_round,
+                    style={
+                        'backgroundColor': '#4CBB17' if not is_last_round else '#cccccc',
+                        'color': 'white' if not is_last_round else '#666666',
+                        'padding': '12px 24px',
+                        'border': 'none',
+                        'borderRadius': '8px',
+                        'fontSize': '22px',
+                        'cursor': 'pointer' if not is_last_round else 'not-allowed',
+                        'width': '300px',
+                        'height': '60px',
+                        'display': 'inline-flex',
+                        'alignItems': 'center',
+                        'justifyContent': 'center',
+                        'lineHeight': '1.2',
+                        'margin': '0',
+                    }
+                ),
+            ],
+            id='ending-submit-row',
+            disable_n_clicks=True,
+            style={
+                'display': 'flex',
+                'flexDirection': 'row',
+                'justifyContent': 'center',
+                'alignItems': 'center',
+                'flexWrap': 'nowrap',
+                'gap': '10px',
+                'marginTop': '4px',
+                'padding': '0 10px',
+                'flexShrink': '0',
+            },
+        ),
+        ], id='ending-primary', disable_n_clicks=True),
+        html.Div(
+            html.Button(
+                t("ui.resume_code.copy_link", locale=locale),
+                id='ending-copy-link-button',
+                type='button',
+                **{"data-copied-text": t("ui.resume_code.copied", locale=locale)},
+                style={
+                    'backgroundColor': '#ffffff',
+                    'color': '#2185d0',
+                    'padding': 'clamp(10px, 1.6vw, 14px) clamp(16px, 2.4vw, 22px)',
+                    'border': '1px solid #2185d0',
+                    'borderRadius': '8px',
+                    'fontSize': 'clamp(14px, 2vw, 18px)',
+                    'fontWeight': '700',
+                    'cursor': 'pointer',
+                    'maxWidth': '400px',
+                    'width': '100%',
+                },
+            ),
+            id='ending-copy-link-row',
+            disable_n_clicks=True,
+            style={'display': 'flex', 'justifyContent': 'center', 'marginTop': '4px', 'padding': '0 10px', 'flexShrink': '0'},
+        ),
+        html.Div(
+            t("ui.ending.local_storage_note", locale=locale),
+            id='ending-local-storage-note',
             disable_n_clicks=True,
             style={
                 'textAlign': 'center',
-                'marginBottom': '5px',
-                'color': '#4a5568',
+                'margin': '6px 0 0 0',
+                'color': '#2d6a4f',
                 'fontSize': '13px',
-                'display': 'block' if subject_info_line else 'none',
-            },
-        ),
-        # 3) Graphic info (units + explanation)
-        html.Div(
-            t("ui.ending.units_line", locale=locale, unit=unit),
-            id='ending-units-line',
-            disable_n_clicks=True,
-            style={
-                'textAlign': 'center',
-                'marginBottom': '5px',
-                'color': '#4a5568',
-                'fontSize': '14px',
-            },
-        ),
-        html.P(
-            t("ui.ending.graph_explanation", locale=locale),
-            id='ending-graph-explanation',
-            style={
-                'textAlign': 'center',
-                'color': '#4a5568',
-                'fontSize': '14px',
-                'marginBottom': '12px',
                 'fontStyle': 'italic',
-            },
+                'display': 'block' if STORAGE_TYPE == 'local' else 'none',
+            }
         ),
-        # 4) Round number
-        html.Div(
-            t("ui.common.round_of", locale=locale, current=current_round_number, total=max_rounds),
-            id='ending-round-info',
-            disable_n_clicks=True,
-            style={
-                'textAlign': 'center',
-                'marginBottom': '2px',
-                'fontSize': 'clamp(16px, 2.5vw, 22px)',
-                'fontWeight': '600',
-                'color': '#2c5282',
-            },
-        ),
-        # 5) Warning / disclaimer
         html.Div(
             [
                 html.I(className="close icon"),
@@ -4289,20 +4414,33 @@ def create_ending_layout(
             disable_n_clicks=True,
             style={
                 'maxWidth': '900px',
-                'margin': '0 auto 15px auto',
+                'margin': '12px auto 8px auto',
                 'fontSize': '14px',
                 'lineHeight': '1.4',
             },
         ),
-        # 6) Progress / gamification, then foldable table + metrics
-        _build_gamification_section(
-            current_round=current_round_number,
-            max_rounds=max_rounds,
-            min_useful=min_useful,
-            mae=current_mae,
-            rounds=all_rounds,
-            locale=locale,
-            is_last_round=is_last_round,
+        html.Div(
+            subject_info_line,
+            id='ending-source-info',
+            disable_n_clicks=True,
+            style={
+                'textAlign': 'center',
+                'marginBottom': '4px',
+                'color': '#4a5568',
+                'fontSize': '13px',
+                'display': 'block' if subject_info_line else 'none',
+            },
+        ),
+        html.Div(
+            t("ui.ending.units_line", locale=locale, unit=unit),
+            id='ending-units-line',
+            disable_n_clicks=True,
+            style={
+                'textAlign': 'center',
+                'marginBottom': '8px',
+                'color': '#4a5568',
+                'fontSize': '14px',
+            },
         ),
         html.Div(
             [
@@ -4372,100 +4510,6 @@ def create_ending_layout(
             ],
             disable_n_clicks=True,
             style=_fold_box_style,
-        ),
-        html.Div(
-            t("ui.ending.local_storage_note", locale=locale),
-            id='ending-local-storage-note',
-            disable_n_clicks=True,
-            style={
-                'textAlign': 'center',
-                'marginBottom': '10px',
-                'color': '#2d6a4f',
-                'fontSize': '13px',
-                'fontStyle': 'italic',
-                'display': 'block' if STORAGE_TYPE == 'local' else 'none',
-            }
-        ),
-        html.Div([
-            html.Button(
-                t("ui.ending.view_complete_analysis", locale=locale) if is_last_round else t("ui.common.finish_exit", locale=locale),
-                id='finish-study-button-ending',
-                autoFocus=False,
-                style={
-                    'backgroundColor': '#007bff',
-                    'color': 'white',
-                    'padding': 'clamp(12px, 2vw, 16px) clamp(18px, 3vw, 26px)',
-                    'border': 'none',
-                    'borderRadius': '5px',
-                    'fontSize': 'clamp(16px, 2.5vw, 22px)',
-                    'cursor': 'pointer',
-                    'minWidth': '200px',
-                    'maxWidth': '400px',
-                    'width': '100%',
-                    'height': 'clamp(55px, 7vh, 70px)',
-                    'display': 'flex',
-                    'alignItems': 'center',
-                    'justifyContent': 'center',
-                    'lineHeight': '1.2',
-                    'margin': '0 clamp(5px, 1vw, 10px)',
-                }
-            ),
-            html.Button(
-                t("ui.ending.next_round", locale=locale),
-                id='next-round-button',
-                className="ui green button",
-                disabled=is_last_round,
-                style={
-                    'backgroundColor': '#4CBB17' if not is_last_round else '#cccccc',
-                    'color': 'white' if not is_last_round else '#666666',
-                    'padding': 'clamp(12px, 2vw, 16px) clamp(18px, 3vw, 26px)',
-                    'border': 'none',
-                    'borderRadius': '5px',
-                    'fontSize': 'clamp(16px, 2.5vw, 22px)',
-                    'cursor': 'pointer' if not is_last_round else 'not-allowed',
-                    'minWidth': '200px',
-                    'maxWidth': '400px',
-                    'width': '100%',
-                    'height': 'clamp(55px, 7vh, 70px)',
-                    'display': 'flex',
-                    'alignItems': 'center',
-                    'justifyContent': 'center',
-                    'lineHeight': '1.2',
-                    'margin': '0 clamp(5px, 1vw, 10px)',
-                }
-            ),
-        ], disable_n_clicks=True, style={
-            'display': 'flex',
-            'justifyContent': 'center',
-            'alignItems': 'stretch',
-            'marginTop': '20px',
-            'padding': '0 10px',
-        }),
-        # Cross-device resume: copy a "?resume=<code>" link from the between-rounds
-        # summary (there's screen budget here, unlike the in-round chart page) so
-        # the player can continue this session on another device.
-        html.Div(
-            html.Button(
-                t("ui.resume_code.copy_link", locale=locale),
-                id='ending-copy-link-button',
-                type='button',
-                **{"data-copied-text": t("ui.resume_code.copied", locale=locale)},
-                style={
-                    'backgroundColor': '#ffffff',
-                    'color': '#2185d0',
-                    'padding': 'clamp(10px, 1.6vw, 14px) clamp(16px, 2.4vw, 22px)',
-                    'border': '1px solid #2185d0',
-                    'borderRadius': '8px',
-                    'fontSize': 'clamp(14px, 2vw, 18px)',
-                    'fontWeight': '700',
-                    'cursor': 'pointer',
-                    'maxWidth': '400px',
-                    'width': '100%',
-                },
-            ),
-            id='ending-copy-link-row',
-            disable_n_clicks=True,
-            style={'display': 'flex', 'justifyContent': 'center', 'marginTop': '12px', 'padding': '0 10px'},
         ),
         html.Div(
             [
@@ -4541,15 +4585,14 @@ def create_ending_layout(
                 'display': 'block' if (is_last_round and switch_targets) else 'none',
             },
         ),
-    ], disable_n_clicks=True, style={
+    ], id="ending-page", className="ending-page", disable_n_clicks=True, style={
         'maxWidth': '100%',
         'width': '100%',
         'margin': '0 auto',
-        'padding': 'clamp(10px, 2vw, 20px)',
+        'padding': '0 20px 16px 20px',
         'display': 'flex',
         'flexDirection': 'column',
-        'minHeight': '100vh',
-        'gap': 'clamp(10px, 2vh, 20px)',
+        'gap': '8px',
         'boxSizing': 'border-box'
     })
 
@@ -4735,7 +4778,9 @@ def _nickname_editor_children(
 ) -> list[Any]:
     """The "your name on the leaderboard" box shown on ``/final``.
 
-    Deliberately absent from the public ``/highscore`` page, which is session-free.
+    Only mounted when the player has board presence *and* did not already type
+    a nickname at startup.  Deliberately absent from the public ``/highscore``
+    page, which is session-free.
     Its ids are ``final-nickname-*`` rather than the ``/startup`` ``nickname-input``:
     a Dash callback only fires when *every* one of its components is in the layout,
     so reusing the id would drag the startup validation callback onto ``/final`` and
@@ -4798,11 +4843,17 @@ def _final_leaderboard_children(
     locale: str,
     unit: str,
     user_info: Optional[Dict[str, Any]] = None,
+    offer_nickname: Optional[bool] = None,
 ) -> list[Any]:
     """Inner children of the ``final-ranking-list`` wrapper.
 
     Split out of :func:`_build_final_leaderboard` so ``save_final_nickname`` can
     re-render the board in place after the player renames themselves.
+
+    The nickname box is skipped when they already typed one at startup
+    (``user_info['nickname']``).  ``save_final_nickname`` passes
+    ``offer_nickname=True`` so the just-saved editor (and its Dash ids) stay
+    mounted for the status line.
     """
     hero_inner: list[Any] = _leaderboard_hero_children(overall, locale=locale, unit=unit)
 
@@ -4855,8 +4906,11 @@ def _final_leaderboard_children(
 
     # Only offer the rename box once the player actually has a board presence --
     # a session with no submitted rounds is never written to the ranking CSVs,
-    # so a nickname would have nothing to label.
-    if left_children or right_children:
+    # so a nickname would have nothing to label.  Skip it entirely when they
+    # already picked a name at startup; asking again is noise.
+    already_named: bool = bool(normalize_nickname((user_info or {}).get("nickname")))
+    show_editor: bool = not already_named if offer_nickname is None else offer_nickname
+    if (left_children or right_children) and show_editor:
         left_children.append(
             html.Div(
                 _nickname_editor_children(user_info, locale=locale),
@@ -5849,6 +5903,68 @@ def sync_data_source_into_user_info(
     user_info['is_example_data'] = bool(is_example_data) if is_example_data is not None else bool(user_info.get('is_example_data', True))
     return user_info
 
+
+def append_round_from_window(
+    user_info: Dict[str, Any],
+    current_df: pl.DataFrame,
+    slider_value: Optional[int],
+) -> Dict[str, Any]:
+    """Append the current chart window as a completed round on ``user_info``.
+
+    Shared by Submit (shows results) and Finish/Exit (stores the round without
+    ranking or the results page).
+    """
+    info: Dict[str, Any] = dict(user_info)
+    if 'age' in info:
+        current_df = current_df.with_columns(pl.lit(int(info['age'])).alias("age"))
+    rounds: list[dict[str, Any]] = list(info.get('rounds') or [])
+    round_number = len(rounds) + 1
+    info['prediction_window_start'] = slider_value or 0
+    info['prediction_window_size'] = len(current_df)
+    prediction_table_data = PredictionTableComponent()._generate_table_data(current_df)
+    info['prediction_table_data'] = prediction_table_data
+    info['current_round_number'] = round_number
+    window_times = current_df.get_column('time').dt.strftime('%Y-%m-%d %H:%M:%S').to_list()
+    info['window_times'] = window_times
+    round_info: dict[str, Any] = {
+        'round_number': round_number,
+        'prediction_window_start': info['prediction_window_start'],
+        'prediction_window_size': info['prediction_window_size'],
+        'prediction_table_data': prediction_table_data,
+        'window_times': window_times,
+        'format': str(info.get('format') or ''),
+        'is_example_data': bool(info.get('is_example_data', True)),
+        'data_source_name': str(info.get('data_source_name', 'example.csv')),
+    }
+    if round_info['is_example_data']:
+        generic_window = generic_round_window_from_df(
+            current_df,
+            source_name=str(round_info['data_source_name']),
+        )
+        round_info['generic_slice_key'] = (
+            info.get('current_generic_slice_key')
+            or generic_window.slice_key
+        )
+    rounds.append(round_info)
+    info['rounds'] = rounds
+    return info
+
+
+def capture_complete_round_on_exit(
+    user_info: Optional[Dict[str, Any]],
+    current_df_data: Optional[Dict[str, Any]],
+    slider_value: Optional[int],
+) -> Dict[str, Any]:
+    """If the hidden hour is fully drawn, persist that round onto ``user_info``."""
+    info: Dict[str, Any] = dict(user_info or {})
+    if not current_df_data:
+        return info
+    current_df = reconstruct_dataframe_from_dict(current_df_data)
+    if not hidden_area_is_complete(current_df):
+        return info
+    return append_round_from_window(info, current_df, slider_value)
+
+
 @app.callback(
     [Output('url', 'pathname', allow_duplicate=True),
      Output('user-info-store', 'data', allow_duplicate=True),
@@ -5899,45 +6015,7 @@ def handle_submit_button(
         user_info["last_submit_round_number"] = pending_round_number
         user_info["last_submit_n_clicks"] = int(n_clicks)
 
-        rounds: list[dict[str, Any]] = user_info.get('rounds') or []
-        round_number = len(rounds) + 1
-        
-        # Store the window position information for the ending page
-        user_info['prediction_window_start'] = slider_value or 0
-        user_info['prediction_window_size'] = len(current_df)
-        
-        # Create a temporary prediction table component to generate the table data
-        temp_prediction_table = PredictionTableComponent()
-        prediction_table_data = temp_prediction_table._generate_table_data(current_df)
-        user_info['prediction_table_data'] = prediction_table_data
-        user_info['current_round_number'] = round_number
-
-        # Capture the window's absolute times now (the window df is in hand) so
-        # save_statistics never needs the full dataset to recover per-round times.
-        window_times = current_df.get_column('time').dt.strftime('%Y-%m-%d %H:%M:%S').to_list()
-        user_info['window_times'] = window_times
-
-        round_info: dict[str, Any] = {
-            'round_number': round_number,
-            'prediction_window_start': user_info['prediction_window_start'],
-            'prediction_window_size': user_info['prediction_window_size'],
-            'prediction_table_data': prediction_table_data,
-            'window_times': window_times,
-            'format': str(user_info.get('format') or ''),
-            'is_example_data': bool(user_info.get('is_example_data', True)),
-            'data_source_name': str(user_info.get('data_source_name', 'example.csv')),
-        }
-        if round_info['is_example_data']:
-            generic_window = generic_round_window_from_df(
-                current_df,
-                source_name=str(round_info['data_source_name']),
-            )
-            round_info['generic_slice_key'] = (
-                user_info.get('current_generic_slice_key')
-                or generic_window.slice_key
-            )
-        rounds.append(round_info)
-        user_info['rounds'] = rounds
+        user_info = append_round_from_window(user_info, current_df, slider_value)
         
         # Debug: Check what predictions we have
         prediction_count = current_df.filter(pl.col("prediction") != 0.0).height
@@ -6078,35 +6156,37 @@ def handle_next_round_button(
 @app.callback(
     [Output('url', 'pathname', allow_duplicate=True),
      Output('user-info-store', 'data', allow_duplicate=True),
-     Output('glucose-chart-mode', 'data', allow_duplicate=True)],
+     Output('glucose-chart-mode', 'data', allow_duplicate=True),
+     Output('last-visited-page', 'data', allow_duplicate=True)],
     [Input('finish-study-button', 'n_clicks')],
-    [State('user-info-store', 'data')],
+    [State('user-info-store', 'data'),
+     State('current-window-df', 'data'),
+     State('time-slider', 'value')],
     prevent_initial_call=True
 )
 def handle_finish_study_from_prediction(
     n_clicks: Optional[int],
     user_info: Optional[Dict[str, Any]],
-) -> Tuple[str, Optional[Dict[str, Any]], Dict[str, bool]]:
+    current_df_data: Optional[Dict[str, Any]],
+    slider_value: Optional[int],
+) -> Tuple[str, Optional[Dict[str, Any]], Dict[str, bool], Optional[str]]:
+    """Exit from the chart: store a fully drawn round, skip results/ranking UI."""
     print(f"DEBUG handle_finish_study_from_prediction FIRED: n_clicks={n_clicks}")
     if not n_clicks:
-        return no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update
 
     with start_action(action_type=u"handle_finish_study_from_prediction", n_clicks=int(n_clicks)):
         pass
 
-    if not user_info:
-        return '/final', None, {'hide_last_hour': True}
-
-    rounds: list[dict[str, Any]] = user_info.get('rounds') or []
-    if not rounds:
-        return '/final', user_info, {'hide_last_hour': True}
-
-    if should_persist_study_data(user_info):
+    info = capture_complete_round_on_exit(user_info, current_df_data, slider_value)
+    if should_persist_study_data(info):
         with start_action(action_type=u"handle_finish_study_from_prediction"):
-            submit_component.save_statistics(user_info)
-            user_info['statistics_saved'] = True
+            submit_component.save_statistics(info, write_ranking=False)
+            info['statistics_saved'] = True
 
-    return '/final', user_info, {'hide_last_hour': False}
+    # Landing, not /final: results and ranking stay behind Submit → /ending → Finish.
+    # Clear last-visited-page so redirect_landing_to_game does not bounce back.
+    return '/', info, {'hide_last_hour': True}, None
 
 
 @app.callback(
@@ -6231,6 +6311,7 @@ def save_final_nickname(
             locale=locale,
             unit=unit,
             user_info=updated_info,
+            offer_nickname=True,
         ),
     )
 
@@ -6395,6 +6476,7 @@ def handle_share_results_button(
             "rankings": rankings,
             "user_info": {
                 "name": str(user_info.get("name") or ""),
+                "nickname": normalize_nickname(user_info.get("nickname")),
                 "study_id": study_id,
                 "format": current_format,
                 "uses_cgm": bool(user_info.get("uses_cgm", False)),

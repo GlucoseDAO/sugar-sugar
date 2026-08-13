@@ -239,7 +239,8 @@ html.mobile-device body {
 
   html.route-prediction.mobile-device .prediction-header #header-app-title,
   html.route-prediction.mobile-device .prediction-header #header-description,
-  html.route-prediction.mobile-device .prediction-header > div > div:nth-child(2) {
+  html.route-prediction.mobile-device .prediction-header > div > div:nth-child(2),
+  html.route-prediction.mobile-device .prediction-header .header-controls-column {
     display: none !important;
   }
 
@@ -531,7 +532,8 @@ html.mobile-device body {
 
   html.route-prediction.mobile-device .prediction-header #header-app-title,
   html.route-prediction.mobile-device .prediction-header #header-description,
-  html.route-prediction.mobile-device .prediction-header > div > div:nth-child(2) {
+  html.route-prediction.mobile-device .prediction-header > div > div:nth-child(2),
+  html.route-prediction.mobile-device .prediction-header .header-controls-column {
     display: none !important;
   }
 
@@ -1022,6 +1024,22 @@ html.mobile-device .info-page .contact-table a {
 html.mobile-device .info-page .contact-table a[href^="http"] {
   font-size: 21px !important;
   font-weight: 600 !important;
+}
+
+html.mobile-device #ending-static-graph,
+html.mobile-device #ending-static-graph .js-plotly-plot,
+html.mobile-device #ending-static-graph .plot-container {
+  height: 450px !important;
+}
+html.mobile-device #ending-gamification {
+  padding: 8px 12px 6px 12px !important;
+}
+html.mobile-device #ending-graph-card {
+  padding: 0 !important;
+}
+html.mobile-device #ending-graph-explanation,
+html.mobile-device #ending-round-motivation {
+  display: none !important;
 }
 
 
@@ -1780,7 +1798,8 @@ html.route-prediction.mobile-device #submit-button {
 
   html.route-prediction.mobile-device .prediction-header #header-app-title,
   html.route-prediction.mobile-device .prediction-header #header-description,
-  html.route-prediction.mobile-device .prediction-header > div > div:nth-child(2) {
+  html.route-prediction.mobile-device .prediction-header > div > div:nth-child(2),
+  html.route-prediction.mobile-device .prediction-header .header-controls-column {
     display: none !important;
   }
 
@@ -2170,7 +2189,8 @@ html.route-prediction.mobile-device #submit-button {
 /* Format-B gated state (no upload yet): hide the Source plaque entirely -- its
    time/metadata reflect the stale example seed and are meaningless here. Must
    beat the immersive-landscape rule that re-shows the plaque with !important. */
-#prediction-chart-submit-wrap.b-gated #prediction-source-plaque {
+#prediction-chart-submit-wrap.b-gated #prediction-source-plaque,
+.prediction-meta-row.b-gated #prediction-source-plaque {
   display: none !important;
 }
 

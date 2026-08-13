@@ -49,6 +49,7 @@ from dash import dcc, html
 from sugar_sugar.config import PREDICTION_HOUR_OFFSET, SHARE_ROUND_LABELS
 from sugar_sugar.encouragement import encouragement_text
 from sugar_sugar.i18n import normalize_locale, t
+from sugar_sugar.nickname import normalize_nickname
 
 
 # Draw order: Generic (A), My data (B), Mixed (C) — one subplot per format present.
@@ -451,16 +452,71 @@ def _format_generated_at(share_record: dict[str, Any], *, locale: str) -> Option
 
 
 def _safe_display_name(user_info: dict[str, Any]) -> str:
-    """Return a human-readable display name, never a UUID.
+    """Return a public display name, never a UUID.
 
-    Study IDs generated server-side are UUIDs, which are ugly on the share
-    card.  If the explicit ``name`` is missing we fall back to an empty
-    string (callers omit the whole line) rather than surfacing the UUID.
+    Prefers the optional leaderboard ``nickname`` (what the player typed at
+    startup or on ``/final``).  Falls back to the legacy ``name`` field used by
+    share-mode / staging fixtures.  Study IDs generated server-side are UUIDs,
+    which are ugly on the share card — those are omitted rather than shown.
     """
-    raw_name = str(user_info.get("name") or "").strip()
+    nick: str = normalize_nickname(user_info.get("nickname"))
+    if nick:
+        return nick
+    raw_name: str = str(user_info.get("name") or "").strip()
     if raw_name and not _UUID_RE.match(raw_name):
         return raw_name
     return ""
+
+
+def _share_results_title(name: str, *, locale: str) -> str:
+    """``My Sugar Sugar results``, or ``{name}'s …`` once a nickname exists."""
+    loc: str = normalize_locale(locale)
+    if name:
+        return t("ui.share.title_named", locale=loc, name=name)
+    return t("ui.share.title", locale=loc)
+
+
+def _name_stamp(name: str) -> Optional[html.Div]:
+    """Tilted brag stamp for the HTML share page. ``None`` when anonymous."""
+    if not name:
+        return None
+    return html.Div(
+        name,
+        className="share-name-stamp",
+        disable_n_clicks=True,
+    )
+
+
+def _add_name_stamp_annotation(fig: go.Figure, name: str) -> None:
+    """Draw the brag stamp in the bottom-left gap above the generated-at line.
+
+    Kept almost upright (a few degrees of tilt) so it reads as a stamp without
+    covering the placement hero or the timestamp.
+    """
+    if not name:
+        return
+    length: int = len(name)
+    size: int = 26 if length <= 12 else 20 if length <= 18 else 16
+    fig.add_annotation(
+        xref="paper",
+        yref="paper",
+        x=0.035,
+        y=0.082,
+        xanchor="left",
+        yanchor="bottom",
+        text=f"<b>{html_escape(name, quote=False)}</b>",
+        textangle=-8,
+        showarrow=False,
+        font=dict(
+            size=size,
+            color="#1e3a8a",
+            family="Arial Black, Helvetica Neue, Arial, sans-serif",
+        ),
+        bordercolor="#1e3a8a",
+        borderwidth=3,
+        borderpad=8,
+        bgcolor="rgba(255,255,255,0.88)",
+    )
 
 
 def _play_url_from_share(share_url: str) -> str:
@@ -488,7 +544,9 @@ def _qrcode_png_data_uri(target_url: str) -> str:
 # The card is a 1.91:1 landscape (1200x630) so Facebook/LinkedIn/X show it as a large
 # image without cropping. Layout zones (paper coords, 0=bottom/left):
 #   - Title band:   full width, top.
-#   - Left column:  subtitle, name, stat lines, encouragement quote.
+#   - Left column:  subtitle (My / {name}'s results), stat lines, encouragement
+#                   quote. Nickname stamp sits in the bottom-left gap above
+#                   the generated-at timestamp, not over the stats.
 #   - Right column: the synthesis chart (per-panel format labels are OFF here to
 #                   avoid the "Generic data" annotation overlapping the card text).
 #   - Footer band:  placement hero (left — same specifics as /final left
@@ -1103,20 +1161,10 @@ def build_share_card_figure(
         xref="paper", yref="paper",
         x=left_x, y=0.865,
         xanchor="left", yanchor="top",
-        text=_brand_colored_label(t("ui.share.title", locale=loc)),
+        text=_brand_colored_label(_share_results_title(name, locale=loc)),
         showarrow=False,
         font=dict(size=28, color="rgba(100,116,139,1)"),
     )
-    if name:
-        fig.add_annotation(
-            xref="paper", yref="paper",
-            x=left_x, y=0.790,
-            xanchor="left", yanchor="top",
-            text=f"<b>{name}</b>",
-            showarrow=False,
-            font=dict(size=18, color="rgba(30,58,138,1)"),
-        )
-
     mae_label: str = t("ui.share.stat_mae", locale=loc)
     rmse_label: str = t("ui.share.stat_rmse", locale=loc)
     rounds_label: str = t("ui.share.stat_rounds", locale=loc)
@@ -1136,7 +1184,7 @@ def build_share_card_figure(
     # (same left-column specifics as /final), so we do not duplicate percentile.
     stat_lines.append(f"<b>{rounds_played}</b> {rounds_label}")
 
-    y_stats_top: float = 0.735 if name else 0.785
+    y_stats_top: float = 0.785
     stat_step: float = 0.066
     for idx, line in enumerate(stat_lines):
         fig.add_annotation(
@@ -1250,9 +1298,11 @@ def build_share_card_figure(
                 font=dict(size=12, color="rgba(71,85,105,1)"),
             )
             line_y -= 0.032
+            # Leave a band above the timestamp for the nickname stamp when present.
+            chip_floor: float = 0.145 if name else 0.055
             chip_step: float = min(
                 0.034,
-                max(0.026, (line_y - 0.055) / float(max(len(format_chip_lines), 1))),
+                max(0.026, (line_y - chip_floor) / float(max(len(format_chip_lines), 1))),
             )
             for idx, chip in enumerate(format_chip_lines):
                 fig.add_annotation(
@@ -1324,6 +1374,8 @@ def build_share_card_figure(
             showarrow=False,
             font=dict(size=11, color="rgba(100,116,139,1)"),
         )
+    # Stamp last so it sits in the reserved bottom-left band, above the timestamp.
+    _add_name_stamp_annotation(fig, name)
 
     return fig
 
@@ -1732,23 +1784,13 @@ def create_share_layout(
                    "color": "#0f172a", "textAlign": "center"},
         ),
         html.P(
-            t("ui.share.title", locale=loc),
+            _share_results_title(name, locale=loc),
             style={"fontSize": "clamp(16px,2.5vw,20px)",
                    "color": "#475569", "textAlign": "center",
                    "margin": "0 0 2px 0"},
             disable_n_clicks=True,
         ),
     ]
-    if name:
-        header_children.append(
-            html.P(
-                name,
-                style={"fontSize": "15px", "color": "#1e3a8a",
-                       "textAlign": "center", "fontWeight": "600",
-                       "margin": "0"},
-                disable_n_clicks=True,
-            )
-        )
     if generated_at:
         header_children.append(
             html.P(
@@ -1764,20 +1806,32 @@ def create_share_layout(
             )
         )
 
-    main_stack: list[Any] = [
-        url_store,
-        html.Div(
-            header_children,
-            style={"paddingTop": "8px"},
-            disable_n_clicks=True,
-        ),
-        stats_row,
-        quote_block,
-    ]
+    stamp: Optional[html.Div] = _name_stamp(name)
+    main_stack: list[Any] = [url_store]
+    main_stack.extend(
+        [
+            html.Div(
+                header_children,
+                style={"paddingTop": "8px"},
+                disable_n_clicks=True,
+            ),
+            stats_row,
+            quote_block,
+        ]
+    )
     if played_line is not None:
         main_stack.append(played_line)
     main_stack.append(synthesis_card)
-    main_stack.append(qr_block)
+    if stamp is not None:
+        main_stack.append(
+            html.Div(
+                [stamp, qr_block],
+                className="share-stamp-qr-row",
+                disable_n_clicks=True,
+            )
+        )
+    else:
+        main_stack.append(qr_block)
     main_stack.extend(
         [
             action_buttons,
@@ -1798,5 +1852,7 @@ def create_share_layout(
         disable_n_clicks=True,
         style={
             "background": "linear-gradient(135deg,#eff6ff 0%,#f8fafc 40%,#fdf2f8 100%)",
+            "position": "relative",
+            "overflow": "visible",
         },
     )

@@ -65,6 +65,7 @@ def make_test_share_record() -> dict[str, Any]:
         },
         "user_info": {
             "name": "Test Player",
+            "nickname": "Test Player",
             "study_id": "test-001",
             "format": "A",
             "uses_cgm": True,

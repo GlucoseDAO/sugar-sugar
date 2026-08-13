@@ -29,6 +29,24 @@ def _is_mobile_ua(ua: Optional[str]) -> bool:
     return any(keyword in lc for keyword in _MOBILE_UA_KEYWORDS)
 
 
+def hidden_area_is_complete(df: pl.DataFrame) -> bool:
+    """True when the hidden hour is drawn through to its last point.
+
+    Same rule as the Submit button: the last ``PREDICTION_HOUR_OFFSET`` rows
+    must include a non-zero prediction on the final slot (drawing interpolates
+    the points in between). Used both to enable Submit and to decide whether
+    Finish/Exit may persist the in-progress round.
+    """
+    if df.height < PREDICTION_HOUR_OFFSET:
+        return False
+    hidden = df.slice(df.height - PREDICTION_HOUR_OFFSET, PREDICTION_HOUR_OFFSET)
+    predictions = hidden.get_column("prediction")
+    nonzero = [i for i, value in enumerate(predictions.to_list()) if value != 0.0]
+    if not nonzero:
+        return False
+    return max(nonzero) >= hidden.height - 1
+
+
 # `SubmitComponent()` is also constructed per prediction-page render
 # (create_prediction_layout), so the one-shot ranking migration is gated to run
 # once per process rather than on every render -- it reads five CSVs.
@@ -96,26 +114,55 @@ class SubmitComponent(html.Div):
                     'fontStyle': 'italic'
                 }
             ),
-            html.Button(
-                t("ui.submit.submit", locale=self._locale),
-                id="submit-button",
-                className="ui green button mt-4",
-                disabled=True,  # Start disabled
-                style={'width': '300px', 'fontSize': '25px', 'padding': '15px 0', 'textAlign': 'center', 'verticalAlign': 'middle', 'lineHeight': '1.5', 'height': '60px'}
-            ),
-            html.Button(
-                t("ui.common.finish_exit", locale=self._locale),
-                id="finish-study-button",
-                className="ui primary button mt-3",
+            html.Div(
+                [
+                    html.Button(
+                        t("ui.common.finish_exit", locale=self._locale),
+                        id="finish-study-button",
+                        className="ui primary button finish-study-exit",
+                        title=t("ui.common.finish_exit", locale=self._locale),
+                        style={
+                            'width': '48px',
+                            'minWidth': '48px',
+                            'fontSize': '18px',
+                            'padding': '0',
+                            'textAlign': 'center',
+                            'display': 'inline-flex',
+                            'alignItems': 'center',
+                            'justifyContent': 'center',
+                            'lineHeight': '1',
+                            'height': '48px',
+                            'flexShrink': '0',
+                        }
+                    ),
+                    html.Button(
+                        t("ui.submit.submit", locale=self._locale),
+                        id="submit-button",
+                        className="ui green button",
+                        disabled=True,  # Start disabled
+                        style={
+                            'width': '300px',
+                            'fontSize': '25px',
+                            'padding': '15px 0',
+                            'textAlign': 'center',
+                            'display': 'inline-flex',
+                            'alignItems': 'center',
+                            'justifyContent': 'center',
+                            'lineHeight': '1.2',
+                            'height': '60px',
+                        }
+                    ),
+                ],
+                id="prediction-submit-row",
+                disable_n_clicks=True,
                 style={
-                    'width': '300px',
-                    'fontSize': '18px',
-                    'padding': '12px 0',
-                    'textAlign': 'center',
-                    'verticalAlign': 'middle',
-                    'lineHeight': '1.5',
-                    'height': '50px'
-                }
+                    'display': 'flex',
+                    'flexDirection': 'row',
+                    'alignItems': 'center',
+                    'justifyContent': 'center',
+                    'gap': '10px',
+                    'flexWrap': 'nowrap',
+                },
             ),
             dcc.Store(id='prediction-stats-store', data=None, storage_type=STORAGE_TYPE)
         ], id="prediction-actions", style={'display': 'flex', 'flexDirection': 'column', 'justifyContent': 'center', 'alignItems': 'center'})
@@ -415,7 +462,7 @@ class SubmitComponent(html.Div):
         except Exception:
             return 0
 
-    def save_statistics(self, user_info: dict[str, Any]) -> None:
+    def save_statistics(self, user_info: dict[str, Any], *, write_ranking: bool = True) -> None:
         """Save prediction statistics to CSV file.
 
         This writes a single row for the whole "study entry".
@@ -426,6 +473,11 @@ class SubmitComponent(html.Div):
         at submit; for legacy rounds missing that, the dataset is reloaded
         server-side by the round's own identity and sliced. age/user_id come from
         `user_info` (age) and the fixed adapter default (user_id=1).
+
+        ``write_ranking`` is True for Submit and for Finish from ``/ending``
+        (the player completed the round/study procedure). Finish/Exit from the
+        chart still stores the study row but skips the leaderboard so ranking
+        is not awarded for an abandoned game.
         """
         # Consent gate (defense-in-depth): never persist study data for a session
         # that has not completed mandatory consent. The display_page guard already
@@ -723,7 +775,8 @@ class SubmitComponent(html.Div):
         }
         # Leaderboard only after at least one submitted round -- a Start-only
         # stub (forgot before drawing) lives in prediction_statistics only.
-        if rounds_played < 1:
+        # Finish/Exit from the chart also skips ranking (write_ranking=False).
+        if rounds_played < 1 or not write_ranking:
             return
 
         # Ranking within the current format/category (A, B, or C)
@@ -817,13 +870,15 @@ class SubmitComponent(html.Div):
                 else t("ui.submit.progress_ready", locale=locale)
             )
             base_style = {
-                'width': '300px', 
-                'fontSize': '25px', 
-                'padding': '15px 0', 
-                'textAlign': 'center', 
-                'verticalAlign': 'middle', 
-                'lineHeight': '1.5', 
-                'height': '60px'
+                'width': '300px',
+                'fontSize': '25px',
+                'padding': '15px 0',
+                'textAlign': 'center',
+                'display': 'inline-flex',
+                'alignItems': 'center',
+                'justifyContent': 'center',
+                'lineHeight': '1.2',
+                'height': '60px',
             }
             
             base_label_style = {
@@ -853,8 +908,7 @@ class SubmitComponent(html.Div):
                 last_prediction_idx = max(prediction_indices)
                 total_hidden_points = len(hidden_area_df)
                 
-                # Check if predictions go to the end (must reach the actual end)
-                predictions_to_end = last_prediction_idx >= total_hidden_points - 1
+                predictions_to_end = hidden_area_is_complete(df)
                 
                 # Check if first point is auto-snapped to ground truth
                 first_point_is_snapped = False

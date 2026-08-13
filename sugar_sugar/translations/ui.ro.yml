@@ -234,6 +234,7 @@ ro:
   share:
     button_share: "Distribuie rezultatele"
     title: "Rezultatele mele Sugar Sugar"
+    title_named: "Rezultatele Sugar Sugar ale lui %{name}"
     subtitle: "Poți prezice glicemia mai bine decât mine? Încearcă!"
     download_png: "Descarcă imaginea"
     download_png_hint: "Salvează cardul ca PNG, perfect pentru Stories pe Instagram."

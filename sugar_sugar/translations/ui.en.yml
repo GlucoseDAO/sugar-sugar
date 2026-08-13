@@ -237,6 +237,7 @@ en:
   share:
     button_share: "Share my results"
     title: "My Sugar Sugar results"
+    title_named: "%{name}'s Sugar Sugar results"
     subtitle: "Can you predict glucose better than me? Try it!"
     download_png: "Download image"
     download_png_hint: "Save the card as PNG, perfect for Instagram stories."

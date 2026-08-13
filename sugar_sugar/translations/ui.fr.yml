@@ -214,6 +214,7 @@ fr:
   share:
     button_share: "Partager mes résultats"
     title: "Mes résultats Sugar Sugar"
+    title_named: "Résultats Sugar Sugar de %{name}"
     subtitle: "Sauras-tu prédire la glycémie mieux que moi ? Essaie !"
     download_png: "Télécharger l'image"
     download_png_hint: "Enregistre la carte en PNG, parfait pour les stories Instagram."

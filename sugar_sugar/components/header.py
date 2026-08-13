@@ -264,13 +264,13 @@ class HeaderComponent(Div):
                         'color': '#4a5568',
                         'lineHeight': '1.8'
                     })
-                ], style={'flex': '1', 'paddingRight': '20px'}),
+                ], className="header-copy-column", style={'flex': '1', 'paddingRight': '20px'}),
 
                 # Right column - Upload and controls
                 html.Div([
                     *right_column_children
-                ], style={'flex': '1'})
-            ], style={
+                ], className="header-controls-column", style={'flex': '1'})
+            ], className="header-body-row", style={
                 'display': 'flex',
                 'flexDirection': 'row',
                 'gap': '20px',
