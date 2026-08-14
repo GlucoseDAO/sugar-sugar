@@ -6112,15 +6112,13 @@ def append_round_from_window(
         'is_example_data': bool(info.get('is_example_data', True)),
         'data_source_name': str(info.get('data_source_name', 'example.csv')),
     }
-    if round_info['is_example_data']:
-        generic_window = generic_round_window_from_df(
-            current_df,
-            source_name=str(round_info['data_source_name']),
-        )
-        round_info['generic_slice_key'] = (
-            info.get('current_generic_slice_key')
-            or generic_window.slice_key
-        )
+    # Window fingerprint for every format: A (generic subject), B (own file),
+    # and C (alternating). Prefer the key stamped when a generic window was
+    # selected; never reuse that key on an own-data round (stale after A→B).
+    if round_info['is_example_data'] and info.get('current_generic_slice_key'):
+        round_info['generic_slice_key'] = str(info['current_generic_slice_key'])
+    else:
+        round_info['generic_slice_key'] = generic_window_slice_key(current_df)
     rounds.append(round_info)
     info['rounds'] = rounds
     return info

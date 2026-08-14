@@ -9,12 +9,14 @@ import polars as pl
 
 from sugar_sugar.app import (
     EXAMPLE_DATASET_PATH,
+    append_round_from_window,
     capture_complete_round_on_exit,
     create_prediction_layout,
     dataframe_to_store_dict,
     handle_finish_study_from_prediction,
     load_dataset,
 )
+from sugar_sugar.subject_sources import generic_window_slice_key
 from sugar_sugar.components.submit import SubmitComponent, hidden_area_is_complete
 from sugar_sugar.config import DEFAULT_POINTS, PREDICTION_HOUR_OFFSET
 
@@ -70,6 +72,46 @@ def test_capture_complete_round_on_exit_appends_only_when_drawn() -> None:
         0,
     )
     assert incomplete.get("rounds") == []
+
+
+def test_append_round_stores_source_and_slice_key_for_own_data() -> None:
+    window = _complete_window()
+    expected_key = generic_window_slice_key(window)
+    info = append_round_from_window(
+        {
+            "rounds": [],
+            "format": "B",
+            "is_example_data": False,
+            "data_source_name": "Clarity_Export.csv",
+            "current_generic_slice_key": "stale-from-format-a",
+        },
+        window,
+        0,
+    )
+    round_info = info["rounds"][0]
+    assert round_info["data_source_name"] == "Clarity_Export.csv"
+    assert round_info["is_example_data"] is False
+    assert round_info["generic_slice_key"] == expected_key
+    assert round_info["generic_slice_key"] != "stale-from-format-a"
+
+
+def test_append_round_keeps_generic_slice_key_for_format_c_odd_round() -> None:
+    window = _complete_window()
+    info = append_round_from_window(
+        {
+            "rounds": [],
+            "format": "C",
+            "is_example_data": True,
+            "data_source_name": "D1NAMO-002.csv",
+            "current_generic_slice_key": "picked-generic-key",
+        },
+        window,
+        0,
+    )
+    round_info = info["rounds"][0]
+    assert round_info["data_source_name"] == "D1NAMO-002.csv"
+    assert round_info["is_example_data"] is True
+    assert round_info["generic_slice_key"] == "picked-generic-key"
 
 
 def test_finish_from_prediction_goes_to_ending_when_round_is_complete() -> None:

@@ -7,6 +7,7 @@ arity matches its (full-df-free) Output list.
 """
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 from typing import Any
 
@@ -133,6 +134,176 @@ def test_save_statistics_uses_per_round_window_times(tmp_path: Path) -> None:
     # Times from BOTH rounds' own windows must appear in the saved record.
     assert times1[-1] in pt
     assert times2[-1] in pt
+
+
+def test_save_statistics_records_per_round_generic_sources(tmp_path: Path) -> None:
+    """Format A picks a new generic subject each round; the stats CSV must
+    keep every source, not only the last ``user_info['data_source_name']``."""
+    import csv
+
+    submit = SubmitComponent()
+    submit._stats_csv_path = tmp_path / "prediction_statistics.csv"
+    submit._ranking_csv_path = tmp_path / "prediction_ranking.csv"
+    submit._ranking_by_format_paths = {k: tmp_path / f"r_{k}.csv" for k in ("A", "B", "C")}
+
+    full_df, _ = load_dataset(EXAMPLE_DATASET_PATH)
+    w1 = full_df.slice(0, DEFAULT_POINTS).with_columns(
+        pl.when(pl.int_range(pl.len()) >= DEFAULT_POINTS - PREDICTION_HOUR_OFFSET)
+        .then(pl.col("gl") + 1.0).otherwise(pl.col("prediction")).alias("prediction")
+    )
+    w2 = full_df.slice(DEFAULT_POINTS, DEFAULT_POINTS).with_columns(
+        pl.when(pl.int_range(pl.len()) >= DEFAULT_POINTS - PREDICTION_HOUR_OFFSET)
+        .then(pl.col("gl") + 1.0).otherwise(pl.col("prediction")).alias("prediction")
+    )
+    user_info: dict[str, Any] = {
+        "study_id": "generic-trace",
+        "run_id": "r-a",
+        "number": 1,
+        "consent_completed": True,
+        "format": "A",
+        "run_format": "A",
+        "age": 40,
+        "data_source_name": "D1NAMO-002.csv",
+        "rounds": [
+            {
+                "round_number": 1,
+                "prediction_window_size": len(w1),
+                "prediction_table_data": _table_data(w1),
+                "window_times": _times(w1),
+                "format": "A",
+                "is_example_data": True,
+                "data_source_name": "BIGIDEAS-001.csv",
+                "generic_slice_key": "slice-aaa",
+            },
+            {
+                "round_number": 2,
+                "prediction_window_size": len(w2),
+                "prediction_table_data": _table_data(w2),
+                "window_times": _times(w2),
+                "format": "A",
+                "is_example_data": True,
+                "data_source_name": "D1NAMO-002.csv",
+                "generic_slice_key": "slice-bbb",
+            },
+        ],
+    }
+    submit.save_statistics(user_info)
+
+    with submit._stats_csv_path.open(newline="") as fh:
+        row = list(csv.DictReader(fh))[0]
+    per_round = ast.literal_eval(row["per_round_metrics"])
+    assert [entry["data_source_name"] for entry in per_round] == [
+        "BIGIDEAS-001.csv",
+        "D1NAMO-002.csv",
+    ]
+    assert [entry["generic_slice_key"] for entry in per_round] == [
+        "slice-aaa",
+        "slice-bbb",
+    ]
+    assert [entry["is_example_data"] for entry in per_round] == [True, True]
+
+
+def test_save_statistics_records_per_round_sources_for_b_and_c(tmp_path: Path) -> None:
+    """Format B is one uploaded file; Format C alternates generic + own data.
+    Both must keep per-round ``data_source_name`` and ``generic_slice_key``."""
+    import csv
+
+    submit = SubmitComponent()
+    submit._stats_csv_path = tmp_path / "prediction_statistics.csv"
+    submit._ranking_csv_path = tmp_path / "prediction_ranking.csv"
+    submit._ranking_by_format_paths = {k: tmp_path / f"r_{k}.csv" for k in ("A", "B", "C")}
+
+    full_df, _ = load_dataset(EXAMPLE_DATASET_PATH)
+    w1 = full_df.slice(0, DEFAULT_POINTS).with_columns(
+        pl.when(pl.int_range(pl.len()) >= DEFAULT_POINTS - PREDICTION_HOUR_OFFSET)
+        .then(pl.col("gl") + 1.0).otherwise(pl.col("prediction")).alias("prediction")
+    )
+    w2 = full_df.slice(DEFAULT_POINTS, DEFAULT_POINTS).with_columns(
+        pl.when(pl.int_range(pl.len()) >= DEFAULT_POINTS - PREDICTION_HOUR_OFFSET)
+        .then(pl.col("gl") + 1.0).otherwise(pl.col("prediction")).alias("prediction")
+    )
+
+    def _save(study_id: str, fmt: str, rounds: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        user_info: dict[str, Any] = {
+            "study_id": study_id,
+            "run_id": f"run-{fmt}",
+            "number": 1,
+            "consent_completed": True,
+            "format": fmt,
+            "run_format": fmt,
+            "age": 40,
+            "data_source_name": str(rounds[-1]["data_source_name"]),
+            "is_example_data": bool(rounds[-1]["is_example_data"]),
+            "rounds": rounds,
+        }
+        submit.save_statistics(user_info)
+        with submit._stats_csv_path.open(newline="") as fh:
+            rows = [row for row in csv.DictReader(fh) if row["study_id"] == study_id]
+        return ast.literal_eval(rows[-1]["per_round_metrics"])
+
+    own = "Clarity_Export.csv"
+    b_rounds = [
+        {
+            "round_number": 1,
+            "prediction_window_size": len(w1),
+            "prediction_table_data": _table_data(w1),
+            "window_times": _times(w1),
+            "format": "B",
+            "is_example_data": False,
+            "data_source_name": own,
+            "generic_slice_key": "own-window-1",
+        },
+        {
+            "round_number": 2,
+            "prediction_window_size": len(w2),
+            "prediction_table_data": _table_data(w2),
+            "window_times": _times(w2),
+            "format": "B",
+            "is_example_data": False,
+            "data_source_name": own,
+            "generic_slice_key": "own-window-2",
+        },
+    ]
+    b_metrics = _save("fmt-b", "B", b_rounds)
+    assert [entry["data_source_name"] for entry in b_metrics] == [own, own]
+    assert [entry["generic_slice_key"] for entry in b_metrics] == [
+        "own-window-1",
+        "own-window-2",
+    ]
+    assert [entry["is_example_data"] for entry in b_metrics] == [False, False]
+
+    c_rounds = [
+        {
+            "round_number": 1,
+            "prediction_window_size": len(w1),
+            "prediction_table_data": _table_data(w1),
+            "window_times": _times(w1),
+            "format": "C",
+            "is_example_data": True,
+            "data_source_name": "BIGIDEAS-001.csv",
+            "generic_slice_key": "generic-odd",
+        },
+        {
+            "round_number": 2,
+            "prediction_window_size": len(w2),
+            "prediction_table_data": _table_data(w2),
+            "window_times": _times(w2),
+            "format": "C",
+            "is_example_data": False,
+            "data_source_name": own,
+            "generic_slice_key": "own-even",
+        },
+    ]
+    c_metrics = _save("fmt-c-mix", "C", c_rounds)
+    assert [entry["data_source_name"] for entry in c_metrics] == [
+        "BIGIDEAS-001.csv",
+        own,
+    ]
+    assert [entry["generic_slice_key"] for entry in c_metrics] == [
+        "generic-odd",
+        "own-even",
+    ]
+    assert [entry["is_example_data"] for entry in c_metrics] == [True, False]
 
 
 def test_create_ending_layout_renders_from_window_without_full_df() -> None:

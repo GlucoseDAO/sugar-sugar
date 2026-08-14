@@ -21,6 +21,7 @@ Python module name.
 | Share page & OG cards | `/share/<id>`, Flask OG routes | [docs/share-ops.md](share-ops.md) |
 | Mobile layout | All routes (UA + CSS) | [docs/mobile-version.md](mobile-version.md) |
 | Bundled browser assets | `assets/` (auto-served by Dash) | [§ Asset build & cache busting](#asset-build--cache-busting) |
+| Study CSVs | `data/input/*.csv` (server disk) | [§ Study CSVs](#study-csvs) |
 
 ---
 
@@ -254,6 +255,131 @@ browsers cache them aggressively.
 
 `DEPLOY_BUILD` is injected into the app shell so clients pick up new asset/callback
 versions after deploy.
+
+---
+
+## Study CSVs
+
+Server-side research exports live under `data/input/` (gitignored except empty
+headers). They are **not** `dcc.Store` state: a visitor's browser never uploads
+these files. Writers: `sugar_sugar/consent.py` (consent) and
+`SubmitComponent.save_statistics` (stats + ranking). Chart-mode
+(`uv run chart`) skips writes.
+
+One **person** is a `study_id`. One **format run** (A, then later B, …) is a
+`run_id`. Stats and ranking upsert on `study_id` + `run_id`, so switching
+format must not erase the previous run.
+
+| File | One row is | Written when |
+|------|------------|--------------|
+| `consent_agreement.csv` | one person (`study_id`) | Consent / Start; later upload-consent upserts the same row |
+| `prediction_statistics.csv` | one format run | Start (0-round stub), every Submit, Finish/Exit |
+| `prediction_ranking.csv` | one finished game, `format=ALL` (cumulative) | Submit / Finish from `/ending` (not chart Exit) |
+| `prediction_ranking_{A,B,C}.csv` | one format run | Same as ranking, only that format |
+
+The public `/highscore` board reads the ranking CSVs and hides runs below
+`MIN_USEFUL_ROUNDS` (default 6). Statistics keep every submitted round,
+including 1-round and Start-only stubs.
+
+### `consent_agreement.csv`
+
+Consent flags only. No predictions, no nickname, no email.
+
+| Column | Meaning |
+|--------|---------|
+| `study_id` | Stable person id (UUID). Join key to the other CSVs. |
+| `number` | Sequential study number (from stats `max(number)+1`). |
+| `timestamp` | Consent (or last upsert) time, `YYYY-MM-DD HH:MM:SS`. |
+| `gdpr_consent` | Mandatory GDPR box. |
+| `upload_own_data` | Player ticked “I will upload my CGM”. |
+| `play_only` | Always `False` now (legacy column; old sessions may still say `True`). |
+| `participate_in_study` | Always `True` after 18+ + GDPR. |
+| `receive_results_later` | Optional: email results later. |
+| `keep_up_to_date` | Optional: project updates. |
+| `no_selection` | True when neither optional email box was ticked. |
+| `consent_use_uploaded_data` | Late consent that the uploaded file may be used. |
+| `consent_use_uploaded_data_timestamp` | When that late consent was given. |
+
+### `prediction_statistics.csv`
+
+The research record. Metrics are always **mg/dL**, regardless of the UI unit.
+
+| Column | Meaning |
+|--------|---------|
+| `study_id` | Person. |
+| `run_id` | This format run. Empty on some pre-`run_id` rows. |
+| `number` | Sequential study number. |
+| `timestamp` | Last save of this run. |
+| `email` | Address as entered (separate from ranking; see consent notice). |
+| `format` | `A` generic, `B` own data, `C` mixed (odd generic / even own). |
+| `is_example_data` | Run-level flag: last round only. **Do not use this to classify Format C rounds.** |
+| `data_source_name` | Run-level source: last round only. Format A may be `BIGIDEAS-001.csv` / `D1NAMO-002.csv`; B is the upload filename; C is whichever side played last. Use `per_round_metrics` for the real list. |
+| `age`, `user_id`, `gender`, `uses_cgm`, `cgm_duration_years`, `diabetic`, `diabetic_type`, `diabetes_duration`, `location` | Demographics from `/startup`. `user_id` is the adapter default (`1`), not a public id. |
+| `generic_intervention` | Format A source policy for this player (`bigideas`, `d1namo`, or a mix). Empty on older rows. |
+| `rounds_played` | Count of completed rounds in this run (`0` = Start stub). |
+| `predicted_values` | Python-literal list of `{version, round, value}` (prediction, mg/dL). |
+| `real_values` | Same shape: ground truth, mg/dL. |
+| `prediction_times` | Same shape: window timestamps (`YYYY-MM-DD HH:MM:SS`). |
+| `overall_mae_mgdl`, `overall_mse_mgdl`, `overall_rmse_mgdl`, `overall_mape_pct` | Aggregate over every point in the run. |
+| `per_round_metrics` | Python-literal list — **this is the per-round trace**. |
+
+`predicted_values` / `real_values` / `prediction_times` are aligned by index.
+Each item looks like `{'version': 'A', 'round': 2, 'value': '119.6'}`. Parse
+with `ast.literal_eval` (they are `str(list)`, not JSON).
+
+#### `per_round_metrics` (the per-round source of truth)
+
+```python
+{
+  "round_number": 2,
+  "mae": 8.4,
+  "mse": 93.4,
+  "rmse": 9.7,
+  "mape": 7.7,
+  "data_source_name": "BIGIDEAS-001.csv",  # or the upload filename
+  "is_example_data": True,                 # False = own uploaded file
+  "generic_slice_key": "a1b2c3…",          # SHA-256 of time+glucose in the window
+}
+```
+
+| Format | Typical `data_source_name` | `is_example_data` | `generic_slice_key` |
+|--------|----------------------------|-------------------|---------------------|
+| A | `BIGIDEAS-{id}.csv` or `D1NAMO-{id}.csv` (one subject per round) | `True` | Window fingerprint; used to avoid repeating the same generic slice |
+| B | Upload basename (e.g. `Clarity_Export.csv`) — same file every round | `False` | Distinguishes **which window** of that file |
+| C | Alternates: odd = generic subject, even = upload basename | `True` / `False` | Same meaning as A or B for that round |
+
+The slice key is content-based (`time` + `gl` rounded to 0.1), not a file
+offset. Two rounds with the same key used the same glucose window.
+
+**Older rows** (before this field was persisted) have metrics only, or a
+run-level `data_source_name` of `example.csv`. Those cannot be backfilled.
+
+### `prediction_ranking.csv` and `prediction_ranking_{A,B,C}.csv`
+
+Leaderboard bookkeeping. **No email, no nickname in the study/consent files.**
+`nickname` and `email_key` live only here.
+
+| Column | Meaning |
+|--------|---------|
+| `study_id`, `run_id`, `number`, `timestamp` | Same as stats. |
+| `email_key` | Salted HMAC-SHA256 of the casefolded address, 16 hex chars. Merges one player across devices. Never rotate `RANKING_EMAIL_SALT` / `data/.ranking_salt`. |
+| `nickname` | Optional public display label. Absent from stats and consent on purpose. |
+| `format` | `A` / `B` / `C` on the per-source files; `ALL` on the overall file (cumulative across formats). |
+| `rounds_played` | Overall file is cumulative (12 then 24 if they played two formats). |
+| `is_example_data`, `data_source_name` | Run-level only (last source, or `multiple` on `ALL` when sources differ). |
+| `overall_mae_mgdl` … `overall_mape_pct` | Same units as stats. |
+
+Arcade placement: one slot per finished game among completers; ties break on
+earlier timestamp. Display filter: hide `rounds_played < MIN_USEFUL_ROUNDS`.
+
+### Related writers
+
+```
+sugar_sugar/consent.py              # consent_agreement.csv
+sugar_sugar/components/submit.py    # stats + ranking (save_statistics)
+sugar_sugar/nickname.py             # email_key / nickname rules
+sugar_sugar/app.py                  # append_round_from_window (per-round fields)
+```
 
 ---
 

@@ -50,6 +50,8 @@ Until you choose to submit, everything stays in your own browser's localStorage.
 
 Raw uploaded CGM files are used only to run the game and are not kept permanently.
 
+The on-disk study files (`data/input/consent_agreement.csv`, `prediction_statistics.csv`, `prediction_ranking*.csv`) and the per-round `data_source_name` / `generic_slice_key` fields are documented in [docs/technical-specification.md → Study CSVs](docs/technical-specification.md#study-csvs).
+
 ## Resume and study integrity
 
 Your progress is saved locally in the browser. You can close the tab and return later — you will be offered to continue from where you left off.

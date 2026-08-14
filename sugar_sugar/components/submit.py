@@ -29,6 +29,43 @@ def _is_mobile_ua(ua: Optional[str]) -> bool:
     return any(keyword in lc for keyword in _MOBILE_UA_KEYWORDS)
 
 
+def _round_source_name(round_info: dict[str, Any], fallback: str = "") -> str:
+    """Prefer the source captured on the round; fall back to the run-level name."""
+    return str(round_info.get("data_source_name") or fallback or "")
+
+
+def _per_round_metric_entry(
+    *,
+    round_number: int,
+    metrics: dict[str, Optional[float]],
+    round_info: Optional[dict[str, Any]] = None,
+    fallback_source: str = "",
+    fallback_is_example: bool = True,
+) -> dict[str, Any]:
+    """One ``per_round_metrics`` row, including the dataset used for that round.
+
+    ``data_source_name`` / ``generic_slice_key`` / ``is_example_data`` are
+    written for every format: A (generic subject file), B (uploaded filename),
+    and C (alternating). The run-level ``data_source_name`` column is only the
+    last source and is not enough to reconstruct Format C.
+    """
+    info = round_info or {}
+    if "is_example_data" in info:
+        is_example = bool(info.get("is_example_data"))
+    else:
+        is_example = fallback_is_example
+    return {
+        "round_number": round_number,
+        "mae": metrics["mae"],
+        "mse": metrics["mse"],
+        "rmse": metrics["rmse"],
+        "mape": metrics["mape"],
+        "data_source_name": _round_source_name(info, fallback_source),
+        "is_example_data": is_example,
+        "generic_slice_key": str(info.get("generic_slice_key") or ""),
+    }
+
+
 def hidden_area_is_complete(df: pl.DataFrame) -> bool:
     """True when the hidden hour is drawn through to its last point.
 
@@ -578,23 +615,23 @@ class SubmitComponent(html.Div):
                 table_data = round_info.get('prediction_table_data') or []
                 round_number = int(round_info.get('round_number') or (len(per_round_metrics) + 1))
                 m = _metrics_from_table(table_data)
-                per_round_metrics.append({
-                    'round_number': round_number,
-                    'mae': m['mae'],
-                    'mse': m['mse'],
-                    'rmse': m['rmse'],
-                    'mape': m['mape'],
-                })
+                per_round_metrics.append(_per_round_metric_entry(
+                    round_number=round_number,
+                    metrics=m,
+                    round_info=round_info,
+                    fallback_source=str(user_info.get('data_source_name', '')),
+                    fallback_is_example=bool(user_info.get('is_example_data', True)),
+                ))
         elif user_info.get('prediction_table_data'):
             table_data = user_info.get('prediction_table_data', []) or []
             m = _metrics_from_table(table_data)
-            per_round_metrics.append({
-                'round_number': 1,
-                'mae': m['mae'],
-                'mse': m['mse'],
-                'rmse': m['rmse'],
-                'mape': m['mape'],
-            })
+            per_round_metrics.append(_per_round_metric_entry(
+                round_number=1,
+                metrics=m,
+                round_info=user_info,
+                fallback_source=str(user_info.get('data_source_name', '')),
+                fallback_is_example=bool(user_info.get('is_example_data', True)),
+            ))
 
         overall_table_data = _build_aggregate_table_data(rounds) if rounds else (user_info.get('prediction_table_data', []) or [])
         overall = _metrics_from_table(overall_table_data)
@@ -780,13 +817,13 @@ class SubmitComponent(html.Div):
             for round_idx, round_info in enumerate(run_rounds, start=1):
                 table_data = round_info.get('prediction_table_data') or []
                 m = _metrics_from_table(table_data)
-                per_round.append({
-                    'round_number': int(round_info.get('round_number') or round_idx),
-                    'mae': m['mae'],
-                    'mse': m['mse'],
-                    'rmse': m['rmse'],
-                    'mape': m['mape'],
-                })
+                per_round.append(_per_round_metric_entry(
+                    round_number=int(round_info.get('round_number') or round_idx),
+                    metrics=m,
+                    round_info=round_info,
+                    fallback_source=source_name,
+                    fallback_is_example=is_example,
+                ))
                 if len(table_data) < 2:
                     continue
                 window_size = int(round_info.get('prediction_window_size') or 0)
