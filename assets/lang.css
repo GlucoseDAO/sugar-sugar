@@ -922,10 +922,16 @@ html:not(.mobile-device) #prediction-glucose-chart-container {
   min-height: 0;
   height: auto;
 }
-html:not(.mobile-device) #glucose-graph,
+html:not(.mobile-device) #glucose-graph {
+  height: 100% !important;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 html:not(.mobile-device) #glucose-graph-graph,
 html:not(.mobile-device) #glucose-graph .js-plotly-plot,
 html:not(.mobile-device) #glucose-graph .plot-container {
+  flex: 1 1 auto;
   height: 100% !important;
   min-height: 0;
 }
@@ -1162,6 +1168,98 @@ html:not(.mobile-device) #next-round-button {
   max-width: 280px;
   width: auto !important;
   min-width: 0;
+}
+
+.glucose-chart-shell {
+  --plotly-top-margin: 72px;
+  --food-bubble-strip-height: 32px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.meal-food-bubble-strip {
+  /* Overlay Plotly's top margin so the apple sits on the plot edge. */
+  position: absolute;
+  top: calc(var(--plotly-top-margin) - var(--food-bubble-strip-height));
+  left: 56px;
+  right: 20px;
+  height: var(--food-bubble-strip-height);
+  margin: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.meal-food-speech-bubble {
+  position: absolute;
+  top: auto;
+  bottom: 1px;
+  transform: translateX(-50%);
+  width: 32px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #2e7d32;
+  border-radius: 14px 14px 14px 4px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(46, 125, 50, 0.25);
+  pointer-events: auto;
+  touch-action: manipulation;
+  cursor: pointer;
+  z-index: 5;
+}
+
+.meal-food-speech-bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  background: #ffffff;
+  border-right: 1px solid #2e7d32;
+  border-bottom: 1px solid #2e7d32;
+  transform: rotate(45deg);
+}
+
+.meal-food-bubble-apple {
+  width: 18px;
+  height: 18px;
+  display: block;
+  margin: 3px auto 0 auto;
+  pointer-events: none;
+}
+
+.meal-food-lightbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  align-items: center;
+  justify-content: center;
+}
+
+.meal-food-lightbox.is-open {
+  display: flex;
+}
+
+.meal-food-lightbox-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.meal-food-lightbox-image {
+  position: relative;
+  z-index: 1;
+  max-width: min(90vw, 720px);
+  max-height: 85vh;
+  object-fit: contain;
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  background: #111;
 }
 
 

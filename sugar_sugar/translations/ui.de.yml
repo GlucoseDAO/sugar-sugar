@@ -311,6 +311,7 @@ de:
     event_insulin: "Insulin"
     event_exercise: "Bewegung"
     event_carbohydrates: "Kohlenhydrate"
+    food_label: "ESSEN"
 
   metrics:
     title: "Metriken"

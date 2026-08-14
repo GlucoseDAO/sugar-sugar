@@ -310,6 +310,7 @@ zh:
     event_insulin: "胰岛素"
     event_exercise: "运动"
     event_carbohydrates: "碳水化合物"
+    food_label: "食物"
 
   metrics:
     title: "指标"

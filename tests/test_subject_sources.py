@@ -21,6 +21,7 @@ from sugar_sugar.subject_sources import (
     GenericRoundWindow,
     collect_generic_round_history,
     discover_generic_dataset_sources,
+    discover_legacy_generic_sources,
     generic_round_window_from_df,
     generic_window_slice_key,
     generic_window_slice_key_from_round,
@@ -44,7 +45,7 @@ def _window_df(times: list[str]) -> pl.DataFrame:
 
 
 def test_under_18_subjects_are_excluded() -> None:
-    sources = discover_generic_dataset_sources()
+    sources = discover_legacy_generic_sources()
     names = {source.source_name for source in sources}
     assert "loop_154_chronological.csv" not in names
     assert "loop_1017_chronological.csv" not in names
@@ -167,7 +168,7 @@ def test_zero_insulin_values_are_excluded_from_loop_events() -> None:
 
 def test_generic_slice_key_is_stable_for_same_window() -> None:
     sources = discover_generic_dataset_sources()
-    source = next(s for s in sources if s.source_name == "example.csv")
+    source = next((s for s in sources if s.source_name == "example.csv"), sources[0])
     full_df, _ = load_generic_dataset_source(source)
     window_a = full_df.slice(0, DEFAULT_POINTS)
     window_b = full_df.slice(0, DEFAULT_POINTS)
@@ -228,7 +229,7 @@ def test_windows_conflict_blocks_exact_slice_key() -> None:
 
 def test_pick_unique_generic_window_avoids_used_slices() -> None:
     sources = discover_generic_dataset_sources()
-    source = next(s for s in sources if s.source_name == "example.csv")
+    source = next((s for s in sources if s.source_name == "example.csv"), sources[0])
     full_df, _ = load_generic_dataset_source(source)
     first = generic_round_window_from_df(full_df.slice(0, DEFAULT_POINTS), source_name=source.source_name)
 
@@ -238,7 +239,7 @@ def test_pick_unique_generic_window_avoids_used_slices() -> None:
 
 def test_pick_unique_generic_window_avoids_same_source_two_hour_overlap() -> None:
     sources = discover_generic_dataset_sources()
-    source = next(s for s in sources if s.source_name == "example.csv")
+    source = next((s for s in sources if s.source_name == "example.csv"), sources[0])
     full_df, _ = load_generic_dataset_source(source)
     first_window = generic_round_window_from_df(
         full_df.slice(0, DEFAULT_POINTS),
@@ -268,7 +269,7 @@ def test_resolve_generic_source_path_maps_known_sources() -> None:
 
 def test_collect_generic_round_history_reads_completed_rounds() -> None:
     sources = discover_generic_dataset_sources()
-    source = next(s for s in sources if s.source_name == "example.csv")
+    source = next((s for s in sources if s.source_name == "example.csv"), sources[0])
     full_df, _ = load_generic_dataset_source(source)
     window = full_df.slice(0, DEFAULT_POINTS)
     times = window.get_column("time").dt.strftime("%Y-%m-%d %H:%M:%S").to_list()

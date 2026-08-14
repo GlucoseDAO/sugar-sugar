@@ -310,6 +310,7 @@ ru:
     event_insulin: "Инсулин"
     event_exercise: "Упражнения"
     event_carbohydrates: "Углеводы"
+    food_label: "ЕДА"
 
   metrics:
     title: "Метрики"

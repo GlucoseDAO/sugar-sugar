@@ -93,7 +93,7 @@ from sugar_sugar.consent import (
     should_persist_study_data,
     upsert_consent_agreement_fields,
 )
-from sugar_sugar.components.glucose import GlucoseChart
+from sugar_sugar.components.glucose import GlucoseChart, meal_food_bubble_children
 from sugar_sugar.components.metrics import MetricsComponent
 from sugar_sugar.components.predictions import PredictionTableComponent
 from sugar_sugar.components.ag_grid import build_readonly_ag_grid, build_readonly_column_defs
@@ -698,12 +698,17 @@ def dataframe_to_store_dict(df_in: pl.DataFrame) -> Dict[str, List[Any]]:
 
 def events_dataframe_to_store_dict(df_in: pl.DataFrame) -> Dict[str, List[Any]]:
     """Convert an events Polars DataFrame into a session-store dictionary."""
-    return {
+    payload: Dict[str, List[Any]] = {
         'time': df_in.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
         'event_type': df_in.get_column('event_type').to_list(),
         'event_subtype': df_in.get_column('event_subtype').to_list(),
         'insulin_value': df_in.get_column('insulin_value').to_list()
     }
+    if 'photo_path' in df_in.columns:
+        payload['photo_path'] = [
+            str(value or '') for value in df_in.get_column('photo_path').to_list()
+        ]
+    return payload
 
 
 def events_within_window(events_df: pl.DataFrame, window_df: pl.DataFrame) -> pl.DataFrame:
@@ -1542,6 +1547,34 @@ def _share_card_og(share_id: str) -> Any:
     return redirect(_build_share_url(share_id), code=302)
 
 
+@server.route("/cgmacros/<subject>/photo/<path:rel_path>")
+def _cgmacros_meal_photo(subject: str, rel_path: str) -> Any:
+    """Serve a window-local CGMacros meal JPEG. Path is subject-relative."""
+    from flask import abort
+
+    from sugar_sugar.cgmacros import resolve_served_photo
+
+    photo_path = resolve_served_photo(subject, rel_path)
+    if photo_path is None:
+        abort(404)
+    suffix = photo_path.suffix.lower()
+    mime = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+        ".heic": "image/heic",
+    }.get(suffix, "application/octet-stream")
+    response = flask_send_file(
+        photo_path,
+        mimetype=mime,
+        as_attachment=False,
+        max_age=86400,
+    )
+    response.headers["X-Robots-Tag"] = "noindex"
+    return response
+
+
 # ---------------------------------------------------------------------------
 # Staging mode (prod+): synthetic prefilled nodes for remote testing.
 #
@@ -2026,6 +2059,27 @@ app.layout = html.Div([
     html.Div(id='navbar-container', children=[], disable_n_clicks=True),
 
     html.Div(id='page-content', children=[], disable_n_clicks=True),
+
+    html.Div(
+        [
+            html.Div(
+                id='meal-food-lightbox-backdrop',
+                className='meal-food-lightbox-backdrop',
+                n_clicks=0,
+            ),
+            html.Img(
+                id='meal-food-lightbox-image',
+                className='meal-food-lightbox-image',
+                src='',
+                alt='',
+                disable_n_clicks=True,
+            ),
+        ],
+        id='meal-food-lightbox',
+        className='meal-food-lightbox',
+        disable_n_clicks=True,
+        **{"aria-hidden": "true"},
+    ),
 
     # Throwaway sinks for the clientside immersive handlers.
     html.Div(id="immersive-sink", style={"display": "none"}),
@@ -4357,28 +4411,42 @@ def create_ending_layout(
         html.Div([
             html.Div(
                 id='ending-glucose-chart-container',
-                children=dcc.Graph(
-                    id='ending-static-graph',
-                    figure=GlucoseChart.build_static_figure(
-                        df,
-                        events_df,
-                        str(user_info.get('data_source_name') or '') if user_info else None,
-                        unit=unit,
-                        locale=locale,
-                        prediction_boundary=len(df) - PREDICTION_HOUR_OFFSET,
+                className='glucose-chart-shell',
+                children=[
+                    html.Div(
+                        meal_food_bubble_children(
+                            df,
+                            events_df,
+                            source_name=str(user_info.get('data_source_name') or '') if user_info else '',
+                            hide_last_hour=False,
+                        ),
+                        id='ending-food-bubbles',
+                        className='meal-food-bubble-strip',
+                        disable_n_clicks=True,
                     ),
-                    config={
-                        'displayModeBar': False,
-                        'scrollZoom': False,
-                        'doubleClick': 'reset',
-                        'showAxisDragHandles': False,
-                        'displaylogo': False,
-                        'editable': False,
-                    },
-                    style={'height': '100%'},
-                ),
+                    dcc.Graph(
+                        id='ending-static-graph',
+                        figure=GlucoseChart.build_static_figure(
+                            df,
+                            events_df,
+                            str(user_info.get('data_source_name') or '') if user_info else None,
+                            unit=unit,
+                            locale=locale,
+                            prediction_boundary=len(df) - PREDICTION_HOUR_OFFSET,
+                        ),
+                        config={
+                            'displayModeBar': False,
+                            'scrollZoom': False,
+                            'doubleClick': 'reset',
+                            'showAxisDragHandles': False,
+                            'displaylogo': False,
+                            'editable': False,
+                        },
+                        style={'height': '100%', 'flex': '1', 'minHeight': '0'},
+                    ),
+                ],
                 disable_n_clicks=True,
-                style={'height': '100%', 'flex': '1', 'minHeight': '0'},
+                style={'height': '100%', 'flex': '1', 'minHeight': '0', 'display': 'flex', 'flexDirection': 'column'},
             ),
             html.P(
                 t("ui.ending.graph_explanation", locale=locale),
@@ -5652,13 +5720,20 @@ def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) ->
             except (ValueError, TypeError):
                 insulin_values.append(None)
     
-    return pl.DataFrame({
+    reconstructed = {
         'time': pl.Series(events_data['time'], dtype=pl.String).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),
         'event_type': pl.Series(events_data['event_type'], dtype=pl.String),
         'event_subtype': pl.Series(events_data['event_subtype'], dtype=pl.String),
         # Use pre-processed float values
         'insulin_value': pl.Series(insulin_values, dtype=pl.Float64)
-    })
+    }
+    photo_paths = events_data.get('photo_path')
+    if photo_paths is not None:
+        reconstructed['photo_path'] = pl.Series(
+            [str(value or '') for value in photo_paths],
+            dtype=pl.String,
+        )
+    return pl.DataFrame(reconstructed)
 
 @app.callback(
     [Output('url', 'pathname'),
@@ -8464,12 +8539,7 @@ def convert_events_df_to_dict(df: pl.DataFrame) -> Dict[str, List[Any]]:
     given, and a whole-subject event log there is what froze production on
     2026-07-28. Use ``events_store_for_window`` so the payload stays window-sized.
     """
-    return {
-        'time': df.get_column('time').dt.strftime('%Y-%m-%dT%H:%M:%S').to_list(),
-        'event_type': df.get_column('event_type').to_list(),
-        'event_subtype': df.get_column('event_subtype').to_list(),
-        'insulin_value': df.get_column('insulin_value').to_list()
-    }
+    return events_dataframe_to_store_dict(df)
 
 def reconstruct_dataframe_from_dict(df_data: Dict[str, List[Any]]) -> pl.DataFrame:
     """Safely reconstruct a Polars DataFrame from a dictionary with proper type handling."""

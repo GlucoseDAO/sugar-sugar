@@ -6,13 +6,80 @@ from datetime import datetime
 
 import plotly.graph_objs as go
 import polars as pl
-from dash import dcc, Output, Input, State
+from dash import ALL, dcc, Output, Input, State
 from dash import Dash, html
 from dash.exceptions import PreventUpdate
 from eliot import start_action
 
+from sugar_sugar.cgmacros import cgmacros_photo_url, visible_food_photo_events
 from sugar_sugar.config import PREDICTION_HOUR_OFFSET, STORAGE_TYPE
 from sugar_sugar.i18n import normalize_locale, t
+
+_FOOD_LINE_COLOR: str = "#2e7d32"
+_APPLE_ICON_SRC: str = "/assets/images/apple.svg"
+
+
+def event_x_index(window_df: pl.DataFrame, event_time: datetime) -> float:
+    """Map an event timestamp onto the chart's integer x index."""
+    df_times = window_df.get_column("time")
+    before_idx: Optional[int] = None
+    after_idx: Optional[int] = None
+    for i, time_val in enumerate(df_times):
+        if time_val <= event_time:
+            before_idx = i
+        if time_val >= event_time and after_idx is None:
+            after_idx = i
+    if before_idx is None:
+        before_idx = 0
+    if after_idx is None:
+        after_idx = len(df_times) - 1
+    if df_times[before_idx] == event_time or before_idx == after_idx:
+        return float(before_idx)
+    before_time = df_times[before_idx].timestamp()
+    after_time = df_times[after_idx].timestamp()
+    factor = (event_time.timestamp() - before_time) / (after_time - before_time)
+    return float(before_idx) + factor
+
+
+def meal_food_bubble_children(
+    window_df: pl.DataFrame,
+    events_df: pl.DataFrame,
+    *,
+    source_name: str,
+    hide_last_hour: bool,
+) -> list[html.Button]:
+    """HTML speech bubbles above the plot, one per visible meal photo."""
+    if window_df.height == 0:
+        return []
+    meals = visible_food_photo_events(
+        window_df, events_df, hide_last_hour=hide_last_hour
+    )
+    n_points = float(len(window_df))
+    buttons: list[html.Button] = []
+    for meal in meals:
+        event_time = meal["time"]
+        photo_path = str(meal.get("photo_path") or "")
+        if not isinstance(event_time, datetime) or not photo_path:
+            continue
+        x_pos = event_x_index(window_df, event_time)
+        left_pct = 100.0 * (x_pos + 0.5) / n_points
+        photo_url = cgmacros_photo_url(source_name, photo_path)
+        buttons.append(
+            html.Button(
+                html.Img(
+                    src=_APPLE_ICON_SRC,
+                    className="meal-food-bubble-apple",
+                    alt="",
+                    disable_n_clicks=True,
+                ),
+                id={"type": "meal-food-bubble", "index": photo_url},
+                className="meal-food-speech-bubble",
+                type="button",
+                n_clicks=0,
+                style={"left": f"{left_pct:.3f}%"},
+            )
+        )
+    return buttons
 
 _ASSETS_IMAGES = Path(__file__).resolve().parents[2] / "assets" / "images"
 
@@ -67,6 +134,12 @@ class GlucoseChart(html.Div):
                 dcc.Store(id=f"{id}-df-store", data=None, storage_type=STORAGE_TYPE),
                 dcc.Store(id=f"{id}-events-store", data=None, storage_type=STORAGE_TYPE),
                 dcc.Store(id=f"{id}-source-store", data=None, storage_type=STORAGE_TYPE),
+                html.Div(
+                    id=f"{id}-food-bubbles",
+                    className="meal-food-bubble-strip",
+                    children=[],
+                    disable_n_clicks=True,
+                ),
                 dcc.Graph(
                     id=f"{id}-graph",
                     figure=self._create_empty_figure(),
@@ -87,10 +160,11 @@ class GlucoseChart(html.Div):
                     # `touchAction: none` prevents the browser from intercepting
                     # touch gestures (pinch-zoom, pan) on the chart, which
                     # otherwise fights with Plotly's drawline handler on mobile.
-                    style={'height': '100%', 'touchAction': 'none'}
+                    style={'height': '100%', 'touchAction': 'none', 'flex': '1', 'minHeight': '0'}
                 )
             ],
-            style={'height': '100%', 'touchAction': 'none'}
+            className="glucose-chart-shell",
+            style={'height': '100%', 'display': 'flex', 'flexDirection': 'column'},
         )
         self.id = id
         self.hide_last_hour = hide_last_hour
@@ -147,7 +221,8 @@ class GlucoseChart(html.Div):
                 return df_data, events_data, source_name
 
         @app.callback(
-            Output(f'{self.id}-graph', 'figure'),
+            [Output(f'{self.id}-graph', 'figure'),
+             Output(f'{self.id}-food-bubbles', 'children')],
             [Input(f'{self.id}-df-store', 'data'),
              Input(f'{self.id}-events-store', 'data'),
              Input(f'{self.id}-source-store', 'data'),
@@ -164,12 +239,12 @@ class GlucoseChart(html.Div):
             glucose_unit: Optional[str],
             interface_language: Optional[str],
             pathname: Optional[str],
-        ) -> go.Figure:
+        ) -> tuple[go.Figure, list[html.Button]]:
             """Update the chart figure when data changes"""
             if pathname != '/prediction':
                 raise PreventUpdate
             if not df_data:
-                return self._create_empty_figure()
+                return self._create_empty_figure(), []
             locale = normalize_locale(interface_language)
             
             # Reconstruct DataFrames from stored data
@@ -189,8 +264,54 @@ class GlucoseChart(html.Div):
                 source=source_name,
                 hide_last_hour=hide_last_hour_flag
             ):
-                # Create the figure with source information
-                return self._build_figure(df, events_df, source_name, locale=locale)
+                figure = self._build_figure(df, events_df, source_name, locale=locale)
+                bubbles = meal_food_bubble_children(
+                    df,
+                    events_df,
+                    source_name=str(source_name or ""),
+                    hide_last_hour=hide_last_hour_flag,
+                )
+                return figure, bubbles
+
+        app.clientside_callback(
+            """
+            function(nClicks) {
+                const cs = window.dash_clientside;
+                if (!nClicks || !nClicks.some(Boolean)) {
+                    return [cs.no_update, cs.no_update, cs.no_update];
+                }
+                const triggered = cs.callback_context.triggered_id;
+                if (!triggered || triggered.type !== 'meal-food-bubble' || !triggered.index) {
+                    return [cs.no_update, cs.no_update, cs.no_update];
+                }
+                return ['meal-food-lightbox is-open', triggered.index, 'false'];
+            }
+            """,
+            [
+                Output('meal-food-lightbox', 'className'),
+                Output('meal-food-lightbox-image', 'src'),
+                Output('meal-food-lightbox', 'aria-hidden'),
+            ],
+            Input({'type': 'meal-food-bubble', 'index': ALL}, 'n_clicks'),
+            prevent_initial_call=True,
+        )
+        app.clientside_callback(
+            """
+            function(nClicks) {
+                const cs = window.dash_clientside;
+                if (!nClicks) {
+                    return [cs.no_update, cs.no_update];
+                }
+                return ['meal-food-lightbox', 'true'];
+            }
+            """,
+            [
+                Output('meal-food-lightbox', 'className', allow_duplicate=True),
+                Output('meal-food-lightbox', 'aria-hidden', allow_duplicate=True),
+            ],
+            Input('meal-food-lightbox-backdrop', 'n_clicks'),
+            prevent_initial_call=True,
+        )
 
     def _reconstruct_dataframe_from_dict(self, df_data: dict[str, list[Any]]) -> pl.DataFrame:
         """Reconstruct a Polars DataFrame from stored dictionary data"""
@@ -204,12 +325,20 @@ class GlucoseChart(html.Div):
 
     def _reconstruct_events_dataframe_from_dict(self, events_data: dict[str, list[Any]]) -> pl.DataFrame:
         """Reconstruct the events DataFrame from stored data"""
+        n_rows = len(events_data.get('time') or [])
+        photo_raw = events_data.get('photo_path')
+        photo_paths = (
+            [str(value or '') for value in photo_raw]
+            if photo_raw is not None and len(photo_raw) == n_rows
+            else [''] * n_rows
+        )
         return pl.DataFrame({
             'time': pl.Series(events_data['time'], dtype=pl.String).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),
             'event_type': pl.Series(events_data['event_type'], dtype=pl.String),
             'event_subtype': pl.Series(events_data['event_subtype'], dtype=pl.String),
             # Coerce numeric strings and mixed integer/float values to Float64.
-            'insulin_value': pl.Series(events_data['insulin_value'], dtype=pl.Float64, strict=False)
+            'insulin_value': pl.Series(events_data['insulin_value'], dtype=pl.Float64, strict=False),
+            'photo_path': pl.Series(photo_paths, dtype=pl.String),
         })
 
     def _build_figure(self, df: pl.DataFrame, events_df: pl.DataFrame, source_name: Optional[str] = None, *, locale: str = "en") -> go.Figure:
@@ -226,6 +355,7 @@ class GlucoseChart(html.Div):
         self._add_glucose_trace(figure, locale=locale)
         self._add_prediction_traces(figure, locale=locale)
         self._add_event_markers(figure, locale=locale)
+        self._add_food_photo_guides(figure, locale=locale)
         self._update_layout(figure, locale=locale)
         
         return figure
@@ -486,6 +616,10 @@ class GlucoseChart(html.Div):
                 if self.hide_last_hour and x_pos > float(known_end_idx):
                     continue
                 event_row = events.filter(pl.col("time") == event_time)
+                if event_type == "Carbohydrates" and "photo_path" in events.columns:
+                    photo = str(event_row.get_column("photo_path")[0] or "").strip()
+                    if photo:
+                        continue
                 if event_type == "Insulin":
                     hover = t(
                         "ui.chart.hover_insulin",
@@ -547,6 +681,46 @@ class GlucoseChart(html.Div):
             )
 
         self._add_icon_legend(figure, icon_legend_entries)
+
+    def _add_food_photo_guides(self, figure: go.Figure, *, locale: str) -> None:
+        """Thin green dotted meal line + translated FOOD label along it."""
+        meals = visible_food_photo_events(
+            self._current_df,
+            self._current_events,
+            hide_last_hour=self.hide_last_hour,
+        )
+        if not meals:
+            return
+        food_label = t("ui.chart.food_label", locale=locale)
+        for meal in meals:
+            event_time = meal["time"]
+            if not isinstance(event_time, datetime):
+                continue
+            x_pos, _glucose = self._event_xy_for_time(event_time)
+            figure.add_shape(
+                type="line",
+                x0=x_pos,
+                x1=x_pos,
+                y0=0,
+                y1=1,
+                xref="x",
+                yref="paper",
+                line=dict(color=_FOOD_LINE_COLOR, width=1.5, dash="dot"),
+                layer="below",
+            )
+            figure.add_annotation(
+                x=x_pos,
+                y=0.52,
+                xref="x",
+                yref="paper",
+                text=food_label,
+                textangle=-90,
+                showarrow=False,
+                font=dict(size=11, color=_FOOD_LINE_COLOR),
+                xanchor="left",
+                yanchor="middle",
+                xshift=7,
+            )
 
     @staticmethod
     def _stack_icon_markers(

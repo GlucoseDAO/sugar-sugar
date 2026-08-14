@@ -312,6 +312,7 @@ es:
     event_insulin: "Insulina"
     event_exercise: "Ejercicio"
     event_carbohydrates: "Carbohidratos"
+    food_label: "COMIDA"
 
   metrics:
     title: "Métricas"

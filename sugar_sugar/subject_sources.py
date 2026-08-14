@@ -11,8 +11,9 @@ from typing import Any
 import polars as pl
 from eliot import start_action
 
+from sugar_sugar.cgmacros import discover_cgmacros_sources, window_has_visible_food_photo
 from sugar_sugar.config import PREDICTION_HOUR_OFFSET
-from sugar_sugar.data import load_glucose_data, load_loop_chronological_data
+from sugar_sugar.data import load_glucose_data
 
 _ADULT_MIN_AGE = 18
 _SAME_SOURCE_BUFFER = timedelta(hours=2)
@@ -99,7 +100,8 @@ def _is_adult(age: int | None) -> bool:
     return age is not None and age >= _ADULT_MIN_AGE
 
 
-def discover_generic_dataset_sources() -> list[GenericDatasetSource]:
+def discover_legacy_generic_sources() -> list[GenericDatasetSource]:
+    """example.csv + LOOP subjects. Temporarily unused as the generic play pool."""
     sources: list[GenericDatasetSource] = []
 
     example_path = _example_csv_path()
@@ -147,12 +149,39 @@ def discover_generic_dataset_sources() -> list[GenericDatasetSource]:
     return sources
 
 
+def discover_generic_dataset_sources() -> list[GenericDatasetSource]:
+    sources: list[GenericDatasetSource] = []
+
+    # Temporarily disabled: generic play uses CGMacros only.
+    # sources.extend(discover_legacy_generic_sources())
+
+    for cgmacros in discover_cgmacros_sources():
+        if cgmacros.age_years is not None and not _is_adult(cgmacros.age_years):
+            continue
+        sources.append(
+            GenericDatasetSource(
+                source_name=cgmacros.source_name,
+                csv_path=cgmacros.csv_path,
+                age_years=cgmacros.age_years,
+                gender=cgmacros.gender,
+                weight=cgmacros.weight,
+                sensor=cgmacros.sensor,
+            )
+        )
+
+    if not sources:
+        # Boot/CI fallback when the CGMacros extract is not on disk.
+        sources.extend(discover_legacy_generic_sources())
+
+    return sources
+
+
 def resolve_generic_source_path(source_name: str) -> Path | None:
     """Map a stored ``data_source_name`` (file basename) to its on-disk path."""
     name = Path(str(source_name or "")).name
     if not name:
         return None
-    for source in discover_generic_dataset_sources():
+    for source in discover_generic_dataset_sources() + discover_legacy_generic_sources():
         if source.source_name == name:
             return source.csv_path
     return None
@@ -176,9 +205,7 @@ def load_generic_dataset_source(source: GenericDatasetSource) -> tuple[pl.DataFr
         source_name=source.source_name,
         csv_path=str(source.csv_path),
     ):
-        if source.csv_path.name == "example.csv":
-            return load_glucose_data(source.csv_path)
-        return load_loop_chronological_data(source.csv_path)
+        return load_glucose_data(source.csv_path)
 
 
 def load_random_generic_dataset(
@@ -357,6 +384,7 @@ def pick_unique_generic_window(
     source_pool = list(sources)
     random.shuffle(source_pool)
     fallback: GenericWindowSelection | None = None
+    unique_fallback: GenericWindowSelection | None = None
 
     with start_action(
         action_type=u"pick_unique_generic_window",
@@ -388,23 +416,32 @@ def pick_unique_generic_window(
                     fallback = selection
                 if any(windows_conflict(old, round_window) for old in prior):
                     continue
+                if unique_fallback is None:
+                    unique_fallback = selection
+                if not window_has_visible_food_photo(window_df, events_df):
+                    continue
                 action.log(
                     message_type="unique_slice_selected",
                     source_name=source.source_name,
                     start_index=start_index,
                     slice_key=slice_key,
+                    has_food_photo=True,
                     window_start=round_window.window_start.isoformat(),
                     window_end=round_window.window_end.isoformat(),
                 )
                 return selection
 
-        if fallback is None:
+        chosen = unique_fallback or fallback
+        if chosen is None:
             raise ValueError("Could not pick any generic window")
 
         action.log(
             message_type="slice_pool_exhausted_reusing",
-            source_name=fallback.source.source_name,
-            start_index=fallback.start_index,
-            slice_key=fallback.slice_key,
+            source_name=chosen.source.source_name,
+            start_index=chosen.start_index,
+            slice_key=chosen.slice_key,
+            has_food_photo=window_has_visible_food_photo(
+                chosen.window_df, chosen.events_df
+            ),
         )
-        return fallback
+        return chosen

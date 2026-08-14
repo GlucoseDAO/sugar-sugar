@@ -310,6 +310,7 @@ uk:
     event_insulin: "Інсулін"
     event_exercise: "Фізична активність"
     event_carbohydrates: "Вуглеводи"
+    food_label: "ЇЖА"
 
   metrics:
     title: "Метрики"

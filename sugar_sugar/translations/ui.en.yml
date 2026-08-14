@@ -335,6 +335,7 @@ en:
     event_insulin: "Insulin"
     event_exercise: "Exercise"
     event_carbohydrates: "Carbohydrates"
+    food_label: "FOOD"
 
   metrics:
     title: "Metrics"

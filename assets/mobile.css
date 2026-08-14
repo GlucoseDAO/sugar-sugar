@@ -2422,3 +2422,21 @@ html.route-prediction.mobile-device #submit-button {
     transform-origin: center center !important;
   }
 }
+
+html.mobile-device .meal-food-speech-bubble {
+  width: 36px;
+  height: 32px;
+  touch-action: manipulation;
+}
+
+html.mobile-device .meal-food-bubble-apple {
+  width: 20px;
+  height: 20px;
+}
+
+@media (orientation: landscape) and (pointer: coarse) {
+  html.route-prediction.mobile-device .meal-food-bubble-strip {
+    left: 48px;
+    right: 8px;
+  }
+}

@@ -332,6 +332,7 @@ ro:
     event_insulin: "Insulină"
     event_exercise: "Exercițiu"
     event_carbohydrates: "Carbohidrați"
+    food_label: "MÂNCARE"
 
   metrics:
     title: "Metrici"

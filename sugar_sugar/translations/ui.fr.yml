@@ -312,6 +312,7 @@ fr:
     event_insulin: "Insuline"
     event_exercise: "Exercice"
     event_carbohydrates: "Glucides"
+    food_label: "REPAS"
 
   metrics:
     title: "Métriques"

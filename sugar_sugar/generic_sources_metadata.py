@@ -5,7 +5,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from sugar_sugar.subject_sources import GenericDatasetSource, discover_generic_dataset_sources
+from sugar_sugar.subject_sources import (
+    GenericDatasetSource,
+    discover_generic_dataset_sources,
+    discover_legacy_generic_sources,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,7 +66,7 @@ def load_generic_sources_metadata() -> dict[str, GenericSourceMetadata]:
                 if meta is not None:
                     out[key] = meta
 
-    for source in discover_generic_dataset_sources():
+    for source in discover_legacy_generic_sources() + discover_generic_dataset_sources():
         meta = _metadata_from_source(source)
         if meta is not None:
             out[source.source_name] = meta

@@ -8,6 +8,8 @@ import polars as pl
 from cgm_format import FormatParser, FormatProcessor, UnifiedEventType
 from eliot import start_action
 
+from sugar_sugar.cgmacros import is_cgmacros_csv, load_cgmacros_data
+
 
 def decode_upload_bytes(payload: Optional[str]) -> Optional[bytes]:
     """Decode an upload payload to raw file bytes.
@@ -76,6 +78,8 @@ def load_glucose_data(file_path: Path = Path("data/example.csv")) -> tuple[pl.Da
     with start_action(action_type=u"load_glucose_data", file_path=str(file_path)):
         if _is_loop_chronological_csv(file_path):
             return load_loop_chronological_data(file_path)
+        if is_cgmacros_csv(file_path):
+            return load_cgmacros_data(file_path)
         unified_df = FormatParser.parse_file(file_path)
         glucose_df, events_df = FormatProcessor.split_glucose_events(unified_df)
         return _adapt_glucose_df(glucose_df), _adapt_events_df(events_df)
