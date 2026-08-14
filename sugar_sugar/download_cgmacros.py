@@ -153,10 +153,11 @@ def download_url(
     *,
     expected_sha256: Optional[str] = None,
     show_progress: bool = False,
+    user_agent: str = USER_AGENT,
 ) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_name(dest.name + ".part")
-    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    request = urllib.request.Request(url, headers={"User-Agent": user_agent})
     hasher = hashlib.sha256()
     with urllib.request.urlopen(request) as resp, tmp.open("wb") as out:
         total = int(resp.headers.get("Content-Length") or 0)

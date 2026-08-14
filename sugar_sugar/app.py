@@ -125,6 +125,7 @@ from sugar_sugar.subject_sources import (
     generic_round_window_from_df,
     generic_window_slice_key,
     load_random_generic_dataset,
+    generic_intervention_for_user,
     pick_unique_generic_window,
     resolve_generic_source_path,
 )
@@ -187,7 +188,10 @@ def _load_generic_round_window(
     user_info: dict[str, Any] | None = None,
 ) -> tuple[pl.DataFrame, pl.DataFrame, str, int, str, str, str, str]:
     history = collect_generic_round_history(rounds, user_info)
-    selection = pick_unique_generic_window(points, history)
+    intervention = generic_intervention_for_user(user_info)
+    if user_info is not None:
+        user_info["generic_intervention"] = intervention
+    selection = pick_unique_generic_window(points, history, intervention=intervention)
     round_window = generic_round_window_from_df(
         selection.window_df,
         source_name=selection.source.source_name,
@@ -1555,6 +1559,34 @@ def _cgmacros_meal_photo(subject: str, rel_path: str) -> Any:
     from sugar_sugar.cgmacros import resolve_served_photo
 
     photo_path = resolve_served_photo(subject, rel_path)
+    if photo_path is None:
+        abort(404)
+    suffix = photo_path.suffix.lower()
+    mime = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+        ".heic": "image/heic",
+    }.get(suffix, "application/octet-stream")
+    response = flask_send_file(
+        photo_path,
+        mimetype=mime,
+        as_attachment=False,
+        max_age=86400,
+    )
+    response.headers["X-Robots-Tag"] = "noindex"
+    return response
+
+
+@server.route("/d1namo/<subject>/photo/<path:rel_path>")
+def _d1namo_meal_photo(subject: str, rel_path: str) -> Any:
+    """Serve a window-local D1NAMO meal JPEG. Path is subject-relative."""
+    from flask import abort
+
+    from sugar_sugar.d1namo import resolve_served_photo as resolve_d1namo_photo
+
+    photo_path = resolve_d1namo_photo(subject, rel_path)
     if photo_path is None:
         abort(404)
     suffix = photo_path.suffix.lower()
@@ -5846,6 +5878,9 @@ def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
             'diabetic': diabetic,
             'diabetic_type': diabetic_type,
             'diabetes_duration': diabetes_duration,
+            'generic_intervention': generic_intervention_for_user(
+                {'diabetic': diabetic}
+            ),
             'location': location,
             'rounds': info.get('rounds') or [],
             'max_rounds': int(info.get('max_rounds') or MAX_ROUNDS),

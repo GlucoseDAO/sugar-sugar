@@ -13,7 +13,11 @@ from eliot import start_action
 
 from sugar_sugar.cgmacros import discover_cgmacros_sources, window_has_visible_food_photo
 from sugar_sugar.config import PREDICTION_HOUR_OFFSET
+from sugar_sugar.d1namo import discover_d1namo_sources
 from sugar_sugar.data import load_glucose_data
+
+GENERIC_INTERVENTION_CGMACROS: str = "cgmacros"
+GENERIC_INTERVENTION_D1NAMO: str = "d1namo"
 
 _ADULT_MIN_AGE = 18
 _SAME_SOURCE_BUFFER = timedelta(hours=2)
@@ -51,6 +55,7 @@ class GenericDatasetSource:
     gender: str
     weight: str
     sensor: str
+    intervention: str = ""
 
 
 def _parse_info_txt(info_path: Path) -> tuple[int | None, str, str, str]:
@@ -149,12 +154,15 @@ def discover_legacy_generic_sources() -> list[GenericDatasetSource]:
     return sources
 
 
-def discover_generic_dataset_sources() -> list[GenericDatasetSource]:
+def generic_intervention_for_user(user_info: dict[str, Any] | None) -> str:
+    """Study arm: diabetic players get D1NAMO; everyone else gets CGMacros."""
+    if user_info and user_info.get("diabetic") is True:
+        return GENERIC_INTERVENTION_D1NAMO
+    return GENERIC_INTERVENTION_CGMACROS
+
+
+def _cgmacros_generic_sources() -> list[GenericDatasetSource]:
     sources: list[GenericDatasetSource] = []
-
-    # Temporarily disabled: generic play uses CGMacros only.
-    # sources.extend(discover_legacy_generic_sources())
-
     for cgmacros in discover_cgmacros_sources():
         if cgmacros.age_years is not None and not _is_adult(cgmacros.age_years):
             continue
@@ -166,11 +174,55 @@ def discover_generic_dataset_sources() -> list[GenericDatasetSource]:
                 gender=cgmacros.gender,
                 weight=cgmacros.weight,
                 sensor=cgmacros.sensor,
+                intervention=GENERIC_INTERVENTION_CGMACROS,
             )
         )
+    return sources
+
+
+def _d1namo_generic_sources() -> list[GenericDatasetSource]:
+    sources: list[GenericDatasetSource] = []
+    for d1namo in discover_d1namo_sources():
+        if d1namo.age_years is not None and not _is_adult(d1namo.age_years):
+            continue
+        sources.append(
+            GenericDatasetSource(
+                source_name=d1namo.source_name,
+                csv_path=d1namo.csv_path,
+                age_years=d1namo.age_years,
+                gender=d1namo.gender,
+                weight=d1namo.weight,
+                sensor=d1namo.sensor,
+                intervention=GENERIC_INTERVENTION_D1NAMO,
+            )
+        )
+    return sources
+
+
+def discover_generic_dataset_sources(
+    *,
+    intervention: str | None = None,
+) -> list[GenericDatasetSource]:
+    sources: list[GenericDatasetSource] = []
+
+    # Temporarily disabled: generic play uses CGMacros / D1NAMO by diabetic status.
+    # sources.extend(discover_legacy_generic_sources())
+
+    wanted = str(intervention or "").strip().lower()
+    if wanted == GENERIC_INTERVENTION_D1NAMO:
+        sources.extend(_d1namo_generic_sources())
+        if not sources:
+            sources.extend(_cgmacros_generic_sources())
+    elif wanted == GENERIC_INTERVENTION_CGMACROS:
+        sources.extend(_cgmacros_generic_sources())
+        if not sources:
+            sources.extend(_d1namo_generic_sources())
+    else:
+        sources.extend(_cgmacros_generic_sources())
+        sources.extend(_d1namo_generic_sources())
 
     if not sources:
-        # Boot/CI fallback when the CGMacros extract is not on disk.
+        # Boot/CI fallback when neither extract is on disk.
         sources.extend(discover_legacy_generic_sources())
 
     return sources
@@ -369,6 +421,8 @@ class GenericWindowSelection:
 def pick_unique_generic_window(
     points: int,
     history: list[GenericRoundWindow] | None = None,
+    *,
+    intervention: str | None = None,
 ) -> GenericWindowSelection:
     """Pick a random generic window that does not duplicate prior rounds this game.
 
@@ -376,7 +430,7 @@ def pick_unique_generic_window(
     - never reuse the same window content (``slice_key``)
     - never reuse the same source within ±2h of a prior window's timestamps
     """
-    sources = discover_generic_dataset_sources()
+    sources = discover_generic_dataset_sources(intervention=intervention)
     if not sources:
         raise FileNotFoundError("No generic dataset sources are configured")
 
@@ -390,6 +444,7 @@ def pick_unique_generic_window(
         action_type=u"pick_unique_generic_window",
         points=points,
         history_count=len(prior),
+        intervention=intervention,
     ) as action:
         for source in source_pool:
             glucose_df, events_df = load_generic_dataset_source(source)

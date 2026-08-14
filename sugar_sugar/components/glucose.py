@@ -12,6 +12,7 @@ from dash.exceptions import PreventUpdate
 from eliot import start_action
 
 from sugar_sugar.cgmacros import cgmacros_photo_url, visible_food_photo_events
+from sugar_sugar.d1namo import d1namo_photo_url, is_d1namo_source_name
 from sugar_sugar.config import PREDICTION_HOUR_OFFSET, STORAGE_TYPE
 from sugar_sugar.i18n import normalize_locale, t
 
@@ -63,7 +64,11 @@ def meal_food_bubble_children(
             continue
         x_pos = event_x_index(window_df, event_time)
         left_pct = 100.0 * (x_pos + 0.5) / n_points
-        photo_url = cgmacros_photo_url(source_name, photo_path)
+        photo_url = (
+            d1namo_photo_url(source_name, photo_path)
+            if is_d1namo_source_name(source_name)
+            else cgmacros_photo_url(source_name, photo_path)
+        )
         buttons.append(
             html.Button(
                 html.Img(

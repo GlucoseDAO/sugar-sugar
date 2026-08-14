@@ -675,6 +675,7 @@ class SubmitComponent(html.Div):
             'diabetic': user_info.get('diabetic', ''),
             'diabetic_type': user_info.get('diabetic_type', ''),
             'diabetes_duration': user_info.get('diabetes_duration', ''),
+            'generic_intervention': user_info.get('generic_intervention', ''),
             'location': user_info.get('location', ''),
             'rounds_played': rounds_played,
             # Clear naming: "real" == ground truth, "predicted" == user prediction
@@ -823,6 +824,7 @@ class SubmitComponent(html.Div):
                 'diabetic': user_info.get('diabetic', ''),
                 'diabetic_type': user_info.get('diabetic_type', ''),
                 'diabetes_duration': user_info.get('diabetes_duration', ''),
+                'generic_intervention': user_info.get('generic_intervention', ''),
                 'location': user_info.get('location', ''),
                 'rounds_played': rounds_n,
                 'predicted_values': str(parameters_run),

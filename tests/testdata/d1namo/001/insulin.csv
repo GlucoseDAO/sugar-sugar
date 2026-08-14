@@ -1,0 +1,4 @@
+date,time,fast_insulin,slow_insulin,comment
+2014-10-01,08:00:00,,12.0,basal
+2014-10-01,12:10:00,2.5,,bolus
+2014-10-01,12:12:00,0,,skipped

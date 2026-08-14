@@ -208,3 +208,8 @@ backup/archives/
 # Fetch locally with: uv run download-cgmacros
 # https://physionet.org/content/cgmacros/1.0.0/
 data/cgmmacros/
+
+# Public D1NAMO (Dubosson) dataset from Zenodo (not stored in git).
+# Fetch locally with: uv run download-d1namo
+# https://zenodo.org/records/5651217
+data/d1namo/

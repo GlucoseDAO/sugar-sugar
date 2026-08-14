@@ -113,11 +113,14 @@ cd sugar-sugar
 uv sync
 ```
 
-The [CGMacros](https://physionet.org/content/cgmacros/1.0.0/) dataset is not in git. Download a local copy (CSVs only by default; add `--photos` for meal images) with:
+The [CGMacros](https://physionet.org/content/cgmacros/1.0.0/) and [D1NAMO](https://zenodo.org/records/5651217) datasets are not in git. Download local copies with:
 
 ```bash
-uv run download-cgmacros
+uv run download-cgmacros --photos
+uv run download-d1namo
 ```
+
+Format A routes non-diabetic players to CGMacros (meal photos, no insulin doses) and diabetic players to D1NAMO / Dubosson (meal photos + insulin).
 
 ### Chrome / Chromium (for share-card image export)
 
