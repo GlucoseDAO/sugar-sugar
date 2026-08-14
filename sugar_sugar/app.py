@@ -92,6 +92,7 @@ from sugar_sugar.consent import (
     identity_is_complete,
     reconcile_stored_consents,
     results_destination,
+    session_age,
     should_persist_study_data,
     stamp_identity_fields,
     upsert_consent_agreement_fields,
@@ -6119,8 +6120,7 @@ def append_round_from_window(
     routes to ``/ending`` or ``/final``).
     """
     info: Dict[str, Any] = dict(user_info)
-    if 'age' in info:
-        current_df = current_df.with_columns(pl.lit(int(info['age'])).alias("age"))
+    current_df = current_df.with_columns(pl.lit(session_age(info)).alias("age"))
     rounds: list[dict[str, Any]] = list(info.get('rounds') or [])
     round_number = len(rounds) + 1
     info['prediction_window_start'] = slider_value or 0
@@ -6207,9 +6207,9 @@ def handle_submit_button(
         # round-tripped through the client (it lives server-side, sliced on demand).
         current_df = reconstruct_dataframe_from_dict(current_df_data)
 
-        # Update age from user_info on the window.
-        if user_info and 'age' in user_info:
-            current_df = current_df.with_columns(pl.lit(int(user_info['age'])).alias("age"))
+        # Player age is collected on /profile after play; 0 until then.
+        if user_info:
+            current_df = current_df.with_columns(pl.lit(session_age(user_info)).alias("age"))
 
         # Generate prediction table data directly from DataFrame instead of relying on component
         if user_info is None:

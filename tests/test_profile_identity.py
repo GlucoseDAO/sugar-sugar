@@ -10,8 +10,17 @@ from sugar_sugar.components.submit import SubmitComponent
 from sugar_sugar.consent import (
     identity_is_complete,
     results_destination,
+    session_age,
     stamp_identity_fields,
 )
+
+
+def test_session_age_treats_blank_as_zero() -> None:
+    assert session_age(None) == 0
+    assert session_age({}) == 0
+    assert session_age({"age": ""}) == 0
+    assert session_age({"age": "34"}) == 34
+    assert session_age({"age": 41}) == 41
 
 
 def test_identity_is_complete_from_flag() -> None:
@@ -134,3 +143,31 @@ def test_backfill_identity_completes_stub_and_played_rows(tmp_path: Path) -> Non
     ):
         assert column in rows[0]
         assert str(rows[0][column]).strip() != ""
+
+
+def test_save_statistics_skips_row_without_run_id(tmp_path: Path) -> None:
+    """A half-hydrated Submit must not mint a new study_id / blank-run_id orphan."""
+    submit = SubmitComponent()
+    submit._stats_csv_path = tmp_path / "prediction_statistics.csv"
+    submit._ranking_csv_path = tmp_path / "prediction_ranking.csv"
+    submit._ranking_by_format_paths = {k: tmp_path / f"r_{k}.csv" for k in ("A", "B", "C")}
+
+    submit.save_statistics(
+        {
+            "consent_completed": True,
+            "format": "A",
+            "rounds": [{"round_number": 1, "prediction_table_data": []}],
+        }
+    )
+    assert not submit._stats_csv_path.exists()
+
+    submit.save_statistics(
+        {
+            "study_id": "has-study",
+            "consent_completed": True,
+            "format": "A",
+            "run_id": "",
+            "rounds": [],
+        }
+    )
+    assert not submit._stats_csv_path.exists()

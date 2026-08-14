@@ -13,6 +13,7 @@ from sugar_sugar.app import (
     create_prediction_layout,
     dataframe_to_store_dict,
     handle_finish_study_from_prediction,
+    handle_submit_button,
     load_dataset,
 )
 from sugar_sugar.components.submit import SubmitComponent, hidden_area_is_complete
@@ -70,6 +71,27 @@ def test_capture_complete_round_on_exit_appends_only_when_drawn() -> None:
         0,
     )
     assert incomplete.get("rounds") == []
+
+
+def test_submit_works_before_identity_is_collected() -> None:
+    """Start stores age as '' until /profile; Submit must not crash on int('')."""
+    pathname, info, mode, _window = handle_submit_button(
+        1,
+        {
+            "consent_completed": True,
+            "rounds": [],
+            "format": "A",
+            "is_example_data": True,
+            "age": "",
+            "email": "",
+            "gender": "",
+            "location": "",
+        },
+        dataframe_to_store_dict(_complete_window()),
+        0,
+    )
+    assert pathname == "/ending"
+    assert len(info.get("rounds") or []) == 1
 
 
 def test_finish_from_prediction_goes_to_ending_when_round_is_complete() -> None:

@@ -581,6 +581,20 @@ class SubmitComponent(html.Div):
                 pass
             return
 
+        study_id = str(user_info.get('study_id') or '').strip()
+        run_id = str(user_info.get('run_id') or '').strip()
+        if not study_id or not run_id:
+            # Start always assigns both. A save without them (Submit after a
+            # crash, a half-hydrated store) used to mint a new study_id and
+            # write a blank-run_id row that never got email/age backfill.
+            with start_action(
+                action_type=u"save_statistics_skipped_missing_ids",
+                study_id=study_id,
+                run_id=run_id,
+            ):
+                pass
+            return
+
         csv_file_path = self._stats_csv_path
         
         rounds: list[dict[str, Any]] = user_info.get('rounds') or []
@@ -588,12 +602,6 @@ class SubmitComponent(html.Div):
         actual_values: list[dict[str, Any]] = []
         prediction_times: list[dict[str, Any]] = []
         version = str(user_info.get('run_format') or user_info.get('format') or '')
-
-        # Stable ID across derived outputs (stats + ranking)
-        study_id = user_info.get('study_id')
-        if not study_id:
-            study_id = str(uuid.uuid4())
-            user_info['study_id'] = study_id
 
         metrics_component = MetricsComponent()
 

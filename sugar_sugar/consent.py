@@ -68,6 +68,19 @@ def reconcile_stored_consents(user_info: dict[str, Any]) -> dict[str, Any]:
     )
 
 
+def session_age(user_info: Optional[dict[str, Any]]) -> int:
+    """Player age for dataframe/CSV writes. ``0`` until ``/profile`` fills it in."""
+    if not user_info:
+        return 0
+    raw = user_info.get("age")
+    if raw is None or str(raw).strip() == "":
+        return 0
+    try:
+        return int(float(raw))
+    except (TypeError, ValueError):
+        return 0
+
+
 def identity_is_complete(user_info: Optional[dict[str, Any]]) -> bool:
     """True when nickname/email/age/gender/location have already been collected.
 
