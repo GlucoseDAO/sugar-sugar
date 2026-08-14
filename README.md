@@ -113,14 +113,27 @@ cd sugar-sugar
 uv sync
 ```
 
-The [CGMacros](https://physionet.org/content/cgmacros/1.0.0/) and [D1NAMO](https://zenodo.org/records/5651217) datasets are not in git. Download local copies with:
+The [BIG IDEAs](https://physionet.org/content/big-ideas-glycemic-wearable/1.1.3/) and [D1NAMO](https://zenodo.org/records/5651217) datasets are not in git. Download local copies with:
 
 ```bash
-uv run download-cgmacros --photos
+uv run download-bigideas
 uv run download-d1namo
 ```
 
-Format A routes non-diabetic players to CGMacros (meal photos, no insulin doses) and diabetic players to D1NAMO / Dubosson (meal photos + insulin).
+`download-bigideas` pulls only Dexcom + food-log CSVs (the full PhysioNet zip is 4.7 GB of Empatica streams and is not used).
+
+Format A source policy (stored as `generic_intervention`):
+
+| Player | Dataset |
+|---|---|
+| No diabetes | BIG IDEAs (Dexcom + food-log text) |
+| Gestational | BIG IDEAs |
+| Type 1 | D1NAMO (CGM + meal photos + insulin) |
+| Type 2 | 50% BIG IDEAs / 50% D1NAMO each round |
+| Prediabetes | 75% BIG IDEAs / 25% D1NAMO each round |
+| LADA | 75% D1NAMO / 25% BIG IDEAs each round |
+
+BIG IDEAs meals have no photographs: the apple icon opens a notepad with the food-log description. D1NAMO meals still open the photo lightbox. Backdrop click closes either overlay.
 
 ### Chrome / Chromium (for share-card image export)
 

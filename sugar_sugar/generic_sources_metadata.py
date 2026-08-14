@@ -18,6 +18,7 @@ class GenericSourceMetadata:
     gender: str
     weight: str
     sensor: str = ""
+    diabetic: bool | None = None
 
 
 def _project_root() -> Path:
@@ -26,15 +27,27 @@ def _project_root() -> Path:
 
 
 def _metadata_from_source(source: GenericDatasetSource) -> GenericSourceMetadata | None:
-    if source.age_years is None:
+    if source.age_years is None and not source.gender and source.diabetic is None:
         return None
-    age = f"{source.age_years} years old"
+    age = f"{source.age_years} years old" if source.age_years is not None else ""
     return GenericSourceMetadata(
         age=age,
         gender=source.gender,
         weight=source.weight,
         sensor=source.sensor,
+        diabetic=source.diabetic,
     )
+
+
+def _parse_optional_bool(value: Any) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    raw = str(value or "").strip().lower()
+    if raw in {"1", "true", "yes", "diabetic"}:
+        return True
+    if raw in {"0", "false", "no", "non-diabetic", "nondiabetic"}:
+        return False
+    return None
 
 
 def _metadata_from_json_entry(value: dict[str, Any]) -> GenericSourceMetadata | None:
@@ -42,13 +55,15 @@ def _metadata_from_json_entry(value: dict[str, Any]) -> GenericSourceMetadata | 
     gender = str(value.get("gender") or "").strip()
     weight = str(value.get("weight") or "").strip()
     sensor = str(value.get("sensor") or "").strip()
-    if not age:
+    diabetic = _parse_optional_bool(value.get("diabetic"))
+    if not age and not gender and diabetic is None:
         return None
     return GenericSourceMetadata(
         age=age,
         gender=gender,
         weight=weight,
         sensor=sensor,
+        diabetic=diabetic,
     )
 
 
@@ -74,6 +89,20 @@ def load_generic_sources_metadata() -> dict[str, GenericSourceMetadata]:
     return out
 
 
+def resolve_source_metadata(source_name: str) -> GenericSourceMetadata | None:
+    """Look up demographics for a stored source name, including a live scan."""
+    key = Path(str(source_name or "")).name
+    if not key:
+        return None
+    cached = load_generic_sources_metadata().get(key)
+    if cached is not None:
+        return cached
+    for source in discover_legacy_generic_sources() + discover_generic_dataset_sources():
+        if source.source_name == key:
+            return _metadata_from_source(source)
+    return None
+
+
 def _gender_display(gender: str, *, locale: str) -> str:
     from sugar_sugar.i18n import t
 
@@ -92,6 +121,16 @@ def _gender_display(gender: str, *, locale: str) -> str:
     return str(gender or "")
 
 
+def _diabetes_status_label(diabetic: bool | None, *, locale: str) -> str:
+    from sugar_sugar.i18n import t
+
+    if diabetic is True:
+        return t("ui.header.diabetic", locale=locale)
+    if diabetic is False:
+        return t("ui.header.non_diabetic", locale=locale)
+    return ""
+
+
 def _format_demographics_line(
     *,
     age_display: str,
@@ -99,15 +138,32 @@ def _format_demographics_line(
     weight_display: str,
     sensor: str,
     locale: str,
+    diabetic: bool | None = None,
 ) -> str:
     from sugar_sugar.i18n import t
 
-    if locale == "en" and age_display and gender_display:
-        if weight_display:
-            return f"{age_display} yr old {gender_display}, weight {weight_display}"
-        return f"{age_display} yr old {gender_display}"
+    status = _diabetes_status_label(diabetic, locale=locale)
+    if locale == "en":
+        if age_display and gender_display:
+            details = f"{age_display} yr old {gender_display}"
+            if weight_display:
+                details = f"{details}, weight {weight_display}"
+        else:
+            bits: list[str] = []
+            if age_display:
+                bits.append(f"{age_display} yr old")
+            if gender_display:
+                bits.append(gender_display)
+            if weight_display:
+                bits.append(f"weight {weight_display}")
+            details = ", ".join(bits)
+        if status and details:
+            return f"{status} · {details}"
+        return status or details
 
     detail_parts: list[str] = []
+    if status:
+        detail_parts.append(status)
     if age_display:
         detail_parts.append(f"{t('ui.startup.age_label', locale=locale)}: {age_display}")
     if gender_display:
@@ -163,6 +219,7 @@ def format_participant_demographics(
     *,
     locale: str,
     weight: str = "",
+    diabetic: bool | None = None,
     show_no_carbs_note: bool = False,
     show_carbs_info_note: bool = False,
 ) -> str:
@@ -178,6 +235,7 @@ def format_participant_demographics(
         weight_display=weight_display,
         sensor="",
         locale=locale,
+        diabetic=diabetic,
     )
     return _append_metadata_notes(
         line,
@@ -211,6 +269,7 @@ def format_generic_source_metadata(
         weight_display=weight_display,
         sensor=str(meta.sensor or ""),
         locale=locale,
+        diabetic=meta.diabetic,
     )
     return _append_metadata_notes(
         line,

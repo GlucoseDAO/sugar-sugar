@@ -519,8 +519,9 @@ def visible_food_photo_events(
     rows: list[dict[str, object]] = []
     for row in events_df.iter_rows(named=True):
         photo = str(row.get("photo_path") or "").strip()
+        note = str(row.get("food_note") or "").strip()
         event_time = row.get("time")
-        if not photo or event_time is None:
+        if (not photo and not note) or event_time is None:
             continue
         if event_time < start_time or event_time > visible_end:
             continue

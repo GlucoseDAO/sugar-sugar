@@ -11,6 +11,8 @@ from dash import Dash, html
 from dash.exceptions import PreventUpdate
 from eliot import start_action
 
+from urllib.parse import quote
+
 from sugar_sugar.cgmacros import cgmacros_photo_url, visible_food_photo_events
 from sugar_sugar.d1namo import d1namo_photo_url, is_d1namo_source_name
 from sugar_sugar.config import PREDICTION_HOUR_OFFSET, STORAGE_TYPE
@@ -59,16 +61,20 @@ def meal_food_bubble_children(
     buttons: list[html.Button] = []
     for meal in meals:
         event_time = meal["time"]
-        photo_path = str(meal.get("photo_path") or "")
-        if not isinstance(event_time, datetime) or not photo_path:
+        photo_path = str(meal.get("photo_path") or "").strip()
+        food_note = str(meal.get("food_note") or "").strip()
+        if not isinstance(event_time, datetime) or (not photo_path and not food_note):
             continue
         x_pos = event_x_index(window_df, event_time)
         left_pct = 100.0 * (x_pos + 0.5) / n_points
-        photo_url = (
-            d1namo_photo_url(source_name, photo_path)
-            if is_d1namo_source_name(source_name)
-            else cgmacros_photo_url(source_name, photo_path)
-        )
+        if photo_path:
+            bubble_index = (
+                d1namo_photo_url(source_name, photo_path)
+                if is_d1namo_source_name(source_name)
+                else cgmacros_photo_url(source_name, photo_path)
+            )
+        else:
+            bubble_index = f"note:{quote(food_note, safe='')}"
         buttons.append(
             html.Button(
                 html.Img(
@@ -77,7 +83,7 @@ def meal_food_bubble_children(
                     alt="",
                     disable_n_clicks=True,
                 ),
-                id={"type": "meal-food-bubble", "index": photo_url},
+                id={"type": "meal-food-bubble", "index": bubble_index},
                 className="meal-food-speech-bubble",
                 type="button",
                 n_clicks=0,
@@ -283,18 +289,25 @@ class GlucoseChart(html.Div):
             function(nClicks) {
                 const cs = window.dash_clientside;
                 if (!nClicks || !nClicks.some(Boolean)) {
-                    return [cs.no_update, cs.no_update, cs.no_update];
+                    return [cs.no_update, cs.no_update, cs.no_update, cs.no_update];
                 }
                 const triggered = cs.callback_context.triggered_id;
                 if (!triggered || triggered.type !== 'meal-food-bubble' || !triggered.index) {
-                    return [cs.no_update, cs.no_update, cs.no_update];
+                    return [cs.no_update, cs.no_update, cs.no_update, cs.no_update];
                 }
-                return ['meal-food-lightbox is-open', triggered.index, 'false'];
+                const index = String(triggered.index);
+                if (index.startsWith('note:')) {
+                    let note = index.slice(5);
+                    try { note = decodeURIComponent(note); } catch (err) { /* keep raw */ }
+                    return ['meal-food-lightbox is-open is-note', '', note, 'false'];
+                }
+                return ['meal-food-lightbox is-open', index, '', 'false'];
             }
             """,
             [
                 Output('meal-food-lightbox', 'className'),
                 Output('meal-food-lightbox-image', 'src'),
+                Output('meal-food-lightbox-note', 'children'),
                 Output('meal-food-lightbox', 'aria-hidden'),
             ],
             Input({'type': 'meal-food-bubble', 'index': ALL}, 'n_clicks'),
@@ -305,13 +318,15 @@ class GlucoseChart(html.Div):
             function(nClicks) {
                 const cs = window.dash_clientside;
                 if (!nClicks) {
-                    return [cs.no_update, cs.no_update];
+                    return [cs.no_update, cs.no_update, cs.no_update, cs.no_update];
                 }
-                return ['meal-food-lightbox', 'true'];
+                return ['meal-food-lightbox', '', '', 'true'];
             }
             """,
             [
                 Output('meal-food-lightbox', 'className', allow_duplicate=True),
+                Output('meal-food-lightbox-image', 'src', allow_duplicate=True),
+                Output('meal-food-lightbox-note', 'children', allow_duplicate=True),
                 Output('meal-food-lightbox', 'aria-hidden', allow_duplicate=True),
             ],
             Input('meal-food-lightbox-backdrop', 'n_clicks'),
@@ -337,6 +352,12 @@ class GlucoseChart(html.Div):
             if photo_raw is not None and len(photo_raw) == n_rows
             else [''] * n_rows
         )
+        note_raw = events_data.get('food_note')
+        food_notes = (
+            [str(value or '') for value in note_raw]
+            if note_raw is not None and len(note_raw) == n_rows
+            else [''] * n_rows
+        )
         return pl.DataFrame({
             'time': pl.Series(events_data['time'], dtype=pl.String).str.strptime(pl.Datetime, format='%Y-%m-%dT%H:%M:%S'),
             'event_type': pl.Series(events_data['event_type'], dtype=pl.String),
@@ -344,6 +365,7 @@ class GlucoseChart(html.Div):
             # Coerce numeric strings and mixed integer/float values to Float64.
             'insulin_value': pl.Series(events_data['insulin_value'], dtype=pl.Float64, strict=False),
             'photo_path': pl.Series(photo_paths, dtype=pl.String),
+            'food_note': pl.Series(food_notes, dtype=pl.String),
         })
 
     def _build_figure(self, df: pl.DataFrame, events_df: pl.DataFrame, source_name: Optional[str] = None, *, locale: str = "en") -> go.Figure:
@@ -621,9 +643,18 @@ class GlucoseChart(html.Div):
                 if self.hide_last_hour and x_pos > float(known_end_idx):
                     continue
                 event_row = events.filter(pl.col("time") == event_time)
-                if event_type == "Carbohydrates" and "photo_path" in events.columns:
-                    photo = str(event_row.get_column("photo_path")[0] or "").strip()
-                    if photo:
+                if event_type == "Carbohydrates":
+                    photo = (
+                        str(event_row.get_column("photo_path")[0] or "").strip()
+                        if "photo_path" in events.columns
+                        else ""
+                    )
+                    note = (
+                        str(event_row.get_column("food_note")[0] or "").strip()
+                        if "food_note" in events.columns
+                        else ""
+                    )
+                    if photo or note:
                         continue
                 if event_type == "Insulin":
                     hover = t(

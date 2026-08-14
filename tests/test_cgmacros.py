@@ -24,11 +24,6 @@ from sugar_sugar.i18n import setup_i18n, t
 setup_i18n()
 from sugar_sugar.data import load_glucose_data
 from sugar_sugar.download_cgmacros import dataset_is_present, default_dest
-from sugar_sugar.subject_sources import (
-    discover_generic_dataset_sources,
-    load_generic_dataset_source,
-    resolve_generic_source_path,
-)
 
 FIXTURE_ROOT = Path(__file__).parent / "testdata" / "cgmacros"
 SUBJECT_001 = FIXTURE_ROOT / "CGMacros" / "CGMacros-001" / "CGMacros-001.csv"
@@ -111,20 +106,6 @@ def test_load_glucose_data_routes_cgmacros() -> None:
     assert "gl" in glucose_df.columns
     assert "Carbohydrates" in events_df.get_column("event_type").to_list()
     assert "photo_path" in events_df.columns
-
-
-def test_generic_pipeline_can_resolve_and_load_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        "sugar_sugar.subject_sources.discover_cgmacros_sources",
-        lambda dest=None: discover_cgmacros_sources(FIXTURE_ROOT),
-    )
-    path = resolve_generic_source_path("CGMacros-001.csv")
-    assert path == SUBJECT_001
-    sources = discover_generic_dataset_sources()
-    source = next(item for item in sources if item.source_name == "CGMacros-001.csv")
-    glucose_df, events_df = load_generic_dataset_source(source)
-    assert glucose_df.height > 0
-    assert events_df.get_column("photo_path").to_list() == ["photos/meal-before.jpg"]
 
 
 def _pad_window(base: pl.DataFrame, *, hours_before: int = 0, hours_after: int = 0) -> pl.DataFrame:

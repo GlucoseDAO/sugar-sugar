@@ -35,6 +35,17 @@ def _truthy_consent_flag(value: Any) -> bool:
     return text in {"1", "true", "yes", "on"}
 
 
+def diabetes_type_dropdown_options(locale: str) -> list[dict[str, str]]:
+    return [
+        {'label': t("ui.startup.diabetes_type_1", locale=locale), 'value': 'Type 1'},
+        {'label': t("ui.startup.diabetes_type_2", locale=locale), 'value': 'Type 2'},
+        {'label': t("ui.startup.diabetes_type_prediabetes", locale=locale), 'value': 'Prediabetes'},
+        {'label': t("ui.startup.diabetes_type_gestational", locale=locale), 'value': 'Gestational'},
+        {'label': t("ui.startup.diabetes_type_lada", locale=locale), 'value': 'LADA'},
+        {'label': t("ui.startup.gender_na", locale=locale), 'value': 'N/A'},
+    ]
+
+
 def prior_upload_data_consent(user_info: Optional[dict[str, Any]]) -> bool:
     """True if upload/CGM-data usage consent is already established for this session.
 
@@ -653,13 +664,7 @@ class StartupPage(html.Div):
                         ], style={'marginBottom': '10px'}),
                         dcc.Dropdown(
                             id='diabetic-type-dropdown',
-                            options=[
-                                {'label': t("ui.startup.diabetes_type_1", locale=locale), 'value': 'Type 1'},
-                                {'label': t("ui.startup.diabetes_type_2", locale=locale), 'value': 'Type 2'},
-                                {'label': t("ui.startup.diabetes_type_gestational", locale=locale), 'value': 'Gestational'},
-                                {'label': t("ui.startup.diabetes_type_lada", locale=locale), 'value': 'LADA'},
-                                {'label': t("ui.startup.gender_na", locale=locale), 'value': 'N/A'}
-                            ],
+                            options=diabetes_type_dropdown_options(locale),
                             placeholder=t("ui.startup.diabetes_type_placeholder", locale=locale),
                             persistence=True,
                             persistence_type=STORAGE_TYPE,
@@ -1605,13 +1610,7 @@ class StartupPageMobile(html.Div):
                 _m_label(t("ui.startup.diabetes_type_label", locale=locale), 'diabetic-type-required'),
                 dcc.Dropdown(
                     id='diabetic-type-dropdown',
-                    options=[
-                        {'label': t("ui.startup.diabetes_type_1", locale=locale), 'value': 'Type 1'},
-                        {'label': t("ui.startup.diabetes_type_2", locale=locale), 'value': 'Type 2'},
-                        {'label': t("ui.startup.diabetes_type_gestational", locale=locale), 'value': 'Gestational'},
-                        {'label': t("ui.startup.diabetes_type_lada", locale=locale), 'value': 'LADA'},
-                        {'label': t("ui.startup.gender_na", locale=locale), 'value': 'N/A'},
-                    ],
+                    options=diabetes_type_dropdown_options(locale),
                     placeholder=t("ui.startup.diabetes_type_placeholder", locale=locale),
                     persistence=True, persistence_type=STORAGE_TYPE, style=_M_DROPDOWN,
                 ),

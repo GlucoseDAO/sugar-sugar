@@ -204,10 +204,15 @@ logs/*
 # Local backup archives (see backup/README.md)
 backup/archives/
 
-# Public CGMacros dataset from PhysioNet (not stored in git).
+# Public CGMacros dataset from PhysioNet (not stored in git; unused in Format A).
 # Fetch locally with: uv run download-cgmacros
 # https://physionet.org/content/cgmacros/1.0.0/
 data/cgmmacros/
+
+# Public BIG IDEAs Dexcom + food logs from PhysioNet (not stored in git).
+# Fetch locally with: uv run download-bigideas
+# https://physionet.org/content/big-ideas-glycemic-wearable/1.1.3/
+data/bigideas/
 
 # Public D1NAMO (Dubosson) dataset from Zenodo (not stored in git).
 # Fetch locally with: uv run download-d1namo

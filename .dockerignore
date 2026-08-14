@@ -5,6 +5,7 @@ __pycache__/
 logs/
 data/shares/
 data/cgmmacros/
+data/bigideas/
 data/d1namo/
 .env
 .cursor/

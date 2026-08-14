@@ -118,6 +118,7 @@ from sugar_sugar.generic_sources_metadata import (
     format_participant_demographics,
     format_source_notes,
     load_generic_sources_metadata,
+    resolve_source_metadata,
 )
 from sugar_sugar.prediction_window_context import should_show_no_carbs_note
 from sugar_sugar.subject_sources import (
@@ -152,7 +153,7 @@ def _build_source_metadata_line(
     locale: str,
 ) -> str:
     key = Path(str(source_name or "example.csv")).name
-    meta = GENERIC_SOURCES_METADATA.get(key)
+    meta = GENERIC_SOURCES_METADATA.get(key) or resolve_source_metadata(key)
     show_no_carbs = should_show_no_carbs_note(window_df, events_df)
     show_carbs_info = not is_example_data
 
@@ -165,10 +166,14 @@ def _build_source_metadata_line(
         )
 
     if not is_example_data and user_info and user_info.get("age"):
+        diabetic_raw = user_info.get("diabetic")
+        diabetic = diabetic_raw if isinstance(diabetic_raw, bool) else None
         return format_participant_demographics(
             user_info["age"],
             str(user_info.get("gender") or ""),
             locale=locale,
+            weight=str(user_info.get("weight") or ""),
+            diabetic=diabetic,
             show_no_carbs_note=show_no_carbs,
             show_carbs_info_note=True,
         )
@@ -711,6 +716,10 @@ def events_dataframe_to_store_dict(df_in: pl.DataFrame) -> Dict[str, List[Any]]:
     if 'photo_path' in df_in.columns:
         payload['photo_path'] = [
             str(value or '') for value in df_in.get_column('photo_path').to_list()
+        ]
+    if 'food_note' in df_in.columns:
+        payload['food_note'] = [
+            str(value or '') for value in df_in.get_column('food_note').to_list()
         ]
     return payload
 
@@ -2104,6 +2113,12 @@ app.layout = html.Div([
                 className='meal-food-lightbox-image',
                 src='',
                 alt='',
+                disable_n_clicks=True,
+            ),
+            html.Div(
+                id='meal-food-lightbox-note',
+                className='meal-food-lightbox-note',
+                children='',
                 disable_n_clicks=True,
             ),
         ],
@@ -3679,6 +3694,7 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
                 ),
                 html.Div(
                     [
+                        html.Div(id='generic-source-metadata-display', children="", className="prediction-source-metadata"),
                         html.Div(
                             [
                                 html.Label(
@@ -3691,7 +3707,6 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
                             ],
                             className="prediction-source-line",
                         ),
-                        html.Div(id='generic-source-metadata-display', children="", className="prediction-source-metadata"),
                     ],
                     id="prediction-source-plaque",
                     disable_n_clicks=True,
@@ -5763,6 +5778,12 @@ def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) ->
     if photo_paths is not None:
         reconstructed['photo_path'] = pl.Series(
             [str(value or '') for value in photo_paths],
+            dtype=pl.String,
+        )
+    food_notes = events_data.get('food_note')
+    if food_notes is not None:
+        reconstructed['food_note'] = pl.Series(
+            [str(value or '') for value in food_notes],
             dtype=pl.String,
         )
     return pl.DataFrame(reconstructed)

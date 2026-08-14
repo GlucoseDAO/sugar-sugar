@@ -7,7 +7,11 @@ import polars as pl
 
 from sugar_sugar.config import DEFAULT_POINTS
 from sugar_sugar.data import load_loop_chronological_data
+from sugar_sugar.i18n import setup_i18n
+
+setup_i18n()
 from sugar_sugar.generic_sources_metadata import (
+    GenericSourceMetadata,
     format_generic_source_metadata,
     format_participant_demographics,
     load_generic_sources_metadata,
@@ -155,8 +159,35 @@ def test_generic_metadata_english_without_weight_uses_age_gender_only() -> None:
     metadata = load_generic_sources_metadata()
     loop_meta = metadata["loop_556_chronological.csv"]
     line = format_generic_source_metadata(loop_meta, locale="en")
+    assert line.lower().startswith("diabetic · ")
     assert "23 yr old female" in line.lower()
     assert "84" in line
+
+
+def test_source_metadata_leads_with_diabetes_status() -> None:
+    diabetic = GenericSourceMetadata(
+        age="23 years old",
+        gender="female",
+        weight="84 kg",
+        diabetic=True,
+    )
+    assert format_generic_source_metadata(diabetic, locale="en") == (
+        "Diabetic · 23 yr old Female, weight 84kg"
+    )
+    non_diabetic = GenericSourceMetadata(
+        age="",
+        gender="female",
+        weight="",
+        diabetic=False,
+    )
+    assert format_generic_source_metadata(non_diabetic, locale="en") == "Non-diabetic · Female"
+    status_only = GenericSourceMetadata(age="", gender="", weight="", diabetic=True)
+    assert format_generic_source_metadata(status_only, locale="en") == "Diabetic"
+
+
+def test_participant_demographics_can_lead_with_diabetes_status() -> None:
+    line = format_participant_demographics(28, "F", locale="en", diabetic=True)
+    assert line == "Diabetic · 28 yr old Female"
 
 
 def test_zero_insulin_values_are_excluded_from_loop_events() -> None:

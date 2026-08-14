@@ -78,5 +78,7 @@ DASH_DEBUG: bool = _env_bool("DASH_DEBUG", DEBUG_MODE)
 # 18: navbar gained the Highscore item (/highscore page) on desktop + mobile.
 # 19: optional leaderboard nicknames -- fill_form_data gained a nickname-input Output.
 # 21: CGMacros meal speech-bubble clientside open/close callbacks.
-DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "21"))
+# 22: BIG IDEAs food-note notepad lightbox (extra Output on meal-food-lightbox).
+# 23: meal-food-lightbox close also clears the image src (same 4 Outputs as open).
+DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "23"))
 

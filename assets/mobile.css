@@ -126,18 +126,18 @@ html.mobile-device body {
 
   html.route-prediction.mobile-device #prediction-source-plaque .prediction-source-label {
     flex: 0 0 auto !important;
-    color: #4a5568 !important;
-    font-size: 15px !important;
-    font-weight: 800 !important;
+    color: #718096 !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
   }
 
   html.route-prediction.mobile-device #prediction-source-plaque #data-source-display {
     flex: 0 1 auto !important;
     min-width: 0 !important;
-    max-width: 180px !important;
-    color: #111827 !important;
-    font-size: 17px !important;
-    font-weight: 800 !important;
+    max-width: 140px !important;
+    color: #718096 !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
     font-style: normal !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
@@ -149,17 +149,27 @@ html.mobile-device body {
     height: auto !important;
     padding: 0 !important;
     margin: 0 !important;
-    color: #111827 !important;
+    color: #718096 !important;
     background: transparent !important;
     border: 0 !important;
     box-shadow: none !important;
-    font-size: 17px !important;
-    font-weight: 800 !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
     white-space: nowrap !important;
   }
 
   html.route-prediction.mobile-device #prediction-source-plaque #generic-source-metadata-display {
-    display: none !important;
+    display: block !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    color: #2c5282 !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    font-style: normal !important;
+    line-height: 1.15 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
   }
 
   html.route-prediction.mobile-device #prediction-units-row {
@@ -411,18 +421,18 @@ html.mobile-device body {
 
   html.route-prediction.mobile-device #prediction-source-plaque .prediction-source-label {
     flex: 0 0 auto !important;
-    color: #4a5568 !important;
-    font-size: 15px !important;
-    font-weight: 800 !important;
+    color: #718096 !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
   }
 
   html.route-prediction.mobile-device #prediction-source-plaque #data-source-display {
     flex: 0 1 auto !important;
     min-width: 0 !important;
-    max-width: 180px !important;
-    color: #111827 !important;
-    font-size: 17px !important;
-    font-weight: 800 !important;
+    max-width: 140px !important;
+    color: #718096 !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
     font-style: normal !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
@@ -434,17 +444,27 @@ html.mobile-device body {
     height: auto !important;
     padding: 0 !important;
     margin: 0 !important;
-    color: #111827 !important;
+    color: #718096 !important;
     background: transparent !important;
     border: 0 !important;
     box-shadow: none !important;
-    font-size: 17px !important;
-    font-weight: 800 !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
     white-space: nowrap !important;
   }
 
   html.route-prediction.mobile-device #prediction-source-plaque #generic-source-metadata-display {
-    display: none !important;
+    display: block !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    color: #2c5282 !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    font-style: normal !important;
+    line-height: 1.15 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
   }
 
   html.route-prediction.mobile-device #prediction-units-row {
@@ -1268,26 +1288,31 @@ html.route-prediction.mobile-device #submit-button {
 
   html.route-prediction.mobile-device #data-source-display,
   html.route-prediction.mobile-device #generic-source-metadata-display {
-    font-size: 14px !important;
     line-height: 1.25 !important;
   }
 
   html.route-prediction.mobile-device #data-source-display {
-    color: #111827 !important;
-    font-size: 16px !important;
-    font-weight: 800 !important;
+    color: #718096 !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
     font-style: normal !important;
   }
 
   html.route-prediction.mobile-device #generic-source-metadata-display {
     width: 100% !important;
+    color: #2c5282 !important;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    font-style: normal !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
   }
 
   html.route-prediction.mobile-device #header-data-source-label {
-    font-size: 14px !important;
+    font-size: 12px !important;
+    color: #718096 !important;
+    font-weight: 500 !important;
   }
 
   html.route-prediction.mobile-device #round-indicator {
@@ -1427,17 +1452,17 @@ html.route-prediction.mobile-device #submit-button {
 
   html.route-prediction.mobile-device .prediction-source-label {
     flex: 0 0 auto !important;
-    color: #4a5568 !important;
-    font-size: 14px !important;
-    font-weight: 800 !important;
+    color: #718096 !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
   }
 
   html.route-prediction.mobile-device .prediction-source-name {
     flex: 0 1 auto !important;
     min-width: 0 !important;
-    color: #111827 !important;
-    font-size: 16px !important;
-    font-weight: 800 !important;
+    color: #718096 !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
     font-style: normal !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
@@ -1451,9 +1476,9 @@ html.route-prediction.mobile-device #submit-button {
 
   html.route-prediction.mobile-device .prediction-source-metadata {
     color: #2c5282 !important;
-    font-size: 14px !important;
-    font-style: italic !important;
-    font-weight: 500 !important;
+    font-size: 16px !important;
+    font-style: normal !important;
+    font-weight: 700 !important;
     line-height: 1.2 !important;
     width: 100% !important;
     white-space: nowrap !important;
@@ -1743,18 +1768,18 @@ html.route-prediction.mobile-device #submit-button {
 
   html.route-prediction.mobile-device #prediction-source-plaque .prediction-source-label {
     flex: 0 0 auto !important;
-    color: #4a5568 !important;
-    font-size: 15px !important;
-    font-weight: 800 !important;
+    color: #718096 !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
   }
 
   html.route-prediction.mobile-device #prediction-source-plaque #data-source-display {
     flex: 0 1 auto !important;
     min-width: 0 !important;
-    max-width: 180px !important;
-    color: #111827 !important;
-    font-size: 17px !important;
-    font-weight: 800 !important;
+    max-width: 140px !important;
+    color: #718096 !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
     font-style: normal !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
@@ -1766,17 +1791,27 @@ html.route-prediction.mobile-device #submit-button {
     height: auto !important;
     padding: 0 !important;
     margin: 0 !important;
-    color: #111827 !important;
+    color: #718096 !important;
     background: transparent !important;
     border: 0 !important;
     box-shadow: none !important;
-    font-size: 17px !important;
-    font-weight: 800 !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
     white-space: nowrap !important;
   }
 
   html.route-prediction.mobile-device #prediction-source-plaque #generic-source-metadata-display {
-    display: none !important;
+    display: block !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    color: #2c5282 !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    font-style: normal !important;
+    line-height: 1.15 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
   }
 
   html.route-prediction.mobile-device #prediction-units-row {
@@ -2421,6 +2456,21 @@ html.route-prediction.mobile-device #submit-button {
     transform: translate(-42%, -50%) rotate(-90deg) !important;
     transform-origin: center center !important;
   }
+}
+
+html.mobile-device .meal-food-lightbox-note {
+  width: min(94vw, 720px);
+  max-height: 80vh;
+  padding: 20px 20px 24px 36px;
+  font-size: 18px;
+  line-height: 28px;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 27px,
+    rgba(80, 130, 180, 0.28) 27px,
+    rgba(80, 130, 180, 0.28) 28px
+  );
 }
 
 html.mobile-device .meal-food-speech-bubble {

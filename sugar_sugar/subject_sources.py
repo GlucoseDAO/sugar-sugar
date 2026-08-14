@@ -11,13 +11,17 @@ from typing import Any
 import polars as pl
 from eliot import start_action
 
-from sugar_sugar.cgmacros import discover_cgmacros_sources, window_has_visible_food_photo
+from sugar_sugar.bigideas import discover_bigideas_sources
+from sugar_sugar.cgmacros import window_has_visible_food_photo
 from sugar_sugar.config import PREDICTION_HOUR_OFFSET
 from sugar_sugar.d1namo import discover_d1namo_sources
 from sugar_sugar.data import load_glucose_data
 
-GENERIC_INTERVENTION_CGMACROS: str = "cgmacros"
+GENERIC_INTERVENTION_BIGIDEAS: str = "bigideas"
 GENERIC_INTERVENTION_D1NAMO: str = "d1namo"
+GENERIC_INTERVENTION_MIX_T2: str = "mix_t2"
+GENERIC_INTERVENTION_MIX_PREDIABETES: str = "mix_prediabetes"
+GENERIC_INTERVENTION_MIX_LADA: str = "mix_lada"
 
 _ADULT_MIN_AGE = 18
 _SAME_SOURCE_BUFFER = timedelta(hours=2)
@@ -56,6 +60,7 @@ class GenericDatasetSource:
     weight: str
     sensor: str
     intervention: str = ""
+    diabetic: bool | None = None
 
 
 def _parse_info_txt(info_path: Path) -> tuple[int | None, str, str, str]:
@@ -148,6 +153,7 @@ def discover_legacy_generic_sources() -> list[GenericDatasetSource]:
                 gender=gender,
                 weight=weight,
                 sensor=sensor,
+                diabetic=True,
             )
         )
 
@@ -155,26 +161,61 @@ def discover_legacy_generic_sources() -> list[GenericDatasetSource]:
 
 
 def generic_intervention_for_user(user_info: dict[str, Any] | None) -> str:
-    """Study arm: diabetic players get D1NAMO; everyone else gets CGMacros."""
-    if user_info and user_info.get("diabetic") is True:
+    """Format A source policy from diabetes status / type.
+
+    no diabetes / gestational → BIG IDEAs
+    type 1 → D1NAMO
+    type 2 → 50/50 mix
+    prediabetes → 75% BIG IDEAs / 25% D1NAMO
+    LADA → 75% D1NAMO / 25% BIG IDEAs
+    """
+    if not user_info or user_info.get("diabetic") is not True:
+        return GENERIC_INTERVENTION_BIGIDEAS
+    kind = str(user_info.get("diabetic_type") or "").strip().lower()
+    if kind in {"type 1", "type1", "t1"}:
         return GENERIC_INTERVENTION_D1NAMO
-    return GENERIC_INTERVENTION_CGMACROS
+    if kind in {"type 2", "type2", "t2"}:
+        return GENERIC_INTERVENTION_MIX_T2
+    if kind.startswith("prediab"):
+        return GENERIC_INTERVENTION_MIX_PREDIABETES
+    if kind == "lada":
+        return GENERIC_INTERVENTION_MIX_LADA
+    if kind.startswith("gestational"):
+        return GENERIC_INTERVENTION_BIGIDEAS
+    return GENERIC_INTERVENTION_D1NAMO
 
 
-def _cgmacros_generic_sources() -> list[GenericDatasetSource]:
+def intervention_pool_weights(policy: str | None) -> dict[str, float]:
+    """Per-round dataset weights for a stored ``generic_intervention`` policy."""
+    key = str(policy or "").strip().lower()
+    if key == GENERIC_INTERVENTION_D1NAMO:
+        return {GENERIC_INTERVENTION_D1NAMO: 1.0}
+    if key == GENERIC_INTERVENTION_MIX_T2:
+        return {GENERIC_INTERVENTION_BIGIDEAS: 0.5, GENERIC_INTERVENTION_D1NAMO: 0.5}
+    if key == GENERIC_INTERVENTION_MIX_PREDIABETES:
+        return {GENERIC_INTERVENTION_BIGIDEAS: 0.75, GENERIC_INTERVENTION_D1NAMO: 0.25}
+    if key == GENERIC_INTERVENTION_MIX_LADA:
+        return {GENERIC_INTERVENTION_D1NAMO: 0.75, GENERIC_INTERVENTION_BIGIDEAS: 0.25}
+    if key == GENERIC_INTERVENTION_BIGIDEAS:
+        return {GENERIC_INTERVENTION_BIGIDEAS: 1.0}
+    return {GENERIC_INTERVENTION_BIGIDEAS: 1.0, GENERIC_INTERVENTION_D1NAMO: 1.0}
+
+
+def _bigideas_generic_sources() -> list[GenericDatasetSource]:
     sources: list[GenericDatasetSource] = []
-    for cgmacros in discover_cgmacros_sources():
-        if cgmacros.age_years is not None and not _is_adult(cgmacros.age_years):
+    for bigideas in discover_bigideas_sources():
+        if bigideas.age_years is not None and not _is_adult(bigideas.age_years):
             continue
         sources.append(
             GenericDatasetSource(
-                source_name=cgmacros.source_name,
-                csv_path=cgmacros.csv_path,
-                age_years=cgmacros.age_years,
-                gender=cgmacros.gender,
-                weight=cgmacros.weight,
-                sensor=cgmacros.sensor,
-                intervention=GENERIC_INTERVENTION_CGMACROS,
+                source_name=bigideas.source_name,
+                csv_path=bigideas.csv_path,
+                age_years=bigideas.age_years,
+                gender=bigideas.gender,
+                weight=bigideas.weight,
+                sensor=bigideas.sensor,
+                intervention=GENERIC_INTERVENTION_BIGIDEAS,
+                diabetic=False,
             )
         )
     return sources
@@ -194,9 +235,18 @@ def _d1namo_generic_sources() -> list[GenericDatasetSource]:
                 weight=d1namo.weight,
                 sensor=d1namo.sensor,
                 intervention=GENERIC_INTERVENTION_D1NAMO,
+                diabetic=True,
             )
         )
     return sources
+
+
+def _sources_for_pool(pool: str) -> list[GenericDatasetSource]:
+    if pool == GENERIC_INTERVENTION_D1NAMO:
+        return _d1namo_generic_sources()
+    if pool == GENERIC_INTERVENTION_BIGIDEAS:
+        return _bigideas_generic_sources()
+    return []
 
 
 def discover_generic_dataset_sources(
@@ -205,24 +255,19 @@ def discover_generic_dataset_sources(
 ) -> list[GenericDatasetSource]:
     sources: list[GenericDatasetSource] = []
 
-    # Temporarily disabled: generic play uses CGMacros / D1NAMO by diabetic status.
+    # Temporarily disabled: generic play uses BIG IDEAs / D1NAMO by diabetes type.
     # sources.extend(discover_legacy_generic_sources())
 
-    wanted = str(intervention or "").strip().lower()
-    if wanted == GENERIC_INTERVENTION_D1NAMO:
-        sources.extend(_d1namo_generic_sources())
-        if not sources:
-            sources.extend(_cgmacros_generic_sources())
-    elif wanted == GENERIC_INTERVENTION_CGMACROS:
-        sources.extend(_cgmacros_generic_sources())
-        if not sources:
-            sources.extend(_d1namo_generic_sources())
-    else:
-        sources.extend(_cgmacros_generic_sources())
-        sources.extend(_d1namo_generic_sources())
+    weights = intervention_pool_weights(intervention)
+    for pool in (GENERIC_INTERVENTION_BIGIDEAS, GENERIC_INTERVENTION_D1NAMO):
+        if weights.get(pool, 0) > 0:
+            sources.extend(_sources_for_pool(pool))
 
     if not sources:
-        # Boot/CI fallback when neither extract is on disk.
+        for pool in (GENERIC_INTERVENTION_BIGIDEAS, GENERIC_INTERVENTION_D1NAMO):
+            sources.extend(_sources_for_pool(pool))
+
+    if not sources:
         sources.extend(discover_legacy_generic_sources())
 
     return sources
@@ -430,13 +475,37 @@ def pick_unique_generic_window(
     - never reuse the same window content (``slice_key``)
     - never reuse the same source within ±2h of a prior window's timestamps
     """
-    sources = discover_generic_dataset_sources(intervention=intervention)
-    if not sources:
-        raise FileNotFoundError("No generic dataset sources are configured")
+    weights = intervention_pool_weights(intervention)
+    by_pool: dict[str, list[GenericDatasetSource]] = {}
+    for pool, weight in weights.items():
+        if weight <= 0:
+            continue
+        pool_sources = _sources_for_pool(pool)
+        if pool_sources:
+            by_pool[pool] = pool_sources
+    if not by_pool:
+        sources = discover_generic_dataset_sources(intervention=intervention)
+        if not sources:
+            raise FileNotFoundError("No generic dataset sources are configured")
+        source_pool = list(sources)
+        random.shuffle(source_pool)
+    else:
+        names = list(by_pool)
+        chosen_pool = random.choices(
+            names,
+            weights=[weights[name] for name in names],
+            k=1,
+        )[0]
+        source_pool = list(by_pool[chosen_pool])
+        random.shuffle(source_pool)
+        for name in names:
+            if name == chosen_pool:
+                continue
+            extras = list(by_pool[name])
+            random.shuffle(extras)
+            source_pool.extend(extras)
 
     prior = list(history or [])
-    source_pool = list(sources)
-    random.shuffle(source_pool)
     fallback: GenericWindowSelection | None = None
     unique_fallback: GenericWindowSelection | None = None
 

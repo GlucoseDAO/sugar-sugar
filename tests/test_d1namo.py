@@ -6,7 +6,6 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from sugar_sugar.cgmacros import discover_cgmacros_sources
 from sugar_sugar.components.glucose import GlucoseChart, meal_food_bubble_children
 from sugar_sugar.d1namo import (
     d1namo_photo_url,
@@ -22,7 +21,6 @@ from sugar_sugar.d1namo import (
 from sugar_sugar.data import load_glucose_data
 from sugar_sugar.download_d1namo import dataset_is_present, default_dest
 from sugar_sugar.subject_sources import (
-    GENERIC_INTERVENTION_CGMACROS,
     GENERIC_INTERVENTION_D1NAMO,
     discover_generic_dataset_sources,
     generic_intervention_for_user,
@@ -33,7 +31,6 @@ from sugar_sugar.subject_sources import (
 FIXTURE_ROOT = Path(__file__).parent / "testdata" / "d1namo"
 SUBJECT_001 = FIXTURE_ROOT / "001" / "glucose.csv"
 SUBJECT_002 = FIXTURE_ROOT / "002" / "glucose.csv"
-CGMACROS_FIXTURE = Path(__file__).parent / "testdata" / "cgmacros"
 
 
 def test_is_d1namo_path_detects_glucose_and_virtual_name() -> None:
@@ -152,52 +149,26 @@ def test_generic_pipeline_can_resolve_and_load_fixture(monkeypatch: pytest.Monke
     assert photos == ["pictures/meal.jpg"]
 
 
-def test_generic_intervention_follows_diabetic_status() -> None:
-    assert generic_intervention_for_user({"diabetic": True}) == GENERIC_INTERVENTION_D1NAMO
-    assert generic_intervention_for_user({"diabetic": False}) == GENERIC_INTERVENTION_CGMACROS
-    assert generic_intervention_for_user({}) == GENERIC_INTERVENTION_CGMACROS
-    assert generic_intervention_for_user(None) == GENERIC_INTERVENTION_CGMACROS
+def test_generic_intervention_type_1_is_d1namo() -> None:
+    assert generic_intervention_for_user({"diabetic": True, "diabetic_type": "Type 1"}) == (
+        GENERIC_INTERVENTION_D1NAMO
+    )
 
 
-def test_discover_routes_diabetic_to_d1namo_and_others_to_cgmacros(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_discover_routes_type_1_to_d1namo(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "sugar_sugar.subject_sources.discover_d1namo_sources",
         lambda dest=None: discover_d1namo_sources(FIXTURE_ROOT),
     )
     monkeypatch.setattr(
-        "sugar_sugar.subject_sources.discover_cgmacros_sources",
-        lambda dest=None: discover_cgmacros_sources(CGMACROS_FIXTURE),
-    )
-    d1namo_names = {
-        source.source_name
-        for source in discover_generic_dataset_sources(intervention=GENERIC_INTERVENTION_D1NAMO)
-    }
-    cgmacros_names = {
-        source.source_name
-        for source in discover_generic_dataset_sources(intervention=GENERIC_INTERVENTION_CGMACROS)
-    }
-    assert d1namo_names == {"D1NAMO-001.csv", "D1NAMO-002.csv"}
-    assert cgmacros_names == {"CGMacros-001.csv", "CGMacros-002.csv"}
-
-
-def test_d1namo_pool_falls_back_to_cgmacros_when_missing(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(
-        "sugar_sugar.subject_sources.discover_d1namo_sources",
+        "sugar_sugar.subject_sources.discover_bigideas_sources",
         lambda dest=None: [],
-    )
-    monkeypatch.setattr(
-        "sugar_sugar.subject_sources.discover_cgmacros_sources",
-        lambda dest=None: discover_cgmacros_sources(CGMACROS_FIXTURE),
     )
     names = {
         source.source_name
         for source in discover_generic_dataset_sources(intervention=GENERIC_INTERVENTION_D1NAMO)
     }
-    assert names == {"CGMacros-001.csv", "CGMacros-002.csv"}
+    assert names == {"D1NAMO-001.csv", "D1NAMO-002.csv"}
 
 
 def test_meal_bubbles_use_d1namo_photo_url() -> None:

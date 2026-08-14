@@ -1,8 +1,8 @@
 """Import D1NAMO (Dubosson) T1D tables into the app store schema.
 
-This is an in-app formatter, not a library and not ``cgm-format``. CGMacros has
-its own dedicated importer; D1NAMO is the diabetic-arm intervention and is
-parsed here from the published CSVs (glucose / insulin / food + photos).
+This is an in-app formatter, not a library and not ``cgm-format``. D1NAMO is
+the type-1 / insulin-using Format A arm (glucose / insulin / food + photos).
+Non-insulin arms use BIG IDEAs instead.
 
 Download a local copy with ``uv run download-d1namo``.
 Paper: Dubosson et al., Informatics in Medicine Unlocked, 2018.
