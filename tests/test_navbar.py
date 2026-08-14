@@ -56,7 +56,7 @@ def test_navbar_game_always_visible():
 
 def test_navbar_game_active_on_game_flow_pages():
     """Game tab is active on all game-flow pages."""
-    for page in ("/", "/consent-form", "/startup", "/prediction", "/ending", "/final"):
+    for page in ("/", "/consent-form", "/startup", "/prediction", "/ending", "/final", "/profile"):
         navbar = NavBar(locale="en", current_page=page)
         game_item = navbar.children[0]
         assert "active" in game_item.className, f"Game not active on {page}"

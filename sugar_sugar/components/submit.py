@@ -448,6 +448,90 @@ class SubmitComponent(html.Div):
 
         return changed_total
 
+    def backfill_identity_columns(self, user_info: dict[str, Any]) -> int:
+        """Stamp identity fields onto every stats + ranking row for this study_id.
+
+        ``save_statistics`` upserts by ``study_id`` + ``run_id``. A player who
+        started before filling the end-of-game form already has stub rows with
+        empty email/age/gender/location. This walk updates *all* of their rows
+        so the CSVs are complete even if a run_id is no longer in session state.
+        """
+        study_id = str(user_info.get('study_id') or '').strip()
+        if not study_id:
+            return 0
+
+        identity = {
+            'email': user_info.get('email', ''),
+            'age': int(user_info.get('age') or 0),
+            'gender': user_info.get('gender', ''),
+            'location': user_info.get('location', ''),
+        }
+        leaderboard_identity = email_key(user_info.get('email'))
+        leaderboard_nickname = normalize_nickname(user_info.get('nickname'))
+
+        changed = 0
+        stats_path = self._stats_csv_path
+        if stats_path.exists():
+            with stats_path.open('r', newline='', encoding='utf-8', errors='replace') as file_handle:
+                reader = csv.DictReader(file_handle)
+                header = list(reader.fieldnames or [])
+                rows = list(reader)
+            if header:
+                for row in rows:
+                    if str(row.get('study_id') or '') != study_id:
+                        continue
+                    for key, value in identity.items():
+                        if key in header or key in row:
+                            row[key] = value
+                    changed += 1
+                upgraded = list(header)
+                for key in identity:
+                    if key not in upgraded:
+                        upgraded.append(key)
+                tmp_path = stats_path.with_suffix('.tmp')
+                with tmp_path.open('w', newline='', encoding='utf-8') as out_handle:
+                    writer = csv.DictWriter(out_handle, fieldnames=upgraded)
+                    writer.writeheader()
+                    for row in rows:
+                        writer.writerow({column: row.get(column, '') for column in upgraded})
+                tmp_path.replace(stats_path)
+
+        ranking_paths = [self._ranking_csv_path, *self._ranking_by_format_paths.values()]
+        for path in ranking_paths:
+            if not path.exists():
+                continue
+            with path.open('r', newline='', encoding='utf-8', errors='replace') as file_handle:
+                reader = csv.DictReader(file_handle)
+                header = list(reader.fieldnames or [])
+                rows = list(reader)
+            if not header:
+                continue
+            upgraded_header = header + [
+                column for column in ('email_key', 'nickname') if column not in header
+            ]
+            for row in rows:
+                if str(row.get('study_id') or '') != study_id:
+                    continue
+                if leaderboard_identity:
+                    row['email_key'] = leaderboard_identity
+                row['nickname'] = leaderboard_nickname
+                changed += 1
+            tmp_path = path.with_suffix('.tmp')
+            with tmp_path.open('w', newline='', encoding='utf-8') as out_handle:
+                writer = csv.DictWriter(out_handle, fieldnames=upgraded_header)
+                writer.writeheader()
+                for row in rows:
+                    writer.writerow({column: row.get(column, '') for column in upgraded_header})
+            tmp_path.replace(path)
+
+        with start_action(
+            action_type=u"backfill_identity_columns",
+            study_id=study_id,
+            changed=changed,
+        ):
+            pass
+        return changed
+
     def _get_next_number(self) -> int:
         """Get the next number for the prediction statistics."""
         csv_file_path = self._stats_csv_path

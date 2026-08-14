@@ -200,6 +200,7 @@ def _route_flag(
         ("/prediction", None, None, False),
         ("/ending", None, None, False),
         ("/final", None, None, False),
+        ("/profile", None, None, False),
         # ...but non-game routes never depend on the stores.
         ("/", None, None, True),
         ("/startup", None, None, True),
@@ -210,6 +211,7 @@ def _route_flag(
         ("/ending", {"study_id": "a"}, {"time": []}, True),
         ("/prediction", {"study_id": "a"}, None, True),
         ("/final", {"study_id": "a"}, None, True),
+        ("/profile", {"study_id": "a"}, None, True),
     ],
 )
 def test_game_stores_ready(
@@ -222,7 +224,7 @@ def test_game_stores_ready(
 
 
 def test_game_routes_are_the_store_backed_ones() -> None:
-    assert _GAME_ROUTES == frozenset({"/prediction", "/ending", "/final"})
+    assert _GAME_ROUTES == frozenset({"/prediction", "/ending", "/final", "/profile"})
 
 
 @pytest.mark.parametrize(

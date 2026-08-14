@@ -89,8 +89,11 @@ from sugar_sugar.nickname import (
 )
 from sugar_sugar.consent import (
     apply_optional_consent_choices,
+    identity_is_complete,
     reconcile_stored_consents,
+    results_destination,
     should_persist_study_data,
+    stamp_identity_fields,
     upsert_consent_agreement_fields,
 )
 from sugar_sugar.components.glucose import GlucoseChart, meal_food_bubble_children
@@ -98,6 +101,7 @@ from sugar_sugar.components.metrics import MetricsComponent
 from sugar_sugar.components.predictions import PredictionTableComponent
 from sugar_sugar.components.ag_grid import build_readonly_ag_grid, build_readonly_column_defs
 from sugar_sugar.components.startup import StartupPage, StartupPageMobile
+from sugar_sugar.components.profile import create_profile_layout
 from sugar_sugar.components.landing import LandingPage, LandingPageMobile
 from sugar_sugar.components.consent_form import ConsentFormPage
 from sugar_sugar.components.submit import SubmitComponent, hidden_area_is_complete
@@ -2624,7 +2628,7 @@ _STATEFUL_PAGES = frozenset({'/prediction', '/ending'})
 
 # Game routes whose content is rebuilt from localStorage-backed stores, so they
 # cannot be rendered correctly until those stores have hydrated.
-_GAME_ROUTES: frozenset[str] = frozenset({'/prediction', '/ending', '/final'})
+_GAME_ROUTES: frozenset[str] = frozenset({'/prediction', '/ending', '/final', '/profile'})
 
 # How long the restoring placeholder waits for hydration before giving up and
 # routing to landing (ticks of `session-restore-poll`, 250 ms each).
@@ -2814,8 +2818,14 @@ def update_on_language_change(
         staging_layout = _staging_display(pathname, locale=locale, glucose_unit=glucose_unit)
         if staging_layout is not None:
             return staging_layout, warning_content, navbar
+    if pathname == '/profile':
+        if user_info:
+            return create_profile_layout(user_info, locale=locale), warning_content, navbar
+        return no_update, no_update, navbar
     if pathname == '/final':
         if user_info:
+            if not identity_is_complete(user_info):
+                return create_profile_layout(user_info, locale=locale), warning_content, navbar
             return create_final_layout(user_info, glucose_unit, locale=locale), warning_content, navbar
         return no_update, no_update, navbar
     if pathname and pathname.startswith('/share/'):
@@ -3129,6 +3139,27 @@ def display_page(
                     ], style={'textAlign': 'center'})
                 ]), warning_content, navbar
             return create_ending_layout(current_df_data, events_df_data, user_info, glucose_unit, locale=locale), warning_content, navbar
+        if pathname == '/profile':
+            if not user_info:
+                return html.Div([
+                    html.H2(t("ui.session_expired.title", locale=locale), style={'textAlign': 'center', 'marginTop': '50px'}),
+                    html.P(t("ui.session_expired.text", locale=locale), style={'textAlign': 'center', 'marginBottom': '30px'}),
+                    html.Div([
+                        html.A(
+                            t("ui.common.go_to_start", locale=locale),
+                            href="/",
+                            style={
+                                'backgroundColor': '#007bff',
+                                'color': 'white',
+                                'padding': '15px 30px',
+                                'textDecoration': 'none',
+                                'borderRadius': '5px',
+                                'fontSize': '18px'
+                            }
+                        )
+                    ], style={'textAlign': 'center'})
+                ]), warning_content, navbar
+            return create_profile_layout(user_info, locale=locale), warning_content, navbar
         if pathname == '/final':
             if not user_info:
                 return html.Div([
@@ -3149,6 +3180,8 @@ def display_page(
                         )
                     ], style={'textAlign': 'center'})
                 ]), warning_content, navbar
+            if not identity_is_complete(user_info):
+                return create_profile_layout(user_info, locale=locale), warning_content, navbar
             return create_final_layout(user_info, glucose_unit, locale=locale), warning_content, navbar
         if pathname and pathname.startswith('/share/'):
             share_id = pathname.split('/share/', 1)[1].strip('/').split('/', 1)[0]
@@ -5798,27 +5831,21 @@ def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) ->
      Output('initial-slider-value', 'data', allow_duplicate=True),
      Output('randomization-initialized', 'data', allow_duplicate=True)],
     [Input('start-button', 'n_clicks')],
-    [State('nickname-input', 'value'),
-     State('email-input', 'value'),
-     State('age-input', 'value'),
-     State('gender-dropdown', 'value'),
-     State('cgm-dropdown', 'value'),
+    [State('cgm-dropdown', 'value'),
      State('cgm-duration-input', 'value'),
      State('format-dropdown', 'value'),
      State('data-usage-consent', 'value'),
      State('diabetic-dropdown', 'value'),
      State('diabetic-type-dropdown', 'value'),
      State('diabetes-duration-input', 'value'),
-     State('location-input', 'value'),
      State('user-info-store', 'data')],
     prevent_initial_call=True
 )
-def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
-                       email: Optional[str], age: Optional[int | float],
-                       gender: Optional[str], uses_cgm: Optional[bool], cgm_duration_years: Optional[float],
+def handle_start_button(n_clicks: Optional[int],
+                       uses_cgm: Optional[bool], cgm_duration_years: Optional[float],
                        format_value: Optional[str], data_usage_consent: Optional[list[str]],
                        diabetic: Optional[bool], diabetic_type: Optional[str],
-                       diabetes_duration: Optional[float], location: Optional[str],
+                       diabetes_duration: Optional[float],
                        existing_user_info: Optional[Dict[str, Any]] = None) -> tuple[Any, ...]:
     """Handle start button on startup page.
 
@@ -5836,35 +5863,34 @@ def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
         return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
 
     from sugar_sugar.components.startup import (
-        _wants_contact_from_user_info,
         prior_upload_data_consent,
         stamp_upload_data_consent,
         validate_startup_form,
     )
 
-    wants_contact = _wants_contact_from_user_info(existing_user_info)
     already_upload_consent = prior_upload_data_consent(existing_user_info)
     validation = validate_startup_form(
-        email=email,
-        age=age,
-        gender=gender,
+        email=None,
+        age=None,
+        gender=None,
         format_value=format_value,
         data_usage_consent=data_usage_consent,
         is_diabetic=diabetic,
         diabetic_type=diabetic_type,
         diabetes_duration=diabetes_duration,
-        location=location,
+        location=None,
         uses_cgm=uses_cgm,
         cgm_duration=cgm_duration_years,
-        wants_contact=wants_contact,
+        wants_contact=False,
         locale=None,
         prior_upload_consent=already_upload_consent,
+        stage="play",
     )
     _start_idle = (no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update)
     if not validation.form_complete:
         return _start_idle
 
-    if age and gender and diabetic is not None and location and format_value:
+    if diabetic is not None and format_value:
         from datetime import datetime
         from sugar_sugar.consent import ensure_consent_agreement_row, get_next_study_number
 
@@ -5882,11 +5908,12 @@ def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
             'run_id': run_id,
             # Stable cross-device resume code (server-side savegame key).
             'resume_code': info.get('resume_code') or resume_store.new_code(),
-            'email': email or info.get('email') or '',
-            # Optional public leaderboard label -- display only, never study data.
-            'nickname': normalize_nickname(nickname) or info.get('nickname') or '',
-            'age': age,
-            'gender': gender,
+            # Identity is collected on /profile after exit/finish. Keep the
+            # columns present so every CSV write has a complete schema.
+            'email': info.get('email') or '',
+            'nickname': normalize_nickname(info.get('nickname')) or '',
+            'age': info.get('age') or '',
+            'gender': info.get('gender') or '',
             'uses_cgm': uses_cgm_bool,
             'cgm_duration_years': cgm_duration_years,
             'format': format_value,
@@ -5902,7 +5929,8 @@ def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
             'generic_intervention': generic_intervention_for_user(
                 {'diabetic': diabetic}
             ),
-            'location': location,
+            'location': info.get('location') or '',
+            'identity_completed': bool(info.get('identity_completed')),
             'rounds': info.get('rounds') or [],
             'max_rounds': int(info.get('max_rounds') or MAX_ROUNDS),
             'current_round_number': int(info.get('current_round_number') or 1),
@@ -6379,7 +6407,10 @@ def handle_finish_study_from_prediction(
     if show_this_round:
         return "/ending", info, {"hide_last_hour": False}, "/ending"
     if rounds:
-        return "/final", info, {"hide_last_hour": False}, "/final"
+        dest = results_destination(info)
+        return dest, info, {"hide_last_hour": False}, dest
+    if not identity_is_complete(info):
+        return "/profile", info, {"hide_last_hour": True}, "/profile"
     return "/", info, {"hide_last_hour": True}, None
 
 
@@ -6406,15 +6437,372 @@ def handle_finish_study_from_ending(
         return '/final', None, {'hide_last_hour': True}
 
     rounds: list[dict[str, Any]] = user_info.get('rounds') or []
-    if not rounds:
-        return '/final', user_info, {'hide_last_hour': True}
-
-    if should_persist_study_data(user_info):
+    if should_persist_study_data(user_info) and rounds:
         with start_action(action_type=u"handle_finish_study_from_ending"):
             submit_component.save_statistics(user_info)
             user_info['statistics_saved'] = True
 
-    return '/final', user_info, {'hide_last_hour': False}
+    dest = results_destination(user_info)
+    return dest, user_info, {'hide_last_hour': False}
+
+
+def _persist_profile_identity(
+    user_info: Optional[Dict[str, Any]],
+    *,
+    nickname: Optional[str],
+    email: Optional[str],
+    age: Optional[int | float],
+    gender: Optional[str],
+    location: Optional[str],
+    receive_results_value: Optional[list[str]],
+    keep_updated_value: Optional[list[str]],
+    locale: Optional[str],
+) -> tuple[Optional[Dict[str, Any]], Any]:
+    """Validate identity, stamp user_info, and complete every CSV row.
+
+    Returns ``(info, None)`` on success or ``(None, hint)`` when the form is incomplete.
+    """
+    from sugar_sugar.components.startup import validate_startup_form
+
+    receive_results = bool(receive_results_value and "receive_results" in receive_results_value)
+    keep_updated = bool(keep_updated_value and "keep_updated" in keep_updated_value)
+    wants_contact = receive_results or keep_updated
+    info: Dict[str, Any] = dict(user_info or {})
+    validation = validate_startup_form(
+        email=email,
+        age=age,
+        gender=gender,
+        format_value=str(info.get("format") or "A"),
+        data_usage_consent=["agree"],
+        is_diabetic=info.get("diabetic"),
+        diabetic_type=info.get("diabetic_type"),
+        diabetes_duration=info.get("diabetes_duration"),
+        location=location,
+        uses_cgm=info.get("uses_cgm"),
+        cgm_duration=info.get("cgm_duration_years"),
+        wants_contact=wants_contact,
+        locale=locale,
+        stage="identity",
+    )
+    if not validation.form_complete:
+        return None, validation.hint_children()
+
+    stamp_identity_fields(
+        info,
+        nickname=nickname,
+        email=email,
+        age=age,
+        gender=gender,
+        location=location,
+        receive_results=receive_results,
+        keep_updated=keep_updated,
+    )
+    study_id = str(info.get("study_id") or "")
+    if study_id:
+        upsert_consent_agreement_fields(
+            study_id,
+            {
+                "receive_results_later": receive_results,
+                "keep_up_to_date": keep_updated,
+                "no_selection": bool(info.get("consent_no_selection", True)),
+                "upload_own_data": bool(info.get("consent_upload_own_data", False)),
+            },
+        )
+    if should_persist_study_data(info):
+        submit_component.save_statistics(info)
+        submit_component.backfill_identity_columns(info)
+        info["statistics_saved"] = True
+    return info, None
+
+
+@app.callback(
+    [Output('profile-submit-button', 'disabled'),
+     Output('profile-submit-button', 'style'),
+     Output('email-required', 'style'),
+     Output('age-required', 'style'),
+     Output('gender-required', 'style'),
+     Output('location-required', 'style'),
+     Output('age-error', 'children'),
+     Output('profile-duration-error', 'children'),
+     Output('profile-missing-fields', 'children')],
+    [Input('email-input', 'value'),
+     Input('age-input', 'value'),
+     Input('gender-dropdown', 'value'),
+     Input('location-input', 'value'),
+     Input('profile-receive-results', 'value'),
+     Input('profile-keep-updated', 'value'),
+     Input('user-info-store', 'data'),
+     Input('interface-language', 'data')],
+    prevent_initial_call=False,
+)
+def update_profile_form_validation(
+    email: Optional[str],
+    age: Optional[int | float],
+    gender: Optional[str],
+    location: Optional[str],
+    receive_results_value: Optional[list[str]],
+    keep_updated_value: Optional[list[str]],
+    user_info: Optional[Dict[str, Any]],
+    interface_language: Optional[str],
+) -> tuple[Any, ...]:
+    from sugar_sugar.components.startup import validate_startup_form
+
+    hidden_style = {'display': 'none'}
+    required_style = {'color': '#d32f2f', 'fontSize': '22px', 'fontWeight': 'bold'}
+    wants_contact = bool(
+        (receive_results_value and "receive_results" in receive_results_value)
+        or (keep_updated_value and "keep_updated" in keep_updated_value)
+    )
+    info: Dict[str, Any] = dict(user_info or {})
+    validation = validate_startup_form(
+        email=email,
+        age=age,
+        gender=gender,
+        format_value=str(info.get("format") or "A"),
+        data_usage_consent=["agree"],
+        is_diabetic=info.get("diabetic"),
+        diabetic_type=info.get("diabetic_type"),
+        diabetes_duration=info.get("diabetes_duration"),
+        location=location,
+        uses_cgm=info.get("uses_cgm"),
+        cgm_duration=info.get("cgm_duration_years"),
+        wants_contact=wants_contact,
+        locale=interface_language,
+        stage="identity",
+    )
+    duration_error = validation.diabetes_duration_error or validation.cgm_duration_error
+    ready_style = {
+        'backgroundColor': '#4CBB17',
+        'color': 'white',
+        'padding': '18px 30px',
+        'border': 'none',
+        'borderRadius': '8px',
+        'fontSize': '22px',
+        'cursor': 'pointer',
+        'width': '100%',
+        'marginTop': '8px',
+    }
+    blocked_style = {**ready_style, 'backgroundColor': '#cccccc', 'cursor': 'not-allowed'}
+    return (
+        not validation.form_complete,
+        ready_style if validation.form_complete else blocked_style,
+        hidden_style if (not wants_contact or email) else required_style,
+        hidden_style if age else required_style,
+        hidden_style if gender else required_style,
+        hidden_style if location else required_style,
+        validation.age_error,
+        duration_error,
+        validation.hint_children(),
+    )
+
+
+@app.callback(
+    [Output('url', 'pathname', allow_duplicate=True),
+     Output('user-info-store', 'data', allow_duplicate=True),
+     Output('last-visited-page', 'data', allow_duplicate=True),
+     Output('profile-missing-fields', 'children', allow_duplicate=True)],
+    Input('profile-submit-button', 'n_clicks'),
+    [State('nickname-input', 'value'),
+     State('email-input', 'value'),
+     State('age-input', 'value'),
+     State('gender-dropdown', 'value'),
+     State('location-input', 'value'),
+     State('profile-receive-results', 'value'),
+     State('profile-keep-updated', 'value'),
+     State('user-info-store', 'data'),
+     State('interface-language', 'data')],
+    prevent_initial_call=True,
+)
+def handle_profile_submit(
+    n_clicks: Optional[int],
+    nickname: Optional[str],
+    email: Optional[str],
+    age: Optional[int | float],
+    gender: Optional[str],
+    location: Optional[str],
+    receive_results_value: Optional[list[str]],
+    keep_updated_value: Optional[list[str]],
+    user_info: Optional[Dict[str, Any]],
+    interface_language: Optional[str],
+) -> tuple[Any, ...]:
+    if not n_clicks:
+        raise PreventUpdate
+    info, hint = _persist_profile_identity(
+        user_info,
+        nickname=nickname,
+        email=email,
+        age=age,
+        gender=gender,
+        location=location,
+        receive_results_value=receive_results_value,
+        keep_updated_value=keep_updated_value,
+        locale=interface_language,
+    )
+    if info is None:
+        return no_update, no_update, no_update, hint
+    rounds = info.get("rounds") or []
+    archived = any(runs for runs in (info.get("runs_by_format") or {}).values())
+    dest = "/final" if (rounds or archived) else "/"
+    return dest, info, dest if dest != "/" else None, ""
+
+
+@app.callback(
+    [Output('url', 'pathname', allow_duplicate=True),
+     Output('user-info-store', 'data', allow_duplicate=True),
+     Output('glucose-chart-mode', 'data', allow_duplicate=True),
+     Output('current-window-df', 'data', allow_duplicate=True),
+     Output('events-df', 'data', allow_duplicate=True),
+     Output('is-example-data', 'data', allow_duplicate=True),
+     Output('data-source-name', 'data', allow_duplicate=True),
+     Output('randomization-initialized', 'data', allow_duplicate=True),
+     Output('initial-slider-value', 'data', allow_duplicate=True),
+     Output('profile-switch-format-error', 'children'),
+     Output('profile-missing-fields', 'children', allow_duplicate=True)],
+    [Input('profile-switch-format-a', 'n_clicks'),
+     Input('profile-switch-format-b', 'n_clicks'),
+     Input('profile-switch-format-c', 'n_clicks')],
+    [State('nickname-input', 'value'),
+     State('email-input', 'value'),
+     State('age-input', 'value'),
+     State('gender-dropdown', 'value'),
+     State('location-input', 'value'),
+     State('profile-receive-results', 'value'),
+     State('profile-keep-updated', 'value'),
+     State('user-info-store', 'data'),
+     State('interface-language', 'data')],
+    prevent_initial_call=True,
+)
+def handle_profile_switch_format(
+    n_a: Optional[int],
+    n_b: Optional[int],
+    n_c: Optional[int],
+    nickname: Optional[str],
+    email: Optional[str],
+    age: Optional[int | float],
+    gender: Optional[str],
+    location: Optional[str],
+    receive_results_value: Optional[list[str]],
+    keep_updated_value: Optional[list[str]],
+    user_info: Optional[Dict[str, Any]],
+    interface_language: Optional[str],
+) -> tuple[Any, ...]:
+    triggered = ctx.triggered_id
+    if triggered not in (
+        'profile-switch-format-a',
+        'profile-switch-format-b',
+        'profile-switch-format-c',
+    ):
+        raise PreventUpdate
+    clicks = {
+        'profile-switch-format-a': n_a,
+        'profile-switch-format-b': n_b,
+        'profile-switch-format-c': n_c,
+    }[triggered]
+    if not clicks:
+        raise PreventUpdate
+
+    locale = normalize_locale(interface_language)
+    info, hint = _persist_profile_identity(
+        user_info,
+        nickname=nickname,
+        email=email,
+        age=age,
+        gender=gender,
+        location=location,
+        receive_results_value=receive_results_value,
+        keep_updated_value=keep_updated_value,
+        locale=locale,
+    )
+    idle = (
+        no_update, no_update, no_update, no_update, no_update,
+        no_update, no_update, no_update, no_update, no_update, hint,
+    )
+    if info is None:
+        return idle
+
+    target_format = {
+        'profile-switch-format-a': 'A',
+        'profile-switch-format-b': 'B',
+        'profile-switch-format-c': 'C',
+    }[triggered]
+    if target_format in ("B", "C") and not bool(info.get("uses_cgm", False)):
+        return (
+            no_update, no_update, no_update, no_update, no_update,
+            no_update, no_update, no_update, no_update,
+            dbc.Alert(t("ui.switch_format.not_eligible_no_cgm", locale=locale), color="warning"),
+            "",
+        )
+
+    from sugar_sugar.components.startup import stamp_upload_data_consent
+
+    current_fmt = str(info.get("format") or "")
+    rounds_now = info.get("rounds") or []
+    if current_fmt and rounds_now:
+        runs_by_format: Dict[str, list[Dict[str, Any]]] = dict(info.get("runs_by_format") or {})
+        runs_list = list(runs_by_format.get(current_fmt) or [])
+        runs_list.append(
+            {
+                "run_id": str(uuid.uuid4()),
+                "format": current_fmt,
+                "active_run_id": str(info.get("run_id") or ""),
+                "ended_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "rounds": rounds_now,
+                "rounds_played": int(len(rounds_now)),
+                "uses_cgm": bool(info.get("uses_cgm", False)),
+                "consent_use_uploaded_data": bool(info.get("consent_use_uploaded_data", False)),
+                "is_example_data": bool(info.get("is_example_data", True)),
+                "data_source_name": str(info.get("data_source_name") or ""),
+            }
+        )
+        runs_by_format[current_fmt] = runs_list
+        info["runs_by_format"] = runs_by_format
+
+    stamp_upload_data_consent(info)
+    info["format"] = target_format
+    info["run_id"] = str(uuid.uuid4())
+    info["run_format"] = target_format
+    info["rounds"] = []
+    info["current_round_number"] = 1
+    info["last_submit_round_number"] = 0
+    info["last_submit_n_clicks"] = 0
+    info["prediction_table_data"] = None
+    info["prediction_window_start"] = None
+    info["prediction_window_size"] = None
+    info["statistics_saved"] = False
+
+    chart_mode = {'hide_last_hour': True}
+    points = int(info.get("prediction_window_size") or DEFAULT_POINTS)
+    points = max(MIN_POINTS, min(MAX_POINTS, points))
+    uploaded_path = info.get("uploaded_data_path")
+
+    if target_format == "A":
+        new_df, events_df, source_name, random_start = _apply_generic_round_selection(info, [], points)
+        new_df = new_df.with_columns(pl.lit(0.0).alias("prediction"))
+        info["is_example_data"] = True
+        info["data_source_name"] = source_name
+        return (
+            "/prediction", info, chart_mode, convert_df_to_dict(new_df),
+            events_store_for_window(events_df, new_df), True, source_name,
+            False, random_start, None, "",
+        )
+    if target_format in ("B", "C") and uploaded_path:
+        full_df, events_df = load_glucose_data(Path(str(uploaded_path)))
+        full_df = full_df.with_columns(pl.lit(0.0).alias("prediction"))
+        new_df, random_start = get_random_data_window(full_df, points)
+        new_df = new_df.with_columns(pl.lit(0.0).alias("prediction"))
+        source_name = str(info.get("uploaded_data_filename") or info.get("data_source_name") or "uploaded.csv")
+        info["is_example_data"] = False
+        info["data_source_name"] = source_name
+        return (
+            "/prediction", info, chart_mode, convert_df_to_dict(new_df),
+            events_store_for_window(events_df, new_df), False, source_name,
+            False, random_start, None, "",
+        )
+    info["is_example_data"] = False
+    info["data_source_name"] = ""
+    return (
+        "/prediction", info, chart_mode, None, None, False, "", False, 0, None, "",
+    )
 
 
 @app.callback(
@@ -6946,7 +7334,7 @@ app.clientside_callback(
             window._lastConsentScrollRequest = 0;
         }
 
-        if (pathname === '/ending' || pathname === '/final' || pathname === '/startup' || pathname === '/prediction') {
+        if (pathname === '/ending' || pathname === '/final' || pathname === '/startup' || pathname === '/prediction' || pathname === '/profile') {
             window.scrollTo(0, 0);
             return '';
         }
@@ -7012,7 +7400,7 @@ app.clientside_callback(
         // This ensures clicking the "Game" navbar link (href="/") does not
         // overwrite the stored last-game-page, so the redirect-back callback
         // can return the user to their in-progress game.
-        var persistable = ["/startup", "/prediction", "/ending", "/final"];
+        var persistable = ["/startup", "/prediction", "/ending", "/final", "/profile"];
         if (persistable.indexOf(pathname) !== -1) {
             return [pathname, true];
         }
@@ -7084,7 +7472,7 @@ def restore_page_on_load(
     if pathname and pathname != "/":
         return no_update, True, no_update, True
 
-    if last_page in ("/prediction", "/ending", "/final") and not user_info:
+    if last_page in ("/prediction", "/ending", "/final", "/profile") and not user_info:
         raise PreventUpdate
     if last_page == "/ending" and not current_df_data:
         raise PreventUpdate
@@ -7111,9 +7499,13 @@ def restore_page_on_load(
             elif user_info:
                 target = "/prediction"
 
+        elif last_page == "/profile":
+            if user_info:
+                target = "/profile"
+
         elif last_page == "/final":
             if user_info:
-                target = "/final"
+                target = results_destination(user_info)
 
         if target is None:
             action.log(message_type="no_restorable_target", last_page=last_page)
@@ -7243,7 +7635,10 @@ def redirect_landing_to_game(
         raise PreventUpdate
 
     if last_page == "/final":
-        return "/final" if user_info else "/prediction"
+        return results_destination(user_info) if user_info else "/prediction"
+
+    if last_page == "/profile":
+        return "/profile" if user_info else "/prediction"
 
     if last_page in ("/startup", "/prediction"):
         return last_page

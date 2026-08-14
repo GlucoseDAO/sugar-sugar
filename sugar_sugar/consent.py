@@ -68,6 +68,63 @@ def reconcile_stored_consents(user_info: dict[str, Any]) -> dict[str, Any]:
     )
 
 
+def identity_is_complete(user_info: Optional[dict[str, Any]]) -> bool:
+    """True when nickname/email/age/gender/location have already been collected.
+
+    New sessions collect these on ``/profile`` after the player exits or
+    finishes. Older sessions (and staging/chart synthetics) filled them on
+    ``/startup``; treat those as complete so they are not asked again.
+    """
+    if not user_info:
+        return False
+    if user_info.get("identity_completed"):
+        return True
+    age = user_info.get("age")
+    try:
+        age_ok = age is not None and str(age).strip() != "" and float(age) >= 18
+    except (TypeError, ValueError):
+        age_ok = False
+    return bool(age_ok and user_info.get("gender") and user_info.get("location"))
+
+
+def stamp_identity_fields(
+    info: dict[str, Any],
+    *,
+    nickname: Optional[str],
+    email: Optional[str],
+    age: Optional[int | float],
+    gender: Optional[str],
+    location: Optional[str],
+    receive_results: bool,
+    keep_updated: bool,
+) -> dict[str, Any]:
+    """Write end-of-game identity + email-pref fields onto ``info``."""
+    from sugar_sugar.nickname import normalize_nickname
+
+    info["nickname"] = normalize_nickname(nickname) or info.get("nickname") or ""
+    info["email"] = (str(email).strip() if email else "") or info.get("email") or ""
+    info["age"] = age
+    info["gender"] = gender or ""
+    info["location"] = location or ""
+    apply_optional_consent_choices(
+        info,
+        receive_results=receive_results,
+        keep_updated=keep_updated,
+        upload_own_data=bool(
+            info.get("consent_upload_own_data") or info.get("consent_use_uploaded_data")
+        ),
+    )
+    info["identity_completed"] = True
+    return info
+
+
+def results_destination(user_info: Optional[dict[str, Any]]) -> str:
+    """``/profile`` until identity is in, then ``/final``."""
+    if identity_is_complete(user_info):
+        return "/final"
+    return "/profile"
+
+
 def should_persist_study_data(user_info: Optional[dict[str, Any]]) -> bool:
     """True when this session should write (or update) stats + ranking CSVs.
 

@@ -70,7 +70,7 @@ def test_initialize_data_keeps_matching_own_data_window() -> None:
     assert result[0] is no_update
 
 
-@pytest.mark.parametrize("last_page", ["/final", "/startup", "/prediction", "/ending"])
+@pytest.mark.parametrize("last_page", ["/final", "/startup", "/prediction", "/ending", "/profile"])
 def test_redirect_does_not_bounce_a_cleared_session(last_page: str) -> None:
     with pytest.raises(PreventUpdate):
         redirect_landing_to_game("/", last_page, None, None)

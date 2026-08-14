@@ -9,7 +9,6 @@ from sugar_sugar.components.landing import consent_controls_children
 from sugar_sugar.components.submit import _is_mobile_ua
 from sugar_sugar.i18n import t
 from sugar_sugar.config import STORAGE_TYPE
-from sugar_sugar.nickname import MAX_NICKNAME_LENGTH
 from flask import has_request_context, request as flask_request
 
 MAX_AGE: int = 130
@@ -255,17 +254,27 @@ def validate_startup_form(
     locale: Optional[str],
     wizard_step: Optional[int] = None,
     prior_upload_consent: bool = False,
+    stage: Optional[str] = None,
 ) -> StartupValidationResult:
-    """Validate startup fields for a wizard step (0-5) or the full form (``wizard_step=None``)."""
-    age_error, age_in_range = _age_field_errors(age, locale)
+    """Validate play fields (``/startup``) and/or identity fields (``/profile``).
+
+    ``stage="play"`` — diabetes, CGM, format (asked after consent).
+    ``stage="identity"`` — nickname/email/age/gender/location (asked before results).
+    ``stage=None`` — both, used by tests and any leftover full-form callers.
+
+    Mobile wizard steps after the split: 1 diabetes, 2 CGM, 3 format.
+    """
+    check_identity = stage != "play"
+    check_play = stage != "identity"
+    age_error, age_in_range = _age_field_errors(age, locale) if check_identity else ("", True)
     diabetes_duration_error = (
         t("ui.startup.diabetes_duration_exceeds_age_error", locale=locale)
-        if _duration_exceeds_age(diabetes_duration, age)
+        if check_identity and _duration_exceeds_age(diabetes_duration, age)
         else ""
     )
     cgm_duration_error = (
         t("ui.startup.cgm_duration_exceeds_age_error", locale=locale)
-        if uses_cgm is True and _duration_exceeds_age(cgm_duration, age)
+        if check_identity and uses_cgm is True and _duration_exceeds_age(cgm_duration, age)
         else ""
     )
 
@@ -318,45 +327,60 @@ def validate_startup_form(
             missing.append("ui.startup.data_usage_consent_label")
 
     if wizard_step is None:
-        _identity_missing()
-        _cgm_missing()
-        _diabetes_missing()
-        _format_missing()
+        if check_identity:
+            _identity_missing()
+        if check_play:
+            _cgm_missing()
+            _diabetes_missing()
+            _format_missing()
     elif wizard_step == 1:
-        _identity_missing()
+        _diabetes_missing()
     elif wizard_step == 2:
         _cgm_missing()
     elif wizard_step == 3:
-        _diabetes_missing()
-    elif wizard_step == 4:
         _format_missing()
 
     step_range_ok = True
-    if wizard_step in (None, 1):
+    if wizard_step is None and check_identity:
         step_range_ok = step_range_ok and age_in_range and not age_error
-    if wizard_step in (None, 2) and uses_cgm is True:
+    if wizard_step in (None, 2) and uses_cgm is True and check_identity:
         step_range_ok = step_range_ok and not cgm_duration_error
-    if wizard_step in (None, 3) and is_diabetic:
+    if wizard_step in (None, 1) and is_diabetic and check_identity:
         step_range_ok = step_range_ok and not diabetes_duration_error
 
     step_complete = not missing and step_range_ok
-    if wizard_step == 4:
+    if wizard_step == 3:
         step_complete = step_complete and not data_usage_error
 
     is_adult = (age is not None) and (float(age) >= MIN_AGE) and (float(age) <= MAX_AGE)
-    form_complete = (
-        not missing
-        and is_adult
-        and not has_range_errors
-        and format_value
+    play_complete = (
+        format_value
         and is_diabetic is not None
-        and location
-        and (email if wants_contact else True)
         and uses_cgm is not None
         and (not uses_cgm or cgm_duration is not None)
         and (not is_diabetic or (diabetic_type and diabetes_duration is not None))
         and (not needs_data_consent or has_data_consent)
     )
+    identity_complete = (
+        is_adult
+        and not age_error
+        and bool(gender)
+        and bool(location)
+        and (email if wants_contact else True)
+        and not diabetes_duration_error
+        and not cgm_duration_error
+    )
+    if stage == "play":
+        form_complete = bool(not missing and play_complete)
+    elif stage == "identity":
+        form_complete = bool(not missing and identity_complete and not has_range_errors)
+    else:
+        form_complete = bool(
+            not missing
+            and play_complete
+            and identity_complete
+            and not has_range_errors
+        )
 
     return StartupValidationResult(
         age_error=age_error,
@@ -389,7 +413,7 @@ def _step_hint_children(
     current_step: int,
     prior_upload_consent: bool = False,
 ) -> Any:
-    if 1 <= current_step <= 4:
+    if 1 <= current_step <= 3:
         return validate_startup_form(
             email=email,
             age=age,
@@ -406,6 +430,7 @@ def _step_hint_children(
             locale=locale,
             wizard_step=current_step,
             prior_upload_consent=prior_upload_consent,
+            stage="play",
         ).hint_children()
     if current_step == 0:
         return ""
@@ -424,6 +449,7 @@ def _step_hint_children(
         wants_contact=wants_contact,
         prior_upload_consent=prior_upload_consent,
         locale=locale,
+        stage="play",
     ).hint_children()
 
 
@@ -494,75 +520,57 @@ class StartupPage(html.Div):
                     html.Div([
                         html.P(t("ui.startup.required_fields_note", locale=locale), style={'color': '#666', 'fontSize': '16px', 'fontStyle': 'italic', 'marginBottom': '20px', 'textAlign': 'right'})
                     ]),
-                    
-                    # Optional public leaderboard label. No asterisk, and deliberately
-                    # not an Input of update_form_validation -- it never gates Start.
-                    html.Div([
-                        html.Label(t("ui.startup.nickname_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a', 'display': 'inline-block'}),
-                    ], style={'marginBottom': '10px'}),
-                    dcc.Input(
-                        id='nickname-input',
-                        type='text',
-                        maxLength=MAX_NICKNAME_LENGTH,
-                        placeholder=t("ui.startup.nickname_placeholder", locale=locale),
-                        persistence=True,
-                        persistence_type=STORAGE_TYPE,
-                        style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '6px'}
-                    ),
-                    html.Small(
-                        t("ui.startup.nickname_hint", locale=locale),
-                        style={'color': '#666', 'fontSize': '15px', 'display': 'block', 'marginBottom': '20px'}
-                    ),
 
                     html.Div([
-                        html.Label(t("ui.startup.email_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a', 'display': 'inline-block'}),
-                        html.Span(id='email-required', children=' *', style={'color': '#d32f2f', 'fontSize': '22px', 'fontWeight': 'bold'})
-                    ], style={'marginBottom': '10px'}),
-                    dcc.Input(
-                        id='email-input',
-                        type='email',
-                        placeholder=t("ui.startup.email_placeholder", locale=locale),
-                        persistence=True,
-                        persistence_type=STORAGE_TYPE,
-                        style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
-                    ),
-                    
-                    html.Div([
-                        html.Label(t("ui.startup.age_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a', 'display': 'inline-block'}),
-                        html.Span(id='age-required', children=' *', style={'color': '#d32f2f', 'fontSize': '22px', 'fontWeight': 'bold'})
-                    ], style={'marginBottom': '10px'}),
-                    dcc.Input(
-                        id='age-input',
-                        type='number',
-                        placeholder=t("ui.startup.age_placeholder", locale=locale),
-                        min=0,
-                        max=130,
-                        persistence=True,
-                        persistence_type=STORAGE_TYPE,
-                        style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '20px'}
-                    ),
-                    html.Div(
-                        id='age-error',
-                        children='',
-                        style={'color': '#d32f2f', 'fontSize': '16px', 'marginTop': '-12px', 'marginBottom': '20px'}
-                    ),
-                    
-                    html.Div([
-                        html.Label(t("ui.startup.gender_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a', 'display': 'inline-block'}),
-                        html.Span(id='gender-required', children=' *', style={'color': '#d32f2f', 'fontSize': '22px', 'fontWeight': 'bold'})
+                        html.Label(t("ui.startup.diabetic_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a', 'display': 'inline-block'}),
+                        html.Span(id='diabetic-required', children=' *', style={'color': '#d32f2f', 'fontSize': '22px', 'fontWeight': 'bold'})
                     ], style={'marginBottom': '10px'}),
                     dcc.Dropdown(
-                        id='gender-dropdown',
+                        id='diabetic-dropdown',
                         options=[
-                            {'label': t("ui.startup.gender_male", locale=locale), 'value': 'M'},
-                            {'label': t("ui.startup.gender_female", locale=locale), 'value': 'F'},
-                            {'label': t("ui.startup.gender_na", locale=locale), 'value': 'N/A'}
+                            {'label': t("ui.startup.yes", locale=locale), 'value': True},
+                            {'label': t("ui.startup.no", locale=locale), 'value': False}
                         ],
-                        placeholder=t("ui.startup.gender_placeholder", locale=locale),
+                        placeholder=t("ui.startup.diabetic_placeholder", locale=locale),
                         persistence=True,
                         persistence_type=STORAGE_TYPE,
                         style={'fontSize': '20px', 'marginBottom': '20px'}
                     ),
+
+                    html.Div(id='diabetic-details', style={'display': 'none'}, children=[
+                        html.Div([
+                            html.Label(t("ui.startup.diabetes_type_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a', 'display': 'inline-block'}),
+                            html.Span(id='diabetic-type-required', children=' *', style={'color': '#d32f2f', 'fontSize': '22px', 'fontWeight': 'bold'})
+                        ], style={'marginBottom': '10px'}),
+                        dcc.Dropdown(
+                            id='diabetic-type-dropdown',
+                            options=diabetes_type_dropdown_options(locale),
+                            placeholder=t("ui.startup.diabetes_type_placeholder", locale=locale),
+                            persistence=True,
+                            persistence_type=STORAGE_TYPE,
+                            style={'fontSize': '20px', 'marginBottom': '20px'}
+                        ),
+
+                        html.Div([
+                            html.Label(t("ui.startup.diabetes_duration_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a', 'display': 'inline-block'}),
+                            html.Span(id='diabetes-duration-required', children=' *', style={'color': '#d32f2f', 'fontSize': '22px', 'fontWeight': 'bold'})
+                        ], style={'marginBottom': '10px'}),
+                        dcc.Input(
+                            id='diabetes-duration-input',
+                            type='number',
+                            placeholder=t("ui.startup.diabetes_duration_placeholder", locale=locale),
+                            min=0,
+                            max=130,
+                            persistence=True,
+                            persistence_type=STORAGE_TYPE,
+                            style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '8px'}
+                        ),
+                        html.Div(
+                            id='diabetes-duration-error',
+                            children='',
+                            style={'color': '#d32f2f', 'fontSize': '16px', 'marginBottom': '20px'}
+                        )
+                    ]),
 
                     html.Label(t("ui.startup.cgm_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a'}),
                     dcc.Dropdown(
@@ -577,7 +585,7 @@ class StartupPage(html.Div):
                         style={'fontSize': '20px', 'marginBottom': '20px'}
                     ),
 
-                    html.Div(id='cgm-details', children=[
+                    html.Div(id='cgm-details', style={'display': 'none'}, children=[
                         html.Label(t("ui.startup.cgm_duration_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a'}),
                         dcc.Input(
                             id='cgm-duration-input',
@@ -640,89 +648,7 @@ class StartupPage(html.Div):
                             style={'display': 'none', 'marginBottom': '20px'}
                         ),
                     ], style={'marginBottom': '10px'}),
-                    
-                    html.Div([
-                        html.Label(t("ui.startup.diabetic_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a', 'display': 'inline-block'}),
-                        html.Span(id='diabetic-required', children=' *', style={'color': '#d32f2f', 'fontSize': '22px', 'fontWeight': 'bold'})
-                    ], style={'marginBottom': '10px'}),
-                    dcc.Dropdown(
-                        id='diabetic-dropdown',
-                        options=[
-                            {'label': t("ui.startup.yes", locale=locale), 'value': True},
-                            {'label': t("ui.startup.no", locale=locale), 'value': False}
-                        ],
-                        placeholder=t("ui.startup.diabetic_placeholder", locale=locale),
-                        persistence=True,
-                        persistence_type=STORAGE_TYPE,
-                        style={'fontSize': '20px', 'marginBottom': '20px'}
-                    ),
-                    
-                    html.Div(id='diabetic-details', children=[
-                        html.Div([
-                            html.Label(t("ui.startup.diabetes_type_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a', 'display': 'inline-block'}),
-                            html.Span(id='diabetic-type-required', children=' *', style={'color': '#d32f2f', 'fontSize': '22px', 'fontWeight': 'bold'})
-                        ], style={'marginBottom': '10px'}),
-                        dcc.Dropdown(
-                            id='diabetic-type-dropdown',
-                            options=diabetes_type_dropdown_options(locale),
-                            placeholder=t("ui.startup.diabetes_type_placeholder", locale=locale),
-                            persistence=True,
-                            persistence_type=STORAGE_TYPE,
-                            style={'fontSize': '20px', 'marginBottom': '20px'}
-                        ),
-                        
-                        html.Div([
-                            html.Label(t("ui.startup.diabetes_duration_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a', 'display': 'inline-block'}),
-                            html.Span(id='diabetes-duration-required', children=' *', style={'color': '#d32f2f', 'fontSize': '22px', 'fontWeight': 'bold'})
-                        ], style={'marginBottom': '10px'}),
-                        dcc.Input(
-                            id='diabetes-duration-input',
-                            type='number',
-                            placeholder=t("ui.startup.diabetes_duration_placeholder", locale=locale),
-                            min=0,
-                            max=130,
-                            persistence=True,
-                            persistence_type=STORAGE_TYPE,
-                            style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '8px'}
-                        ),
-                        html.Div(
-                            id='diabetes-duration-error',
-                            children='',
-                            style={'color': '#d32f2f', 'fontSize': '16px', 'marginBottom': '20px'}
-                        )
-                    ]),
-                    
-                    html.Div([
-                        html.Label(t("ui.startup.location_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a', 'display': 'inline-block'}),
-                        html.Span(id='location-required', children=' *', style={'color': '#d32f2f', 'fontSize': '22px', 'fontWeight': 'bold'})
-                    ], style={'marginBottom': '10px'}),
-                    html.Div(
-                        dcc.Input(
-                            id='location-input',
-                            type='text',
-                            placeholder=t("ui.startup.location_placeholder", locale=locale),
-                            persistence=True,
-                            persistence_type=STORAGE_TYPE,
-                            style={'width': '100%', 'padding': '10px', 'fontSize': '20px'}
-                        ),
-                        className='location-autocomplete-host',
-                        style={'marginBottom': '20px'},
-                    ),
-                    
-                    html.Div(
-                        [
-                            html.H3(
-                                t("ui.startup.contact_prefs_title", locale=locale),
-                                style={'fontSize': '24px', 'marginBottom': '12px', 'color': '#2c5282'}
-                            ),
-                            html.P(
-                                t("ui.startup.contact_prefs_text", locale=locale),
-                                style={'fontSize': '18px', 'lineHeight': '1.6', 'marginBottom': '0', 'color': '#555'}
-                            ),
-                        ],
-                        style={'backgroundColor': '#f8f9fa', 'padding': '20px', 'borderRadius': '8px', 'marginBottom': '20px'}
-                    ),
-                    
+
                     # <!-- START INSERTION: Just Test Me Button (Debug Mode Only) --> 
                     html.Div([
                         html.Button(
@@ -1005,22 +931,18 @@ class StartupPage(html.Div):
              Output('diabetic-type-dropdown', 'value'),
              Output('diabetes-duration-input', 'value')],
             [Input('diabetic-dropdown', 'value')],
-            [State('test-me-button', 'n_clicks'),
-             State('email-input', 'value')]
+            [State('test-me-button', 'n_clicks')]
         )
         def update_diabetic_details(
             is_diabetic: Optional[bool],
             test_clicks: Optional[int],
-            email: Optional[str]
         ) -> tuple[dict[str, str], Any, Any]:
             if is_diabetic is None:
                 return {'display': 'none'}, dash.no_update, dash.no_update
             elif is_diabetic:
-                # Check if this is from the test button (email will be test email)
-                if test_clicks and email and 'test.user@example.com' in str(email):
+                if test_clicks:
                     return {'display': 'block'}, 'Type 1', 5
-                else:
-                    return {'display': 'block'}, dash.no_update, dash.no_update
+                return {'display': 'block'}, dash.no_update, dash.no_update
             else:
                 return {'display': 'none'}, 'N/A', 0
 
@@ -1028,16 +950,14 @@ class StartupPage(html.Div):
             [Output('cgm-details', 'style'),
              Output('cgm-duration-input', 'value')],
             [Input('cgm-dropdown', 'value')],
-            [State('test-me-button', 'n_clicks'),
-             State('email-input', 'value')]
+            [State('test-me-button', 'n_clicks')]
         )
         def update_cgm_details(
             uses_cgm: Optional[bool],
             test_clicks: Optional[int],
-            email: Optional[str],
         ) -> tuple[dict[str, str], Any]:
             if uses_cgm is True:
-                if test_clicks and email and 'test.user@example.com' in str(email):
+                if test_clicks:
                     return {'display': 'block'}, 3
                 return {'display': 'block'}, dash.no_update
             return {'display': 'none'}, dash.no_update
@@ -1045,39 +965,27 @@ class StartupPage(html.Div):
         @app.callback(
             [Output('start-button', 'disabled'),
              Output('start-button', 'style'),
-             Output('email-required', 'style'),
-             Output('age-required', 'style'),
-             Output('gender-required', 'style'),
              Output('diabetic-required', 'style'),
              Output('diabetic-type-required', 'style'),
              Output('diabetes-duration-required', 'style'),
-             Output('location-required', 'style'),
              Output('format-required', 'style'),
-             Output('age-error', 'children'),
              Output('diabetes-duration-error', 'children'),
              Output('cgm-duration-error', 'children'),
              Output('data-usage-error', 'children'),
              Output('startup-missing-fields', 'children'),
              Output('startup-missing-fields', 'style')],
-            [Input('email-input', 'value'),
-             Input('age-input', 'value'),
-             Input('gender-dropdown', 'value'),
-             Input('cgm-dropdown', 'value'),
+            [Input('cgm-dropdown', 'value'),
              Input('cgm-duration-input', 'value'),
              Input('format-dropdown', 'value'),
              Input('data-usage-consent', 'value'),
              Input('diabetic-dropdown', 'value'),
              Input('diabetic-type-dropdown', 'value'),
              Input('diabetes-duration-input', 'value'),
-             Input('location-input', 'value'),
              Input('user-info-store', 'data'),
              Input('interface-language', 'data'),
              Input('startup-step', 'data')]
         )
         def update_form_validation(
-            email: Optional[str],
-            age: Optional[int | float],
-            gender: Optional[str],
             uses_cgm: Optional[bool],
             cgm_duration: Optional[int | float],
             format_value: Optional[str],
@@ -1085,7 +993,6 @@ class StartupPage(html.Div):
             is_diabetic: Optional[bool],
             diabetic_type: Optional[str],
             diabetes_duration: Optional[int | float],
-            location: Optional[str],
             user_info: Optional[dict[str, Any]],
             interface_language: Optional[str],
             startup_step: Optional[int],
@@ -1093,42 +1000,42 @@ class StartupPage(html.Div):
             hidden_style = {'display': 'none'}
             required_style = {'color': '#d32f2f', 'fontSize': '24px', 'fontWeight': 'bold'}
 
-            wants_contact = _wants_contact_from_user_info(user_info)
             current_step = int(startup_step or 0)
             is_mobile = _is_mobile_ua(
                 flask_request.headers.get('User-Agent') if has_request_context() else None
             )
             full_validation = validate_startup_form(
-                email=email,
-                age=age,
-                gender=gender,
+                email=None,
+                age=None,
+                gender=None,
                 format_value=format_value,
                 data_usage_consent=data_usage_consent,
                 is_diabetic=is_diabetic,
                 diabetic_type=diabetic_type,
                 diabetes_duration=diabetes_duration,
-                location=location,
+                location=None,
                 uses_cgm=uses_cgm,
                 cgm_duration=cgm_duration,
-                wants_contact=wants_contact,
+                wants_contact=False,
                 locale=interface_language,
                 prior_upload_consent=prior_upload_data_consent(user_info),
+                stage="play",
             )
             if is_mobile:
-                if 1 <= current_step <= 4:
+                if 1 <= current_step <= 3:
                     hint = _step_hint_children(
-                        email=email,
-                        age=age,
-                        gender=gender,
+                        email=None,
+                        age=None,
+                        gender=None,
                         format_value=format_value,
                         data_usage_consent=data_usage_consent,
                         is_diabetic=is_diabetic,
                         diabetic_type=diabetic_type,
                         diabetes_duration=diabetes_duration,
-                        location=location,
+                        location=None,
                         uses_cgm=uses_cgm,
                         cgm_duration=cgm_duration,
-                        wants_contact=wants_contact,
+                        wants_contact=False,
                         locale=interface_language,
                         current_step=current_step,
                         prior_upload_consent=prior_upload_data_consent(user_info),
@@ -1141,16 +1048,12 @@ class StartupPage(html.Div):
                 hint = full_validation.hint_children()
             validation = full_validation
 
-            email_asterisk = hidden_style if (not wants_contact or email) else required_style
-            age_asterisk = hidden_style if age else required_style
-            gender_asterisk = hidden_style if gender else required_style
             format_asterisk = hidden_style if format_value else required_style
             diabetic_asterisk = hidden_style if is_diabetic is not None else required_style
             diabetic_type_asterisk = hidden_style if (not is_diabetic or diabetic_type) else required_style
             diabetes_duration_asterisk = (
                 hidden_style if (not is_diabetic or diabetes_duration is not None) else required_style
             )
-            location_asterisk = hidden_style if location else required_style
 
             hint_visible = bool(hint) if isinstance(hint, str) else bool(hint)
             missing_style = {
@@ -1159,49 +1062,14 @@ class StartupPage(html.Div):
                 'textAlign': 'center',
             }
 
-            if full_validation.form_complete:
-                button_style = {
-                    'backgroundColor': '#4CBB17',
-                    'color': 'white',
-                    'padding': '20px 30px',
-                    'border': 'none',
-                    'borderRadius': '5px',
-                    'fontSize': '24px',
-                    'cursor': 'pointer',
-                    'width': '100%',
-                    'height': '80px',
-                    'display': 'flex',
-                    'alignItems': 'center',
-                    'justifyContent': 'center',
-                    'lineHeight': '1.2',
-                }
-                return (
-                    False,
-                    button_style,
-                    email_asterisk,
-                    age_asterisk,
-                    gender_asterisk,
-                    diabetic_asterisk,
-                    diabetic_type_asterisk,
-                    diabetes_duration_asterisk,
-                    location_asterisk,
-                    format_asterisk,
-                    validation.age_error,
-                    validation.diabetes_duration_error,
-                    validation.cgm_duration_error,
-                    validation.data_usage_error,
-                    hint,
-                    missing_style,
-                )
-
             button_style = {
-                'backgroundColor': '#555555',
+                'backgroundColor': '#4CBB17' if full_validation.form_complete else '#555555',
                 'color': 'white',
                 'padding': '20px 30px',
                 'border': 'none',
                 'borderRadius': '5px',
                 'fontSize': '24px',
-                'cursor': 'not-allowed',
+                'cursor': 'pointer' if full_validation.form_complete else 'not-allowed',
                 'width': '100%',
                 'height': '80px',
                 'display': 'flex',
@@ -1210,17 +1078,12 @@ class StartupPage(html.Div):
                 'lineHeight': '1.2',
             }
             return (
-                True,
+                not full_validation.form_complete,
                 button_style,
-                email_asterisk,
-                age_asterisk,
-                gender_asterisk,
                 diabetic_asterisk,
                 diabetic_type_asterisk,
                 diabetes_duration_asterisk,
-                location_asterisk,
                 format_asterisk,
-                validation.age_error,
                 validation.diabetes_duration_error,
                 validation.cgm_duration_error,
                 validation.data_usage_error,
@@ -1228,38 +1091,17 @@ class StartupPage(html.Div):
                 missing_style,
             )
 
-        # <!-- START INSERTION: Test Me Button Callback -->
-        # Callback for "Just Test Me" button
-        # Note: diabetic-type-dropdown and diabetes-duration-input are handled
-        # by their respective callback when diabetic-dropdown changes
         @app.callback(
-            [Output('nickname-input', 'value'),
-             Output('email-input', 'value'),
-             Output('age-input', 'value'),
-             Output('gender-dropdown', 'value'),
-             Output('cgm-dropdown', 'value'),
+            [Output('cgm-dropdown', 'value'),
              Output('diabetic-dropdown', 'value'),
-             Output('location-input', 'value')],
+             Output('format-dropdown', 'value')],
             [Input('test-me-button', 'n_clicks')],
             prevent_initial_call=True
         )
-        def fill_form_data(n_clicks: Optional[int]) -> tuple[str, str, int, str, bool, bool, str]:
+        def fill_form_data(n_clicks: Optional[int]) -> tuple[Any, Any, Any]:
             if n_clicks:
-                # Fill the form with realistic test data and tick consent checkbox
-                # Note: diabetic-type and diabetes-duration will be auto-filled by existing callbacks
-                return (
-                    'Test Player',            # nickname (optional leaderboard label)
-                    'test.user@example.com',  # email
-                    28,                       # age
-                    'F',                      # gender (Female)
-                    True,                     # uses_cgm
-                    True,                     # is_diabetic (Yes) - this will trigger diabetic details callback
-                    'San Francisco, CA'       # location
-                )
-
-            return (
-                no_update, no_update, no_update, no_update, no_update, no_update, no_update
-            )
+                return True, True, 'C'
+            return no_update, no_update, no_update
 
         # ---- Mobile startup wizard step navigation (StartupPageMobile) ----
         # The `mobile-step-*`, `startup-prev`, `startup-next`, `startup-progress`
@@ -1315,15 +1157,11 @@ class StartupPage(html.Div):
             [Input('consent-acknowledge', 'value'),
              Input('consent-gdpr', 'value'),
              Input('startup-step', 'data'),
-             Input('email-input', 'value'),
-             Input('age-input', 'value'),
-             Input('gender-dropdown', 'value'),
              Input('cgm-dropdown', 'value'),
              Input('cgm-duration-input', 'value'),
              Input('diabetic-dropdown', 'value'),
              Input('diabetic-type-dropdown', 'value'),
              Input('diabetes-duration-input', 'value'),
-             Input('location-input', 'value'),
              Input('format-dropdown', 'value'),
              Input('data-usage-consent', 'value'),
              Input('user-info-store', 'data'),
@@ -1334,15 +1172,11 @@ class StartupPage(html.Div):
             acknowledge_value: Optional[list[str]],
             gdpr_value: Optional[list[str]],
             current_step: Optional[int],
-            email: Optional[str],
-            age: Optional[int | float],
-            gender: Optional[str],
             uses_cgm: Optional[bool],
             cgm_duration: Optional[int | float],
             is_diabetic: Optional[bool],
             diabetic_type: Optional[str],
             diabetes_duration: Optional[int | float],
-            location: Optional[str],
             format_value: Optional[str],
             data_usage_consent: Optional[list[str]],
             user_info: Optional[dict[str, Any]],
@@ -1363,24 +1197,24 @@ class StartupPage(html.Div):
                     return True, "ui button startup-next-disabled", hint_shown
                 return False, "ui blue button", hint_hidden
 
-            if 1 <= step <= 4:
-                wants_contact = _wants_contact_from_user_info(user_info)
+            if 1 <= step <= 3:
                 step_validation = validate_startup_form(
-                    email=email,
-                    age=age,
-                    gender=gender,
+                    email=None,
+                    age=None,
+                    gender=None,
                     format_value=format_value,
                     data_usage_consent=data_usage_consent,
                     is_diabetic=is_diabetic,
                     diabetic_type=diabetic_type,
                     diabetes_duration=diabetes_duration,
-                    location=location,
+                    location=None,
                     uses_cgm=uses_cgm,
                     cgm_duration=cgm_duration,
-                    wants_contact=wants_contact,
+                    wants_contact=False,
                     locale=interface_language,
                     wizard_step=step,
                     prior_upload_consent=prior_upload_data_consent(user_info),
+                    stage="play",
                 )
                 if not step_validation.step_complete:
                     return True, "ui button startup-next-disabled", hint_hidden
@@ -1407,7 +1241,7 @@ class StartupPage(html.Div):
 # ---------------------------------------------------------------------------
 # Number of wizard steps.  Must match the number of `mobile-step-{i}` wrappers
 # the builder renders and the Outputs in `navigate_startup_wizard`.
-WIZARD_STEPS: int = 6
+WIZARD_STEPS: int = 5
 
 # Mobile field styling: big tap targets, 16px+ to avoid iOS zoom-on-focus.
 _M_LABEL = {'fontSize': '18px', 'fontWeight': '800', 'marginBottom': '8px', 'color': '#0f172a', 'display': 'inline-block'}
@@ -1518,83 +1352,8 @@ class StartupPageMobile(html.Div):
             dcc.Interval(id='consent-scroll-poll', interval=500, n_intervals=0),
         ]
 
-        # --- Step 1: identity (pure required fields, no conditional cascade) ---
-        # The optional nickname belongs HERE, not in step_consent (mobile-step-0):
-        # it is a public display label, not study data, and must not read as a
-        # consent item.
-        step0 = [
-            _m_label(t("ui.startup.nickname_label", locale=locale)),
-            dcc.Input(
-                id='nickname-input', type='text', maxLength=MAX_NICKNAME_LENGTH,
-                placeholder=t("ui.startup.nickname_placeholder", locale=locale),
-                persistence=True, persistence_type=STORAGE_TYPE, style=_M_INPUT,
-            ),
-            html.Small(
-                t("ui.startup.nickname_hint", locale=locale),
-                style={'color': '#64748b', 'fontSize': '13px', 'display': 'block', 'marginBottom': '10px'},
-            ),
-            _m_label(t("ui.startup.email_label", locale=locale), 'email-required'),
-            dcc.Input(
-                id='email-input', type='email',
-                placeholder=t("ui.startup.email_placeholder", locale=locale),
-                persistence=True, persistence_type=STORAGE_TYPE, style=_M_INPUT,
-            ),
-            _m_label(t("ui.startup.age_label", locale=locale), 'age-required'),
-            dcc.Input(
-                id='age-input', type='number',
-                placeholder=t("ui.startup.age_placeholder", locale=locale),
-                min=0, max=130, persistence=True, persistence_type=STORAGE_TYPE, style=_M_INPUT,
-            ),
-            html.Div(id='age-error', children='', style=_M_ERROR, disable_n_clicks=True),
-            _m_label(t("ui.startup.gender_label", locale=locale), 'gender-required'),
-            dcc.Dropdown(
-                id='gender-dropdown',
-                options=[
-                    {'label': t("ui.startup.gender_male", locale=locale), 'value': 'M'},
-                    {'label': t("ui.startup.gender_female", locale=locale), 'value': 'F'},
-                    {'label': t("ui.startup.gender_na", locale=locale), 'value': 'N/A'},
-                ],
-                placeholder=t("ui.startup.gender_placeholder", locale=locale),
-                persistence=True, persistence_type=STORAGE_TYPE, style=_M_DROPDOWN,
-            ),
-            html.Div(style={'height': '12px'}, disable_n_clicks=True),
-            _m_label(t("ui.startup.location_label", locale=locale), 'location-required'),
-            html.Div(
-                dcc.Input(
-                    id='location-input', type='text',
-                    placeholder=t("ui.startup.location_placeholder", locale=locale),
-                    persistence=True, persistence_type=STORAGE_TYPE, style=_M_INPUT,
-                ),
-                className='location-autocomplete-host',
-            ),
-        ]
-
-        # --- Step 2: CGM (cgm-dropdown -> cgm-details/duration) ---
+        # --- Step 1: diabetes (diabetic-dropdown -> type + duration) ---
         step1 = [
-            _m_label(t("ui.startup.cgm_label", locale=locale)),
-            dcc.Dropdown(
-                id='cgm-dropdown',
-                options=[
-                    {'label': t("ui.startup.yes", locale=locale), 'value': True},
-                    {'label': t("ui.startup.no", locale=locale), 'value': False},
-                ],
-                placeholder=t("ui.startup.cgm_placeholder", locale=locale),
-                persistence=True, persistence_type=STORAGE_TYPE, style=_M_DROPDOWN,
-            ),
-            html.Div(id='cgm-details', children=[
-                html.Div(style={'height': '12px'}, disable_n_clicks=True),
-                _m_label(t("ui.startup.cgm_duration_label", locale=locale)),
-                dcc.Input(
-                    id='cgm-duration-input', type='number',
-                    placeholder=t("ui.startup.cgm_duration_placeholder", locale=locale),
-                    min=0, max=130, persistence=True, persistence_type=STORAGE_TYPE, style=_M_INPUT,
-                ),
-                html.Div(id='cgm-duration-error', children='', style=_M_ERROR, disable_n_clicks=True),
-            ]),
-        ]
-
-        # --- Step 3: diabetes (diabetic-dropdown -> type + duration) ---
-        step2 = [
             _m_label(t("ui.startup.diabetic_label", locale=locale), 'diabetic-required'),
             dcc.Dropdown(
                 id='diabetic-dropdown',
@@ -1605,7 +1364,7 @@ class StartupPageMobile(html.Div):
                 placeholder=t("ui.startup.diabetic_placeholder", locale=locale),
                 persistence=True, persistence_type=STORAGE_TYPE, style=_M_DROPDOWN,
             ),
-            html.Div(id='diabetic-details', children=[
+            html.Div(id='diabetic-details', style={'display': 'none'}, children=[
                 html.Div(style={'height': '12px'}, disable_n_clicks=True),
                 _m_label(t("ui.startup.diabetes_type_label", locale=locale), 'diabetic-type-required'),
                 dcc.Dropdown(
@@ -1625,7 +1384,31 @@ class StartupPageMobile(html.Div):
             ]),
         ]
 
-        # --- Step 4: format & data-usage consent ---
+        # --- Step 2: CGM (cgm-dropdown -> cgm-details/duration) ---
+        step2 = [
+            _m_label(t("ui.startup.cgm_label", locale=locale)),
+            dcc.Dropdown(
+                id='cgm-dropdown',
+                options=[
+                    {'label': t("ui.startup.yes", locale=locale), 'value': True},
+                    {'label': t("ui.startup.no", locale=locale), 'value': False},
+                ],
+                placeholder=t("ui.startup.cgm_placeholder", locale=locale),
+                persistence=True, persistence_type=STORAGE_TYPE, style=_M_DROPDOWN,
+            ),
+            html.Div(id='cgm-details', style={'display': 'none'}, children=[
+                html.Div(style={'height': '12px'}, disable_n_clicks=True),
+                _m_label(t("ui.startup.cgm_duration_label", locale=locale)),
+                dcc.Input(
+                    id='cgm-duration-input', type='number',
+                    placeholder=t("ui.startup.cgm_duration_placeholder", locale=locale),
+                    min=0, max=130, persistence=True, persistence_type=STORAGE_TYPE, style=_M_INPUT,
+                ),
+                html.Div(id='cgm-duration-error', children='', style=_M_ERROR, disable_n_clicks=True),
+            ]),
+        ]
+
+        # --- Step 3: format & CGM data-usage consent ---
         step3 = [
             _m_label(t("ui.startup.format_label", locale=locale), 'format-required'),
             dcc.Dropdown(
@@ -1662,16 +1445,8 @@ class StartupPageMobile(html.Div):
             ),
         ]
 
-        # --- Step 5: contact prefs + submit (start-button driven by validation) ---
+        # --- Step 4: start ---
         step4 = [
-            html.Div(
-                [
-                    html.H3(t("ui.startup.contact_prefs_title", locale=locale), style={'fontSize': '20px', 'marginBottom': '10px', 'color': '#2c5282'}),
-                    html.P(t("ui.startup.contact_prefs_text", locale=locale), style={'fontSize': '15px', 'lineHeight': '1.6', 'margin': '0', 'color': '#555'}),
-                ],
-                style={'backgroundColor': '#f8f9fa', 'padding': '16px', 'borderRadius': '8px', 'marginBottom': '20px'},
-                disable_n_clicks=True,
-            ),
             html.Button(
                 t("ui.startup.just_test_me", locale=locale),
                 id='test-me-button',
@@ -1696,7 +1471,7 @@ class StartupPageMobile(html.Div):
             ),
         ]
 
-        steps = [step_consent, step0, step1, step2, step3, step4]
+        steps = [step_consent, step1, step2, step3, step4]
         step_divs = [
             html.Div(
                 children=content,

@@ -85,7 +85,7 @@ def test_finish_from_prediction_goes_to_ending_when_round_is_complete() -> None:
     assert len(info.get("rounds") or []) == 1
 
 
-def test_finish_from_prediction_goes_to_final_when_prior_rounds_exist() -> None:
+def test_finish_from_prediction_goes_to_profile_when_identity_missing() -> None:
     prior = {
         "round_number": 1,
         "prediction_table_data": [{"metric": "Actual Glucose"}],
@@ -102,16 +102,61 @@ def test_finish_from_prediction_goes_to_final_when_prior_rounds_exist() -> None:
         dataframe_to_store_dict(_incomplete_window()),
         0,
     )
+    assert pathname == "/profile"
+    assert last_page == "/profile"
+    assert mode == {"hide_last_hour": False}
+    assert len(info.get("rounds") or []) == 1
+
+
+def test_finish_from_prediction_goes_to_final_when_identity_complete() -> None:
+    prior = {
+        "round_number": 1,
+        "prediction_table_data": [{"metric": "Actual Glucose"}],
+        "format": "A",
+    }
+    pathname, info, mode, last_page = handle_finish_study_from_prediction(
+        1,
+        {
+            "consent_completed": False,
+            "rounds": [prior],
+            "format": "A",
+            "prediction_table_data": prior["prediction_table_data"],
+            "age": 30,
+            "gender": "F",
+            "location": "Berlin",
+        },
+        dataframe_to_store_dict(_incomplete_window()),
+        0,
+    )
     assert pathname == "/final"
     assert last_page == "/final"
     assert mode == {"hide_last_hour": False}
     assert len(info.get("rounds") or []) == 1
 
 
-def test_finish_from_prediction_goes_to_landing_when_nothing_to_show() -> None:
+def test_finish_from_prediction_goes_to_profile_when_nothing_to_show() -> None:
     pathname, info, _mode, last_page = handle_finish_study_from_prediction(
         1,
         {"consent_completed": False, "rounds": [], "format": "A"},
+        dataframe_to_store_dict(_incomplete_window()),
+        0,
+    )
+    assert pathname == "/profile"
+    assert last_page == "/profile"
+    assert info.get("rounds") == []
+
+
+def test_finish_from_prediction_goes_to_landing_when_identity_complete_and_empty() -> None:
+    pathname, info, _mode, last_page = handle_finish_study_from_prediction(
+        1,
+        {
+            "consent_completed": False,
+            "rounds": [],
+            "format": "A",
+            "age": 30,
+            "gender": "F",
+            "location": "Berlin",
+        },
         dataframe_to_store_dict(_incomplete_window()),
         0,
     )

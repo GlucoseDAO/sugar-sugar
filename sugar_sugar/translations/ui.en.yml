@@ -441,6 +441,13 @@ en:
     play_now: "Play now"
     privacy_note: "Nicknames are optional and public. If you gave an email address, the board stores only a one-way hash of it so your results are recognised across devices — never the address itself and no other personal data. Nicknames are not part of the study data."
 
+  profile:
+    title: "A few details before your results"
+    intro: "Please tell us a bit about yourself so we can complete your study record. You can also try another data format, or go straight to your results."
+    other_formats_title: "Want to play another format?"
+    other_formats_text: "You can start another format now, or see the results of the game you just finished."
+    see_results: "See my results"
+
   final:
     title: "Complete Analysis"
     rounds_played: "Rounds played: %{played} / %{total}"

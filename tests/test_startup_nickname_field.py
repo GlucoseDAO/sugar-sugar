@@ -1,9 +1,8 @@
-"""The optional nickname field on `/startup`, desktop and mobile.
+"""Play-form ids on `/startup` that `handle_start_button` reads as State.
 
-Guards the trap documented in CLAUDE.md that bit twice: a Dash callback only fires
-when *every* one of its Input/State components is in the current layout, so any id
-`handle_start_button` reads must exist on BOTH startup builders. A miss there leaves
-the Start button activating but navigating nowhere.
+Identity fields (nickname/email/age/gender/location) now live on `/profile`.
+A Dash callback only fires when every State id is in the current layout, so
+those identity ids must NOT appear on either startup builder.
 """
 
 from __future__ import annotations
@@ -12,6 +11,7 @@ from typing import Any
 
 import pytest
 
+from sugar_sugar.components.profile import PROFILE_FIELD_IDS, create_profile_layout
 from sugar_sugar.components.startup import (
     WIZARD_STEPS,
     StartupPage,
@@ -20,13 +20,8 @@ from sugar_sugar.components.startup import (
 from sugar_sugar.i18n import setup_i18n
 from sugar_sugar.nickname import MAX_NICKNAME_LENGTH
 
-# Every component id `handle_start_button` takes as State (sugar_sugar/app.py).
 START_BUTTON_STATE_IDS: frozenset[str] = frozenset(
     {
-        'nickname-input',
-        'email-input',
-        'age-input',
-        'gender-dropdown',
         'cgm-dropdown',
         'cgm-duration-input',
         'format-dropdown',
@@ -34,6 +29,15 @@ START_BUTTON_STATE_IDS: frozenset[str] = frozenset(
         'diabetic-dropdown',
         'diabetic-type-dropdown',
         'diabetes-duration-input',
+    }
+)
+
+IDENTITY_FIELD_IDS: frozenset[str] = frozenset(
+    {
+        'nickname-input',
+        'email-input',
+        'age-input',
+        'gender-dropdown',
         'location-input',
     }
 )
@@ -77,41 +81,41 @@ def startup_page(request: pytest.FixtureRequest) -> Any:
     return StartupPage(locale="en") if request.param == "desktop" else StartupPageMobile(locale="en")
 
 
-def test_nickname_input_exists_on_both_builders(startup_page: Any) -> None:
-    assert 'nickname-input' in _ids(startup_page)
-
-
 def test_every_start_button_state_id_is_present(startup_page: Any) -> None:
     missing = START_BUTTON_STATE_IDS - _ids(startup_page)
     assert not missing, f"handle_start_button would never fire; missing: {sorted(missing)}"
 
 
-def test_nickname_is_length_capped_and_persistent(startup_page: Any) -> None:
-    field = _find(startup_page, 'nickname-input')
-    assert field.maxLength == MAX_NICKNAME_LENGTH
-    # Survives the layout rebuild on language change.
-    assert field.persistence is True
+def test_identity_fields_are_not_on_startup(startup_page: Any) -> None:
+    overlap = IDENTITY_FIELD_IDS & _ids(startup_page)
+    assert not overlap, f"identity fields leaked onto startup: {sorted(overlap)}"
 
 
-def test_nickname_has_no_required_asterisk(startup_page: Any) -> None:
-    """It is optional, so it must not grow a managed `*-required` span."""
-    assert 'nickname-required' not in _ids(startup_page)
-
-
-def test_mobile_nickname_is_in_the_identity_step_not_the_consent_step() -> None:
-    """mobile-step-0 is consent; the nickname is not study data and must not sit there."""
-    page = StartupPageMobile(locale="en")
-    consent_step = _find(page, 'mobile-step-0')
-    identity_step = _find(page, 'mobile-step-1')
-    assert consent_step is not None and identity_step is not None
-    assert 'nickname-input' not in _ids(consent_step)
-    assert 'nickname-input' in _ids(identity_step)
-
-
-def test_wizard_step_count_is_unchanged() -> None:
-    """The nickname joined an existing step rather than adding one."""
+def test_mobile_wizard_has_five_steps() -> None:
     page = StartupPageMobile(locale="en")
     ids = _ids(page)
-    assert WIZARD_STEPS == 6
+    assert WIZARD_STEPS == 5
     assert all(f'mobile-step-{i}' in ids for i in range(WIZARD_STEPS))
     assert f'mobile-step-{WIZARD_STEPS}' not in ids
+
+
+def test_mobile_step_1_is_diabetes_not_identity() -> None:
+    page = StartupPageMobile(locale="en")
+    consent_step = _find(page, 'mobile-step-0')
+    diabetes_step = _find(page, 'mobile-step-1')
+    assert consent_step is not None and diabetes_step is not None
+    assert 'nickname-input' not in _ids(consent_step)
+    assert 'diabetic-dropdown' in _ids(diabetes_step)
+
+
+def test_profile_has_identity_fields() -> None:
+    page = create_profile_layout(
+        {"uses_cgm": True, "format": "A", "rounds": [{"round_number": 1}]},
+        locale="en",
+    )
+    ids = _ids(page)
+    assert IDENTITY_FIELD_IDS <= ids
+    assert PROFILE_FIELD_IDS <= ids
+    nickname = _find(page, 'nickname-input')
+    assert nickname.maxLength == MAX_NICKNAME_LENGTH
+    assert nickname.persistence is True

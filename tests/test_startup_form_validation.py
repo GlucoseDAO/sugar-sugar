@@ -36,28 +36,60 @@ def _base_kwargs(**overrides: object) -> dict[str, object]:
     return values
 
 
+def test_play_stage_does_not_require_identity() -> None:
+    result = validate_startup_form(
+        **_base_kwargs(age=None, gender=None, location=None, email=None),
+        stage="play",
+    )
+    assert result.form_complete is True
+
+
+def test_identity_stage_requires_age_gender_location() -> None:
+    result = validate_startup_form(
+        **_base_kwargs(age=None, gender=None, location=None),
+        stage="identity",
+    )
+    assert result.form_complete is False
+    assert "ui.startup.age_label" in result.missing_label_keys
+
+
 def test_age_allows_up_to_max() -> None:
-    result = validate_startup_form(**_base_kwargs(age=MAX_AGE))
+    result = validate_startup_form(**_base_kwargs(age=MAX_AGE), stage="identity")
     assert result.form_complete is True
     assert result.age_error == ""
 
 
 def test_age_over_max_is_rejected() -> None:
-    result = validate_startup_form(**_base_kwargs(age=MAX_AGE + 1))
+    result = validate_startup_form(**_base_kwargs(age=MAX_AGE + 1), stage="identity")
     assert result.form_complete is False
     assert result.has_range_errors is True
     assert "130" in result.age_error
 
 
 def test_diabetes_duration_cannot_exceed_age() -> None:
-    result = validate_startup_form(**_base_kwargs(age=20, diabetes_duration=25))
+    result = validate_startup_form(
+        **_base_kwargs(age=20, diabetes_duration=25),
+        stage="identity",
+    )
     assert result.form_complete is False
     assert result.diabetes_duration_error
     assert result.has_range_errors is True
 
 
+def test_play_stage_skips_duration_vs_age() -> None:
+    result = validate_startup_form(
+        **_base_kwargs(age=None, diabetes_duration=25),
+        stage="play",
+    )
+    assert result.form_complete is True
+    assert result.diabetes_duration_error == ""
+
+
 def test_cgm_duration_cannot_exceed_age() -> None:
-    result = validate_startup_form(**_base_kwargs(age=15, cgm_duration=16, uses_cgm=True))
+    result = validate_startup_form(
+        **_base_kwargs(age=15, cgm_duration=16, uses_cgm=True),
+        stage="identity",
+    )
     assert result.form_complete is False
     assert result.cgm_duration_error
     assert result.has_range_errors is True
@@ -70,12 +102,13 @@ def test_cgm_duration_not_checked_when_no_cgm() -> None:
 
 def test_missing_fields_message_lists_labels() -> None:
     result = validate_startup_form(
-        **_base_kwargs(age=None, gender=None, location=None),
+        **_base_kwargs(is_diabetic=None),
         wizard_step=1,
+        stage="play",
     )
     assert result.step_complete is False
-    assert "ui.startup.age_label" in result.missing_label_keys
-    assert "Age" in result.missing_fields_message
+    assert "ui.startup.diabetic_label" in result.missing_label_keys
+    assert "diabetic" in result.missing_fields_message.lower()
 
 
 def test_format_b_requires_data_usage_consent() -> None:
@@ -131,18 +164,18 @@ def test_prior_upload_consent_from_own_data_round() -> None:
 @pytest.mark.parametrize(
     "wizard_step, missing_key",
     [
+        (1, "ui.startup.diabetic_label"),
         (2, "ui.startup.cgm_label"),
-        (3, "ui.startup.diabetic_label"),
-        (4, "ui.startup.format_label"),
+        (3, "ui.startup.format_label"),
     ],
 )
 def test_wizard_step_missing_fields(wizard_step: int, missing_key: str) -> None:
     kwargs = _base_kwargs()
-    if wizard_step == 2:
+    if wizard_step == 1:
+        kwargs["is_diabetic"] = None
+    elif wizard_step == 2:
         kwargs["uses_cgm"] = None
     elif wizard_step == 3:
-        kwargs["is_diabetic"] = None
-    elif wizard_step == 4:
         kwargs["format_value"] = None
-    result = validate_startup_form(**kwargs, wizard_step=wizard_step)
+    result = validate_startup_form(**kwargs, wizard_step=wizard_step, stage="play")
     assert missing_key in result.missing_label_keys

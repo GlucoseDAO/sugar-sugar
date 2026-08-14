@@ -2,7 +2,7 @@ from dash import dcc, html
 from sugar_sugar.i18n import t
 
 
-_GAME_PAGES = frozenset({"/", "/consent-form", "/startup", "/prediction", "/ending", "/final"})
+_GAME_PAGES = frozenset({"/", "/consent-form", "/startup", "/prediction", "/ending", "/final", "/profile"})
 
 LANGUAGES: list[tuple[str, str, str]] = [
     ("en", "/assets/flags/gb.svg", "EN"),
