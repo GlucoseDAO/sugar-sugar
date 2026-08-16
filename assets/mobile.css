@@ -2502,3 +2502,195 @@ html.mobile-device .meal-food-bubble-apple {
     right: 8px;
   }
 }
+
+/* --- Prediction X + Submit match /ending pair (must stay last) ------------
+   Same sizes as the results row: 48px X + 300px green, centered as a pair.
+   How-to-play keeps its 220px slot so the full label fits. */
+@media (orientation: landscape) and (pointer: coarse) {
+  html.route-prediction.mobile-device .prediction-header {
+    width: 220px !important;
+  }
+
+  html.route-prediction.mobile-device #header-how-to-play {
+    width: 220px !important;
+    height: 48px !important;
+  }
+
+  html.route-prediction.mobile-device .header-how-to-play-toggle {
+    width: 220px !important;
+    height: 48px !important;
+    padding: 0 12px !important;
+    font-size: 18px !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-mobile-actions {
+    left: max(234px, calc(50% - 179px)) !important;
+    right: auto !important;
+    width: 358px !important;
+    transform: none !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-actions,
+  html.route-prediction.mobile-device #prediction-submit-row {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 10px !important;
+    width: 358px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  html.route-prediction.mobile-device #finish-study-button {
+    flex: 0 0 48px !important;
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: 0 !important;
+    line-height: 0 !important;
+    color: transparent !important;
+    overflow: hidden !important;
+    border-radius: 8px !important;
+    position: relative !important;
+  }
+
+  html.route-prediction.mobile-device #finish-study-button::after {
+    content: "×";
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px !important;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+  }
+
+  html.route-prediction.mobile-device #submit-button {
+    flex: 0 0 300px !important;
+    width: 300px !important;
+    min-width: 300px !important;
+    max-width: 300px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+    margin: 0 !important;
+    padding: 8px 12px !important;
+    font-size: 22px !important;
+    line-height: 1.2 !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-mobile-actions.has-upload {
+    left: max(234px, calc(50% - 241px)) !important;
+    width: 482px !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-mobile-actions.has-upload #prediction-actions,
+  html.route-prediction.mobile-device #prediction-mobile-actions.has-upload #prediction-submit-row {
+    width: auto !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-mobile-actions.has-upload #finish-study-button {
+    flex: 0 0 48px !important;
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-mobile-actions.has-upload #upload-data {
+    flex: 0 0 120px !important;
+    width: 120px !important;
+    min-width: 120px !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-mobile-actions.has-upload #submit-button {
+    flex: 0 0 300px !important;
+    width: 300px !important;
+    min-width: 300px !important;
+    max-width: 300px !important;
+  }
+}
+
+@media (orientation: portrait) {
+  html.route-prediction.mobile-device #prediction-mobile-actions {
+    grid-template-rows: 48px !important;
+  }
+
+  html.route-prediction.mobile-device .prediction-fullscreen-button {
+    grid-row: 1 !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-actions,
+  html.route-prediction.mobile-device #prediction-submit-row {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  html.route-prediction.mobile-device #finish-study-button {
+    flex: 0 0 46px !important;
+    width: 46px !important;
+    min-width: 46px !important;
+    max-width: 46px !important;
+    height: 46px !important;
+    min-height: 46px !important;
+    max-height: 46px !important;
+    padding: 0 !important;
+    font-size: 0 !important;
+    line-height: 0 !important;
+    color: transparent !important;
+    overflow: hidden !important;
+    position: relative !important;
+  }
+
+  html.route-prediction.mobile-device #finish-study-button::after {
+    content: "×";
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px !important;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+  }
+
+  html.route-prediction.mobile-device #submit-button {
+    flex: 0 0 300px !important;
+    width: 300px !important;
+    max-width: min(300px, calc(100% - 56px)) !important;
+    height: 48px !important;
+    min-height: 48px !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-mobile-actions.has-upload #finish-study-button {
+    flex: 0 0 46px !important;
+    width: 46px !important;
+    min-width: 46px !important;
+    max-width: 46px !important;
+    height: 46px !important;
+  }
+}

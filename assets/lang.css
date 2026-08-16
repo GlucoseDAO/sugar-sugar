@@ -1022,7 +1022,7 @@ html:not(.mobile-device) #submit-button {
   text-align: center !important;
   line-height: 1.2 !important;
 }
-html:not(.mobile-device) #finish-study-button,
+#finish-study-button,
 #finish-study-button-ending,
 #restart-button {
   width: 48px !important;
@@ -1043,7 +1043,7 @@ html:not(.mobile-device) #finish-study-button,
   color: transparent !important;
   text-indent: 0 !important;
 }
-html:not(.mobile-device) #finish-study-button::after,
+#finish-study-button::after,
 #finish-study-button-ending::after,
 #restart-button::after {
   content: "×";
