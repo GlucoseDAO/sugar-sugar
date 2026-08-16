@@ -1,4 +1,5 @@
 import base64
+from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Optional
@@ -20,6 +21,9 @@ from sugar_sugar.i18n import normalize_locale, t
 
 _FOOD_LINE_COLOR: str = "#2e7d32"
 _APPLE_ICON_SRC: str = "/assets/images/apple.svg"
+_FOOD_CLUSTER_X_GAP: float = 1.8
+FOOD_COMPOSITE_MAX: int = 6
+_FOOD_COMPOSITE_PREFIX: str = "composite:"
 
 
 def event_x_index(window_df: pl.DataFrame, event_time: datetime) -> float:
@@ -44,6 +48,79 @@ def event_x_index(window_df: pl.DataFrame, event_time: datetime) -> float:
     return float(before_idx) + factor
 
 
+@dataclass(frozen=True, slots=True)
+class FoodEventCluster:
+    x_pos: float
+    photo_urls: list[str] = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)
+
+
+def _meal_photo_url(source_name: str, photo_path: str) -> str:
+    if is_d1namo_source_name(source_name):
+        return d1namo_photo_url(source_name, photo_path)
+    return cgmacros_photo_url(source_name, photo_path)
+
+
+def cluster_visible_food_events(
+    window_df: pl.DataFrame,
+    events_df: pl.DataFrame,
+    *,
+    source_name: str,
+    hide_last_hour: bool,
+) -> list[FoodEventCluster]:
+    """Group meal markers that would overlap into one clickable cluster."""
+    if window_df.height == 0:
+        return []
+    meals = visible_food_photo_events(
+        window_df, events_df, hide_last_hour=hide_last_hour
+    )
+    items: list[tuple[float, str, str]] = []
+    for meal in meals:
+        event_time = meal["time"]
+        photo_path = str(meal.get("photo_path") or "").strip()
+        food_note = str(meal.get("food_note") or "").strip()
+        if not isinstance(event_time, datetime) or (not photo_path and not food_note):
+            continue
+        photo_url = _meal_photo_url(source_name, photo_path) if photo_path else ""
+        items.append((event_x_index(window_df, event_time), photo_url, food_note))
+    items.sort(key=lambda item: item[0])
+
+    clusters: list[FoodEventCluster] = []
+    for x_pos, photo_url, food_note in items:
+        if clusters and abs(x_pos - clusters[-1].x_pos) <= _FOOD_CLUSTER_X_GAP:
+            previous = clusters[-1]
+            photos = list(previous.photo_urls)
+            notes = list(previous.notes)
+            if photo_url and photo_url not in photos:
+                photos.append(photo_url)
+            if food_note and food_note not in notes:
+                notes.append(food_note)
+            n_items = max(1, len(photos) + len(notes))
+            merged_x = (previous.x_pos * (n_items - 1) + x_pos) / n_items
+            clusters[-1] = FoodEventCluster(
+                x_pos=merged_x,
+                photo_urls=photos[:FOOD_COMPOSITE_MAX],
+                notes=notes,
+            )
+            continue
+        clusters.append(
+            FoodEventCluster(
+                x_pos=x_pos,
+                photo_urls=[photo_url] if photo_url else [],
+                notes=[food_note] if food_note else [],
+            )
+        )
+    return clusters
+
+
+def _bubble_index_for_cluster(cluster: FoodEventCluster) -> str:
+    if len(cluster.photo_urls) > 1:
+        return _FOOD_COMPOSITE_PREFIX + "|".join(cluster.photo_urls)
+    if cluster.photo_urls:
+        return cluster.photo_urls[0]
+    return f"note:{quote(chr(10).join(cluster.notes), safe='')}"
+
+
 def meal_food_bubble_children(
     window_df: pl.DataFrame,
     events_df: pl.DataFrame,
@@ -51,30 +128,22 @@ def meal_food_bubble_children(
     source_name: str,
     hide_last_hour: bool,
 ) -> list[html.Button]:
-    """HTML speech bubbles above the plot, one per visible meal photo."""
+    """HTML speech bubbles above the plot, one per visible meal cluster."""
     if window_df.height == 0:
         return []
-    meals = visible_food_photo_events(
-        window_df, events_df, hide_last_hour=hide_last_hour
-    )
     n_points = float(len(window_df))
     buttons: list[html.Button] = []
-    for meal in meals:
-        event_time = meal["time"]
-        photo_path = str(meal.get("photo_path") or "").strip()
-        food_note = str(meal.get("food_note") or "").strip()
-        if not isinstance(event_time, datetime) or (not photo_path and not food_note):
-            continue
-        x_pos = event_x_index(window_df, event_time)
-        left_pct = 100.0 * (x_pos + 0.5) / n_points
-        if photo_path:
-            bubble_index = (
-                d1namo_photo_url(source_name, photo_path)
-                if is_d1namo_source_name(source_name)
-                else cgmacros_photo_url(source_name, photo_path)
-            )
-        else:
-            bubble_index = f"note:{quote(food_note, safe='')}"
+    for cluster in cluster_visible_food_events(
+        window_df,
+        events_df,
+        source_name=source_name,
+        hide_last_hour=hide_last_hour,
+    ):
+        left_pct = 100.0 * (cluster.x_pos + 0.5) / n_points
+        count = max(len(cluster.photo_urls), 1 if cluster.notes else 0)
+        extra: dict[str, str] = {}
+        if count > 1:
+            extra["data-count"] = str(count)
         buttons.append(
             html.Button(
                 html.Img(
@@ -83,11 +152,12 @@ def meal_food_bubble_children(
                     alt="",
                     disable_n_clicks=True,
                 ),
-                id={"type": "meal-food-bubble", "index": bubble_index},
+                id={"type": "meal-food-bubble", "index": _bubble_index_for_cluster(cluster)},
                 className="meal-food-speech-bubble",
                 type="button",
                 n_clicks=0,
                 style={"left": f"{left_pct:.3f}%"},
+                **extra,
             )
         )
     return buttons
@@ -284,50 +354,61 @@ class GlucoseChart(html.Div):
                 )
                 return figure, bubbles
 
+        _empty_tiles_js = "[" + ", ".join(["''"] * FOOD_COMPOSITE_MAX) + "]"
         app.clientside_callback(
-            """
-            function(nClicks) {
+            f"""
+            function(nClicks) {{
                 const cs = window.dash_clientside;
-                if (!nClicks || !nClicks.some(Boolean)) {
-                    return [cs.no_update, cs.no_update, cs.no_update, cs.no_update];
-                }
+                const emptyTiles = {_empty_tiles_js};
+                const skip = [cs.no_update, cs.no_update, cs.no_update, cs.no_update, cs.no_update];
+                if (!nClicks || !nClicks.some(Boolean)) {{
+                    return skip;
+                }}
                 const triggered = cs.callback_context.triggered_id;
-                if (!triggered || triggered.type !== 'meal-food-bubble' || !triggered.index) {
-                    return [cs.no_update, cs.no_update, cs.no_update, cs.no_update];
-                }
+                if (!triggered || triggered.type !== 'meal-food-bubble' || !triggered.index) {{
+                    return skip;
+                }}
                 const index = String(triggered.index);
-                if (index.startsWith('note:')) {
+                if (index.startsWith('note:')) {{
                     let note = index.slice(5);
-                    try { note = decodeURIComponent(note); } catch (err) { /* keep raw */ }
-                    return ['meal-food-lightbox is-open is-note', '', note, 'false'];
-                }
-                return ['meal-food-lightbox is-open', index, '', 'false'];
-            }
+                    try {{ note = decodeURIComponent(note); }} catch (err) {{ /* keep raw */ }}
+                    return ['meal-food-lightbox is-open is-note', '', note, 'false', emptyTiles];
+                }}
+                if (index.startsWith('composite:')) {{
+                    const urls = index.slice(10).split('|').filter(Boolean).slice(0, {FOOD_COMPOSITE_MAX});
+                    const tiles = emptyTiles.slice();
+                    urls.forEach(function(src, i) {{ tiles[i] = src; }});
+                    return ['meal-food-lightbox is-open is-composite', '', '', 'false', tiles];
+                }}
+                return ['meal-food-lightbox is-open', index, '', 'false', emptyTiles];
+            }}
             """,
             [
                 Output('meal-food-lightbox', 'className'),
                 Output('meal-food-lightbox-image', 'src'),
                 Output('meal-food-lightbox-note', 'children'),
                 Output('meal-food-lightbox', 'aria-hidden'),
+                Output({'type': 'meal-food-lightbox-tile', 'index': ALL}, 'src'),
             ],
             Input({'type': 'meal-food-bubble', 'index': ALL}, 'n_clicks'),
             prevent_initial_call=True,
         )
         app.clientside_callback(
-            """
-            function(nClicks) {
+            f"""
+            function(nClicks) {{
                 const cs = window.dash_clientside;
-                if (!nClicks) {
-                    return [cs.no_update, cs.no_update, cs.no_update, cs.no_update];
-                }
-                return ['meal-food-lightbox', '', '', 'true'];
-            }
+                if (!nClicks) {{
+                    return [cs.no_update, cs.no_update, cs.no_update, cs.no_update, cs.no_update];
+                }}
+                return ['meal-food-lightbox', '', '', 'true', {_empty_tiles_js}];
+            }}
             """,
             [
                 Output('meal-food-lightbox', 'className', allow_duplicate=True),
                 Output('meal-food-lightbox-image', 'src', allow_duplicate=True),
                 Output('meal-food-lightbox-note', 'children', allow_duplicate=True),
                 Output('meal-food-lightbox', 'aria-hidden', allow_duplicate=True),
+                Output({'type': 'meal-food-lightbox-tile', 'index': ALL}, 'src', allow_duplicate=True),
             ],
             Input('meal-food-lightbox-backdrop', 'n_clicks'),
             prevent_initial_call=True,
@@ -720,19 +801,17 @@ class GlucoseChart(html.Div):
 
     def _add_food_photo_guides(self, figure: go.Figure, *, locale: str) -> None:
         """Thin green dotted meal line + translated FOOD label along it."""
-        meals = visible_food_photo_events(
+        clusters = cluster_visible_food_events(
             self._current_df,
             self._current_events,
+            source_name=str(self._current_source or ""),
             hide_last_hour=self.hide_last_hour,
         )
-        if not meals:
+        if not clusters:
             return
         food_label = t("ui.chart.food_label", locale=locale)
-        for meal in meals:
-            event_time = meal["time"]
-            if not isinstance(event_time, datetime):
-                continue
-            x_pos, _glucose = self._event_xy_for_time(event_time)
+        for cluster in clusters:
+            x_pos = cluster.x_pos
             figure.add_shape(
                 type="line",
                 x0=x_pos,

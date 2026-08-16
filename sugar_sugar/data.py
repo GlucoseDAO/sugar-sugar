@@ -1,14 +1,14 @@
 import base64
 import gzip
+import json
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import polars as pl
 from cgm_format import FormatParser
 from eliot import start_action
 
-from sugar_sugar.cgmacros import is_cgmacros_csv, load_cgmacros_data
 from sugar_sugar.bigideas import is_bigideas_path, load_bigideas_data
 from sugar_sugar.corpus import adapt_events_df, adapt_glucose_df, unified_processor
 from sugar_sugar.d1namo import is_d1namo_path, load_d1namo_data

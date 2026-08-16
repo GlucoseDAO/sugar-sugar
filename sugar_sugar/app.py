@@ -93,7 +93,11 @@ from sugar_sugar.consent import (
     should_persist_study_data,
     upsert_consent_agreement_fields,
 )
-from sugar_sugar.components.glucose import GlucoseChart, meal_food_bubble_children
+from sugar_sugar.components.glucose import (
+    FOOD_COMPOSITE_MAX,
+    GlucoseChart,
+    meal_food_bubble_children,
+)
 from sugar_sugar.components.metrics import MetricsComponent
 from sugar_sugar.components.predictions import PredictionTableComponent
 from sugar_sugar.components.ag_grid import build_readonly_ag_grid, build_readonly_column_defs
@@ -2126,6 +2130,21 @@ app.layout = html.Div([
                 className='meal-food-lightbox-image',
                 src='',
                 alt='',
+                disable_n_clicks=True,
+            ),
+            html.Div(
+                [
+                    html.Img(
+                        id={'type': 'meal-food-lightbox-tile', 'index': tile_i},
+                        className='meal-food-lightbox-tile',
+                        src='',
+                        alt='',
+                        disable_n_clicks=True,
+                    )
+                    for tile_i in range(FOOD_COMPOSITE_MAX)
+                ],
+                id='meal-food-lightbox-gallery',
+                className='meal-food-lightbox-gallery',
                 disable_n_clicks=True,
             ),
             html.Div(

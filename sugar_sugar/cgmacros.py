@@ -28,7 +28,6 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from datetime import timedelta
 from pathlib import Path
 from typing import Iterable, Optional
 
@@ -43,10 +42,8 @@ from sugar_sugar.download_cgmacros import default_dest, dataset_is_present
 logger = logging.getLogger(__name__)
 
 _PHOTO_SUFFIXES: tuple[str, ...] = (".jpg", ".jpeg", ".png", ".webp", ".heic")
-
 _SUBJECT_DIR_RE = re.compile(r"^CGMacros-(\d+)$", re.IGNORECASE)
 _SUBJECT_CSV_RE = re.compile(r"^CGMacros-(\d+)\.csv$", re.IGNORECASE)
-_MEAL_CLUSTER_GAP = timedelta(hours=3)
 _LB_TO_KG = 0.453592
 
 _SUBJECT_ID_ALIASES: tuple[str, ...] = (

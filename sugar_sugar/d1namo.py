@@ -221,18 +221,8 @@ def resolve_served_photo(
 
 
 def load_d1namo_data(file_path: Path) -> tuple[pl.DataFrame, pl.DataFrame]:
-    """Load one D1NAMO participant into the app store schema."""
-    path = Path(file_path)
-    with start_action(action_type=u"load_d1namo_data", file_path=str(path)) as action:
-        glucose_path = path if path.name.lower() == "glucose.csv" else path.parent / "glucose.csv"
-        if not glucose_path.is_file() and is_d1namo_source_name(path.name):
-            subject_id = subject_id_from_path(path)
-            for source in discover_d1namo_sources():
-                if source.subject_id == subject_id:
-                    glucose_path = source.csv_path
-                    break
-        if not glucose_path.is_file():
-            raise FileNotFoundError(f"D1NAMO glucose.csv not found for {path}")
+    """Load one D1NAMO participant through ``cgm-format`` into the app schema."""
+    from sugar_sugar.data import load_glucose_data
 
         subject_dir = glucose_path.parent
         subject_token = subject_id_from_path(glucose_path) or "001"

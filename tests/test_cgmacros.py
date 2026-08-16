@@ -17,7 +17,12 @@ from sugar_sugar.cgmacros import (
     subject_id_from_path,
     visible_food_photo_events,
 )
-from sugar_sugar.components.glucose import GlucoseChart, meal_food_bubble_children
+from sugar_sugar.components.glucose import (
+    FOOD_COMPOSITE_MAX,
+    GlucoseChart,
+    cluster_visible_food_events,
+    meal_food_bubble_children,
+)
 from sugar_sugar.i18n import setup_i18n, t
 
 setup_i18n()
@@ -104,15 +109,21 @@ def test_falls_back_to_libre_only_when_dexcom_has_no_readings() -> None:
     assert name == "dexcom"
 
 
-def test_meal_cluster_keeps_start_photo_and_macros() -> None:
+def test_library_keeps_meal_photo_macros_and_end_photo() -> None:
     glucose_df, events_df = load_cgmacros_data(SUBJECT_001)
     assert glucose_df.height > 0
-    assert events_df.height == 1
-    assert events_df.get_column("event_type").to_list() == ["Carbohydrates"]
-    assert events_df.get_column("meal_type").to_list() == ["Breakfast"]
-    assert events_df.get_column("carbs_g").to_list() == [48.0]
-    assert events_df.get_column("photo_path").to_list() == ["photos/meal-before.jpg"]
-    assert events_df.get_column("time").to_list() == [datetime(2020, 5, 10, 12, 7)]
+    meals = events_df.filter(pl.col("event_type") == "Carbohydrates").sort("time")
+    assert meals.height == 2
+    assert meals.get_column("meal_type").to_list() == ["Breakfast", ""]
+    assert meals.get_column("carbs_g").to_list() == [48.0, None]
+    assert meals.get_column("photo_path").to_list() == [
+        "photos/meal-before.jpg",
+        "photos/meal-after.jpg",
+    ]
+    assert meals.get_column("time").to_list() == [
+        datetime(2020, 5, 10, 12, 7),
+        datetime(2020, 5, 10, 12, 45),
+    ]
 
 
 def test_resolve_photo_path_prefers_existing_file() -> None:
@@ -157,7 +168,7 @@ def test_food_photos_in_last_hour_are_hidden() -> None:
     glucose_df, events_df = load_cgmacros_data(SUBJECT_001)
     visible = _pad_window(glucose_df, hours_after=2)
     shown = visible_food_photo_events(visible, events_df, hide_last_hour=True)
-    assert len(shown) == 1
+    assert len(shown) == 2
     hidden_slice = _pad_window(glucose_df, hours_before=2)
     last_hour_hidden = visible_food_photo_events(
         hidden_slice, events_df, hide_last_hour=True
@@ -169,6 +180,70 @@ def test_food_photos_in_last_hour_are_hidden() -> None:
     assert len(revealed) == 1
 
 
+def test_close_meal_photos_cluster_into_one_composite_bubble() -> None:
+    start = datetime(2020, 5, 10, 12, 0)
+    window_df = pl.DataFrame(
+        {
+            "time": [start + timedelta(minutes=5 * i) for i in range(12)],
+            "gl": [100.0] * 12,
+            "prediction": [0.0] * 12,
+            "age": [0] * 12,
+            "user_id": [1] * 12,
+        }
+    )
+    events_df = pl.DataFrame(
+        {
+            "time": [start + timedelta(minutes=5), start + timedelta(minutes=10)],
+            "event_type": ["Carbohydrates", "Carbohydrates"],
+            "event_subtype": ["Carbs", "Carbs"],
+            "insulin_value": [None, None],
+            "photo_path": ["photos/one.jpg", "photos/two.jpg"],
+            "food_note": ["", ""],
+        }
+    )
+    clusters = cluster_visible_food_events(
+        window_df,
+        events_df,
+        source_name="CGMacros-001.csv",
+        hide_last_hour=False,
+    )
+    assert len(clusters) == 1
+    assert clusters[0].photo_urls == [
+        "/cgmacros/CGMacros-001/photo/photos/one.jpg",
+        "/cgmacros/CGMacros-001/photo/photos/two.jpg",
+    ]
+    bubbles = meal_food_bubble_children(
+        window_df,
+        events_df,
+        source_name="CGMacros-001.csv",
+        hide_last_hour=False,
+    )
+    assert len(bubbles) == 1
+    assert bubbles[0].id["index"].startswith("composite:")
+    assert "photos/one.jpg" in bubbles[0].id["index"]
+    assert "photos/two.jpg" in bubbles[0].id["index"]
+    assert bubbles[0].to_plotly_json()["props"].get("data-count") == "2"
+
+
+def test_lightbox_uses_fixed_composite_tiles() -> None:
+    from sugar_sugar.app import app
+
+    lightbox = next(
+        child
+        for child in app.layout.children
+        if getattr(child, "id", None) == "meal-food-lightbox"
+    )
+    gallery = next(
+        child
+        for child in lightbox.children
+        if getattr(child, "id", None) == "meal-food-lightbox-gallery"
+    )
+    assert [child.id for child in gallery.children] == [
+        {"type": "meal-food-lightbox-tile", "index": i}
+        for i in range(FOOD_COMPOSITE_MAX)
+    ]
+
+
 def test_meal_bubbles_and_food_line_use_photo() -> None:
     glucose_df, events_df = load_cgmacros_data(SUBJECT_001)
     bubbles = meal_food_bubble_children(
@@ -177,8 +252,8 @@ def test_meal_bubbles_and_food_line_use_photo() -> None:
         source_name="CGMacros-001.csv",
         hide_last_hour=False,
     )
-    assert len(bubbles) == 1
-    assert bubbles[0].id["index"] == "/cgmacros/CGMacros-001/photo/photos/meal-before.jpg"
+    indexes = {bubble.id["index"] for bubble in bubbles}
+    assert "/cgmacros/CGMacros-001/photo/photos/meal-before.jpg" in indexes
     figure = GlucoseChart.build_static_figure(
         glucose_df,
         events_df,

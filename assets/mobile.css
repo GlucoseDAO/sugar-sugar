@@ -2458,6 +2458,18 @@ html.route-prediction.mobile-device #submit-button {
   }
 }
 
+html.mobile-device .meal-food-lightbox-gallery {
+  width: min(96vw, 920px);
+  max-height: 80vh;
+  padding: 8px;
+  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+html.mobile-device .meal-food-lightbox-tile {
+  max-height: min(34vh, 220px);
+}
+
 html.mobile-device .meal-food-lightbox-note {
   width: min(94vw, 720px);
   max-height: 80vh;
