@@ -1,8 +1,18 @@
-"""D1NAMO (Dubosson) discovery, photo serving, and library-backed load.
+"""Import D1NAMO (Dubosson) T1D subjects into the app store schema.
 
-Parsing is ``cgm-format`` 0.10+ (``parse_subject_directory``). This module
-keeps the app-specific pieces: Format A source listing, meal-photo URLs, and
-path safety. Download a local copy with ``uv run download-d1namo``.
+Parsing is ``cgm-format``'s job: :func:`cgm_format.FormatParser.parse_subject_directory`
+reads the subject bundle (``glucose.csv`` + ``insulin.csv`` + ``food.csv``), converts
+mmol/L to mg/dL through the *declared* unit rather than a guess, handles the four
+different timestamp conventions D1NAMO mixes inside one subject directory (including
+the EXIF-style ``2014:10:01 12:15:00`` in ``food.csv``), and maps fingersticks to
+``CALIBRAT`` so they never reach the glucose trace.
+
+What stays here is what the library does not do: discovering subjects on disk,
+resolving meal photographs to a servable path, and the Flask-facing URL helpers.
+D1NAMO is the type-1 / insulin-using Format A arm; non-insulin arms use BIG IDEAs,
+which ``bigideas.py`` loads through the same library entry point.
+
+Download a local copy with ``uv run download-d1namo``.
 Paper: Dubosson et al., Informatics in Medicine Unlocked, 2018.
 """
 
@@ -14,12 +24,24 @@ from pathlib import Path
 from typing import Optional
 
 import polars as pl
+from cgm_format import FormatParser, SupportedCGMFormat
+from cgm_format.interface.cgm_interface import UnknownFormatError
+from eliot import start_action
 
+from sugar_sugar.corpus import adapt_unified
 from sugar_sugar.download_d1namo import dataset_is_present, default_dest
 
 _PHOTO_SUFFIXES: tuple[str, ...] = (".jpg", ".jpeg", ".png", ".webp", ".heic")
 _SUBJECT_DIR_RE = re.compile(r"^(\d{3})$")
 _SOURCE_NAME_RE = re.compile(r"^D1NAMO-(\d{3})\.csv$", re.IGNORECASE)
+
+#: The subject shapes the library recognises for this corpus. A directory that
+#: matches neither is not a D1NAMO subject we can parse, and is skipped during
+#: discovery rather than blowing up mid-round.
+_D1NAMO_FORMATS: tuple[SupportedCGMFormat, ...] = (
+    SupportedCGMFormat.D1NAMO_DIABETES,
+    SupportedCGMFormat.D1NAMO_HEALTHY,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,14 +66,23 @@ def is_d1namo_source_name(source_name: str) -> bool:
 
 
 def is_d1namo_path(file_path: Path) -> bool:
-    """True when *file_path* is a D1NAMO glucose table or virtual source name."""
+    """True when *file_path* is a D1NAMO glucose table or virtual source name.
+
+    Kept as a cheap router predicate for ``load_glucose_data``: the virtual
+    ``D1NAMO-NNN.csv`` name never exists on disk, so it is answered by name
+    alone, and a real ``glucose.csv`` is confirmed through the library's own
+    subject-shape probes rather than a path substring.
+    """
     path = Path(file_path)
     if is_d1namo_source_name(path.name):
         return True
     if path.name.lower() != "glucose.csv":
         return False
-    if _SUBJECT_DIR_RE.match(path.parent.name):
+    if subject_format(path.parent) is not None:
         return True
+    # Not a shape the library claims, but unmistakably from the extract tree --
+    # let it through so the caller fails with a real parse error, not a
+    # silent fallthrough to the generic vendor parser.
     return "d1namo" in str(path).replace("\\", "/").lower()
 
 
@@ -66,7 +97,30 @@ def subject_id_from_path(path: Path) -> str | None:
     return None
 
 
+def subject_format(subject_dir: Path) -> SupportedCGMFormat | None:
+    """The D1NAMO subset *subject_dir* belongs to, or ``None`` if it is not one.
+
+    The library discriminates the two subsets by which modality file is present
+    (``insulin.csv`` for diabetes, ``annotations.csv`` for healthy), so a folder
+    holding a bare ``glucose.csv`` is not a subject it can parse. Answering
+    ``None`` here lets discovery skip such a folder instead of handing the round
+    picker a source that raises when loaded.
+    """
+    try:
+        detected = FormatParser.detect_subject_format(subject_dir)
+    except (UnknownFormatError, OSError, ValueError):
+        return None
+    return detected if detected in _D1NAMO_FORMATS else None
+
+
 def resolve_photo_path(image_path: str, subject_dir: Path) -> str:
+    """Return a subject-relative posix path for a meal photograph.
+
+    ``cgm-format`` reports the reference the source recorded (a bare filename)
+    and warns when it cannot resolve it, but never rewrites it -- serving the
+    file is the app's concern, and published subjects disagree about which
+    folder holds the JPEGs.
+    """
     raw = str(image_path or "").strip().replace("\\", "/")
     if not raw:
         return ""
@@ -95,6 +149,10 @@ def discover_d1namo_sources(dest: Optional[Path] = None) -> list[D1NamoSource]:
     for glucose_path in sorted(root.rglob("glucose.csv")):
         subject_id = subject_id_from_path(glucose_path)
         if subject_id is None or subject_id in seen:
+            continue
+        # Only offer subjects the library can actually parse: a round that
+        # picks an unparseable source fails in front of a player.
+        if subject_format(glucose_path.parent) is None:
             continue
         seen.add(subject_id)
         sources.append(
@@ -164,6 +222,36 @@ def resolve_served_photo(
 
 def load_d1namo_data(file_path: Path) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Load one D1NAMO participant through ``cgm-format`` into the app schema."""
-    from sugar_sugar.data import load_glucose_data
+    path = Path(file_path)
+    with start_action(action_type=u"load_d1namo_data", file_path=str(path)) as action:
+        glucose_path = path
+        if not glucose_path.is_file() and is_d1namo_source_name(path.name):
+            subject_id = subject_id_from_path(path)
+            for source in discover_d1namo_sources():
+                if source.subject_id == subject_id:
+                    glucose_path = source.csv_path
+                    break
+        if glucose_path.is_dir():
+            subject_dir = glucose_path
+        elif glucose_path.is_file():
+            subject_dir = glucose_path.parent
+        else:
+            raise FileNotFoundError(f"D1NAMO glucose CSV not found for {path}")
 
-    return load_glucose_data(Path(file_path))
+        subject_token = subject_id_from_path(glucose_path) or "001"
+        # The subject is a *bundle*: glucose, insulin and food are three files
+        # that parse into one frame, so the library takes the directory.
+        unified_df = FormatParser.parse_subject_directory(subject_dir)
+        glucose_df, events_df = adapt_unified(
+            unified_df,
+            subject_id=int(subject_token),
+            photo_resolver=lambda raw: resolve_photo_path(raw, subject_dir),
+        )
+        action.add_success_fields(
+            subject_id=subject_token,
+            glucose_rows=glucose_df.height,
+            event_rows=events_df.height,
+            photo_events=events_df.filter(pl.col("photo_path") != "").height,
+            insulin_events=events_df.filter(pl.col("event_type") == "Insulin").height,
+        )
+        return glucose_df, events_df

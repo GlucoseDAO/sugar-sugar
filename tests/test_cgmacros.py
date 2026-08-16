@@ -63,7 +63,18 @@ def test_discover_cgmacros_sources_reads_fixture_tree() -> None:
     assert first.sensor == "Dexcom G6 Pro"
 
 
-def test_library_prefers_dexcom_and_downsamples_to_five_minutes() -> None:
+def test_plays_dexcom_only_and_downsamples_to_five_minutes() -> None:
+    """Dexcom alone is played, and the 1-minute table is thinned to the game grid.
+
+    Never the average of the two sensors: across the 45 published subjects Libre
+    compresses the excursion to a median 0.70 of Dexcom's, by a subject-specific
+    factor, so a mean trace would carry a distorted amplitude into a study that
+    scores human error in mg/dL.
+
+    cgm-format parses tracks but resamples neither, and CGMacros is a 1-minute
+    interpolated table -- without ``_downsample_glucose_5min`` a 36-point window
+    would cover 36 minutes rather than three hours.
+    """
     glucose_df, _events = load_cgmacros_data(SUBJECT_001)
     assert glucose_df.columns == ["time", "gl", "prediction", "age", "user_id"]
     times = glucose_df.get_column("time").to_list()
@@ -74,16 +85,28 @@ def test_library_prefers_dexcom_and_downsamples_to_five_minutes() -> None:
     ]
     assert deltas
     assert all(delta == 300 for delta in deltas)
+    # 12:00 reads Dexcom 108.0 and Libre 110.0 -- neither their mean (109.0)
+    # nor Libre.
     assert glucose_df.get_column("gl").to_list()[0] == 108.0
 
 
-def test_library_falls_back_to_libre_when_dexcom_is_empty() -> None:
+def test_falls_back_to_libre_only_when_dexcom_has_no_readings() -> None:
+    """A degraded trace beats no round, but only when there is no alternative.
+
+    CGMacros-002's Dexcom column is populated for the last two rows only, so
+    Dexcom still wins; a subject with none at all would fall back to Libre and
+    log that its calibration is unreliable.
+    """
     glucose_df, events_df = load_cgmacros_data(SUBJECT_002)
-    assert glucose_df.height >= 2
-    assert glucose_df.get_column("gl").to_list()[0] == 140.0
-    meals = events_df.filter(pl.col("event_type") == "Carbohydrates")
-    assert meals.height == 1
-    assert meals.get_column("meal_type").to_list() == ["Dinner"]
+    assert glucose_df.get_column("gl").to_list() == [143.5, 146.0]
+    assert events_df.height == 1
+    assert events_df.get_column("meal_type").to_list() == ["Dinner"]
+    assert events_df.get_column("carbs_g").to_list() == [60.0]
+
+    from sugar_sugar.cgmacros import _playable_track
+
+    name, _frame = _playable_track(SUBJECT_001)
+    assert name == "dexcom"
 
 
 def test_library_keeps_meal_photo_macros_and_end_photo() -> None:

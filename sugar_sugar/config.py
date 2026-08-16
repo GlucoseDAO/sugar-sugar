@@ -22,6 +22,12 @@ MAX_POINTS: int = int(os.getenv("MAX_POINTS", "60"))
 PREDICTION_HOUR_OFFSET: int = int(os.getenv("PREDICTION_HOUR_OFFSET", "12"))
 DOUBLE_CLICK_THRESHOLD: int = int(os.getenv("DOUBLE_CLICK_THRESHOLD", "500"))  # milliseconds
 
+# A gap longer than this between consecutive readings means the sensor stopped:
+# a playable window must not straddle one (see subject_sources.window_is_continuous).
+# Matches cgm-format's own `FormatProcessor.small_gap_max_minutes` default, so the
+# app and the library agree on what counts as continuous data.
+SEQUENCE_GAP_MINUTES: int = int(os.getenv("SEQUENCE_GAP_MINUTES", "15"))
+
 # Dash server (see README / .env.template)
 DASH_HOST: str = os.getenv("DASH_HOST", "127.0.0.1")
 DASH_PORT: int = int(os.getenv("DASH_PORT", "8050"))

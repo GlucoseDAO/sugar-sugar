@@ -15,6 +15,7 @@ from sugar_sugar.d1namo import (
     load_d1namo_data,
     resolve_photo_path,
     resolve_served_photo,
+    subject_format,
     subject_id_from_path,
 )
 from sugar_sugar.data import load_glucose_data
@@ -57,29 +58,81 @@ def test_discover_d1namo_sources_reads_fixture_tree() -> None:
     assert first.csv_path == SUBJECT_001
 
 
-def test_library_parses_colon_datetime_mmol_and_photos() -> None:
+def test_food_colon_datetime_parses_without_infer() -> None:
+    """The EXIF-style ``2014:10:01 12:15:00`` in ``food.csv`` reaches the chart.
+
+    D1NAMO mixes four timestamp conventions inside one subject directory, and
+    this is the one that silently produces wrong data: Polars cannot infer a
+    colon-separated date, so it must be parsed by explicit format.
+    """
+    _glucose_df, events_df = load_d1namo_data(SUBJECT_001)
+    meals = events_df.filter(pl.col("event_type") == "Carbohydrates")
+    assert meals.get_column("time").to_list()[0] == datetime(2014, 10, 1, 12, 15)
+    assert meals.get_column("meal_type").to_list()[0] == "Lunch"
+
+
+def test_keeps_cgm_converts_mmol_and_drops_fingerstick() -> None:
+    """Sensor readings only, in mg/dL, with meals and insulin as events.
+
+    D1NAMO glucose is mmol/L in both subsets and is converted through the unit
+    the schema declares (18.0182), not a locally guessed factor. The 12:02
+    fingerstick is a ``CALIBRAT`` event, so it stays out of the trace the player
+    is asked to continue.
+    """
     glucose_df, events_df = load_d1namo_data(SUBJECT_001)
     assert glucose_df.columns == ["time", "gl", "prediction", "age", "user_id"]
     times = glucose_df.get_column("time").to_list()
     assert times[0] == datetime(2014, 10, 1, 12, 0)
     assert datetime(2014, 10, 1, 12, 2) not in times
     assert glucose_df.height == 13
-    assert glucose_df.get_column("gl").to_list()[0] == pytest.approx(108.0, abs=0.2)
+    assert glucose_df.get_column("gl").to_list()[0] == pytest.approx(6.0 * 18.0182)
+
     insulin = events_df.filter(pl.col("event_type") == "Insulin")
+    # The 12:12 row records a skipped bolus of 0 U -- bookkeeping, not a dose.
     assert insulin.height == 2
-    subtypes = set(insulin.get_column("event_subtype").to_list())
-    assert subtypes == {"Fast Acting", "Long Acting"}
+    assert set(insulin.get_column("event_subtype").to_list()) == {
+        "Fast Acting",
+        "Long Acting",
+    }
     meals = events_df.filter(pl.col("event_type") == "Carbohydrates")
     assert meals.height == 2
     assert meals.get_column("photo_path").to_list() == ["pictures/meal.jpg", ""]
     assert meals.get_column("meal_type").to_list() == ["Lunch", "Dinner without photo"]
-    assert meals.get_column("time").to_list()[0] == datetime(2014, 10, 1, 12, 15)
+    # D1NAMO has no carbohydrate column anywhere: null is "the source did not
+    # say", which is not the same as zero.
+    assert meals.get_column("carbs_g").to_list() == [None, None]
 
 
-def test_library_converts_mmol_glucose() -> None:
+def test_glucose_always_converts_from_mmol() -> None:
+    """Every D1NAMO subject is mmol/L -- there is no unit to guess at.
+
+    The old formatter inferred the unit from the series maximum ("< 40 means
+    mmol/L"), which would misread a subject whose readings all sat high. The
+    library takes the unit from the schema instead.
+    """
     glucose_df, events_df = load_d1namo_data(SUBJECT_002)
-    assert glucose_df.get_column("gl").to_list() == pytest.approx([140.4, 142.2, 144.0], abs=0.3)
-    assert events_df.height == 0
+    assert glucose_df.get_column("gl").to_list() == pytest.approx(
+        [7.8 * 18.0182, 7.9 * 18.0182, 8.0 * 18.0182]
+    )
+    assert events_df.get_column("event_subtype").to_list() == ["Long Acting"]
+
+
+def test_subject_format_rejects_a_directory_that_is_not_a_subject(
+    tmp_path: Path,
+) -> None:
+    """A folder holding a bare ``glucose.csv`` is not a parseable D1NAMO subject.
+
+    The two subsets are told apart by ``insulin.csv`` (diabetes) vs
+    ``annotations.csv`` (healthy); without either, the library cannot say which
+    parser applies. Discovery skips such a folder rather than offering the round
+    picker a source that raises when loaded.
+    """
+    orphan = tmp_path / "007"
+    orphan.mkdir()
+    (orphan / "glucose.csv").write_text("date,time,glucose,type,comments\n")
+    assert subject_format(orphan) is None
+    assert subject_format(SUBJECT_001.parent) is not None
+    assert discover_d1namo_sources(tmp_path) == []
 
 
 def test_resolve_photo_path_prefers_existing_file() -> None:

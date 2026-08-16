@@ -13,7 +13,7 @@ from eliot import start_action
 
 from sugar_sugar.bigideas import discover_bigideas_sources
 from sugar_sugar.cgmacros import window_has_visible_food_photo
-from sugar_sugar.config import PREDICTION_HOUR_OFFSET
+from sugar_sugar.config import PREDICTION_HOUR_OFFSET, SEQUENCE_GAP_MINUTES
 from sugar_sugar.d1namo import discover_d1namo_sources
 from sugar_sugar.data import load_glucose_data
 
@@ -441,6 +441,34 @@ def windows_conflict(existing: GenericRoundWindow, candidate: GenericRoundWindow
     return candidate.window_start <= buffered_end and candidate.window_end >= buffered_start
 
 
+def window_is_continuous(
+    window_df: pl.DataFrame,
+    *,
+    gap_minutes: int = SEQUENCE_GAP_MINUTES,
+) -> bool:
+    """True when a window holds one unbroken run of readings.
+
+    A CGM trace is not one continuous run: sensors are replaced, transmitters
+    drop out, people shower. ``data/example.csv`` alone breaks into eleven
+    stretches, two of them a single reading long, and windows are sliced by row
+    index -- so without this check a player can be shown a 36-point "hour" whose
+    middle silently jumps three days. That is not a harder round, it is an
+    unanswerable one that reads as a broken chart.
+
+    Continuity is read straight off the timestamps rather than from a stamped
+    ``sequence_id`` column, so it holds for a frame reconstructed from a session
+    store just as well as for one fresh off disk, and the app-wide glucose
+    schema stays the five columns every caller expects.
+
+    ``gap_minutes`` matches ``cgm-format``'s own ``small_gap_max_minutes``
+    default, so the app and the library agree on what counts as continuous.
+    """
+    if window_df.height < 2 or "time" not in window_df.columns:
+        return True
+    largest_gap = window_df.get_column("time").sort().diff().dt.total_minutes().max()
+    return largest_gap is None or largest_gap <= gap_minutes
+
+
 def _candidate_start_indices(row_count: int, points: int) -> list[int]:
     """Random sample of valid start indices (avoids scanning entire LOOP files)."""
     max_start = row_count - points
@@ -507,7 +535,9 @@ def pick_unique_generic_window(
 
     prior = list(history or [])
     fallback: GenericWindowSelection | None = None
+    continuous_fallback: GenericWindowSelection | None = None
     unique_fallback: GenericWindowSelection | None = None
+    discontinuous_rejected = 0
 
     with start_action(
         action_type=u"pick_unique_generic_window",
@@ -538,6 +568,16 @@ def pick_unique_generic_window(
                 )
                 if fallback is None:
                     fallback = selection
+                # A window spanning a sensor gap is not a harder round, it is an
+                # unanswerable one: the hour the player is asked to continue may
+                # start days after the hour they were shown. Rank this above the
+                # food-photo preference -- a gap-free window with no meal marker
+                # is merely duller, a discontinuous one is broken.
+                if not window_is_continuous(window_df):
+                    discontinuous_rejected += 1
+                    continue
+                if continuous_fallback is None:
+                    continuous_fallback = selection
                 if any(windows_conflict(old, round_window) for old in prior):
                     continue
                 if unique_fallback is None:
@@ -550,12 +590,13 @@ def pick_unique_generic_window(
                     start_index=start_index,
                     slice_key=slice_key,
                     has_food_photo=True,
+                    discontinuous_rejected=discontinuous_rejected,
                     window_start=round_window.window_start.isoformat(),
                     window_end=round_window.window_end.isoformat(),
                 )
                 return selection
 
-        chosen = unique_fallback or fallback
+        chosen = unique_fallback or continuous_fallback or fallback
         if chosen is None:
             raise ValueError("Could not pick any generic window")
 
@@ -567,5 +608,9 @@ def pick_unique_generic_window(
             has_food_photo=window_has_visible_food_photo(
                 chosen.window_df, chosen.events_df
             ),
+            # False only when every candidate straddled a gap, i.e. the source
+            # is too fragmented to yield a clean window of this size.
+            is_continuous=window_is_continuous(chosen.window_df),
+            discontinuous_rejected=discontinuous_rejected,
         )
         return chosen

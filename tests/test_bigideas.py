@@ -9,11 +9,11 @@ import pytest
 
 from sugar_sugar.bigideas import (
     discover_bigideas_sources,
-    format_bigideas_frames,
     is_bigideas_path,
     is_bigideas_source_name,
     load_bigideas_data,
     load_bigideas_demographics,
+    subject_format,
     subject_id_from_path,
 )
 from sugar_sugar.components.glucose import GlucoseChart, meal_food_bubble_children
@@ -45,6 +45,19 @@ def test_is_bigideas_path_detects_dexcom_and_virtual_name() -> None:
     assert not is_bigideas_path(Path("D1NAMO-001.csv"))
 
 
+def test_dexcom_export_alone_is_not_a_bigideas_subject(tmp_path: Path) -> None:
+    """A Clarity export named like a subject file is not the corpus.
+
+    The glucose half of a BIG IDEAs bundle *is* a Dexcom export, so only the
+    food log sitting beside it makes the directory a subject.
+    """
+    lone = tmp_path / "Dexcom_001.csv"
+    lone.write_bytes(SUBJECT_001.read_bytes())
+    assert subject_format(tmp_path) is None
+    assert not is_bigideas_path(lone)
+    assert subject_format(SUBJECT_001.parent) is not None
+
+
 def test_subject_id_from_path() -> None:
     assert subject_id_from_path(SUBJECT_001) == "001"
     assert subject_id_from_path(Path("BIGIDEAS-007.csv")) == "007"
@@ -63,20 +76,37 @@ def test_demographics_and_discover(monkeypatch: pytest.MonkeyPatch) -> None:
     assert first.gender == "female"
 
 
-def test_format_keeps_egv_drops_calibration_and_clusters_food() -> None:
-    raw = pl.read_csv(SUBJECT_001)
-    food = pl.read_csv(SUBJECT_001.parent / "Food_Log_001.csv")
-    glucose_df, events_df = format_bigideas_frames(raw, food_df=food, subject_id=1)
+def test_load_keeps_egv_drops_calibration_and_clusters_food() -> None:
+    glucose_df, events_df = load_bigideas_data(SUBJECT_001)
     assert glucose_df.height == 9
     assert datetime(2020, 2, 13, 18, 0) in glucose_df.get_column("time").to_list()
     assert 99.0 not in glucose_df.get_column("gl").to_list()
     notes = events_df.get_column("food_note").to_list()
+    # Two items logged at 18:00 are one sitting; the 20:30 item is another.
     assert len(notes) == 2
     assert "Berry Smoothie (20.0 fluid ounce)" in notes[0]
     assert "Chicken Leg (1.0)" in notes[0]
-    assert notes[1].startswith("Asparagus")
+    assert notes[1] == "Asparagus (4.0)"
     assert events_df.get_column("photo_path").to_list() == ["", ""]
-    assert events_df.get_column("carbs_g").to_list()[0] == 85.0
+    assert events_df.get_column("carbs_g").to_list() == [85.0, 2.5]
+    assert events_df.get_column("event_type").to_list() == ["Carbohydrates", "Carbohydrates"]
+    assert events_df.get_column("time").dtype == pl.Datetime("ms")
+
+
+def test_headerless_food_log_and_date_time_fallback() -> None:
+    """Subject 002's log has no header row and one blank ``time_begin``.
+
+    Both are shapes the published corpus really ships; ``cgm-format`` absorbs
+    them, so the app sees an ordinary sitting with both items in it.
+    """
+    glucose_df, events_df = load_bigideas_data(SUBJECT_002)
+    assert glucose_df.height == 3
+    assert events_df.height == 1
+    note = events_df.get_column("food_note").to_list()[0]
+    assert "Oatmeal (1.0 cup)" in note
+    assert "Black Coffee (8.0 fluid ounce)" in note
+    assert events_df.get_column("time").to_list() == [datetime(2020, 2, 14, 8, 5)]
+    assert events_df.get_column("carbs_g").to_list() == [27.0]
 
 
 def test_load_glucose_data_routes_bigideas() -> None:

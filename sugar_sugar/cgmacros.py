@@ -1,27 +1,52 @@
-"""CGMacros discovery, photo serving, and library-backed load.
+"""Import PhysioNet CGMacros subjects into the app store schema.
 
-Parsing is ``cgm-format`` 0.10+ (``parse_tracks``). This module keeps the
-app-specific pieces: participant listing, ``bio.csv`` demographics, meal-photo
-URLs, and the visible-food helper used to pick Format A windows.
+Parsing is ``cgm-format``'s job: :func:`cgm_format.FormatParser.parse_tracks`
+reads a subject table into the extended unified schema, carrying macronutrients
+and the meal photograph reference that the six core data columns cannot hold.
+
+Two things the library deliberately does not do, and this module still must:
+
+* **Downsample.** CGMacros is a 1-minute interpolated table and the game grid is
+  5-minute. ``synchronize_timestamps`` snaps readings onto a grid, it does not
+  reduce cadence -- asking it for 5 minutes yields five rows on the same
+  timestamp -- so :func:`_downsample_glucose_5min` still owns that.
+* **Cluster meals.** The library emits one event per source meal row, faithfully.
+  Merging a meal and the snack logged minutes after it into one chart marker is
+  this app's editorial choice, so :func:`_cluster_meal_rows` still owns that.
+
+Tracks are alternatives, not shards: a subject yields a complete ``libre`` view
+and a complete ``dexcom`` view of the same days, meals replicated into both, so
+concatenating them would double-count every meal. Exactly one is
+played -- Dexcom, because the corpus's Libre series is badly calibrated and the
+library's synthetic ``mean`` track would blend that in. See :func:`_playable_track`.
+
 Download a local copy with ``uv run download-cgmacros``.
 """
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 from typing import Iterable, Optional
 
 import polars as pl
+from cgm_format import FormatParser
+from eliot import start_action
 
 from sugar_sugar.config import PREDICTION_HOUR_OFFSET
-from sugar_sugar.download_cgmacros import dataset_is_present, default_dest
+from sugar_sugar.corpus import adapt_unified, empty_events_frame
+from sugar_sugar.download_cgmacros import default_dest, dataset_is_present
+
+logger = logging.getLogger(__name__)
 
 _PHOTO_SUFFIXES: tuple[str, ...] = (".jpg", ".jpeg", ".png", ".webp", ".heic")
 _SUBJECT_DIR_RE = re.compile(r"^CGMacros-(\d+)$", re.IGNORECASE)
 _SUBJECT_CSV_RE = re.compile(r"^CGMacros-(\d+)\.csv$", re.IGNORECASE)
 _LB_TO_KG = 0.453592
+_MEAL_CLUSTER_GAP = timedelta(minutes=30)
 
 _SUBJECT_ID_ALIASES: tuple[str, ...] = (
     "subject",
@@ -217,6 +242,145 @@ def resolve_photo_path(image_path: str, subject_dir: Path) -> str:
     return raw
 
 
+def _downsample_glucose_5min(glucose_df: pl.DataFrame) -> pl.DataFrame:
+    """Keep one reading per 5-minute clock bucket (game grid)."""
+    if glucose_df.height == 0:
+        return glucose_df
+    return (
+        glucose_df.sort("time")
+        .group_by(pl.col("time").dt.truncate("5m").alias("bucket"), maintain_order=True)
+        .agg(
+            [
+                pl.col("gl").first(),
+                pl.col("prediction").first(),
+                pl.col("age").first(),
+                pl.col("user_id").first(),
+            ]
+        )
+        .select(
+            [
+                pl.col("bucket").alias("time"),
+                pl.col("gl"),
+                pl.col("prediction"),
+                pl.col("age"),
+                pl.col("user_id"),
+            ]
+        )
+        .filter(pl.col("time").is_not_null() & pl.col("gl").is_not_null())
+    )
+
+
+def _cluster_meal_rows(rows: list[dict[str, object]]) -> list[list[dict[str, object]]]:
+    if not rows:
+        return []
+    clusters: list[list[dict[str, object]]] = [[rows[0]]]
+    for row in rows[1:]:
+        previous = clusters[-1][-1]
+        same_meal = (
+            str(row.get("meal_type") or "") == str(previous.get("meal_type") or "")
+            and bool(row.get("meal_type"))
+        )
+        previous_time = previous["time"]
+        row_time = row["time"]
+        close = (
+            previous_time is not None
+            and row_time is not None
+            and (row_time - previous_time) <= _MEAL_CLUSTER_GAP
+        )
+        if close and (same_meal or not row.get("meal_type") or not previous.get("meal_type")):
+            clusters[-1].append(row)
+        else:
+            clusters.append([row])
+    return clusters
+
+
+#: Sensor tracks in preference order. Dexcom leads; see :func:`_playable_track`.
+_TRACK_PREFERENCE: tuple[str, ...] = ("dexcom", "libre")
+
+
+def _playable_track(csv_path: Path) -> tuple[str, pl.DataFrame]:
+    """Pick the one sensor series to play from. Dexcom unless it is empty.
+
+    A CGMacros subject wears two sensors, and the library offers three views:
+    ``libre``, ``dexcom``, and a synthetic ``mean`` whose ``mean_horizontal``
+    ignores nulls -- so it averages where both read and passes a lone reading
+    through untouched, exactly reproducing the coalesce this module used to do
+    by hand, and recovering the ~8% of rows Dexcom alone does not cover.
+
+    **The mean is not used, because the two sensors do not agree.** Fitting
+    ``libre = slope*dexcom + intercept`` over all 45 published subjects gives a
+    median slope of **0.70** (range 0.10-1.16) with a small intercept: Libre is
+    not offset from Dexcom, it *compresses* the excursion to roughly two thirds,
+    by a factor that differs per subject. Median correlation is 0.82 and 15 of
+    45 subjects fall below 0.7, so for a third of the corpus the two series
+    disagree in shape and not merely in level. Averaging assumes two comparable
+    estimates of one quantity with unbiased independent error; all three of
+    those fail here, and the mean would carry ~85% of true excursion amplitude
+    with a per-subject distortion -- straight into a study that measures human
+    prediction error in mg/dL.
+
+    Libre is also the implausible one: it reads below 70 mg/dL for 82% and 86%
+    of subjects 007 and 015 respectively, against 0.4% of all Dexcom readings.
+    So the span Dexcom-only gives up is not good data being discarded -- of the
+    57,755 rows only Libre covers, 10.1% are sub-70 against Dexcom's 0.4%. And
+    span is not the binding constraint: ten Dexcom days is ~2850 five-minute
+    readings, some 79 non-overlapping 36-point windows per subject.
+
+    Libre remains the fallback for a subject whose Dexcom series is empty --
+    a degraded trace beats no round at all.
+    """
+    tracks = FormatParser.parse_tracks(csv_path)
+    for name in _TRACK_PREFERENCE:
+        frame = tracks.get(name)
+        if frame is not None and frame.get_column("glucose").drop_nulls().len() > 0:
+            if name != _TRACK_PREFERENCE[0]:
+                logger.warning(
+                    "CGMacros %s: no Dexcom readings, falling back to %r, whose "
+                    "calibration in this corpus is unreliable.",
+                    csv_path.name,
+                    name,
+                )
+            return name, frame
+    name = next(iter(tracks))
+    return name, tracks[name]
+
+
+def _cluster_meal_events(events_df: pl.DataFrame) -> pl.DataFrame:
+    """Collapse meal rows logged within ``_MEAL_CLUSTER_GAP`` into one marker.
+
+    The library reports every meal row the source recorded; a subject who logged
+    a main dish and its side six minutes apart gets two events. On the chart that
+    is two markers on top of each other, so they are merged here -- keeping the
+    first row's label and the first photograph and carbohydrate figure the
+    cluster offers.
+    """
+    if events_df.height == 0:
+        return events_df
+    meals = events_df.filter(pl.col("event_type") == "Carbohydrates").sort("time")
+    others = events_df.filter(pl.col("event_type") != "Carbohydrates")
+    if meals.height == 0:
+        return events_df
+
+    merged: list[dict[str, object]] = []
+    for cluster in _cluster_meal_rows(meals.to_dicts()):
+        head = next((row for row in cluster if row.get("meal_type")), cluster[0])
+        merged.append(
+            {
+                **head,
+                "photo_path": next(
+                    (str(row.get("photo_path") or "") for row in cluster if row.get("photo_path")),
+                    "",
+                ),
+                "carbs_g": next(
+                    (row.get("carbs_g") for row in cluster if row.get("carbs_g") is not None),
+                    None,
+                ),
+            }
+        )
+    clustered = pl.DataFrame(merged, schema=events_df.schema)
+    return pl.concat([others, clustered], how="vertical").sort("time")
+
+
 def cgmacros_photo_url(source_name: str, photo_path: str) -> str:
     """Public URL for a meal photo belonging to ``CGMacros-NNN.csv``."""
     subject = Path(str(source_name or "")).stem
@@ -297,7 +461,27 @@ def visible_food_photo_events(
 
 
 def load_cgmacros_data(file_path: Path) -> tuple[pl.DataFrame, pl.DataFrame]:
-    """Load one CGMacros participant through ``cgm-format`` into the app schema."""
-    from sugar_sugar.data import load_glucose_data
-
-    return load_glucose_data(Path(file_path))
+    """Load one CGMacros participant CSV into the app store schema."""
+    path = Path(file_path)
+    with start_action(
+        action_type=u"load_cgmacros_data",
+        file_path=str(path),
+    ) as action:
+        subject_id = subject_id_from_path(path) or 1
+        subject_dir = path.parent
+        track_name, unified_df = _playable_track(path)
+        glucose_df, events_df = adapt_unified(
+            unified_df,
+            subject_id=subject_id,
+            photo_resolver=lambda raw: resolve_photo_path(raw, subject_dir),
+        )
+        glucose_df = _downsample_glucose_5min(glucose_df)
+        events_df = _cluster_meal_events(events_df) if events_df.height else empty_events_frame()
+        action.add_success_fields(
+            subject_id=subject_id,
+            track=track_name,
+            glucose_rows=glucose_df.height,
+            event_rows=events_df.height,
+            photo_events=events_df.filter(pl.col("photo_path") != "").height,
+        )
+        return glucose_df, events_df

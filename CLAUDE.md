@@ -17,6 +17,107 @@ uv run download-d1namo fetches the public D1NAMO (Dubosson) T1D subset into `dat
 Format A source policy (`generic_intervention`): no diabetes / gestational → BIG IDEAs; type 1 → D1NAMO; type 2 → 50/50 mix each round; prediabetes → 75% BIG IDEAs / 25% D1NAMO; LADA → 75% D1NAMO / 25% BIG IDEAs. BIG IDEAs meals have no photos — the apple icon opens a text notepad (backdrop click closes, same as the D1NAMO photo lightbox).
 uv run serve runs gunicorn (production). uv run serve-staging (= uv run serve --staging) is the same but sets `_STAGING_MODE=1`, exposing prod+ test routes under `/staging/*` (`/staging/ending`, `/staging/final`, `/staging/share`, `/staging/prediction`, and a `/staging` index) that jump straight to prefilled states for remote/visual testing **without altering any production logic** — when the flag is off the app is byte-identical. The staging deployment `https://vanilla-sugar.glucosedao.org/` hosts the dev branch. See `docs/share-ops.md` → "Staging Mode".
 
+## Data ingest: everything parseable goes through `cgm-format`
+
+`sugar_sugar/corpus.py` is the **single boundary** between the library's unified frames and the app's
+`(time, gl, prediction, age, user_id)` / `(time, event_type, event_subtype, insulin_value, …)` stores.
+`load_glucose_data` (`data.py`) routes to five loaders; only LOOP still parses by hand.
+The library floor is **cgm-format 0.11** (`pyproject.toml`) — that is the release that added
+BIG IDEAs, the last corpus the app parsed itself.
+
+| Source | Parser | Why |
+|---|---|---|
+| Vendor exports (Dexcom/Libre/Medtronic/Nightscout) | `FormatParser.parse_file` | — |
+| **D1NAMO** | `FormatParser.parse_subject_directory` | subject = a *bundle* of glucose/insulin/food CSVs |
+| **BIG IDEAs** | `FormatParser.parse_subject_directory` | subject = a Clarity export + a food log (0.11+) |
+| **CGMacros** | `FormatParser.parse_tracks` | subject = one CSV with two sensor tracks |
+| LOOP `*_chronological.csv` | in-repo (`data.py`) | no library counterpart |
+
+Hard-won rules:
+
+- **`ExtendedFormatProcessor`, not `FormatProcessor`, for corpora.** Corpora target the 22-column
+  `CGM_SCHEMA_EXTENDED`; `FormatProcessor.schema` is the 10-column `CGM_SCHEMA` and dies with
+  `MalformedDataError: Schema has 10 columns, dataframe has 22 columns`. Never hardcode either — call
+  `corpus.unified_processor(df)`, which dispatches on the frame's column tuple.
+- **Meal detail rides in the extended schema's JSON `annotations` column**, not in real columns:
+  D1NAMO uses `picture`/`description`, CGMacros `image_path`/`meal_type_raw`. `corpus.adapt_events_df`
+  coalesces both vocabularies into `photo_path`/`meal_type`/`carbs_g`.
+- **Those three columns appear only for corpora.** A vendor export has no meal photos, so it gets the
+  bare 4-column events frame. Widening it would ship an array of empty strings to the browser on every
+  upload — `events-df` is a localStorage store the client re-uploads each callback (see the 2026-07-28
+  freeze note below).
+- **`synchronize_timestamps` is not a downsampler.** Asking it for 5 minutes on 1-minute CGMacros
+  *snaps* readings onto the grid, yielding five rows on one timestamp. `_downsample_glucose_5min`
+  in `cgmacros.py` still owns cadence reduction.
+- **CGMacros: play Dexcom, never the `mean` track.** Each of `libre`/`dexcom` is a complete view of the
+  same days with meals replicated into both, so concatenating double-counts every meal, and the
+  library's synthetic `mean` track looks like the obvious fix — `mean_horizontal` ignores nulls, so it
+  averages where both sensors read and passes a lone reading through untouched, reproducing the old
+  hand-written coalesce exactly (138,168 rows, identical in all 45 subjects).
+  **Do not use it: the two sensors disagree.** Fitting `libre = slope·dexcom + intercept` over all 45
+  published subjects gives median slope **0.70** (range 0.10–1.16) with a small intercept — Libre is
+  not offset from Dexcom, it *compresses* the excursion by a subject-specific factor. Median
+  correlation is 0.82 and 15/45 subjects fall below 0.7, so a third of the corpus disagrees in shape
+  too. Libre is the implausible one: it reads below 70 mg/dL for 82% and 86% of subjects 007 and 015,
+  against 0.4% of all Dexcom readings. Averaging assumes unbiased independent error from two views of
+  one quantity; all three conditions fail, and the mean would carry ~85% of true excursion amplitude
+  into a study scoring human error in mg/dL.
+  `_playable_track` therefore takes Dexcom, falling back to Libre (with a warning) only when a subject
+  has no Dexcom readings at all. The 8.4% of rows this gives up are Libre-only ones, 10.1% of which are
+  sub-70 — a contaminant the old coalesce silently mixed in, not good data lost. Span is not binding:
+  ten Dexcom days is ~2850 five-minute readings, ~79 non-overlapping 36-point windows per subject.
+- **cgm-format emits one event per *labelled* meal row.** CGMacros also has ~1553 unlabelled
+  photo-only rows (a follow-up shot minutes after the meal); the library drops them, which is why the
+  old bridging behaviour that merged distinct meals into one marker is gone.
+- **D1NAMO is always mmol/L** and is converted through the declared unit (18.0182), never a
+  "max < 40" heuristic. Fingersticks become `CALIBRAT` events and so stay out of the glucose trace.
+  `carbs` is genuinely null — D1NAMO has no carbohydrate column anywhere.
+- Photo *resolution and serving* stay in-app: the library only carries the reference it was given.
+  Real D1NAMO subjects store JPEGs in `food_pictures/`; `resolve_photo_path` also tries
+  `pictures/photos/food`. `subject_format()` returns `None` for a directory the library cannot
+  identify (e.g. `glucose.csv` with no `insulin.csv`/`annotations.csv`), and discovery skips it so the
+  round picker is never handed an unparseable source.
+- **BIG IDEAs is a *directory* shape, never a header sniff.** Its glucose half genuinely is a Dexcom
+  Clarity export — `parse_file` on it alone detects DEXCOM and returns glucose with no meals — so only
+  the `Food_Log_*.csv` beside it makes the folder a subject. `bigideas.subject_format()` asks the
+  library (`detect_subject_format`), and `is_bigideas_path` routes a `Dexcom_NNN.csv` to the corpus
+  loader only when that probe answers. The probe is conjunctive: a subject directory holding a Dexcom
+  export and *no* food log is not parseable at all (`parse_subject_directory` raises
+  `UnknownFormatError`), so discovery skips it rather than handing the round picker a source that dies
+  in front of a player.
+- **The food log is per *item*; the chart wants per *sitting*.** cgm-format emits one `CARBS_IN` event
+  per logged food ("clustering items into a sitting is a consumer concern"), so
+  `bigideas.cluster_food_events` folds rows within 30 minutes of the previous one — chained — into one
+  marker, sums their carbohydrates, and joins their names into the `food_note`. Two items logged at the
+  same minute are *not* ordered: `_postprocess_unified` ends in a plain `sort("datetime")`, which polars
+  does not promise is stable, so never assert the order of lines inside one note.
+- **`food_note` is BIG IDEAs-only** (`corpus.FOOD_NOTE_EVENTS_SCHEMA` = the corpus seven plus it). The
+  corpus has no meal photographs, so the apple icon opens a notepad instead of a lightbox; `photo_path`
+  stays empty for every row. Same store-size reasoning as the three meal columns — do not widen the
+  other loaders' frames with it.
+- **Test fixtures must be real-shaped now that the library parses them.** `tests/testdata/bigideas/`
+  holds proper Clarity exports (10 metadata rows, no `Transmitter ID` — which is what the published 16
+  actually ship) rather than the trimmed 5-column tables the in-repo parser tolerated. `001` carries the
+  extra `PatientIdentifier` metadata row that makes the library warn about metadata drift (expected, and
+  it skips what the file has, so no data row is lost); `002` covers the headerless 11-column food log and
+  the blank-`time_begin` → `date` + `time` fallback.
+
+### Windows must not straddle a sensor gap
+
+A CGM trace is not one continuous run — `data/example.csv` alone breaks into 11 stretches. Windows are
+sliced by *row index*, so before this check 1.4–7.6% of random 36-point windows spanned an outage,
+asking the player to continue an hour that was days away from the one shown.
+
+`subject_sources.window_is_continuous(window_df)` reads the largest gap straight off the `time` column
+(threshold `config.SEQUENCE_GAP_MINUTES = 15`, matching cgm-format's `small_gap_max_minutes`). Both
+pickers — `pick_unique_generic_window` and `app.get_random_data_window` — reject discontinuous
+candidates, ranking continuity **above** the food-photo preference (a photo-less window is duller; a
+discontinuous one is broken), and fall back to the old choice rather than failing a round.
+
+Continuity is deliberately **derived from timestamps, not a stamped `sequence_id` column**: the glucose
+frame must stay exactly `["time", "gl", "prediction", "age", "user_id"]`, or frames loaded from disk
+and frames reconstructed from a `dcc.Store` would have different shapes.
+
 ## Known Dash pitfalls
 
 ### n_clicks corruption on static pages (issue #29)
