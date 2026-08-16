@@ -32,6 +32,7 @@ from sugar_sugar.subject_sources import (
     load_generic_dataset_source,
     pick_unique_generic_window,
     resolve_generic_source_path,
+    window_is_continuous,
     windows_conflict,
 )
 
@@ -286,6 +287,56 @@ def test_pick_unique_generic_window_avoids_same_source_two_hour_overlap() -> Non
         )
         assert not any(windows_conflict(prior, chosen) for prior in history)
         history.append(chosen)
+
+
+def test_window_is_continuous_detects_a_sensor_gap() -> None:
+    """A window whose readings jump a sensor outage is not playable.
+
+    The gap threshold is 15 minutes -- one missed 5-minute reading is still one
+    continuous stretch, a three-hour hole is not.
+    """
+    unbroken = _window_df(
+        ["2024-01-01T10:00:00", "2024-01-01T10:05:00", "2024-01-01T10:10:00"]
+    )
+    assert window_is_continuous(unbroken)
+
+    one_dropped_reading = _window_df(
+        ["2024-01-01T10:00:00", "2024-01-01T10:10:00", "2024-01-01T10:15:00"]
+    )
+    assert window_is_continuous(one_dropped_reading)
+
+    sensor_change = _window_df(
+        ["2024-01-01T10:00:00", "2024-01-01T10:05:00", "2024-01-01T13:05:00"]
+    )
+    assert not window_is_continuous(sensor_change)
+
+
+def test_window_is_continuous_tolerates_frames_it_cannot_judge() -> None:
+    """Too few rows, or no ``time`` column, means "no evidence of a gap"."""
+    assert window_is_continuous(_window_df([]))
+    assert window_is_continuous(_window_df(["2024-01-01T10:00:00"]))
+    assert window_is_continuous(pl.DataFrame({"gl": [100.0, 101.0]}))
+
+
+def test_pick_unique_generic_window_returns_a_gap_free_window() -> None:
+    """Rounds are never handed a window that straddles a sensor gap.
+
+    ``data/example.csv`` genuinely breaks into eleven stretches, two of them a
+    couple of readings long, so a row-index slice can easily span one.
+    """
+    sources = discover_generic_dataset_sources()
+    source = next((s for s in sources if s.source_name == "example.csv"), sources[0])
+
+    history: list[GenericRoundWindow] = []
+    for _ in range(8):
+        selection = pick_unique_generic_window(DEFAULT_POINTS, history)
+        assert window_is_continuous(selection.window_df)
+        history.append(
+            generic_round_window_from_df(
+                selection.window_df,
+                source_name=selection.source.source_name,
+            )
+        )
 
 
 def test_resolve_generic_source_path_maps_known_sources() -> None:

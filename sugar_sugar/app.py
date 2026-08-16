@@ -129,6 +129,7 @@ from sugar_sugar.subject_sources import (
     generic_intervention_for_user,
     pick_unique_generic_window,
     resolve_generic_source_path,
+    window_is_continuous,
 )
 from sugar_sugar.contact_info import load_contact_info
 from sugar_sugar.static_markdown import static_markdown_autosize_iframe
@@ -764,6 +765,13 @@ def get_random_data_window(
     """
     Get a random window of data from the full DataFrame, avoiding previously
     used start positions when possible.
+
+    Windows that straddle a sensor gap are skipped: ``assign_sequence_ids``
+    stamps a new ``sequence_id`` either side of every break, so a window
+    touching two of them would ask the player to continue an hour that is not
+    actually adjacent to the one they were shown. If no candidate is gap-free
+    (a heavily fragmented dataset), the original choice stands rather than
+    failing the round.
     """
     import random
     max_start_index = len(full_df) - points
@@ -776,7 +784,12 @@ def get_random_data_window(
                 candidates = remaining
         if len(candidates) > 1 and 0 in candidates:
             candidates = [c for c in candidates if c != 0] or candidates
-        random_start = random.choice(candidates)
+        continuous = [
+            start
+            for start in candidates
+            if window_is_continuous(full_df.slice(start, points))
+        ]
+        random_start = random.choice(continuous or candidates)
     else:
         random_start = 0
 

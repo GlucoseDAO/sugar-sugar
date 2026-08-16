@@ -5,11 +5,12 @@ from pathlib import Path
 from typing import Optional
 
 import polars as pl
-from cgm_format import FormatParser, FormatProcessor, UnifiedEventType
+from cgm_format import FormatParser
 from eliot import start_action
 
 from sugar_sugar.cgmacros import is_cgmacros_csv, load_cgmacros_data
 from sugar_sugar.bigideas import is_bigideas_path, load_bigideas_data
+from sugar_sugar.corpus import adapt_events_df, adapt_glucose_df, unified_processor
 from sugar_sugar.d1namo import is_d1namo_path, load_d1namo_data
 
 
@@ -35,16 +36,6 @@ def decode_upload_bytes(payload: Optional[str]) -> Optional[bytes]:
         return None
     return None
 
-_RENDERED_EVENT_TYPES: tuple[str, ...] = (
-    UnifiedEventType.CARBOHYDRATES.value,
-    UnifiedEventType.INSULIN_FAST.value,
-    UnifiedEventType.INSULIN_SLOW.value,
-    UnifiedEventType.EXERCISE_LIGHT.value,
-    UnifiedEventType.EXERCISE_MEDIUM.value,
-    UnifiedEventType.EXERCISE_HEAVY.value,
-)
-
-
 def load_glucose_data_from_nightscout(
     base_url: str,
     *,
@@ -66,29 +57,45 @@ def load_glucose_data_from_nightscout(
         unified_df = FormatParser.from_nightscout_url(
             base_url, token=token, api_secret=api_secret, days=days
         )
-        glucose_df, events_df = FormatProcessor.split_glucose_events(unified_df)
+        glucose_df, events_df = unified_processor(unified_df).split_glucose_events(unified_df)
         save_dir = Path(save_dir)
         save_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         save_path = save_dir / f"{timestamp}_nightscout.csv"
         FormatParser.to_csv_file(unified_df, str(save_path))
-        return _adapt_glucose_df(glucose_df), _adapt_events_df(events_df), save_path
+        return adapt_glucose_df(glucose_df), adapt_events_df(events_df), save_path
 
 
 def load_glucose_data(file_path: Path = Path("data/example.csv")) -> tuple[pl.DataFrame, pl.DataFrame]:
-    """Load CGM data through cgm-format and adapt it to the app store schema."""
+    """Load CGM data through cgm-format and adapt it to the app store schema.
+
+    Four hand-rolled detectors run before the library: the three research corpora
+    are directory-shaped rather than file-shaped (and BIG IDEAs' glucose half is
+    an ordinary Clarity export, so only its directory tells it apart from a plain
+    upload), and LOOP has no library counterpart at all. Everything else -- every
+    vendor export -- goes straight through ``FormatParser``.
+
+    Every branch returns the same pair of frames:
+    ``(time, gl, prediction, age, user_id)`` and
+    ``(time, event_type, event_subtype, insulin_value, ...)``.
+    """
     with start_action(action_type=u"load_glucose_data", file_path=str(file_path)):
         if _is_loop_chronological_csv(file_path):
-            return load_loop_chronological_data(file_path)
-        if is_cgmacros_csv(file_path):
-            return load_cgmacros_data(file_path)
-        if is_d1namo_path(file_path):
-            return load_d1namo_data(file_path)
-        if is_bigideas_path(file_path):
-            return load_bigideas_data(file_path)
-        unified_df = FormatParser.parse_file(file_path)
-        glucose_df, events_df = FormatProcessor.split_glucose_events(unified_df)
-        return _adapt_glucose_df(glucose_df), _adapt_events_df(events_df)
+            glucose_df, events_df = load_loop_chronological_data(file_path)
+        elif is_cgmacros_csv(file_path):
+            glucose_df, events_df = load_cgmacros_data(file_path)
+        elif is_d1namo_path(file_path):
+            glucose_df, events_df = load_d1namo_data(file_path)
+        elif is_bigideas_path(file_path):
+            glucose_df, events_df = load_bigideas_data(file_path)
+        else:
+            unified_df = FormatParser.parse_file(file_path)
+            split_glucose, split_events = unified_processor(unified_df).split_glucose_events(
+                unified_df
+            )
+            glucose_df = adapt_glucose_df(split_glucose)
+            events_df = adapt_events_df(split_events)
+        return glucose_df, events_df
 
 
 def _is_loop_chronological_csv(file_path: Path) -> bool:
@@ -181,80 +188,3 @@ def load_loop_chronological_data(file_path: Path) -> tuple[pl.DataFrame, pl.Data
 
         events_df = pl.concat([carb_events, bolus_events, basal_events], how="vertical").sort("time")
         return glucose_df, events_df
-
-
-def _adapt_glucose_df(glucose_df: pl.DataFrame) -> pl.DataFrame:
-    return (
-        glucose_df.filter(pl.col("datetime").is_not_null() & pl.col("glucose").is_not_null())
-        .select(
-            [
-                pl.col("datetime").alias("time"),
-                pl.col("glucose").alias("gl"),
-                pl.lit(0.0).alias("prediction"),
-                pl.lit(0).alias("age"),
-                pl.lit(1).alias("user_id"),
-            ]
-        )
-        .sort("time")
-    )
-
-
-def _adapt_events_df(events_df: pl.DataFrame) -> pl.DataFrame:
-    return (
-        events_df.filter(
-            pl.col("datetime").is_not_null() & pl.col("event_type").is_in(_RENDERED_EVENT_TYPES)
-        )
-        .select(
-            [
-                pl.col("datetime").alias("time"),
-                _legacy_event_type_expr().alias("event_type"),
-                _legacy_event_subtype_expr().alias("event_subtype"),
-                pl.coalesce([pl.col("insulin_fast"), pl.col("insulin_slow")])
-                .cast(pl.Float64, strict=False)
-                .alias("insulin_value"),
-            ]
-        )
-        .filter(
-            (pl.col("event_type") != "Insulin")
-            | (pl.col("insulin_value").is_not_null() & (pl.col("insulin_value") != 0))
-        )
-        .sort("time")
-    )
-
-
-def _legacy_event_type_expr() -> pl.Expr:
-    event_type = pl.col("event_type")
-    insulin_events = [UnifiedEventType.INSULIN_FAST.value, UnifiedEventType.INSULIN_SLOW.value]
-    exercise_events = [
-        UnifiedEventType.EXERCISE_LIGHT.value,
-        UnifiedEventType.EXERCISE_MEDIUM.value,
-        UnifiedEventType.EXERCISE_HEAVY.value,
-    ]
-    return (
-        pl.when(event_type == UnifiedEventType.CARBOHYDRATES.value)
-        .then(pl.lit("Carbohydrates"))
-        .when(event_type.is_in(insulin_events))
-        .then(pl.lit("Insulin"))
-        .when(event_type.is_in(exercise_events))
-        .then(pl.lit("Exercise"))
-        .otherwise(pl.lit(""))
-    )
-
-
-def _legacy_event_subtype_expr() -> pl.Expr:
-    event_type = pl.col("event_type")
-    return (
-        pl.when(event_type == UnifiedEventType.CARBOHYDRATES.value)
-        .then(pl.lit("Carbs"))
-        .when(event_type == UnifiedEventType.INSULIN_FAST.value)
-        .then(pl.lit("Fast Acting"))
-        .when(event_type == UnifiedEventType.INSULIN_SLOW.value)
-        .then(pl.lit("Long Acting"))
-        .when(event_type == UnifiedEventType.EXERCISE_LIGHT.value)
-        .then(pl.lit("Light"))
-        .when(event_type == UnifiedEventType.EXERCISE_MEDIUM.value)
-        .then(pl.lit("Medium"))
-        .when(event_type == UnifiedEventType.EXERCISE_HEAVY.value)
-        .then(pl.lit("Heavy"))
-        .otherwise(pl.lit(""))
-    )

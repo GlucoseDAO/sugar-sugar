@@ -1,4 +1,14 @@
-Timestamp,Glucose Value (mg/dL),Event Type
-2020-02-14 08:00:00,140,EGV
-2020-02-14 08:05:00,142,EGV
-2020-02-14 08:10:00,144,EGV
+Index,Timestamp (YYYY-MM-DDThh:mm:ss),Event Type,Event Subtype,Patient Info,Device Info,Source Device ID,Glucose Value (mg/dL),Insulin Value (u),Carb Value (grams),Duration (hh:mm:ss),Glucose Rate of Change (mg/dL/min),Transmitter Time (Long Integer)
+1,,FirstName,,002,,,,,,,,
+2,,LastName,,,,,,,,,,
+3,,Device,,,Dexcom G6 Mobile App,android G6,,,,,,
+4,,Alert,Fall,,,android G6,,,,,3,
+5,,Alert,High,,,android G6,251,,,,,
+6,,Alert,Low,,,android G6,64,,,,,
+7,,Alert,Signal Loss,,,android G6,,,,0:20:00,,
+8,,Alert,Rise,,,android G6,,,,,3,
+9,,Alert,Urgent Low,,,android G6,40,,,,,
+10,,Alert,Urgent Low Soon,,,android G6,40,,,,,
+11,2020-02-14T08:00:00,EGV,,,,android G6,140,,,,,4327400
+12,2020-02-14T08:05:00,EGV,,,,android G6,142,,,,,4327700
+13,2020-02-14T08:10:00,EGV,,,,android G6,144,,,,,4328000

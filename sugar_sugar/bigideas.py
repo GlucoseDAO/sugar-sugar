@@ -1,8 +1,25 @@
-"""Import BIG IDEAs Dexcom + food-log tables into the app store schema.
+"""Import BIG IDEAs Dexcom + food-log bundles into the app store schema.
 
-This is an in-app formatter, not a library and not ``cgm-format``. BIG IDEAs
-has no meal photographs: food events carry a ``food_note`` built from the
-participant food log.
+Parsing is ``cgm-format``'s job since 0.11: :func:`cgm_format.FormatParser.parse_subject_directory`
+reads the subject bundle (``Dexcom_NNN.csv`` + ``Food_Log_NNN.csv``), which means it
+absorbs the three on-disk food-log layouts the published sixteen subjects mix
+(canonical 14-column header, the ``time_of_day`` alias four of them use, and the
+headerless 11-column log subject ``003`` ships), the ``date`` + ``time`` fallback for
+the one row with a blank ``time_begin``, and the Clarity metadata-row drift every
+subject carries. BIG IDEAs is identified by *directory shape*, not by sniffing the
+Dexcom header -- the glucose file genuinely is a Clarity export and would otherwise
+parse as a plain vendor upload with no meals.
+
+What stays here is what the library does not do:
+
+* ``Demographics.csv`` -- per-subject attributes, which have no home in a frame keyed
+  by timestamp, so the library leaves them on disk.
+* Folding the per-item food rows into one marker per sitting. The library emits one
+  event per logged item ("clustering items into a sitting is a consumer concern"),
+  and a player looking at the chart wants one apple icon for a meal, not four.
+* The ``food_note`` text itself. BIG IDEAs has no meal photographs, so the apple icon
+  opens a notepad; the note is built from the food names, amounts and units the
+  library carries in the JSON ``annotations`` column.
 
 Download a local copy with ``uv run download-bigideas``.
 Paper: Bent et al., npj Digital Medicine, 2021.
@@ -17,35 +34,34 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 import polars as pl
+from cgm_format import FormatParser, SupportedCGMFormat, UnifiedEventType
+from cgm_format.interface.cgm_interface import UnknownFormatError
 from eliot import start_action
 
+from sugar_sugar.corpus import (
+    FOOD_NOTE_EVENTS_SCHEMA,
+    adapt_events_df,
+    adapt_glucose_df,
+    annotation_field,
+    legacy_event_subtype_expr,
+    legacy_event_type_expr,
+    unified_processor,
+)
 from sugar_sugar.download_bigideas import dataset_is_present, default_dest
 
 _SUBJECT_DIR_RE = re.compile(r"^(\d{3})$")
 _SOURCE_NAME_RE = re.compile(r"^BIGIDEAS-(\d{3})\.csv$", re.IGNORECASE)
 _DEXCOM_NAME_RE = re.compile(r"^dexcom_(\d{3})\.csv$", re.IGNORECASE)
+
+#: Two food rows this far apart or closer are one sitting. The food log records
+#: every item separately -- a smoothie and a chicken leg logged at 18:00 are one
+#: dinner, not two carbohydrate events an hour apart.
 _FOOD_CLUSTER_GAP = timedelta(minutes=30)
 
-_TIMESTAMP_ALIASES: tuple[str, ...] = (
-    "timestamp (yyyy-mm-ddthh:mm:ss)",
-    "timestamp",
-    "time",
-    "datetime",
-)
-_GLUCOSE_ALIASES: tuple[str, ...] = (
-    "glucose value (mg/dl)",
-    "glucose value",
-    "glucose",
-    "egv",
-    "value",
-)
-_EVENT_TYPE_ALIASES: tuple[str, ...] = ("event type", "event_type")
-_FOOD_TIME_ALIASES: tuple[str, ...] = ("time_begin", "datetime", "timestamp", "begin")
-_LOGGED_FOOD_ALIASES: tuple[str, ...] = ("logged_food", "food", "item")
-_SEARCHED_FOOD_ALIASES: tuple[str, ...] = ("searched_food",)
-_AMOUNT_ALIASES: tuple[str, ...] = ("amount",)
-_UNIT_ALIASES: tuple[str, ...] = ("unit",)
-_CARB_ALIASES: tuple[str, ...] = ("total_carb", "total_carb ", "carbs", "carbohydrates")
+#: Amounts and units the food log spells out as words meaning "nothing".
+_EMPTY_TOKENS: tuple[str, ...] = ("none", "nan")
+
+_CARBS_EVENT: str = UnifiedEventType.CARBOHYDRATES.value
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,12 +86,37 @@ def is_bigideas_source_name(source_name: str) -> bool:
     return bool(_SOURCE_NAME_RE.match(Path(str(source_name or "")).name))
 
 
+def subject_format(subject_dir: Path) -> SupportedCGMFormat | None:
+    """``BIGIDEAS`` when the library recognises *subject_dir*, else ``None``.
+
+    The probe is conjunctive on the library's side -- a subject directory holds
+    a Dexcom export *and* a food log -- so a folder of renamed Clarity exports
+    does not answer here, which is exactly the discrimination the app needs.
+    """
+    try:
+        detected = FormatParser.detect_subject_format(subject_dir)
+    except (UnknownFormatError, OSError, ValueError):
+        return None
+    return detected if detected == SupportedCGMFormat.BIGIDEAS else None
+
+
 def is_bigideas_path(file_path: Path) -> bool:
+    """True when *file_path* is a BIG IDEAs Dexcom table or virtual source name.
+
+    The virtual ``BIGIDEAS-NNN.csv`` name never exists on disk and is answered by
+    name alone. A real ``Dexcom_NNN.csv`` is confirmed through the library's
+    subject-shape probe rather than its own header: the file *is* a Clarity
+    export, so the header cannot tell the two apart -- only the food log sitting
+    beside it can.
+    """
     path = Path(file_path)
     if is_bigideas_source_name(path.name):
         return True
-    if _DEXCOM_NAME_RE.match(path.name):
+    if _DEXCOM_NAME_RE.match(path.name) and subject_format(path.parent) is not None:
         return True
+    # Not a shape the library claims, but unmistakably from the extract tree --
+    # let it through so the caller fails with a real parse error, not a silent
+    # fallthrough to the generic vendor parser.
     return "bigideas" in str(path).replace("\\", "/").lower() and path.suffix.lower() == ".csv"
 
 
@@ -103,71 +144,6 @@ def _column(df: pl.DataFrame, aliases: Iterable[str]) -> str | None:
     return None
 
 
-def _numeric_expr(column: str) -> pl.Expr:
-    return (
-        pl.col(column)
-        .cast(pl.Utf8, strict=False)
-        .str.strip_chars()
-        .replace({"": None, "na": None, "n/a": None, "-": None})
-        .cast(pl.Float64, strict=False)
-    )
-
-
-def _text_expr(column: str) -> pl.Expr:
-    return pl.col(column).cast(pl.Utf8, strict=False).str.strip_chars()
-
-
-def _header_row_index(path: Path) -> int:
-    for index, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines()):
-        lowered = line.lower()
-        if "timestamp" in lowered and ("glucose" in lowered or "egv" in lowered or "value" in lowered):
-            return index
-    return 0
-
-
-def _parse_datetime_series(series: pl.Series) -> pl.Series:
-    text = series.cast(pl.Utf8, strict=False).str.strip_chars()
-    formats = (
-        "%Y-%m-%dT%H:%M:%S",
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%d %H:%M",
-        "%m/%d/%Y %H:%M:%S",
-        "%m/%d/%Y %H:%M",
-        "%Y-%m-%dT%H:%M:%S%.f",
-    )
-    parsed = text.str.to_datetime(format=formats[0], strict=False)
-    for fmt in formats[1:]:
-        if parsed.null_count() == 0:
-            break
-        parsed = parsed.fill_null(text.str.to_datetime(format=fmt, strict=False))
-    return parsed
-
-
-def _empty_events() -> pl.DataFrame:
-    return pl.DataFrame(
-        {
-            "time": [],
-            "event_type": [],
-            "event_subtype": [],
-            "insulin_value": [],
-            "photo_path": [],
-            "meal_type": [],
-            "carbs_g": [],
-            "food_note": [],
-        },
-        schema={
-            "time": pl.Datetime,
-            "event_type": pl.String,
-            "event_subtype": pl.String,
-            "insulin_value": pl.Float64,
-            "photo_path": pl.String,
-            "meal_type": pl.String,
-            "carbs_g": pl.Float64,
-            "food_note": pl.String,
-        },
-    )
-
-
 def _normalize_gender(raw: str) -> str:
     lowered = str(raw or "").strip().lower()
     if lowered == "female":
@@ -178,7 +154,12 @@ def _normalize_gender(raw: str) -> str:
 
 
 def load_bigideas_demographics(dest: Optional[Path] = None) -> dict[str, tuple[str, str]]:
-    """Map subject id ``001`` → (gender, hba1c)."""
+    """Map subject id ``001`` -> (gender, hba1c).
+
+    ``Demographics.csv`` sits at the corpus root and is per-subject attributes,
+    not a time series, so ``cgm-format`` has nowhere to put it and the app reads
+    it directly.
+    """
     path = dataset_root(dest) / "Demographics.csv"
     if not path.is_file():
         return {}
@@ -203,139 +184,115 @@ def load_bigideas_demographics(dest: Optional[Path] = None) -> dict[str, tuple[s
     return out
 
 
-def _format_food_line(row: dict[str, object], logged_col: str | None, searched_col: str | None, amount_col: str | None, unit_col: str | None) -> str:
-    name = ""
-    if logged_col:
-        name = str(row.get(logged_col) or "").strip()
-    if not name and searched_col:
-        name = str(row.get(searched_col) or "").strip()
-    if not name:
-        return ""
-    amount = str(row.get(amount_col) or "").strip() if amount_col else ""
-    unit = str(row.get(unit_col) or "").strip() if unit_col else ""
-    extras = " ".join(part for part in (amount, unit) if part and part.lower() not in {"none", "nan"})
-    if extras:
-        return f"{name} ({extras})"
-    return name
+def _annotation_text(*paths: str) -> pl.Expr:
+    """An annotation field with the food log's word-shaped blanks removed."""
+    text = annotation_field(*paths).str.strip_chars()
+    return pl.when(text.str.to_lowercase().is_in(list(_EMPTY_TOKENS))).then(pl.lit("")).otherwise(text)
 
 
-def _food_events(food_df: pl.DataFrame) -> list[dict[str, object]]:
-    time_col = _column(food_df, _FOOD_TIME_ALIASES)
-    if time_col is None:
-        date_col = _column(food_df, ("date",))
-        clock_col = _column(food_df, ("time", "time_of_day"))
-        if date_col is None or clock_col is None:
-            return []
-        combined = (
-            food_df.get_column(date_col).cast(pl.Utf8, strict=False).str.strip_chars()
-            + " "
-            + food_df.get_column(clock_col).cast(pl.Utf8, strict=False).str.strip_chars()
-        )
-        times = _parse_datetime_series(combined)
-    else:
-        times = _parse_datetime_series(food_df.get_column(time_col))
+def _food_line_expr() -> pl.Expr:
+    """One logged item as a line of the note: ``Berry Smoothie (20.0 fluid ounce)``.
 
-    working = food_df.with_columns(times.alias("time")).filter(pl.col("time").is_not_null()).sort("time")
-    logged_col = _column(working, _LOGGED_FOOD_ALIASES)
-    searched_col = _column(working, _SEARCHED_FOOD_ALIASES)
-    amount_col = _column(working, _AMOUNT_ALIASES)
-    unit_col = _column(working, _UNIT_ALIASES)
-    carbs_col = _column(working, _CARB_ALIASES)
-
-    clusters: list[list[dict[str, object]]] = []
-    for row in working.iter_rows(named=True):
-        if not clusters:
-            clusters.append([row])
-            continue
-        previous = clusters[-1][-1]["time"]
-        current = row["time"]
-        if current - previous <= _FOOD_CLUSTER_GAP:
-            clusters[-1].append(row)
-        else:
-            clusters.append([row])
-
-    events: list[dict[str, object]] = []
-    for cluster in clusters:
-        lines = [
-            line
-            for line in (
-                _format_food_line(row, logged_col, searched_col, amount_col, unit_col)
-                for row in cluster
-            )
-            if line
-        ]
-        if not lines:
-            continue
-        carbs_total = 0.0
-        carbs_seen = False
-        if carbs_col is not None:
-            for row in cluster:
-                raw = row.get(carbs_col)
-                if raw in (None, ""):
-                    continue
-                carbs_total += float(raw)
-                carbs_seen = True
-        events.append(
-            {
-                "time": cluster[0]["time"],
-                "event_type": "Carbohydrates",
-                "event_subtype": "Carbs",
-                "insulin_value": None,
-                "photo_path": "",
-                "meal_type": lines[0],
-                "carbs_g": carbs_total if carbs_seen else None,
-                "food_note": "\n".join(lines),
-            }
-        )
-    return events
-
-
-def format_bigideas_frames(
-    glucose_df: pl.DataFrame,
-    *,
-    food_df: pl.DataFrame | None = None,
-    subject_id: int = 1,
-) -> tuple[pl.DataFrame, pl.DataFrame]:
-    """Format BIG IDEAs Dexcom + food-log tables into app frames."""
-    time_col = _column(glucose_df, _TIMESTAMP_ALIASES)
-    glucose_col = _column(glucose_df, _GLUCOSE_ALIASES)
-    if time_col is None or glucose_col is None:
-        raise ValueError("BIG IDEAs Dexcom CSV is missing Timestamp / glucose columns")
-
-    working = glucose_df.with_columns(_parse_datetime_series(glucose_df.get_column(time_col)).alias("time"))
-    type_col = _column(working, _EVENT_TYPE_ALIASES)
-    if type_col is not None:
-        type_text = _text_expr(type_col).str.to_lowercase()
-        working = working.filter(type_text.is_in(["egv", "glucose", ""]))
-    working = working.with_columns(_numeric_expr(glucose_col).alias("gl"))
-    filtered = working.filter(pl.col("time").is_not_null() & pl.col("gl").is_not_null()).sort("time")
-    glucose_out = pl.DataFrame(
-        {
-            "time": filtered.get_column("time"),
-            "gl": filtered.get_column("gl"),
-            "prediction": [0.0] * filtered.height,
-            "age": [0] * filtered.height,
-            "user_id": [int(subject_id)] * filtered.height,
-        }
+    The participant's own wording wins over the database match the log found for
+    it; the amount and unit are appended only when the source recorded them, so a
+    bare ``Chicken Leg (1.0)`` and a bare ``Asparagus`` both read naturally.
+    """
+    logged = _annotation_text("logged_food")
+    name = pl.when(logged != "").then(logged).otherwise(_annotation_text("searched_food"))
+    amount = _annotation_text("amount")
+    unit = _annotation_text("unit")
+    extras = (
+        pl.when((amount != "") & (unit != ""))
+        .then(amount + pl.lit(" ") + unit)
+        .when(amount != "")
+        .then(amount)
+        .otherwise(unit)
+    )
+    return (
+        pl.when(name == "")
+        .then(pl.lit(""))
+        .when(extras != "")
+        .then(name + pl.lit(" (") + extras + pl.lit(")"))
+        .otherwise(name)
     )
 
-    events = _food_events(food_df) if food_df is not None and food_df.height > 0 else []
-    if not events:
-        return glucose_out, _empty_events()
-    events_df = pl.DataFrame(
-        events,
-        schema={
-            "time": pl.Datetime,
-            "event_type": pl.String,
-            "event_subtype": pl.String,
-            "insulin_value": pl.Float64,
-            "photo_path": pl.String,
-            "meal_type": pl.String,
-            "carbs_g": pl.Float64,
-            "food_note": pl.String,
-        },
-    ).sort("time")
-    return glucose_out, events_df
+
+def cluster_food_events(events_df: pl.DataFrame) -> pl.DataFrame:
+    """Unified carbohydrate rows -> one app event per sitting.
+
+    Items logged within :data:`_FOOD_CLUSTER_GAP` of the previous one join it,
+    chained -- a meal eaten over an hour in five-minute steps stays one marker.
+    Carbohydrates are summed across the sitting and stay null when the source
+    reported none at all, which is a different statement from zero grams.
+
+    Rows the source placed in time but never named are kept for their
+    carbohydrates and contribute no line; a sitting with no named item at all is
+    dropped, because an apple icon opening an empty notepad tells a player
+    nothing.
+    """
+    carbs = events_df.filter(
+        pl.col("datetime").is_not_null() & (pl.col("event_type") == _CARBS_EVENT)
+    ).sort("datetime")
+    if carbs.height == 0:
+        return pl.DataFrame(schema=FOOD_NOTE_EVENTS_SCHEMA)
+
+    named = carbs.with_columns(
+        _food_line_expr().alias("line"),
+        legacy_event_type_expr().alias("event_type_legacy"),
+        legacy_event_subtype_expr().alias("event_subtype_legacy"),
+    ).with_columns(
+        (pl.col("datetime").diff().fill_null(timedelta(0)) > _FOOD_CLUSTER_GAP)
+        .cum_sum()
+        .alias("sitting")
+    )
+
+    lines = pl.col("line").filter(pl.col("line") != "")
+    grouped = (
+        named.group_by("sitting", maintain_order=True)
+        .agg(
+            pl.col("datetime").first().alias("time"),
+            pl.col("event_type_legacy").first().alias("event_type"),
+            pl.col("event_subtype_legacy").first().alias("event_subtype"),
+            pl.lit(None, dtype=pl.Float64).alias("insulin_value"),
+            pl.lit("").alias("photo_path"),
+            lines.first().alias("meal_type"),
+            pl.when(pl.col("carbs").is_not_null().any())
+            .then(pl.col("carbs").sum())
+            .otherwise(None)
+            .alias("carbs_g"),
+            lines.str.join("\n").alias("food_note"),
+        )
+        .filter(pl.col("food_note") != "")
+        .drop("sitting")
+        .sort("time")
+    )
+    return grouped.cast(FOOD_NOTE_EVENTS_SCHEMA)  # type: ignore[arg-type]
+
+
+def adapt_bigideas_unified(
+    unified_df: pl.DataFrame,
+    *,
+    subject_id: int = 1,
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Split a BIG IDEAs unified frame and adapt both halves to the app's stores.
+
+    Meals take the clustering path above; anything else the chart can draw --
+    insulin or exercise a participant typed into the Dexcom app -- goes through
+    the shared adapter and simply carries no note.
+    """
+    processor = unified_processor(unified_df)
+    split_glucose, split_events = processor.split_glucose_events(unified_df)
+    meals = cluster_food_events(split_events)
+    other = adapt_events_df(split_events.filter(pl.col("event_type") != _CARBS_EVENT))
+    if other.height > 0:
+        other = other.with_columns(
+            pl.lit("").alias("photo_path"),
+            pl.lit("").alias("meal_type"),
+            pl.lit(None, dtype=pl.Float64).alias("carbs_g"),
+            pl.lit("").alias("food_note"),
+        ).cast(FOOD_NOTE_EVENTS_SCHEMA)  # type: ignore[arg-type]
+        meals = pl.concat([meals, other.select(meals.columns)], how="vertical").sort("time")
+    return adapt_glucose_df(split_glucose, subject_id=subject_id), meals
 
 
 def discover_bigideas_sources(dest: Optional[Path] = None) -> list[BigIdeasSource]:
@@ -350,6 +307,10 @@ def discover_bigideas_sources(dest: Optional[Path] = None) -> list[BigIdeasSourc
     for dexcom_path in sorted(root.rglob("Dexcom_*.csv")):
         subject_id = subject_id_from_path(dexcom_path)
         if subject_id is None or subject_id in seen:
+            continue
+        # Only offer subjects the library can actually parse: a round that picks
+        # an unparseable source fails in front of a player.
+        if subject_format(dexcom_path.parent) is None:
             continue
         seen.add(subject_id)
         gender, hba1c = demographics.get(subject_id, ("", ""))
@@ -385,19 +346,15 @@ def load_bigideas_data(file_path: Path) -> tuple[pl.DataFrame, pl.DataFrame]:
 
         subject_dir = dexcom_path.parent
         subject_token = subject_id_from_path(dexcom_path) or "001"
-        raw_glucose = pl.read_csv(
-            dexcom_path,
-            skip_rows=_header_row_index(dexcom_path),
-            infer_schema_length=5000,
-        )
-        food_path = subject_dir / f"Food_Log_{subject_token}.csv"
-        food_df = pl.read_csv(food_path, infer_schema_length=2000) if food_path.is_file() else None
-        glucose_df, events_df = format_bigideas_frames(
-            raw_glucose,
-            food_df=food_df,
+        # The subject is a *bundle*: the Clarity export and the food log are two
+        # files that parse into one frame, so the library takes the directory.
+        unified_df = FormatParser.parse_subject_directory(subject_dir)
+        glucose_df, events_df = adapt_bigideas_unified(
+            unified_df,
             subject_id=int(subject_token),
         )
         action.add_success_fields(
+            subject_id=subject_token,
             glucose_rows=glucose_df.height,
             event_rows=events_df.height,
             food_notes=events_df.filter(pl.col("food_note") != "").height,
