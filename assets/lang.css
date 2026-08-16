@@ -1222,6 +1222,23 @@ html:not(.mobile-device) #next-round-button {
   z-index: 5;
 }
 
+.meal-food-speech-bubble[data-count]::before {
+  content: attr(data-count);
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: #2e7d32;
+  color: #ffffff;
+  font-size: 10px;
+  line-height: 16px;
+  font-weight: 700;
+  text-align: center;
+}
+
 .meal-food-speech-bubble::after {
   content: "";
   position: absolute;
@@ -1274,6 +1291,36 @@ html:not(.mobile-device) #next-round-button {
   background: #111;
 }
 
+.meal-food-lightbox-gallery {
+  display: none;
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  width: min(92vw, 920px);
+  max-height: 85vh;
+  padding: 10px;
+  overflow: auto;
+  background: #111;
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  align-items: center;
+}
+
+.meal-food-lightbox-tile {
+  width: 100%;
+  max-height: min(40vh, 280px);
+  object-fit: contain;
+  background: #000;
+  border-radius: 6px;
+}
+
+.meal-food-lightbox-tile[src=""],
+.meal-food-lightbox-tile:not([src]) {
+  display: none;
+}
+
 .meal-food-lightbox-note {
   display: none;
   position: relative;
@@ -1301,12 +1348,17 @@ html:not(.mobile-device) #next-round-button {
   overflow-wrap: anywhere;
 }
 
-.meal-food-lightbox.is-note .meal-food-lightbox-image {
+.meal-food-lightbox.is-note .meal-food-lightbox-image,
+.meal-food-lightbox.is-composite .meal-food-lightbox-image {
   display: none;
 }
 
 .meal-food-lightbox.is-note .meal-food-lightbox-note {
   display: block;
+}
+
+.meal-food-lightbox.is-composite .meal-food-lightbox-gallery {
+  display: grid;
 }
 
 

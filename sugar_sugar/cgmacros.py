@@ -1,39 +1,27 @@
-"""Import PhysioNet CGMacros CSVs and format them to the app store schema.
+"""CGMacros discovery, photo serving, and library-backed load.
 
-CGMacros is a 1-minute interpolated research table (Dexcom 5-min + Libre 15-min
-plus meal macros and photo paths). It is not a vendor export, so it does not go
-through ``cgm-format``. Download a local copy with ``uv run download-cgmacros``.
+Parsing is ``cgm-format`` 0.10+ (``parse_tracks``). This module keeps the
+app-specific pieces: participant listing, ``bio.csv`` demographics, meal-photo
+URLs, and the visible-food helper used to pick Format A windows.
+Download a local copy with ``uv run download-cgmacros``.
 """
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import timedelta
 from pathlib import Path
 from typing import Iterable, Optional
 
 import polars as pl
-from eliot import start_action
 
 from sugar_sugar.config import PREDICTION_HOUR_OFFSET
-from sugar_sugar.download_cgmacros import default_dest, dataset_is_present
+from sugar_sugar.download_cgmacros import dataset_is_present, default_dest
 
 _PHOTO_SUFFIXES: tuple[str, ...] = (".jpg", ".jpeg", ".png", ".webp", ".heic")
-
 _SUBJECT_DIR_RE = re.compile(r"^CGMacros-(\d+)$", re.IGNORECASE)
 _SUBJECT_CSV_RE = re.compile(r"^CGMacros-(\d+)\.csv$", re.IGNORECASE)
-_MEAL_CLUSTER_GAP = timedelta(hours=3)
 _LB_TO_KG = 0.453592
-
-_TIMESTAMP_FORMATS: tuple[str, ...] = (
-    "%m/%d/%Y %H:%M",
-    "%m/%d/%Y %H:%M:%S",
-    "%Y-%m-%d %H:%M:%S",
-    "%Y-%m-%d %H:%M",
-    "%Y-%m-%dT%H:%M:%S",
-    "%Y-%m-%dT%H:%M:%S%.f",
-)
 
 _SUBJECT_ID_ALIASES: tuple[str, ...] = (
     "subject",
@@ -112,34 +100,6 @@ def _column(df: pl.DataFrame, aliases: Iterable[str]) -> str | None:
         if found is not None:
             return found
     return None
-
-
-def _numeric_expr(column: str) -> pl.Expr:
-    return (
-        pl.col(column)
-        .cast(pl.Utf8, strict=False)
-        .str.strip_chars()
-        .replace({"": None, "na": None, "n/a": None, "-": None})
-        .cast(pl.Float64, strict=False)
-    )
-
-
-def _text_expr(column: str) -> pl.Expr:
-    return pl.col(column).cast(pl.Utf8, strict=False).str.strip_chars()
-
-
-def _non_empty(column: str) -> pl.Expr:
-    text = _text_expr(column)
-    return pl.col(column).is_not_null() & (text != "")
-
-
-def parse_cgmacros_timestamps(series: pl.Series) -> pl.Series:
-    """Parse CGMacros timestamps (US month/day/year, plus ISO fallbacks)."""
-    text = series.cast(pl.Utf8, strict=False).str.strip_chars()
-    parsed = text.str.to_datetime(format=_TIMESTAMP_FORMATS[0], strict=False)
-    for fmt in _TIMESTAMP_FORMATS[1:]:
-        parsed = parsed.fill_null(text.str.to_datetime(format=fmt, strict=False))
-    return parsed.fill_null(text.str.to_datetime(strict=False))
 
 
 def _normalize_gender(raw: str) -> str:
@@ -257,199 +217,6 @@ def resolve_photo_path(image_path: str, subject_dir: Path) -> str:
     return raw
 
 
-def _downsample_glucose_5min(glucose_df: pl.DataFrame) -> pl.DataFrame:
-    """Keep one reading per 5-minute clock bucket (game grid)."""
-    if glucose_df.height == 0:
-        return glucose_df
-    return (
-        glucose_df.sort("time")
-        .group_by(pl.col("time").dt.truncate("5m").alias("bucket"), maintain_order=True)
-        .agg(
-            [
-                pl.col("gl").first(),
-                pl.col("prediction").first(),
-                pl.col("age").first(),
-                pl.col("user_id").first(),
-            ]
-        )
-        .select(
-            [
-                pl.col("bucket").alias("time"),
-                pl.col("gl"),
-                pl.col("prediction"),
-                pl.col("age"),
-                pl.col("user_id"),
-            ]
-        )
-        .filter(pl.col("time").is_not_null() & pl.col("gl").is_not_null())
-    )
-
-
-def _cluster_meal_rows(rows: list[dict[str, object]]) -> list[list[dict[str, object]]]:
-    if not rows:
-        return []
-    clusters: list[list[dict[str, object]]] = [[rows[0]]]
-    for row in rows[1:]:
-        previous = clusters[-1][-1]
-        same_meal = (
-            str(row.get("meal_type") or "") == str(previous.get("meal_type") or "")
-            and bool(row.get("meal_type"))
-        )
-        previous_time = previous["time"]
-        row_time = row["time"]
-        close = (
-            previous_time is not None
-            and row_time is not None
-            and (row_time - previous_time) <= _MEAL_CLUSTER_GAP
-        )
-        if close and (same_meal or not row.get("meal_type") or not previous.get("meal_type")):
-            clusters[-1].append(row)
-        else:
-            clusters.append([row])
-    return clusters
-
-
-def format_cgmacros_frames(
-    raw_df: pl.DataFrame,
-    *,
-    subject_dir: Optional[Path] = None,
-    subject_id: int = 1,
-) -> tuple[pl.DataFrame, pl.DataFrame]:
-    """Format a CGMacros participant table into app glucose + events frames."""
-    time_col = _column(raw_df, ("Timestamp", "Time"))
-    dexcom_col = _column(raw_df, ("Dexcom GL", "Dexcom"))
-    libre_col = _column(raw_df, ("Libre GL", "Libre"))
-    if time_col is None or (dexcom_col is None and libre_col is None):
-        raise ValueError("CGMacros CSV is missing Timestamp and a glucose column")
-
-    meal_col = _column(raw_df, ("Meal Type", "MealType"))
-    carbs_col = _column(raw_df, ("Carbs", "Carbohydrates"))
-    calories_col = _column(raw_df, ("Calories",))
-    protein_col = _column(raw_df, ("Protein",))
-    fat_col = _column(raw_df, ("Fat",))
-    fiber_col = _column(raw_df, ("Fiber",))
-    amount_col = _column(raw_df, ("Amount Consumed", "Amount"))
-    image_col = _column(raw_df, ("Image Path", "ImagePath"))
-
-    working = raw_df.with_columns(parse_cgmacros_timestamps(raw_df.get_column(time_col)).alias("time"))
-    dexcom = _numeric_expr(dexcom_col) if dexcom_col else pl.lit(None, dtype=pl.Float64)
-    libre = _numeric_expr(libre_col) if libre_col else pl.lit(None, dtype=pl.Float64)
-    working = working.with_columns(
-        [
-            dexcom.alias("_dexcom"),
-            libre.alias("_libre"),
-        ]
-    )
-    working = working.with_columns(pl.coalesce(pl.col("_dexcom"), pl.col("_libre")).alias("gl"))
-
-    glucose_df = (
-        working.filter(pl.col("time").is_not_null() & pl.col("gl").is_not_null())
-        .select(
-            [
-                pl.col("time"),
-                pl.col("gl"),
-                pl.lit(0.0).alias("prediction"),
-                pl.lit(0).alias("age"),
-                pl.lit(int(subject_id)).alias("user_id"),
-            ]
-        )
-        .sort("time")
-    )
-    glucose_df = _downsample_glucose_5min(glucose_df)
-
-    meal_exprs = [
-        pl.col("time"),
-        (_text_expr(meal_col).alias("meal_type") if meal_col else pl.lit("").alias("meal_type")),
-        (_numeric_expr(carbs_col).alias("carbs_g") if carbs_col else pl.lit(None, dtype=pl.Float64).alias("carbs_g")),
-        (
-            _numeric_expr(calories_col).alias("calories")
-            if calories_col
-            else pl.lit(None, dtype=pl.Float64).alias("calories")
-        ),
-        (
-            _numeric_expr(protein_col).alias("protein_g")
-            if protein_col
-            else pl.lit(None, dtype=pl.Float64).alias("protein_g")
-        ),
-        (_numeric_expr(fat_col).alias("fat_g") if fat_col else pl.lit(None, dtype=pl.Float64).alias("fat_g")),
-        (_numeric_expr(fiber_col).alias("fiber_g") if fiber_col else pl.lit(None, dtype=pl.Float64).alias("fiber_g")),
-        (
-            _numeric_expr(amount_col).alias("amount_consumed")
-            if amount_col
-            else pl.lit(None, dtype=pl.Float64).alias("amount_consumed")
-        ),
-        (_text_expr(image_col).alias("image_raw") if image_col else pl.lit("").alias("image_raw")),
-    ]
-    meal_filter = pl.lit(False)
-    if meal_col:
-        meal_filter = meal_filter | _non_empty(meal_col)
-    if carbs_col:
-        meal_filter = meal_filter | _numeric_expr(carbs_col).is_not_null()
-    if image_col:
-        meal_filter = meal_filter | _non_empty(image_col)
-
-    meal_df = (
-        working.filter(pl.col("time").is_not_null() & meal_filter)
-        .select(meal_exprs)
-        .sort("time")
-    )
-    if meal_df.height == 0:
-        events_df = pl.DataFrame(
-            {
-                "time": [],
-                "event_type": [],
-                "event_subtype": [],
-                "insulin_value": [],
-                "photo_path": [],
-                "meal_type": [],
-                "carbs_g": [],
-            },
-            schema={
-                "time": pl.Datetime,
-                "event_type": pl.String,
-                "event_subtype": pl.String,
-                "insulin_value": pl.Float64,
-                "photo_path": pl.String,
-                "meal_type": pl.String,
-                "carbs_g": pl.Float64,
-            },
-        )
-        return glucose_df, events_df
-
-    rows = meal_df.to_dicts()
-    events: list[dict[str, object]] = []
-    for cluster in _cluster_meal_rows(rows):
-        start = next((row for row in cluster if row.get("meal_type")), cluster[0])
-        photo_raw = next((str(row.get("image_raw") or "") for row in cluster if row.get("image_raw")), "")
-        photo_path = resolve_photo_path(photo_raw, subject_dir) if subject_dir is not None else photo_raw
-        carbs = next((row.get("carbs_g") for row in cluster if row.get("carbs_g") is not None), None)
-        events.append(
-            {
-                "time": start["time"],
-                "event_type": "Carbohydrates",
-                "event_subtype": "Carbs",
-                "insulin_value": None,
-                "photo_path": photo_path,
-                "meal_type": str(start.get("meal_type") or ""),
-                "carbs_g": carbs,
-            }
-        )
-
-    events_df = pl.DataFrame(
-        events,
-        schema={
-            "time": pl.Datetime,
-            "event_type": pl.String,
-            "event_subtype": pl.String,
-            "insulin_value": pl.Float64,
-            "photo_path": pl.String,
-            "meal_type": pl.String,
-            "carbs_g": pl.Float64,
-        },
-    ).sort("time")
-    return glucose_df, events_df
-
-
 def cgmacros_photo_url(source_name: str, photo_path: str) -> str:
     """Public URL for a meal photo belonging to ``CGMacros-NNN.csv``."""
     subject = Path(str(source_name or "")).stem
@@ -530,22 +297,7 @@ def visible_food_photo_events(
 
 
 def load_cgmacros_data(file_path: Path) -> tuple[pl.DataFrame, pl.DataFrame]:
-    """Load one CGMacros participant CSV into the app store schema."""
-    path = Path(file_path)
-    with start_action(
-        action_type=u"load_cgmacros_data",
-        file_path=str(path),
-    ) as action:
-        raw_df = pl.read_csv(path, infer_schema_length=10000)
-        subject_id = subject_id_from_path(path) or 1
-        glucose_df, events_df = format_cgmacros_frames(
-            raw_df,
-            subject_dir=path.parent,
-            subject_id=subject_id,
-        )
-        action.add_success_fields(
-            glucose_rows=glucose_df.height,
-            event_rows=events_df.height,
-            photo_events=events_df.filter(pl.col("photo_path") != "").height,
-        )
-        return glucose_df, events_df
+    """Load one CGMacros participant through ``cgm-format`` into the app schema."""
+    from sugar_sugar.data import load_glucose_data
+
+    return load_glucose_data(Path(file_path))

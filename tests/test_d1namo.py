@@ -10,7 +10,6 @@ from sugar_sugar.components.glucose import GlucoseChart, meal_food_bubble_childr
 from sugar_sugar.d1namo import (
     d1namo_photo_url,
     discover_d1namo_sources,
-    format_d1namo_frames,
     is_d1namo_path,
     is_d1namo_source_name,
     load_d1namo_data,
@@ -58,63 +57,28 @@ def test_discover_d1namo_sources_reads_fixture_tree() -> None:
     assert first.csv_path == SUBJECT_001
 
 
-def test_food_colon_datetime_parses_without_infer() -> None:
-    food_df = pl.DataFrame(
-        {
-            "picture": ["001.jpg"],
-            "description": ["Pasta"],
-            "calories": [637],
-            "datetime": ["2014:10:01 12:21:59"],
-        }
-    )
-    glucose_df = pl.DataFrame(
-        {
-            "date": ["2014-10-01"],
-            "time": ["12:20:00"],
-            "glucose": [6.0],
-            "type": ["cgm"],
-        }
-    )
-    _, events_df = format_d1namo_frames(
-        glucose_df,
-        food_df=food_df,
-        subject_dir=SUBJECT_001.parent,
-        subject_id=1,
-    )
-    meals = events_df.filter(pl.col("event_type") == "Carbohydrates")
-    assert meals.get_column("time").to_list() == [datetime(2014, 10, 1, 12, 21, 59)]
-    assert meals.get_column("meal_type").to_list() == ["Pasta"]
-
-
-def test_format_keeps_cgm_converts_mmol_and_drops_fingerstick() -> None:
-    raw = pl.read_csv(SUBJECT_001)
-    glucose_df, events_df = format_d1namo_frames(
-        raw,
-        insulin_df=pl.read_csv(SUBJECT_001.parent / "insulin.csv"),
-        food_df=pl.read_csv(SUBJECT_001.parent / "food.csv"),
-        subject_dir=SUBJECT_001.parent,
-        subject_id=1,
-    )
+def test_library_parses_colon_datetime_mmol_and_photos() -> None:
+    glucose_df, events_df = load_d1namo_data(SUBJECT_001)
     assert glucose_df.columns == ["time", "gl", "prediction", "age", "user_id"]
     times = glucose_df.get_column("time").to_list()
     assert times[0] == datetime(2014, 10, 1, 12, 0)
     assert datetime(2014, 10, 1, 12, 2) not in times
     assert glucose_df.height == 13
-    assert glucose_df.get_column("gl").to_list()[0] == 108.0
+    assert glucose_df.get_column("gl").to_list()[0] == pytest.approx(108.0, abs=0.2)
     insulin = events_df.filter(pl.col("event_type") == "Insulin")
     assert insulin.height == 2
     subtypes = set(insulin.get_column("event_subtype").to_list())
-    assert subtypes == {"Fast Acting", "Long-Acting"}
+    assert subtypes == {"Fast Acting", "Long Acting"}
     meals = events_df.filter(pl.col("event_type") == "Carbohydrates")
     assert meals.height == 2
     assert meals.get_column("photo_path").to_list() == ["pictures/meal.jpg", ""]
     assert meals.get_column("meal_type").to_list() == ["Lunch", "Dinner without photo"]
+    assert meals.get_column("time").to_list()[0] == datetime(2014, 10, 1, 12, 15)
 
 
-def test_format_leaves_mgdl_glucose_unchanged() -> None:
-    raw = pl.read_csv(SUBJECT_002)
-    glucose_df, events_df = format_d1namo_frames(raw, subject_id=2)
-    assert glucose_df.get_column("gl").to_list() == [140.0, 142.0, 144.0]
+def test_library_converts_mmol_glucose() -> None:
+    glucose_df, events_df = load_d1namo_data(SUBJECT_002)
+    assert glucose_df.get_column("gl").to_list() == pytest.approx([140.4, 142.2, 144.0], abs=0.3)
     assert events_df.height == 0
 
 

@@ -1,6 +1,6 @@
-Timestamp,Dexcom GL,Libre GL,Meal Type,Carbs,Image Path
-05/10/2020 18:00,,140,Dinner,60,
-05/10/2020 18:01,,140.2,,,
-05/10/2020 18:05,,141,,,
-05/10/2020 18:10,,141.5,,,
-05/10/2020 18:15,,142,,,
+Timestamp,Dexcom GL,Libre GL,HR,Meal Type,Carbs,Calories,Protein,Fat,Fiber,Amount Consumed,Image path
+05/10/2020 18:00,,140,,Dinner,60,400,20,15,5,,
+05/10/2020 18:01,,140.2,,,,,,,,,
+05/10/2020 18:05,,141,,,,,,,,,
+05/10/2020 18:10,,141.5,,,,,,,,,
+05/10/2020 18:15,,142,,,,,,,,,
