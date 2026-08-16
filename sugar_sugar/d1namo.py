@@ -222,9 +222,22 @@ def resolve_served_photo(
 
 def load_d1namo_data(file_path: Path) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Load one D1NAMO participant through ``cgm-format`` into the app schema."""
-    from sugar_sugar.data import load_glucose_data
+    path = Path(file_path)
+    with start_action(action_type=u"load_d1namo_data", file_path=str(path)) as action:
+        glucose_path = path
+        if not glucose_path.is_file() and is_d1namo_source_name(path.name):
+            subject_id = subject_id_from_path(path)
+            for source in discover_d1namo_sources():
+                if source.subject_id == subject_id:
+                    glucose_path = source.csv_path
+                    break
+        if glucose_path.is_dir():
+            subject_dir = glucose_path
+        elif glucose_path.is_file():
+            subject_dir = glucose_path.parent
+        else:
+            raise FileNotFoundError(f"D1NAMO glucose CSV not found for {path}")
 
-        subject_dir = glucose_path.parent
         subject_token = subject_id_from_path(glucose_path) or "001"
         # The subject is a *bundle*: glucose, insulin and food are three files
         # that parse into one frame, so the library takes the directory.

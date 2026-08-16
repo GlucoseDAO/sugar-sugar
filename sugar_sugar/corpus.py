@@ -196,6 +196,18 @@ def adapt_events_df(
     Four columns in, four columns out.
     """
     has_annotations = "annotations" in events_df.columns
+    if has_annotations and events_df.height > 0:
+        # Photo-only CGMacros rows (end-of-meal JPEGs, no macros) arrive as
+        # OTHEREVT. Promote them so the chart still gets the apple.
+        has_photo = (
+            annotation_field("image_path", "picture").fill_null("").str.strip_chars() != ""
+        )
+        events_df = events_df.with_columns(
+            pl.when(has_photo & ~pl.col("event_type").is_in(list(RENDERED_EVENT_TYPES)))
+            .then(pl.lit(UnifiedEventType.CARBOHYDRATES.value))
+            .otherwise(pl.col("event_type"))
+            .alias("event_type")
+        )
     base_columns = [
         pl.col("datetime").alias("time"),
         legacy_event_type_expr().alias("event_type"),

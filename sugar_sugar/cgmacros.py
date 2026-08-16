@@ -28,6 +28,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 from typing import Iterable, Optional
 
@@ -45,6 +46,7 @@ _PHOTO_SUFFIXES: tuple[str, ...] = (".jpg", ".jpeg", ".png", ".webp", ".heic")
 _SUBJECT_DIR_RE = re.compile(r"^CGMacros-(\d+)$", re.IGNORECASE)
 _SUBJECT_CSV_RE = re.compile(r"^CGMacros-(\d+)\.csv$", re.IGNORECASE)
 _LB_TO_KG = 0.453592
+_MEAL_CLUSTER_GAP = timedelta(minutes=30)
 
 _SUBJECT_ID_ALIASES: tuple[str, ...] = (
     "subject",
