@@ -10,6 +10,18 @@ from sugar_sugar.components.submit import _is_mobile_ua
 from sugar_sugar.i18n import t
 from sugar_sugar.config import STORAGE_TYPE
 from sugar_sugar.nickname import MAX_NICKNAME_LENGTH
+from sugar_sugar.challenge_unknown import (
+    CHALLENGE_PCT_MAX,
+    CHALLENGE_PCT_MIN,
+    CHALLENGE_PCT_STEP,
+    DEFAULT_CHALLENGE_PCT,
+    challenge_unknown_visible,
+    is_type_1,
+)
+from sugar_sugar.cgm_duration import (
+    DEFAULT_CGM_DURATION_UNIT,
+    cgm_duration_to_years,
+)
 from flask import has_request_context, request as flask_request
 
 MAX_AGE: int = 130
@@ -238,6 +250,87 @@ def _duration_exceeds_age(
     return float(duration) > float(age)
 
 
+def cgm_duration_unit_options(locale: str) -> list[dict[str, str]]:
+    return [
+        {'label': t("ui.startup.cgm_duration_unit_weeks", locale=locale), 'value': 'weeks'},
+        {'label': t("ui.startup.cgm_duration_unit_months", locale=locale), 'value': 'months'},
+        {'label': t("ui.startup.cgm_duration_unit_years", locale=locale), 'value': 'years'},
+    ]
+
+
+def challenge_unknown_children(locale: str) -> html.Div:
+    marks = {pct: f"{pct}%" for pct in range(CHALLENGE_PCT_MIN, CHALLENGE_PCT_MAX + 1, CHALLENGE_PCT_STEP)}
+    return html.Div(
+        [
+            dcc.Checklist(
+                id="challenge-unknown-check",
+                options=[{
+                    "label": t("ui.startup.challenge_unknown_button", locale=locale),
+                    "value": "on",
+                }],
+                value=[],
+                persistence=True,
+                persistence_type=STORAGE_TYPE,
+                className="challenge-unknown-check",
+            ),
+            html.Div(
+                t("ui.startup.challenge_unknown_help", locale=locale),
+                id="challenge-unknown-help",
+                style={"color": "#475569", "fontSize": "14px", "lineHeight": "1.4", "margin": "8px 0"},
+                disable_n_clicks=True,
+            ),
+            html.Div(
+                [
+                    html.Div(
+                        t("ui.startup.challenge_unknown_slider_label", locale=locale),
+                        id="challenge-unknown-slider-label",
+                        style={"fontWeight": "700", "marginBottom": "6px"},
+                        disable_n_clicks=True,
+                    ),
+                    dcc.Slider(
+                        id="challenge-unknown-slider",
+                        min=CHALLENGE_PCT_MIN,
+                        max=CHALLENGE_PCT_MAX,
+                        step=CHALLENGE_PCT_STEP,
+                        value=DEFAULT_CHALLENGE_PCT,
+                        marks=marks,
+                        included=True,
+                        persistence=True,
+                        persistence_type=STORAGE_TYPE,
+                    ),
+                ],
+                id="challenge-unknown-slider-wrap",
+                style={"display": "none", "marginTop": "8px"},
+            ),
+        ],
+        id="challenge-unknown-wrap",
+        style={"display": "none", "margin": "12px 0 20px 0"},
+        disable_n_clicks=True,
+    )
+
+
+def format_help_children(locale: str) -> list[Any]:
+    return [
+        html.Div(t("ui.startup.format_help_a", locale=locale), style={'marginBottom': '6px'}),
+        html.Div(t("ui.startup.format_help_b", locale=locale), style={'marginBottom': '6px'}),
+        html.Div(t("ui.startup.format_help_c", locale=locale), style={'marginBottom': '8px'}),
+        html.Div(
+            [
+                t("ui.startup.format_find_data_before", locale=locale),
+                dcc.Link(
+                    t("ui.startup.format_find_data_link", locale=locale),
+                    href="/faq#download-csv",
+                    style={
+                        'fontWeight': '800',
+                        'color': '#1565c0',
+                        'textDecoration': 'underline',
+                    },
+                ),
+            ],
+        ),
+    ]
+
+
 def validate_startup_form(
     *,
     email: Optional[str],
@@ -255,6 +348,7 @@ def validate_startup_form(
     locale: Optional[str],
     wizard_step: Optional[int] = None,
     prior_upload_consent: bool = False,
+    cgm_duration_unit: Optional[str] = None,
 ) -> StartupValidationResult:
     """Validate startup fields for a wizard step (0-5) or the full form (``wizard_step=None``)."""
     age_error, age_in_range = _age_field_errors(age, locale)
@@ -263,9 +357,14 @@ def validate_startup_form(
         if _duration_exceeds_age(diabetes_duration, age)
         else ""
     )
+    cgm_years = (
+        cgm_duration_to_years(cgm_duration, cgm_duration_unit)
+        if uses_cgm is True
+        else None
+    )
     cgm_duration_error = (
         t("ui.startup.cgm_duration_exceeds_age_error", locale=locale)
-        if uses_cgm is True and _duration_exceeds_age(cgm_duration, age)
+        if uses_cgm is True and _duration_exceeds_age(cgm_years, age)
         else ""
     )
 
@@ -388,6 +487,7 @@ def _step_hint_children(
     locale: Optional[str],
     current_step: int,
     prior_upload_consent: bool = False,
+    cgm_duration_unit: Optional[str] = None,
 ) -> Any:
     if 1 <= current_step <= 4:
         return validate_startup_form(
@@ -406,6 +506,7 @@ def _step_hint_children(
             locale=locale,
             wizard_step=current_step,
             prior_upload_consent=prior_upload_consent,
+            cgm_duration_unit=cgm_duration_unit,
         ).hint_children()
     if current_step == 0:
         return ""
@@ -424,6 +525,7 @@ def _step_hint_children(
         wants_contact=wants_contact,
         prior_upload_consent=prior_upload_consent,
         locale=locale,
+        cgm_duration_unit=cgm_duration_unit,
     ).hint_children()
 
 
@@ -579,15 +681,30 @@ class StartupPage(html.Div):
 
                     html.Div(id='cgm-details', children=[
                         html.Label(t("ui.startup.cgm_duration_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a'}),
-                        dcc.Input(
-                            id='cgm-duration-input',
-                            type='number',
-                            placeholder=t("ui.startup.cgm_duration_placeholder", locale=locale),
-                            min=0,
-                            max=130,
-                            persistence=True,
-                            persistence_type=STORAGE_TYPE,
-                            style={'width': '100%', 'padding': '10px', 'fontSize': '20px', 'marginBottom': '8px'}
+                        html.Div(
+                            [
+                                dcc.Input(
+                                    id='cgm-duration-input',
+                                    type='number',
+                                    placeholder=t("ui.startup.cgm_duration_placeholder", locale=locale),
+                                    min=0,
+                                    max=9999,
+                                    persistence=True,
+                                    persistence_type=STORAGE_TYPE,
+                                    style={'width': '100%', 'padding': '10px', 'fontSize': '20px'}
+                                ),
+                                dcc.Dropdown(
+                                    id='cgm-duration-unit',
+                                    options=cgm_duration_unit_options(locale),
+                                    value=DEFAULT_CGM_DURATION_UNIT,
+                                    clearable=False,
+                                    persistence=True,
+                                    persistence_type=STORAGE_TYPE,
+                                    style={'fontSize': '20px'},
+                                ),
+                            ],
+                            className='cgm-duration-row',
+                            style={'marginBottom': '8px'},
                         ),
                         html.Div(
                             id='cgm-duration-error',
@@ -614,13 +731,7 @@ class StartupPage(html.Div):
                             style={'fontSize': '20px', 'marginBottom': '10px'}
                         ),
                         html.Div(
-                            [
-                                html.Small(t("ui.startup.format_help_a", locale=locale)),
-                                html.Br(),
-                                html.Small(t("ui.startup.format_help_b", locale=locale)),
-                                html.Br(),
-                                html.Small(t("ui.startup.format_help_c", locale=locale)),
-                            ],
+                            format_help_children(locale),
                             style={'color': '#666', 'fontSize': '14px', 'marginBottom': '20px', 'lineHeight': '1.4'}
                         ),
                         html.Div(
@@ -691,6 +802,7 @@ class StartupPage(html.Div):
                             style={'color': '#d32f2f', 'fontSize': '16px', 'marginBottom': '20px'}
                         )
                     ]),
+                    challenge_unknown_children(locale),
                     
                     html.Div([
                         html.Label(t("ui.startup.location_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a', 'display': 'inline-block'}),
@@ -1025,8 +1137,45 @@ class StartupPage(html.Div):
                 return {'display': 'none'}, 'N/A', 0
 
         @app.callback(
+            [Output('challenge-unknown-wrap', 'style'),
+             Output('challenge-unknown-slider-wrap', 'style'),
+             Output('challenge-unknown-check', 'options'),
+             Output('challenge-unknown-help', 'children'),
+             Output('challenge-unknown-slider-label', 'children')],
+            [Input('format-dropdown', 'value'),
+             Input('diabetic-dropdown', 'value'),
+             Input('diabetic-type-dropdown', 'value'),
+             Input('interface-language', 'data')],
+        )
+        def update_challenge_unknown_visibility(
+            format_value: Optional[str],
+            is_diabetic: Optional[bool],
+            diabetic_type: Optional[str],
+            interface_language: Optional[str],
+        ) -> tuple[dict[str, str], dict[str, str], list[dict[str, str]], str, str]:
+            locale = interface_language
+            visible = challenge_unknown_visible(
+                {"diabetic": is_diabetic, "diabetic_type": diabetic_type, "format": format_value},
+                format_value,
+            )
+            wrap_style = {"display": "block", "margin": "12px 0 20px 0"} if visible else {"display": "none"}
+            slider_style = {"display": "block", "marginTop": "8px"} if visible else {"display": "none"}
+            checkbox_options = [{
+                "label": t("ui.startup.challenge_unknown_button", locale=locale),
+                "value": "on",
+            }]
+            if is_type_1({"diabetic": is_diabetic, "diabetic_type": diabetic_type}):
+                help_text = t("ui.startup.challenge_unknown_help_t1", locale=locale)
+                slider_label = t("ui.startup.challenge_unknown_slider_t1", locale=locale)
+            else:
+                help_text = t("ui.startup.challenge_unknown_help_nd", locale=locale)
+                slider_label = t("ui.startup.challenge_unknown_slider_nd", locale=locale)
+            return wrap_style, slider_style, checkbox_options, help_text, slider_label
+
+        @app.callback(
             [Output('cgm-details', 'style'),
-             Output('cgm-duration-input', 'value')],
+             Output('cgm-duration-input', 'value'),
+             Output('cgm-duration-unit', 'value')],
             [Input('cgm-dropdown', 'value')],
             [State('test-me-button', 'n_clicks'),
              State('email-input', 'value')]
@@ -1035,12 +1184,12 @@ class StartupPage(html.Div):
             uses_cgm: Optional[bool],
             test_clicks: Optional[int],
             email: Optional[str],
-        ) -> tuple[dict[str, str], Any]:
+        ) -> tuple[dict[str, str], Any, Any]:
             if uses_cgm is True:
                 if test_clicks and email and 'test.user@example.com' in str(email):
-                    return {'display': 'block'}, 3
-                return {'display': 'block'}, dash.no_update
-            return {'display': 'none'}, dash.no_update
+                    return {'display': 'block'}, 3, DEFAULT_CGM_DURATION_UNIT
+                return {'display': 'block'}, dash.no_update, dash.no_update
+            return {'display': 'none'}, dash.no_update, dash.no_update
 
         @app.callback(
             [Output('start-button', 'disabled'),
@@ -1064,6 +1213,7 @@ class StartupPage(html.Div):
              Input('gender-dropdown', 'value'),
              Input('cgm-dropdown', 'value'),
              Input('cgm-duration-input', 'value'),
+             Input('cgm-duration-unit', 'value'),
              Input('format-dropdown', 'value'),
              Input('data-usage-consent', 'value'),
              Input('diabetic-dropdown', 'value'),
@@ -1080,6 +1230,7 @@ class StartupPage(html.Div):
             gender: Optional[str],
             uses_cgm: Optional[bool],
             cgm_duration: Optional[int | float],
+            cgm_duration_unit: Optional[str],
             format_value: Optional[str],
             data_usage_consent: Optional[list[str]],
             is_diabetic: Optional[bool],
@@ -1113,6 +1264,7 @@ class StartupPage(html.Div):
                 wants_contact=wants_contact,
                 locale=interface_language,
                 prior_upload_consent=prior_upload_data_consent(user_info),
+                cgm_duration_unit=cgm_duration_unit,
             )
             if is_mobile:
                 if 1 <= current_step <= 4:
@@ -1132,6 +1284,7 @@ class StartupPage(html.Div):
                         locale=interface_language,
                         current_step=current_step,
                         prior_upload_consent=prior_upload_data_consent(user_info),
+                        cgm_duration_unit=cgm_duration_unit,
                     )
                 elif current_step == 0:
                     hint = ""
@@ -1320,6 +1473,7 @@ class StartupPage(html.Div):
              Input('gender-dropdown', 'value'),
              Input('cgm-dropdown', 'value'),
              Input('cgm-duration-input', 'value'),
+             Input('cgm-duration-unit', 'value'),
              Input('diabetic-dropdown', 'value'),
              Input('diabetic-type-dropdown', 'value'),
              Input('diabetes-duration-input', 'value'),
@@ -1339,6 +1493,7 @@ class StartupPage(html.Div):
             gender: Optional[str],
             uses_cgm: Optional[bool],
             cgm_duration: Optional[int | float],
+            cgm_duration_unit: Optional[str],
             is_diabetic: Optional[bool],
             diabetic_type: Optional[str],
             diabetes_duration: Optional[int | float],
@@ -1381,6 +1536,7 @@ class StartupPage(html.Div):
                     locale=interface_language,
                     wizard_step=step,
                     prior_upload_consent=prior_upload_data_consent(user_info),
+                    cgm_duration_unit=cgm_duration_unit,
                 )
                 if not step_validation.step_complete:
                     return True, "ui button startup-next-disabled", hint_hidden
@@ -1584,10 +1740,22 @@ class StartupPageMobile(html.Div):
             html.Div(id='cgm-details', children=[
                 html.Div(style={'height': '12px'}, disable_n_clicks=True),
                 _m_label(t("ui.startup.cgm_duration_label", locale=locale)),
-                dcc.Input(
-                    id='cgm-duration-input', type='number',
-                    placeholder=t("ui.startup.cgm_duration_placeholder", locale=locale),
-                    min=0, max=130, persistence=True, persistence_type=STORAGE_TYPE, style=_M_INPUT,
+                html.Div(
+                    [
+                        dcc.Input(
+                            id='cgm-duration-input', type='number',
+                            placeholder=t("ui.startup.cgm_duration_placeholder", locale=locale),
+                            min=0, max=9999, persistence=True, persistence_type=STORAGE_TYPE, style=_M_INPUT,
+                        ),
+                        dcc.Dropdown(
+                            id='cgm-duration-unit',
+                            options=cgm_duration_unit_options(locale),
+                            value=DEFAULT_CGM_DURATION_UNIT,
+                            clearable=False,
+                            persistence=True, persistence_type=STORAGE_TYPE, style=_M_DROPDOWN,
+                        ),
+                    ],
+                    className='cgm-duration-row',
                 ),
                 html.Div(id='cgm-duration-error', children='', style=_M_ERROR, disable_n_clicks=True),
             ]),
@@ -1623,6 +1791,7 @@ class StartupPageMobile(html.Div):
                 ),
                 html.Div(id='diabetes-duration-error', children='', style=_M_ERROR, disable_n_clicks=True),
             ]),
+            challenge_unknown_children(locale),
         ]
 
         # --- Step 4: format & data-usage consent ---
@@ -1639,11 +1808,7 @@ class StartupPageMobile(html.Div):
                 persistence=True, persistence_type=STORAGE_TYPE, style=_M_DROPDOWN,
             ),
             html.Div(
-                [
-                    html.Small(t("ui.startup.format_help_a", locale=locale)), html.Br(),
-                    html.Small(t("ui.startup.format_help_b", locale=locale)), html.Br(),
-                    html.Small(t("ui.startup.format_help_c", locale=locale)),
-                ],
+                format_help_children(locale),
                 style={'color': '#666', 'fontSize': '14px', 'margin': '8px 0 16px', 'lineHeight': '1.4'},
                 disable_n_clicks=True,
             ),

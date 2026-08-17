@@ -476,13 +476,63 @@ def _share_results_title(name: str, *, locale: str) -> str:
     return t("ui.share.title", locale=loc)
 
 
+def _challenge_unknown_on(user_info: dict[str, Any]) -> bool:
+    return bool(user_info.get("challenge_unknown"))
+
+
+# Ink for the "went into the unknown" stamp (HTML page + share-card PNG).
+_UNKNOWN_STAMP_RED: str = "#dc2626"
+
+
+def _unknown_stamp_text(*, locale: str) -> str:
+    return t("ui.share.unknown_stamp", locale=locale)
+
+
+def _unknown_stamp_lines(*, locale: str) -> list[str]:
+    raw: str = _unknown_stamp_text(locale=locale)
+    return textwrap.wrap(raw, width=12) or [raw]
+
+
 def _name_stamp(name: str) -> Optional[html.Div]:
-    """Tilted brag stamp for the HTML share page. ``None`` when anonymous."""
+    """Tilted nickname badge for the HTML share page. ``None`` when anonymous."""
     if not name:
         return None
     return html.Div(
         name,
         className="share-name-stamp",
+        disable_n_clicks=True,
+    )
+
+
+def _unknown_stamp(*, locale: str) -> html.Div:
+    """Red-bordered stamp — same copy and tilt as the share-card PNG."""
+    children: list[Any] = []
+    for index, line in enumerate(_unknown_stamp_lines(locale=locale)):
+        if index:
+            children.append(html.Br())
+        children.append(line)
+    return html.Div(
+        children,
+        className="share-unknown-stamp",
+        style={
+            "transform": "rotate(7deg)",
+            "border": f"3px solid {_UNKNOWN_STAMP_RED}",
+            "color": _UNKNOWN_STAMP_RED,
+            "background": "rgba(255, 255, 255, 0.88)",
+            "padding": "8px 10px",
+            "fontWeight": "900",
+            "letterSpacing": "0.03em",
+            "lineHeight": "1.15",
+            "textAlign": "center",
+            "boxSizing": "border-box",
+            "width": "7.4em",
+            "flex": "0 0 auto",
+            "alignSelf": "flex-end",
+            "marginBottom": "18px",
+            "borderRadius": "4px",
+            "boxShadow": "0 6px 16px rgba(15, 23, 42, 0.12)",
+            "pointerEvents": "none",
+        },
         disable_n_clicks=True,
     )
 
@@ -515,6 +565,34 @@ def _add_name_stamp_annotation(fig: go.Figure, name: str) -> None:
         bordercolor="#1e3a8a",
         borderwidth=3,
         borderpad=8,
+        bgcolor="rgba(255,255,255,0.88)",
+    )
+
+
+def _add_unknown_stamp_annotation(fig: go.Figure, *, locale: str) -> None:
+    """Smaller rust square to the right of the ranking, left of the QR."""
+    raw: str = _unknown_stamp_text(locale=locale)
+    wrapped: str = "<br>".join(
+        html_escape(line, quote=False) for line in (textwrap.wrap(raw, width=12) or [raw])
+    )
+    fig.add_annotation(
+        xref="paper",
+        yref="paper",
+        x=0.255,
+        y=0.078,
+        xanchor="center",
+        yanchor="bottom",
+        text=f"<b>{wrapped}</b>",
+        textangle=7,
+        showarrow=False,
+        font=dict(
+            size=12,
+            color=_UNKNOWN_STAMP_RED,
+            family="Arial Black, Helvetica Neue, Arial, sans-serif",
+        ),
+        bordercolor=_UNKNOWN_STAMP_RED,
+        borderwidth=3,
+        borderpad=7,
         bgcolor="rgba(255,255,255,0.88)",
     )
 
@@ -1391,8 +1469,10 @@ def build_share_card_figure(
             showarrow=False,
             font=dict(size=11, color="rgba(100,116,139,1)"),
         )
-    # Stamp last so it sits in the reserved bottom-left band, above the timestamp.
+    # Stamps last so they sit above the timestamp / ranking whitespace.
     _add_name_stamp_annotation(fig, name)
+    if _challenge_unknown_on(user_info):
+        _add_unknown_stamp_annotation(fig, locale=loc)
 
     return fig
 
@@ -1824,6 +1904,9 @@ def create_share_layout(
         )
 
     stamp: Optional[html.Div] = _name_stamp(name)
+    unknown: Optional[html.Div] = (
+        _unknown_stamp(locale=loc) if _challenge_unknown_on(user_info) else None
+    )
     main_stack: list[Any] = [url_store]
     main_stack.extend(
         [
@@ -1839,10 +1922,11 @@ def create_share_layout(
     if played_line is not None:
         main_stack.append(played_line)
     main_stack.append(synthesis_card)
-    if stamp is not None:
+    stamp_row: list[Any] = [item for item in (stamp, qr_block, unknown) if item is not None]
+    if stamp is not None or unknown is not None:
         main_stack.append(
             html.Div(
-                [stamp, qr_block],
+                stamp_row,
                 className="share-stamp-qr-row",
                 disable_n_clicks=True,
             )

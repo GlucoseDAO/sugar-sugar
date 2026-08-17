@@ -15,6 +15,12 @@ from sugar_sugar.bigideas import discover_bigideas_sources
 from sugar_sugar.cgmacros import window_has_visible_food_photo
 from sugar_sugar.config import PREDICTION_HOUR_OFFSET, SEQUENCE_GAP_MINUTES
 from sugar_sugar.d1namo import discover_d1namo_sources
+from sugar_sugar.challenge_unknown import (
+    challenge_unknown_active,
+    challenge_unknown_weights,
+    encode_mix_policy,
+    parse_mix_policy,
+)
 from sugar_sugar.data import load_glucose_data
 
 GENERIC_INTERVENTION_BIGIDEAS: str = "bigideas"
@@ -168,7 +174,10 @@ def generic_intervention_for_user(user_info: dict[str, Any] | None) -> str:
     type 2 → 50/50 mix
     prediabetes → 75% BIG IDEAs / 25% D1NAMO
     LADA → 75% D1NAMO / 25% BIG IDEAs
+    Challenge the unknown (non-diabetic or type 1, formats A/C) → mix:…
     """
+    if challenge_unknown_active(user_info):
+        return encode_mix_policy(challenge_unknown_weights(user_info))
     if not user_info or user_info.get("diabetic") is not True:
         return GENERIC_INTERVENTION_BIGIDEAS
     kind = str(user_info.get("diabetic_type") or "").strip().lower()
@@ -187,6 +196,9 @@ def generic_intervention_for_user(user_info: dict[str, Any] | None) -> str:
 
 def intervention_pool_weights(policy: str | None) -> dict[str, float]:
     """Per-round dataset weights for a stored ``generic_intervention`` policy."""
+    mixed = parse_mix_policy(policy)
+    if mixed:
+        return mixed
     key = str(policy or "").strip().lower()
     if key == GENERIC_INTERVENTION_D1NAMO:
         return {GENERIC_INTERVENTION_D1NAMO: 1.0}
@@ -491,6 +503,78 @@ class GenericWindowSelection:
     slice_key: str
 
 
+def _weighted_pool_order(
+    weights: dict[str, float],
+    available: dict[str, list[GenericDatasetSource]],
+) -> list[str]:
+    """Draw one pool from ``weights``, then list the rest only as last-resort fallbacks."""
+    names = [name for name, sources in available.items() if sources and weights.get(name, 0) > 0]
+    if not names:
+        return list(available)
+    chosen = random.choices(names, weights=[weights[name] for name in names], k=1)[0]
+    return [chosen] + [name for name in names if name != chosen]
+
+
+def _search_sources_for_window(
+    sources: list[GenericDatasetSource],
+    points: int,
+    prior: list[GenericRoundWindow],
+) -> tuple[GenericWindowSelection | None, bool, int]:
+    """Best window from ``sources`` only.
+
+    Ranking: unique+continuous+food, else unique+continuous, else continuous, else any.
+    The bool is True when the returned window does not conflict with ``prior``.
+    """
+    shuffled = list(sources)
+    random.shuffle(shuffled)
+    fallback: GenericWindowSelection | None = None
+    continuous_fallback: GenericWindowSelection | None = None
+    unique_fallback: GenericWindowSelection | None = None
+    discontinuous_rejected = 0
+    for source in shuffled:
+        glucose_df, events_df = load_generic_dataset_source(source)
+        for start_index in _candidate_start_indices(len(glucose_df), points):
+            window_df = glucose_df.slice(start_index, points)
+            slice_key = generic_window_slice_key(window_df)
+            round_window = GenericRoundWindow(
+                source_name=source.source_name,
+                window_start=window_df.get_column("time")[0],
+                window_end=window_df.get_column("time")[-1],
+                anchor_time=window_df.get_column("time")[
+                    max(0, len(window_df) - PREDICTION_HOUR_OFFSET)
+                ],
+                slice_key=slice_key,
+            )
+            selection = GenericWindowSelection(
+                window_df=window_df,
+                events_df=events_df,
+                source=source,
+                start_index=start_index,
+                slice_key=slice_key,
+            )
+            if fallback is None:
+                fallback = selection
+            # A window spanning a sensor gap is not a harder round, it is an
+            # unanswerable one: the hour the player is asked to continue may
+            # start days after the hour they were shown. Rank this above the
+            # food-photo preference -- a gap-free window with no meal marker
+            # is merely duller, a discontinuous one is broken.
+            if not window_is_continuous(window_df):
+                discontinuous_rejected += 1
+                continue
+            if continuous_fallback is None:
+                continuous_fallback = selection
+            if any(windows_conflict(old, round_window) for old in prior):
+                continue
+            if unique_fallback is None:
+                unique_fallback = selection
+            if not window_has_visible_food_photo(window_df, events_df):
+                continue
+            return selection, True, discontinuous_rejected
+    chosen = unique_fallback or continuous_fallback or fallback
+    return chosen, unique_fallback is not None, discontinuous_rejected
+
+
 def pick_unique_generic_window(
     points: int,
     history: list[GenericRoundWindow] | None = None,
@@ -502,6 +586,8 @@ def pick_unique_generic_window(
     Rules (per game / session history):
     - never reuse the same window content (``slice_key``)
     - never reuse the same source within ±2h of a prior window's timestamps
+    - honour the intervention mix: search the weighted pool first and only
+      leave it when that pool has no unused continuous window left
     """
     weights = intervention_pool_weights(intervention)
     by_pool: dict[str, list[GenericDatasetSource]] = {}
@@ -515,28 +601,12 @@ def pick_unique_generic_window(
         sources = discover_generic_dataset_sources(intervention=intervention)
         if not sources:
             raise FileNotFoundError("No generic dataset sources are configured")
-        source_pool = list(sources)
-        random.shuffle(source_pool)
-    else:
-        names = list(by_pool)
-        chosen_pool = random.choices(
-            names,
-            weights=[weights[name] for name in names],
-            k=1,
-        )[0]
-        source_pool = list(by_pool[chosen_pool])
-        random.shuffle(source_pool)
-        for name in names:
-            if name == chosen_pool:
-                continue
-            extras = list(by_pool[name])
-            random.shuffle(extras)
-            source_pool.extend(extras)
+        by_pool = {"all": sources}
 
     prior = list(history or [])
-    fallback: GenericWindowSelection | None = None
-    continuous_fallback: GenericWindowSelection | None = None
-    unique_fallback: GenericWindowSelection | None = None
+    pool_order = _weighted_pool_order(weights, by_pool)
+    last_selection: GenericWindowSelection | None = None
+    last_unique = False
     discontinuous_rejected = 0
 
     with start_action(
@@ -544,73 +614,46 @@ def pick_unique_generic_window(
         points=points,
         history_count=len(prior),
         intervention=intervention,
+        pool_order=pool_order,
     ) as action:
-        for source in source_pool:
-            glucose_df, events_df = load_generic_dataset_source(source)
-            for start_index in _candidate_start_indices(len(glucose_df), points):
-                window_df = glucose_df.slice(start_index, points)
-                slice_key = generic_window_slice_key(window_df)
-                round_window = GenericRoundWindow(
-                    source_name=source.source_name,
-                    window_start=window_df.get_column("time")[0],
-                    window_end=window_df.get_column("time")[-1],
-                    anchor_time=window_df.get_column("time")[
-                        max(0, len(window_df) - PREDICTION_HOUR_OFFSET)
-                    ],
-                    slice_key=slice_key,
-                )
-                selection = GenericWindowSelection(
-                    window_df=window_df,
-                    events_df=events_df,
-                    source=source,
-                    start_index=start_index,
-                    slice_key=slice_key,
-                )
-                if fallback is None:
-                    fallback = selection
-                # A window spanning a sensor gap is not a harder round, it is an
-                # unanswerable one: the hour the player is asked to continue may
-                # start days after the hour they were shown. Rank this above the
-                # food-photo preference -- a gap-free window with no meal marker
-                # is merely duller, a discontinuous one is broken.
-                if not window_is_continuous(window_df):
-                    discontinuous_rejected += 1
-                    continue
-                if continuous_fallback is None:
-                    continuous_fallback = selection
-                if any(windows_conflict(old, round_window) for old in prior):
-                    continue
-                if unique_fallback is None:
-                    unique_fallback = selection
-                if not window_has_visible_food_photo(window_df, events_df):
-                    continue
+        for index, pool_name in enumerate(pool_order):
+            selection, unique, rejected = _search_sources_for_window(
+                by_pool[pool_name], points, prior
+            )
+            discontinuous_rejected += rejected
+            if selection is None:
+                continue
+            last_selection = selection
+            last_unique = unique
+            if unique or index == len(pool_order) - 1:
                 action.log(
-                    message_type="unique_slice_selected",
-                    source_name=source.source_name,
-                    start_index=start_index,
-                    slice_key=slice_key,
-                    has_food_photo=True,
+                    message_type="unique_slice_selected" if unique else "slice_pool_exhausted_reusing",
+                    source_name=selection.source.source_name,
+                    start_index=selection.start_index,
+                    slice_key=selection.slice_key,
+                    pool=pool_name,
+                    has_food_photo=window_has_visible_food_photo(
+                        selection.window_df, selection.events_df
+                    ),
+                    is_continuous=window_is_continuous(selection.window_df),
                     discontinuous_rejected=discontinuous_rejected,
-                    window_start=round_window.window_start.isoformat(),
-                    window_end=round_window.window_end.isoformat(),
+                    window_start=selection.window_df.get_column("time")[0].isoformat(),
+                    window_end=selection.window_df.get_column("time")[-1].isoformat(),
                 )
                 return selection
 
-        chosen = unique_fallback or continuous_fallback or fallback
-        if chosen is None:
+        if last_selection is None:
             raise ValueError("Could not pick any generic window")
-
         action.log(
             message_type="slice_pool_exhausted_reusing",
-            source_name=chosen.source.source_name,
-            start_index=chosen.start_index,
-            slice_key=chosen.slice_key,
+            source_name=last_selection.source.source_name,
+            start_index=last_selection.start_index,
+            slice_key=last_selection.slice_key,
             has_food_photo=window_has_visible_food_photo(
-                chosen.window_df, chosen.events_df
+                last_selection.window_df, last_selection.events_df
             ),
-            # False only when every candidate straddled a gap, i.e. the source
-            # is too fragmented to yield a clean window of this size.
-            is_continuous=window_is_continuous(chosen.window_df),
+            is_continuous=window_is_continuous(last_selection.window_df),
             discontinuous_rejected=discontinuous_rejected,
+            reused_non_unique=not last_unique,
         )
-        return chosen
+        return last_selection

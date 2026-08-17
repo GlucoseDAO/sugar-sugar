@@ -30,11 +30,12 @@ zh:
     consent_upload_own_data: "我同意上传我自己的 CGM 数据用于可选任务。"
     tagline: "一款测试您血糖预测超能力的游戏。"
     how_it_works: "运作方式"
+    how_it_works_teaser: "三步。一小时。你的直觉对上传感器。"
+    faq_button: "常见问题"
     how_it_works_steps:
-      - "上传 Dexcom/Libre/Medtronic/Nightscout CSV（或使用示例数据集）"
-      - "在图表上画出您预测的血糖趋势"
-      - "将预测与真实值进行比较"
-      - "查看准确性指标 (MAE/RMSE/MAPE)"
+      - "画出你认为下一小时血糖会如何变化"
+      - "把你的线与真实情况对比"
+      - "看看你有多接近"
     preview: "预览"
     about_study_title: "关于本研究"
     about_study_text: "我们正在研究人类在预测血糖趋势方面的准确性，以及经验丰富的 CGM 用户注意到的模式。如果您选择参与，您的游戏过程和上传的 CGM 数据可能会被用于进一步的研究。"
@@ -116,7 +117,7 @@ zh:
     age_must_be_18_error: "您必须年满 18 岁才能参加研究。"
     age_max_error: "年龄不能超过 %{max_age} 岁。"
     diabetes_duration_exceeds_age_error: "患糖尿病的年数不能大于您的年龄。"
-    cgm_duration_exceeds_age_error: "使用 CGM 的年数不能大于您的年龄。"
+    cgm_duration_exceeds_age_error: "CGM 使用时长不能超过您的年龄。"
     values_check_warning: "请检查您输入的数值。"
     missing_fields: "请填写：%{fields}"
     gender_label: "性别"
@@ -124,12 +125,15 @@ zh:
     gender_male: "男"
     gender_female: "女"
     gender_na: "不适用"
-    cgm_label: "您使用 CGM 吗？"
-    cgm_placeholder: "选择您是否使用 CGM"
+    cgm_label: "您是否曾经使用过 CGM？"
+    cgm_placeholder: "选择您是否曾经使用过 CGM"
     yes: "是"
     no: "否"
-    cgm_duration_label: "请指定使用时长（年）"
-    cgm_duration_placeholder: "输入年数"
+    cgm_duration_label: "您使用了多久？"
+    cgm_duration_placeholder: "输入数字"
+    cgm_duration_unit_weeks: "周"
+    cgm_duration_unit_months: "月"
+    cgm_duration_unit_years: "年"
     diabetic_label: "您是否有糖尿病？"
     diabetic_placeholder: "选择您的糖尿病状态"
     diabetes_type_label: "糖尿病类型"
@@ -158,9 +162,19 @@ zh:
     format_a_label_short: "通用"
     format_b_label_short: "我的"
     format_c_label_short: "组合"
-    format_help_a: "通用数据 — 使用通用数据（不需要传感器数据）。使用示例集进行 12 轮。"
-    format_help_b: "我的数据 — 使用您自己的数据。上传您自己的文件并仅针对其进行预测。"
-    format_help_c: "通用 + 我的数据 — 两者都尝试。您将上传自己的文件，但每轮使用示例数据或您自己的数据。"
+    format_help_a: "通用数据 — 不用上传任何文件。直接用公开参考数据游玩。"
+    format_help_b: "我的数据 — 上传你自己的 CSV，用自己的血糖来玩。"
+    format_help_c: "通用 + 我的数据 — 两者结合。有的回合用公开数据，有的用你的。"
+    format_find_data_before: "如果不知道去哪里找自己的数据，"
+    format_find_data_link: "点这里查找。"
+    challenge_unknown_button: "挑战未知"
+    challenge_unknown_button_on: "未知已开启"
+    challenge_unknown_help: "仅适用于“通用”或“通用 + 我的数据”，且仅当你没有糖尿病或为 1 型时可用。"
+    challenge_unknown_help_nd: "多少曲线应来自糖尿病患者？10%% 表示十轮中有一轮使用糖尿病数据。"
+    challenge_unknown_help_t1: "多少曲线应来自非糖尿病者？10%% 表示十轮中有一轮使用非糖尿病数据。"
+    challenge_unknown_slider_label: "未知数据占比"
+    challenge_unknown_slider_nd: "糖尿病数据占比"
+    challenge_unknown_slider_t1: "非糖尿病数据占比"
     data_usage_consent_label: "我同意将我上传的 CGM 数据用于本研究。"
     data_usage_consent_required: "请确认数据使用同意以继续。"
 
@@ -227,6 +241,7 @@ zh:
     download_png_hint: "将成绩卡保存为 PNG，非常适合 Instagram 故事。"
     generated_at: "生成时间"
     play_again: "再玩一次"
+    unknown_stamp: "走进未知"
     copy_link: "复制链接"
     copy_link_success: "链接已复制！"
     share_native: "分享"
@@ -366,6 +381,7 @@ zh:
     units_line: "单位：%{unit}"
     next_round: "下一轮"
     view_complete_analysis: "查看完整分析"
+    results: "结果"
     graph_explanation: "图表显示了您预测的血糖窗口。橙色虚线将已知历史（左侧）与您预测的一小时（右侧）分开。您的预测显示为红色。"
     data_source_label: "数据源：%{source}"
     sensor_label: "传感器"
@@ -443,9 +459,10 @@ zh:
     no_ranking_yet: "至少完成 %{min} 轮即可出现在排行榜上。"
     per_round_metrics: "每轮指标"
     start_over: "退出"
+    journey_title: "你已经走完这段史诗旅程 — 想再来一局吗？"
 
   switch_format:
-    title: "尝试另一个选项"
+    title: "你也可以试试..."
     try_a: "尝试示例数据 = 使用通用数据"
     try_b: "尝试我的数据 = 使用自己的数据"
     try_c: "尝试示例 + 我的数据 = 同时使用通用数据和自己的数据"
@@ -459,8 +476,29 @@ zh:
     line2: "无论您的结果如何，请勿根据此应用更改任何医疗决策"
     line3: "在做出医疗决定之前，请务必咨询您的医生"
 
+
   faq:
     title: "常见问题"
+    ask_title: "写下你自己的问题"
+    ask_intro: "还有我们没回答的，或你想了解的吗？写在这里。"
+    ask_placeholder: "在这里输入问题"
+    name_placeholder: "姓名（可选）"
+    tags_label: "标签"
+    ask_button: "发布问题"
+    ask_thanks: "谢谢 — 你的问题已出现在板上。"
+    ask_empty: "请先写下问题。"
+    tag_gameplay: "玩法"
+    tag_data: "数据"
+    tag_privacy: "隐私"
+    tag_download: "下载"
+    tag_other: "其他"
+    section_participant: "参与者"
+    section_developer: "开发者"
+    reply_placeholder: "写下回复"
+    reply_button: "回复"
+    board_empty: "还没有问题。来当第一个吧。"
+    board_participant_title: "参与者问题"
+    board_developer_title: "开发者问题"
     sections:
       - title: "为什么这项研究很重要"
         items:
@@ -521,6 +559,56 @@ zh:
               - **没有实时压力。** 从容地画一条预测线，与凌晨两点半梦半醒时做用药决策，是完全不同的事情。
 
               - **示例数据与自有数据的差异。** 如果您使用内置的示例数据，您的准确性可能与预测自己的血糖时不同。我们鼓励您上传自己的 CGM 导出数据（Dexcom、Libre、Medtronic 或 Nightscout）——您对自身模式的个人直觉正是与机器学习比较时最有趣的部分。
+      - title: "如何下载你的 CGM CSV"
+        id: download-csv
+        items:
+          - q: "为什么不能从手机 App 导出？"
+            a: "大多数手机上的 CGM App 只能导出 PDF 报告。原始 CSV 来自厂商网站，或 xDrip+、Nightscout 这类开源应用。"
+          - q: "Dexcom（Clarity）"
+            a: >-
+              1. 打开 [clarity.dexcom.com](https://clarity.dexcom.com)（美国）或 [clarity.dexcom.eu](https://clarity.dexcom.eu)（欧洲），用 Dexcom 账号登录。
+
+              2. 打开任意报告，点击顶部的 **Export**。
+
+              3. 选择时间范围（14、30、90 天或自定义），下载 CSV。
+
+
+              Clarity 手机 App 无法导出 CSV — 请用网页。
+
+
+              视频：[上传到 Clarity](https://www.youtube.com/watch?v=GTULvbiAkfc)、[浏览 Clarity](https://www.youtube.com/watch?v=hNSeKZXV1sM)、[G6 / Clarity 导出](https://www.youtube.com/watch?v=7v-d_FKs6Oo)。
+          - q: "Abbott FreeStyle Libre（LibreView）"
+            a: >-
+              1. 打开 [libreview.com](https://www.libreview.com)，用与 Libre App 相同的账号登录。
+
+              2. 点击左上角的 **Glucose History** 图标（趋势波形）。
+
+              3. 点击右上角 **Download Glucose Data**，完成验证码后下载。
+
+
+              不要用 Excel 打开并另存 — 可能损坏数据。按下载原样上传。
+
+
+              视频：[设置 LibreView](https://www.youtube.com/watch?v=xBa6JJEdqcI)、[TypeOneTalks 导出](https://www.youtube.com/watch?v=l09GPGQXOLE)。
+          - q: "Medtronic（CareLink）"
+            a: >-
+              1. 打开 [carelink.minimed.com](https://carelink.minimed.com) 并登录。
+
+              2. 较新的泵（770G / 780G）通过 MiniMed Mobile 同步。较旧的泵需要 CareLink USB 或 Contour Next Link。
+
+              3. 进入 **Reports → Data Export (CSV)**。
+
+
+              视频：[CareLink 概览](https://www.youtube.com/watch?v=WGO1YnVJ0eo)、[设置上传器](https://www.youtube.com/watch?v=u_oC2EubVT4)。
+          - q: "Glooko、Tidepool、xDrip+ 或 Nightscout"
+            a: >-
+              **Glooko：** [my.glooko.com](https://my.glooko.com) → Summary → Export as CSV。
+
+              **Tidepool：** Settings（齿轮）→ Export My Data → 选择日期 → 下载。
+
+              **xDrip+：** 菜单 → Import/Export → Export CSV（SiDiary 格式）。
+
+              **Nightscout：** 在开始页或预测页粘贴你的站点 URL — 不需要文件。
       - title: "数据与隐私"
         items:
           - q: "我的数据会被存储吗？"

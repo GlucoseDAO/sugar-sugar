@@ -56,6 +56,8 @@ data/input/users/
 
 # Share page records (persistent share state for /share/<id>)
 data/shares/
+# Public FAQ question board
+data/faq/
 # Cross-device resume sessions (server-side savegame blobs)
 data/resume/
 data/output/

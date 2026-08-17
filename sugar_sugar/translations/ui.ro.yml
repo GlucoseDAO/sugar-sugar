@@ -11,7 +11,7 @@ ro:
     the_study: "Studiul"
     contact_us: "Contact"
     video_instructions: "Instrucțiuni video"
-    faq: "Întrebări frecvente"
+    faq: "FAQ"
     highscore: "Clasament"
 
   language:
@@ -30,11 +30,12 @@ ro:
     consent_upload_own_data: "Sunt de acord să încarc propriile date CGM pentru sarcinile opționale."
     tagline: "Un joc care îți testează superputerile de a prezice glucoza."
     how_it_works: "Cum funcționează"
+    how_it_works_teaser: "Trei pași. O oră. Instinctul tău contra senzorului."
+    faq_button: "Întrebări frecvente"
     how_it_works_steps:
-      - "Încarcă un CSV Dexcom/Libre/Medtronic/Nightscout (sau folosește setul de date exemplu)"
-      - "Desenează pe grafic tendința estimată a glucozei"
-      - "Compară predicțiile cu valorile reale"
-      - "Vezi metrici de acuratețe (MAE/RMSE/MAPE)"
+      - "Desenează cum crezi că se va mișca glucoza în următoarea oră"
+      - "Compară linia ta cu ce s-a întâmplat cu adevărat"
+      - "Află cât de aproape ai fost"
     preview: "Previzualizare"
     about_study_title: "Despre studiu"
     about_study_text: "Studiem cât de precis pot oamenii să prezică tendințele glucozei și ce tipare observă utilizatorii CGM cu experiență. Dacă alegi să participi, jocul tău și datele CGM încărcate pot fi folosite pentru cercetare ulterioară."
@@ -117,7 +118,7 @@ ro:
     age_must_be_18_error: "Trebuie să ai 18+ ani pentru a participa la studiu."
     age_max_error: "Vârsta nu poate depăși %{max_age}."
     diabetes_duration_exceeds_age_error: "Anii cu diabet nu pot fi mai mulți decât vârsta ta."
-    cgm_duration_exceeds_age_error: "Anii cu CGM nu pot fi mai mulți decât vârsta ta."
+    cgm_duration_exceeds_age_error: "Utilizarea CGM nu poate fi mai lungă decât vârsta ta."
     values_check_warning: "Te rugăm să verifici valorile introduse."
     missing_fields: "Te rugăm să completezi: %{fields}"
     gender_label: "Gen"
@@ -125,12 +126,15 @@ ro:
     gender_male: "Bărbat"
     gender_female: "Femeie"
     gender_na: "N/A"
-    cgm_label: "Folosești CGM?"
-    cgm_placeholder: "Selectează dacă folosești CGM"
+    cgm_label: "Ai folosit vreodată un CGM?"
+    cgm_placeholder: "Selectează dacă ai folosit vreodată un CGM"
     yes: "Da"
     no: "Nu"
-    cgm_duration_label: "Te rugăm să specifici durata utilizării (în ani)"
-    cgm_duration_placeholder: "Introdu numărul de ani"
+    cgm_duration_label: "Cât timp l-ai folosit?"
+    cgm_duration_placeholder: "Introdu un număr"
+    cgm_duration_unit_weeks: "Săptămâni"
+    cgm_duration_unit_months: "Luni"
+    cgm_duration_unit_years: "Ani"
     diabetic_label: "Ai diabet?"
     diabetic_placeholder: "Selectează statusul diabetului"
     diabetes_type_label: "Tip de diabet"
@@ -159,9 +163,19 @@ ro:
     format_a_label_short: "Generice"
     format_b_label_short: "Ale mele"
     format_c_label_short: "Combinate"
-    format_help_a: "Date generice — folosește date generice (nu sunt necesare date de la senzor). 12 runde folosind un set exemplu."
-    format_help_b: "Datele mele — folosește propriile date. Încarcă propriul fișier și prezice doar pe el."
-    format_help_c: "Date generice + datele mele — încearcă ambele. Vei încărca propriul fișier, dar fiecare rundă folosește fie date generice, fie datele tale."
+    format_help_a: "Date generice — nu trebuie să încarci nimic. Joacă folosind date publice de referință."
+    format_help_b: "Datele mele — încarcă propriul CSV și joacă pe glucoza ta."
+    format_help_c: "Date generice + datele mele — o combinație. Unele runde folosesc date publice, altele pe ale tale."
+    format_find_data_before: "Dacă nu știi de unde să-ți iei datele, "
+    format_find_data_link: "caută aici."
+    challenge_unknown_button: "Provoacă necunoscutul"
+    challenge_unknown_button_on: "Necunoscutul e activ"
+    challenge_unknown_help: "Doar pentru Generic sau Generic + datele mele, și doar dacă nu ai diabet sau ai tip 1."
+    challenge_unknown_help_nd: "Cât din curbe să vină de la persoane cu diabet? 10%% înseamnă că una din zece runde folosește date diabetice."
+    challenge_unknown_help_t1: "Cât din curbe să vină de la persoane fără diabet? 10%% înseamnă că una din zece runde folosește date de la persoane fără diabet."
+    challenge_unknown_slider_label: "Ponderea datelor necunoscute"
+    challenge_unknown_slider_nd: "Ponderea datelor diabetice"
+    challenge_unknown_slider_t1: "Ponderea datelor de la persoane fără diabet"
     data_usage_consent_label: "Sunt de acord cu utilizarea datelor mele CGM încărcate pentru acest studiu."
     data_usage_consent_required: "Te rugăm să confirmi consimțământul pentru utilizarea datelor ca să continui."
     import_title: "Importă-ți datele CGM"
@@ -206,7 +220,7 @@ ro:
     nightscout_consent_required: "Te rugăm să acorzi consimțământul pentru utilizarea datelor înainte de a încărca date din Nightscout."
     current_data_source: "Sursa curentă de date:"
     diabetic: "Diabetic"
-    non_diabetic: "Non-diabetic"
+    non_diabetic: "Non diabetic"
     weight_label: "Greutate"
     no_carbs_note: "Această fereastră de masă nu include date de carbohidrați înregistrate."
     carbs_info_note: "Markerii de carbohidrați apar doar dacă setul tău de date îi include. Verifică marcajele de timp — nu toate exporturile CGM înregistrează carbohidrați."
@@ -249,6 +263,7 @@ ro:
     download_png_hint: "Salvează cardul ca PNG, perfect pentru Stories pe Instagram."
     generated_at: "Generat"
     play_again: "Joacă din nou"
+    unknown_stamp: "a intrat în necunoscut"
     copy_link: "Copiază linkul"
     copy_link_success: "Link copiat!"
     share_native: "Distribuie"
@@ -388,6 +403,7 @@ ro:
     units_line: "Unități: %{unit}"
     next_round: "Runda următoare"
     view_complete_analysis: "Vezi analiza completă"
+    results: "Rezultate"
     graph_explanation: "Graficul arată fereastra de glucoză pe care ai prezis-o. Linia portocalie punctată separă istoricul cunoscut (stânga) de ora pe care ai prezis-o (dreapta). Predicțiile tale sunt afișate cu roșu."
     data_source_label: "Sursa datelor: %{source}"
     sensor_label: "Senzor"
@@ -465,9 +481,10 @@ ro:
     no_ranking_yet: "Joacă cel puțin %{min} runde ca să apari în clasament."
     per_round_metrics: "Metrici pe rundă"
     start_over: "Ieșire"
+    journey_title: "Ai terminat această călătorie epică — vrei să începi alta?"
 
   switch_format:
-    title: "Încearcă o altă opțiune"
+    title: "Poți încerca și..."
     try_a: "Încearcă date exemplu = folosește date generice"
     try_b: "Încearcă datele mele = folosește propriile date"
     try_c: "Încearcă date exemplu + datele mele = folosește atât date generice, cât și proprii"
@@ -481,8 +498,29 @@ ro:
     line2: "Indiferent de rezultate, nu schimba nicio decizie medicală pe baza acestei aplicații"
     line3: "Consultă întotdeauna medicul tău înainte de a lua decizii medicale"
 
+
   faq:
     title: "Întrebări frecvente"
+    ask_title: "Scrie-ți propria întrebare"
+    ask_intro: "E ceva ce nu am răspuns sau ai vrea să știi? Scrie aici."
+    ask_placeholder: "Scrie întrebarea aici"
+    name_placeholder: "Nume (opțional)"
+    tags_label: "Etichete"
+    ask_button: "Postează întrebarea"
+    ask_thanks: "Mulțumim — întrebarea ta e pe tablă."
+    ask_empty: "Scrie mai întâi o întrebare."
+    tag_gameplay: "Joc"
+    tag_data: "Date"
+    tag_privacy: "Confidențialitate"
+    tag_download: "Descărcare"
+    tag_other: "Altele"
+    section_participant: "Participant"
+    section_developer: "Dezvoltator"
+    reply_placeholder: "Scrie un răspuns"
+    reply_button: "Răspunde"
+    board_empty: "Încă nu sunt întrebări. Fii primul."
+    board_participant_title: "Întrebări de la participanți"
+    board_developer_title: "Întrebări de la dezvoltatori"
     sections:
       - title: "De ce contează acest studiu"
         items:
@@ -555,6 +593,56 @@ ro:
               - **Fără presiune în timp real.** A desena o linie de predicție în liniște este diferit de a lua o decizie de dozare la 2 dimineața pe jumătate adormit.
 
               - **Date exemplu vs. date proprii.** Dacă joci cu datele exemplu incluse, precizia ta poate diferi față de prezicerea propriei glucoze. Te încurajăm să încarci propriul export CGM (Dexcom, Libre, Medtronic sau Nightscout) — intuiția ta personală despre propriile tipare este parte din ceea ce face comparația cu învățarea automată interesantă.
+      - title: "Cum îți descarci CSV-ul CGM"
+        id: download-csv
+        items:
+          - q: "De ce nu pot exporta din aplicația de telefon?"
+            a: "Majoritatea aplicațiilor CGM de pe telefon oferă doar rapoarte PDF. CSV-ul brut vine de pe site-ul producătorului sau din aplicații open-source precum xDrip+ și Nightscout."
+          - q: "Dexcom (Clarity)"
+            a: >-
+              1. Deschide [clarity.dexcom.com](https://clarity.dexcom.com) (SUA) sau [clarity.dexcom.eu](https://clarity.dexcom.eu) (Europa) și autentifică-te cu contul Dexcom.
+
+              2. Deschide orice raport, apoi apasă **Export** în bara de sus.
+
+              3. Alege un interval (14, 30, 90 de zile sau personalizat) și descarcă CSV-ul.
+
+
+              Aplicația Clarity de pe telefon nu poate exporta CSV — folosește site-ul.
+
+
+              Video: [Încărcare Clarity](https://www.youtube.com/watch?v=GTULvbiAkfc), [Navigare Clarity](https://www.youtube.com/watch?v=hNSeKZXV1sM), [Export G6 / Clarity](https://www.youtube.com/watch?v=7v-d_FKs6Oo).
+          - q: "Abbott FreeStyle Libre (LibreView)"
+            a: >-
+              1. Deschide [libreview.com](https://www.libreview.com) și autentifică-te cu același cont ca în aplicația Libre.
+
+              2. Apasă pictograma **Glucose History** (unda de trend) din stânga-sus.
+
+              3. Apasă **Download Glucose Data** (dreapta-sus), completează captcha-ul și descarcă.
+
+
+              Nu deschide și nu resalva fișierul în Excel — pot strica datele. Încarcă-l așa cum l-ai descărcat.
+
+
+              Video: [Configurare LibreView](https://www.youtube.com/watch?v=xBa6JJEdqcI), [Export TypeOneTalks](https://www.youtube.com/watch?v=l09GPGQXOLE).
+          - q: "Medtronic (CareLink)"
+            a: >-
+              1. Deschide [carelink.minimed.com](https://carelink.minimed.com) și autentifică-te.
+
+              2. Pompele noi (770G / 780G) se sincronizează prin MiniMed Mobile. Cele vechi au nevoie de CareLink USB sau Contour Next Link.
+
+              3. Mergi la **Reports → Data Export (CSV)**.
+
+
+              Video: [Prezentare CareLink](https://www.youtube.com/watch?v=WGO1YnVJ0eo), [Configurare uploader](https://www.youtube.com/watch?v=u_oC2EubVT4).
+          - q: "Glooko, Tidepool, xDrip+ sau Nightscout"
+            a: >-
+              **Glooko:** [my.glooko.com](https://my.glooko.com) → Summary → Export as CSV.
+
+              **Tidepool:** Settings (roata dințată) → Export My Data → alege datele → descarcă.
+
+              **xDrip+:** Meniu → Import/Export → Export CSV (format SiDiary).
+
+              **Nightscout:** lipește URL-ul site-ului pe ecranul de start sau de predicție — nu ai nevoie de fișier.
       - title: "Date și confidențialitate"
         items:
           - q: "Sunt stocate datele mele?"

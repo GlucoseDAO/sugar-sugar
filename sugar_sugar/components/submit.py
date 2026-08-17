@@ -13,6 +13,7 @@ from sugar_sugar.components.metrics import MetricsComponent
 from sugar_sugar.data import load_glucose_data
 from sugar_sugar.i18n import t, normalize_locale
 from sugar_sugar.nickname import email_key, normalize_nickname
+from sugar_sugar.cgm_duration import cgm_duration_csv_value
 
 # Dataset used for the example/generic format and the format-C even rounds.
 _EXAMPLE_DATASET_PATH: Path = Path("data/example.csv")
@@ -708,11 +709,13 @@ class SubmitComponent(html.Div):
             'user_id': user_id,
             'gender': user_info.get('gender', ''),
             'uses_cgm': bool(user_info.get('uses_cgm', False)),
-            'cgm_duration_years': user_info.get('cgm_duration_years', ''),
+            'cgm_duration_years': cgm_duration_csv_value(user_info),
             'diabetic': user_info.get('diabetic', ''),
             'diabetic_type': user_info.get('diabetic_type', ''),
             'diabetes_duration': user_info.get('diabetes_duration', ''),
             'generic_intervention': user_info.get('generic_intervention', ''),
+            'challenge_unknown': bool(user_info.get('challenge_unknown', False)),
+            'challenge_unknown_pct': user_info.get('challenge_unknown_pct', ''),
             'location': user_info.get('location', ''),
             'rounds_played': rounds_played,
             # Clear naming: "real" == ground truth, "predicted" == user prediction
@@ -857,11 +860,13 @@ class SubmitComponent(html.Div):
                 'user_id': user_id,
                 'gender': user_info.get('gender', ''),
                 'uses_cgm': bool(user_info.get('uses_cgm', False)),
-                'cgm_duration_years': user_info.get('cgm_duration_years', ''),
+                'cgm_duration_years': cgm_duration_csv_value(user_info),
                 'diabetic': user_info.get('diabetic', ''),
                 'diabetic_type': user_info.get('diabetic_type', ''),
                 'diabetes_duration': user_info.get('diabetes_duration', ''),
                 'generic_intervention': user_info.get('generic_intervention', ''),
+                'challenge_unknown': bool(user_info.get('challenge_unknown', False)),
+                'challenge_unknown_pct': user_info.get('challenge_unknown_pct', ''),
                 'location': user_info.get('location', ''),
                 'rounds_played': rounds_n,
                 'predicted_values': str(parameters_run),

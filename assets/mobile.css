@@ -872,6 +872,20 @@ html.mobile-device #landing-page .games-played-slots {
   margin-top: 10px !important;
 }
 
+html.mobile-device #landing-page .how-it-works-teaser {
+  font-size: 24px !important;
+  margin-bottom: 10px !important;
+}
+
+html.mobile-device #landing-page .how-it-works-steps {
+  font-size: 24px !important;
+}
+
+html.mobile-device #landing-page .how-it-works-step {
+  font-size: 0.5em !important;
+  margin-bottom: 8px !important;
+}
+
 html.mobile-device #startup-next:disabled,
 html.mobile-device #startup-next[disabled] {
   background: #9ca3af !important;
@@ -949,6 +963,23 @@ html.mobile-device input[type="number"]::-webkit-inner-spin-button {
 
 
 /* --- Info pages (about / faq / contact / demo) ---------------------------- */
+
+html.mobile-device #challenge-unknown-wrap {
+  max-width: 100%;
+}
+html.mobile-device #challenge-unknown-wrap .challenge-unknown-check,
+html.mobile-device #challenge-unknown-wrap .dash-checklist {
+  font-size: 16px;
+}
+html.mobile-device #challenge-unknown-slider-wrap .rc-slider {
+  margin: 10px 10px 28px;
+}
+html.mobile-device #faq-ask-form textarea,
+html.mobile-device .faq-reply-form textarea,
+html.mobile-device #faq-ask-name {
+  width: 100% !important;
+  max-width: 100%;
+}
 
 html.mobile-device .info-page {
   /* The desktop `max-width: clamp(320px, 85vw, 1400px)` centres the page and
@@ -1117,6 +1148,24 @@ html.mobile-device #restart-button {
   max-width: 44px !important;
   height: 44px !important;
   flex: 0 0 44px !important;
+}
+html.mobile-device #finish-study-button-ending.finish-study-results {
+  width: auto !important;
+  min-width: 140px !important;
+  max-width: none !important;
+  height: 44px !important;
+  padding: 0 16px !important;
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  flex: 0 0 auto !important;
+}
+html.mobile-device #final-journey-title {
+  font-size: 18px !important;
+  margin: 0 8px 6px 8px !important;
+}
+html.mobile-device #final-switch-format-title.final-switch-format-title-visible {
+  font-size: 16px !important;
+  margin: 0 8px 8px 8px !important;
 }
 
 

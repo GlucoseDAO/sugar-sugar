@@ -115,6 +115,58 @@ def test_share_card_png_figure_stamps_the_nickname() -> None:
     assert "My Sugar Sugar results" not in titles
 
 
+def test_share_page_stamps_challenge_the_unknown() -> None:
+    setup_i18n()
+    record = make_test_share_record()
+    record["user_info"]["challenge_unknown"] = True
+    layout = create_share_layout(
+        record, share_id="abc", share_url="http://localhost/share/abc", locale="en"
+    )
+    nodes = _walk(layout)
+    stamp = next(
+        (n for n in nodes if getattr(n, "className", None) == "share-unknown-stamp"),
+        None,
+    )
+    assert stamp is not None
+    texts = [c for c in (stamp.children or []) if isinstance(c, str)]
+    assert " ".join(texts) == "went into the unknown"
+    style = getattr(stamp, "style", None) or {}
+    assert "#dc2626" in str(style.get("border", ""))
+    assert style.get("color") == "#dc2626"
+
+
+def test_share_page_hides_unknown_stamp_when_challenge_is_off() -> None:
+    setup_i18n()
+    record = make_test_share_record()
+    record["user_info"]["challenge_unknown"] = False
+    layout = create_share_layout(
+        record, share_id="abc", share_url="http://localhost/share/abc", locale="en"
+    )
+    nodes = _walk(layout)
+    assert not any(getattr(n, "className", None) == "share-unknown-stamp" for n in nodes)
+
+
+def test_share_card_png_figure_stamps_the_unknown() -> None:
+    setup_i18n()
+    record = make_test_share_record()
+    record["user_info"]["nickname"] = "SugarNinja"
+    record["user_info"]["challenge_unknown"] = True
+    fig = build_share_card_figure(
+        record,
+        share_url="http://localhost/share/abc",
+        locale="en",
+        seed="abc",
+    )
+    annotations = list(fig.layout.annotations or [])
+    unknown = [a for a in annotations if "unknown" in str(a.text or "").lower()]
+    assert unknown
+    stamp = unknown[0]
+    assert float(stamp.x) > 0.15
+    assert abs(float(stamp.textangle or 0)) > 1
+    assert "#dc2626" in str(stamp.font.color)
+    assert "#dc2626" in str(stamp.bordercolor)
+
+
 def test_anonymous_share_card_has_no_rotated_stamp() -> None:
     setup_i18n()
     record = make_test_share_record()

@@ -16,6 +16,7 @@ from urllib.parse import quote
 
 from sugar_sugar.cgmacros import cgmacros_photo_url, visible_food_photo_events
 from sugar_sugar.d1namo import d1namo_photo_url, is_d1namo_source_name
+from sugar_sugar.food_note_i18n import translate_food_note
 from sugar_sugar.config import PREDICTION_HOUR_OFFSET, STORAGE_TYPE
 from sugar_sugar.i18n import normalize_locale, t
 
@@ -127,6 +128,7 @@ def meal_food_bubble_children(
     *,
     source_name: str,
     hide_last_hour: bool,
+    locale: str = "en",
 ) -> list[html.Button]:
     """HTML speech bubbles above the plot, one per visible meal cluster."""
     if window_df.height == 0:
@@ -139,6 +141,11 @@ def meal_food_bubble_children(
         source_name=source_name,
         hide_last_hour=hide_last_hour,
     ):
+        cluster = FoodEventCluster(
+            x_pos=cluster.x_pos,
+            photo_urls=cluster.photo_urls,
+            notes=[translate_food_note(note, locale) for note in cluster.notes],
+        )
         left_pct = 100.0 * (cluster.x_pos + 0.5) / n_points
         count = max(len(cluster.photo_urls), 1 if cluster.notes else 0)
         extra: dict[str, str] = {}
@@ -351,6 +358,7 @@ class GlucoseChart(html.Div):
                     events_df,
                     source_name=str(source_name or ""),
                     hide_last_hour=hide_last_hour_flag,
+                    locale=locale,
                 )
                 return figure, bubbles
 

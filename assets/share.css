@@ -55,6 +55,35 @@
   margin-bottom: 18px;
 }
 
+.share-page .share-unknown-stamp {
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+  transform: rotate(7deg);
+  transform-origin: center center;
+  box-sizing: border-box;
+  width: 7.4em;
+  height: 7.4em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border: 3px solid #dc2626;
+  color: #dc2626;
+  background: rgba(255, 255, 255, 0.88);
+  padding: 8px;
+  font-size: clamp(11px, 1.5vw, 14px) !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.03em;
+  line-height: 1.15;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+  border-radius: 4px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  align-self: flex-end;
+  margin-bottom: 18px;
+}
+
 /* Synthesis: title lives in HTML (not Plotly layout.title). Graph fills the card width. */
 .share-page .share-synthesis-headline {
   text-align: center;
@@ -255,12 +284,29 @@
 html.mobile-device .share-page {
   padding: 16px 12px 40px 12px !important;
 }
+html.mobile-device .share-page .share-stamp-qr-row {
+  gap: 16px 20px;
+  align-items: center;
+  overflow: visible;
+}
 html.mobile-device .share-page .share-name-stamp {
   font-size: clamp(18px, 6vw, 26px) !important;
   padding: 6px 12px;
   border-width: 3px;
   max-width: 70vw;
   margin-bottom: 8px;
+}
+html.mobile-device .share-page .share-unknown-stamp {
+  width: 6.4em !important;
+  height: auto !important;
+  min-height: 6.4em;
+  font-size: clamp(10px, 3.2vw, 12px) !important;
+  padding: 6px !important;
+  margin-bottom: 8px;
+  border: 3px solid #dc2626 !important;
+  color: #dc2626 !important;
+  flex: 0 0 auto;
+  overflow: visible;
 }
 html.mobile-device .share-page .share-btn {
   flex: 1 1 45%;

@@ -63,6 +63,22 @@ def test_cgm_duration_cannot_exceed_age() -> None:
     assert result.has_range_errors is True
 
 
+def test_cgm_duration_years_at_age_18_is_rejected() -> None:
+    result = validate_startup_form(
+        **_base_kwargs(age=18, cgm_duration=20, uses_cgm=True, cgm_duration_unit="years")
+    )
+    assert result.form_complete is False
+    assert result.cgm_duration_error
+
+
+def test_cgm_duration_weeks_within_age_is_accepted() -> None:
+    result = validate_startup_form(
+        **_base_kwargs(age=18, cgm_duration=200, uses_cgm=True, cgm_duration_unit="weeks")
+    )
+    assert result.form_complete is True
+    assert result.cgm_duration_error == ""
+
+
 def test_cgm_duration_not_checked_when_no_cgm() -> None:
     result = validate_startup_form(**_base_kwargs(uses_cgm=False, cgm_duration=999))
     assert result.cgm_duration_error == ""

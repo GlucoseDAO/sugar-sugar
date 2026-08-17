@@ -315,7 +315,9 @@ The research record. Metrics are always **mg/dL**, regardless of the UI unit.
 | `is_example_data` | Run-level flag: last round only. **Do not use this to classify Format C rounds.** |
 | `data_source_name` | Run-level source: last round only. Format A may be `BIGIDEAS-001.csv` / `D1NAMO-002.csv`; B is the upload filename; C is whichever side played last. Use `per_round_metrics` for the real list. |
 | `age`, `user_id`, `gender`, `uses_cgm`, `cgm_duration_years`, `diabetic`, `diabetic_type`, `diabetes_duration`, `location` | Demographics from `/startup`. `user_id` is the adapter default (`1`), not a public id. |
-| `generic_intervention` | Format A source policy for this player (`bigideas`, `d1namo`, or a mix). Empty on older rows. |
+| `generic_intervention` | Format A source policy for this player (`bigideas`, `d1namo`, `mix_t2`, or `mix:bigideas=0.90,d1namo=0.10`). Empty on older rows. |
+| `challenge_unknown` | True when the player opted into Challenge the unknown (formats A/C, no diabetes or type 1). |
+| `challenge_unknown_pct` | Share of the opposite pool in 10% steps (10–100). Empty when the challenge is off. |
 | `rounds_played` | Count of completed rounds in this run (`0` = Start stub). |
 | `predicted_values` | Python-literal list of `{version, round, value}` (prediction, mg/dL). |
 | `real_values` | Same shape: ground truth, mg/dL. |

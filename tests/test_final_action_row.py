@@ -51,6 +51,14 @@ def _user(*, uses_cgm: bool, played: list[str]) -> dict[str, Any]:
 
 def test_action_row_sits_under_title_with_x_formats_then_share() -> None:
     layout = create_final_layout(_user(uses_cgm=True, played=["A"]), "mg/dL", locale="en")
+    journey = _by_id(layout, "final-journey-title")
+    assert journey is not None
+    assert "epic journey" in journey.children
+    switch_title = _by_id(layout, "final-switch-format-title")
+    assert switch_title is not None
+    assert switch_title.children == "You can also try..."
+    assert switch_title.style["display"] == "block"
+    assert "final-switch-format-title-visible" in (switch_title.className or "")
     row = _by_id(layout, "final-action-row")
     assert row is not None
     child_ids = [getattr(child, "id", None) for child in row.children]
@@ -98,3 +106,5 @@ def test_all_formats_played_hides_switch_buttons() -> None:
     assert _by_id(row, "switch-format-a").style["display"] == "none"
     assert _by_id(row, "switch-format-b").style["display"] == "none"
     assert _by_id(row, "switch-format-c").style["display"] == "none"
+    assert _by_id(layout, "final-switch-format-title").style["display"] == "none"
+    assert "epic journey" in _by_id(layout, "final-journey-title").children

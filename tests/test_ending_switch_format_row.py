@@ -1,4 +1,4 @@
-"""Last-round /ending puts Try-another-option buttons on the X/submit row."""
+"""Last-round /ending turns the X into Results; format CTAs stay hidden."""
 from __future__ import annotations
 
 from typing import Any
@@ -77,7 +77,7 @@ def _layout(*, last_round: bool, uses_cgm: bool) -> Any:
     )
 
 
-def test_last_round_switch_buttons_sit_on_submit_row_next_to_x() -> None:
+def test_last_round_finish_button_is_green_results() -> None:
     layout = _layout(last_round=True, uses_cgm=True)
     row = _by_id(layout, "ending-submit-row")
     assert row is not None
@@ -92,17 +92,21 @@ def test_last_round_switch_buttons_sit_on_submit_row_next_to_x() -> None:
         "switch-format-c",
     ]
 
+    finish = _by_id(row, "finish-study-button-ending")
+    assert finish.children == "Results"
+    assert "finish-study-results" in finish.className
+    assert finish.style["backgroundColor"] == "#4CBB17"
+    assert finish.style["minWidth"] == "160px"
+
     next_btn = _by_id(row, "next-round-button")
     assert next_btn.style["display"] == "none"
 
-    # Played format A; CGM users still have B and C left.
+    # Remaining formats belong on /final, not last-round /ending.
     assert _by_id(row, "switch-format-a").style["display"] == "none"
-    assert _by_id(row, "switch-format-b").style["display"] == "inline-flex"
-    assert _by_id(row, "switch-format-c").style["display"] == "inline-flex"
-    assert _by_id(row, "switch-format-b").children == "Try My Data"
-    assert _by_id(row, "switch-format-c").children == "Try Generic + My Data"
+    assert _by_id(row, "switch-format-b").style["display"] == "none"
+    assert _by_id(row, "switch-format-c").style["display"] == "none"
 
-    # The old below-the-fold card is gone; the title id stays for language updates.
+    # The title id stays for language updates, but the card stays hidden.
     assert _by_id(layout, "ending-switch-format-title") is not None
     assert _by_id(layout, "ending-switch-format-title").style["display"] == "none"
 
@@ -113,15 +117,21 @@ def test_mid_round_keeps_next_and_hides_switch_buttons() -> None:
     assert row is not None
     assert row.className == ""
     assert _by_id(row, "next-round-button").style["display"] == "inline-flex"
+    finish = _by_id(row, "finish-study-button-ending")
+    assert "finish-study-results" not in (finish.className or "")
+    assert finish.style["backgroundColor"] == "#007bff"
     assert _by_id(row, "switch-format-a").style["display"] == "none"
     assert _by_id(row, "switch-format-b").style["display"] == "none"
     assert _by_id(row, "switch-format-c").style["display"] == "none"
 
 
-def test_last_round_without_cgm_only_shows_x() -> None:
+def test_last_round_without_cgm_only_shows_results() -> None:
     layout = _layout(last_round=True, uses_cgm=False)
     row = _by_id(layout, "ending-submit-row")
     assert row is not None
+    finish = _by_id(row, "finish-study-button-ending")
+    assert finish.children == "Results"
+    assert "finish-study-results" in finish.className
     assert _by_id(row, "next-round-button").style["display"] == "none"
     assert _by_id(row, "switch-format-a").style["display"] == "none"
     assert _by_id(row, "switch-format-b").style["display"] == "none"

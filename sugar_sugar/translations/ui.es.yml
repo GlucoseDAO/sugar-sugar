@@ -11,7 +11,7 @@ es:
     the_study: "El Estudio"
     contact_us: "Contáctanos"
     video_instructions: "Instrucciones en video"
-    faq: "Preguntas frecuentes (FAQ)"
+    faq: "FAQ"
     highscore: "Clasificación"
 
   language:
@@ -32,11 +32,12 @@ es:
     consent_upload_own_data: "Acepto subir mis propios datos de CGM para las tareas opcionales."
     tagline: "Un juego para poner a prueba tus superpoderes de predicción de glucosa."
     how_it_works: "Cómo funciona"
+    how_it_works_teaser: "Tres pasos. Una hora. Tu instinto contra el sensor."
+    faq_button: "FAQ"
     how_it_works_steps:
-      - "Sube un archivo CSV de Dexcom/Libre/Medtronic/Nightscout (o usa el conjunto de datos de ejemplo)"
-      - "Dibuja tu tendencia de glucosa predicha en el gráfico"
-      - "Compara tus predicciones con los valores reales"
-      - "Consulta las métricas de precisión (MAE/RMSE/MAPE)"
+      - "Dibuja cómo crees que se moverá la glucosa en la próxima hora"
+      - "Compara tu línea con lo que realmente ocurrió"
+      - "Descubre qué tan cerca estuviste"
     preview: "Vista previa"
     about_study_title: "Sobre el estudio"
     about_study_text: "Estamos estudiando qué tan precisos son los humanos al predecir las tendencias de la glucosa y qué patrones notan los usuarios experimentados de CGM. Si eliges participar, tu juego y tus datos de CGM subidos pueden ser utilizados para investigaciones posteriores."
@@ -118,7 +119,7 @@ es:
     age_must_be_18_error: "Debes tener 18 años o más para participar en el estudio."
     age_max_error: "La edad no puede superar %{max_age}."
     diabetes_duration_exceeds_age_error: "Los años con diabetes no pueden ser mayores que tu edad."
-    cgm_duration_exceeds_age_error: "Los años con CGM no pueden ser mayores que tu edad."
+    cgm_duration_exceeds_age_error: "El uso de CGM no puede ser más largo que tu edad."
     values_check_warning: "Por favor, revisa los valores que has introducido."
     missing_fields: "Por favor, completa: %{fields}"
     gender_label: "Género"
@@ -126,12 +127,15 @@ es:
     gender_male: "Masculino"
     gender_female: "Femenino"
     gender_na: "N/A"
-    cgm_label: "¿Usas CGM?"
-    cgm_placeholder: "Selecciona si usas CGM"
+    cgm_label: "¿Has usado alguna vez un CGM?"
+    cgm_placeholder: "Selecciona si has usado alguna vez un CGM"
     yes: "Sí"
     no: "No"
-    cgm_duration_label: "Por favor especifica la duración de uso (en años)"
-    cgm_duration_placeholder: "Ingresa el número de años"
+    cgm_duration_label: "¿Durante cuánto tiempo lo usaste?"
+    cgm_duration_placeholder: "Introduce un número"
+    cgm_duration_unit_weeks: "Semanas"
+    cgm_duration_unit_months: "Meses"
+    cgm_duration_unit_years: "Años"
     diabetic_label: "¿Eres diabético?"
     diabetic_placeholder: "Selecciona tu estado diabético"
     diabetes_type_label: "Tipo de diabetes"
@@ -160,9 +164,19 @@ es:
     format_a_label_short: "Genéricos"
     format_b_label_short: "Míos"
     format_c_label_short: "Combinados"
-    format_help_a: "Datos genéricos — usa datos genéricos (no se requieren datos del sensor). 12 rondas usando un conjunto de muestra."
-    format_help_b: "Mis datos — usa tus propios datos. Sube tu propio archivo y predice solo sobre él."
-    format_help_c: "Genéricos + Mis datos — prueba ambos. Subirás tu propio archivo, pero cada ronda usará datos de muestra o tus propios datos."
+    format_help_a: "Datos genéricos — no tienes que subir nada. Juega con datos públicos de referencia."
+    format_help_b: "Mis datos — sube tu propio CSV y juega con tu propia glucosa."
+    format_help_c: "Genéricos + Mis datos — una combinación. Algunas rondas usan datos públicos, otras los tuyos."
+    format_find_data_before: "Si no sabes dónde encontrar tus datos, "
+    format_find_data_link: "búscalos aquí."
+    challenge_unknown_button: "Reta a lo desconocido"
+    challenge_unknown_button_on: "Desconocido activado"
+    challenge_unknown_help: "Solo para Genéricos o Genéricos + mis datos, y solo si no tienes diabetes o tienes tipo 1."
+    challenge_unknown_help_nd: "¿Qué parte de las curvas debe venir de personas con diabetes? 10 %% significa que una de cada diez rondas usa datos diabéticos."
+    challenge_unknown_help_t1: "¿Qué parte de las curvas debe venir de personas sin diabetes? 10 %% significa que una de cada diez rondas usa datos no diabéticos."
+    challenge_unknown_slider_label: "Proporción de datos desconocidos"
+    challenge_unknown_slider_nd: "Proporción de datos diabéticos"
+    challenge_unknown_slider_t1: "Proporción de datos no diabéticos"
     data_usage_consent_label: "Acepto el uso de mis datos CGM subidos para este estudio."
     data_usage_consent_required: "Por favor confirma el consentimiento de uso de datos para continuar."
 
@@ -229,6 +243,7 @@ es:
     download_png_hint: "Guarda la tarjeta como PNG, perfecta para las historias de Instagram."
     generated_at: "Generado"
     play_again: "Jugar de nuevo"
+    unknown_stamp: "entró en lo desconocido"
     copy_link: "Copiar enlace"
     copy_link_success: "¡Enlace copiado!"
     share_native: "Compartir"
@@ -368,6 +383,7 @@ es:
     units_line: "Unidades: %{unit}"
     next_round: "Siguiente ronda"
     view_complete_analysis: "Ver análisis completo"
+    results: "Resultados"
     graph_explanation: "El gráfico muestra la ventana de glucosa sobre la que hiciste predicciones. La línea naranja discontinua separa el historial conocido (izquierda) de la hora que predijiste (derecha). Tus predicciones se muestran en rojo."
     data_source_label: "Fuente de datos: %{source}"
     sensor_label: "Sensor"
@@ -445,9 +461,10 @@ es:
     no_ranking_yet: "Juega al menos %{min} rondas para aparecer en la clasificación."
     per_round_metrics: "Métricas por ronda"
     start_over: "Salir"
+    journey_title: "Has terminado este viaje épico — ¿quieres empezar otro?"
 
   switch_format:
-    title: "Probar otra opción"
+    title: "También puedes probar..."
     try_a: "Probar Datos de ejemplo = usar datos genéricos"
     try_b: "Probar Mis datos = usar datos propios"
     try_c: "Probar Ejemplo + Mis datos = usar tanto datos genéricos como propios"
@@ -461,8 +478,29 @@ es:
     line2: "Independientemente de tus resultados, no cambies ninguna decisión médica basándote en esta aplicación"
     line3: "Consulta siempre a tu médico antes de tomar decisiones médicas"
 
+
   faq:
     title: "Preguntas frecuentes (FAQ)"
+    ask_title: "Escribe tu propia pregunta"
+    ask_intro: "¿Hay algo que no hayamos respondido o que te gustaría saber? Escríbelo aquí."
+    ask_placeholder: "Escribe tu pregunta aquí"
+    name_placeholder: "Nombre (opcional)"
+    tags_label: "Etiquetas"
+    ask_button: "Publicar pregunta"
+    ask_thanks: "Gracias — tu pregunta está en el tablero."
+    ask_empty: "Escribe primero una pregunta."
+    tag_gameplay: "Juego"
+    tag_data: "Datos"
+    tag_privacy: "Privacidad"
+    tag_download: "Descarga"
+    tag_other: "Otro"
+    section_participant: "Participante"
+    section_developer: "Desarrollador"
+    reply_placeholder: "Escribe una respuesta"
+    reply_button: "Responder"
+    board_empty: "Aún no hay preguntas. Sé el primero."
+    board_participant_title: "Preguntas de participantes"
+    board_developer_title: "Preguntas de desarrolladores"
     sections:
       - title: "Por qué es importante este estudio"
         items:
@@ -535,6 +573,56 @@ es:
               - **Sin presión en tiempo real.** Dibujar una línea de predicción con calma es diferente de tomar una decisión de dosificación a las 2 de la madrugada medio dormido.
 
               - **Datos de ejemplo vs. datos propios.** Si juegas con los datos de ejemplo incluidos, tu precisión puede diferir de la que obtendrías prediciendo tu propia glucosa. Te animamos a subir tu propia exportación de CGM (Dexcom, Libre, Medtronic o Nightscout): tu intuición personal sobre tus propios patrones es parte de lo que hace interesante la comparación con el ML.
+      - title: "Cómo descargar tu CSV de CGM"
+        id: download-csv
+        items:
+          - q: "¿Por qué no puedo exportar desde la app del teléfono?"
+            a: "La mayoría de las apps de CGM en el teléfono solo dan informes PDF. El CSV en bruto sale de la web del fabricante o de apps de código abierto como xDrip+ y Nightscout."
+          - q: "Dexcom (Clarity)"
+            a: >-
+              1. Abre [clarity.dexcom.com](https://clarity.dexcom.com) (EE. UU.) o [clarity.dexcom.eu](https://clarity.dexcom.eu) (Europa) e inicia sesión con tu cuenta Dexcom.
+
+              2. Abre cualquier informe y pulsa **Export** arriba.
+
+              3. Elige un periodo (14, 30, 90 días o personalizado) y descarga el CSV.
+
+
+              La app Clarity no puede exportar CSV — usa la web.
+
+
+              Vídeos: [Subida a Clarity](https://www.youtube.com/watch?v=GTULvbiAkfc), [Navegar Clarity](https://www.youtube.com/watch?v=hNSeKZXV1sM), [Exportar G6 / Clarity](https://www.youtube.com/watch?v=7v-d_FKs6Oo).
+          - q: "Abbott FreeStyle Libre (LibreView)"
+            a: >-
+              1. Abre [libreview.com](https://www.libreview.com) e inicia sesión con la misma cuenta que en la app Libre.
+
+              2. Pulsa el icono **Glucose History** (la onda de tendencia) arriba a la izquierda.
+
+              3. Pulsa **Download Glucose Data** (arriba a la derecha), resuelve el captcha y descarga.
+
+
+              No abras ni vuelvas a guardar el archivo en Excel — puede romper los datos. Súbelo tal como se descargó.
+
+
+              Vídeos: [Configurar LibreView](https://www.youtube.com/watch?v=xBa6JJEdqcI), [Exportar TypeOneTalks](https://www.youtube.com/watch?v=l09GPGQXOLE).
+          - q: "Medtronic (CareLink)"
+            a: >-
+              1. Abre [carelink.minimed.com](https://carelink.minimed.com) e inicia sesión.
+
+              2. Las bombas nuevas (770G / 780G) se sincronizan con MiniMed Mobile. Las antiguas necesitan CareLink USB o Contour Next Link.
+
+              3. Ve a **Reports → Data Export (CSV)**.
+
+
+              Vídeos: [Resumen de CareLink](https://www.youtube.com/watch?v=WGO1YnVJ0eo), [Configurar el uploader](https://www.youtube.com/watch?v=u_oC2EubVT4).
+          - q: "Glooko, Tidepool, xDrip+ o Nightscout"
+            a: >-
+              **Glooko:** [my.glooko.com](https://my.glooko.com) → Summary → Export as CSV.
+
+              **Tidepool:** Settings (engranaje) → Export My Data → elige fechas → descarga.
+
+              **xDrip+:** Menú → Import/Export → Export CSV (formato SiDiary).
+
+              **Nightscout:** pega la URL de tu sitio en la pantalla de inicio o de predicción — no hace falta un archivo.
       - title: "Datos y privacidad"
         items:
           - q: "¿Se almacena alguno de mis datos?"

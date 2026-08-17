@@ -30,11 +30,12 @@ uk:
     consent_upload_own_data: "Я погоджуюся завантажити власні CGM‑дані для опційних завдань."
     tagline: "Гра, щоб перевірити твої здібності прогнозувати глюкозу."
     how_it_works: "Як це працює"
+    how_it_works_teaser: "Три кроки. Одна година. Твоя інтуїція проти сенсора."
+    faq_button: "ЧаПи"
     how_it_works_steps:
-      - "Завантаж Dexcom/Libre/Medtronic/Nightscout CSV (або використай приклад)"
-      - "Намалюй прогнозований тренд глюкози на графіку"
-      - "Порівняй прогноз із реальними значеннями"
-      - "Переглянь метрики точності (MAE/RMSE/MAPE)"
+      - "Намалюй, як, на твою думку, зміниться глюкоза протягом наступної години"
+      - "Порівняй свою лінію з тим, що сталося насправді"
+      - "Дізнайся, наскільки близько ти влучив"
     preview: "Попередній перегляд"
     about_study_title: "Про дослідження"
     about_study_text: "Ми досліджуємо, наскільки точно люди прогнозують тренди глюкози та які патерни помічають досвідчені користувачі CGM. Якщо ти вирішиш взяти участь, твоя гра та завантажені CGM‑дані можуть бути використані для подальших досліджень."
@@ -116,7 +117,7 @@ uk:
     age_must_be_18_error: "Для участі в дослідженні тобі має бути 18+ років."
     age_max_error: "Вік не може перевищувати %{max_age}."
     diabetes_duration_exceeds_age_error: "Років з діабетом не може бути більше, ніж твій вік."
-    cgm_duration_exceeds_age_error: "Років з CGM не може бути більше, ніж твій вік."
+    cgm_duration_exceeds_age_error: "Тривалість використання CGM не може бути більшою за твій вік."
     values_check_warning: "Будь ласка, перевір введені значення."
     missing_fields: "Будь ласка, заповни: %{fields}"
     gender_label: "Стать"
@@ -124,12 +125,15 @@ uk:
     gender_male: "Чоловіча"
     gender_female: "Жіноча"
     gender_na: "Н/Д"
-    cgm_label: "Ти використовуєш CGM?"
-    cgm_placeholder: "Обери, чи використовуєш CGM"
+    cgm_label: "Ти коли-небудь користувався CGM?"
+    cgm_placeholder: "Обери, чи користувався ти коли-небудь CGM"
     yes: "Так"
     no: "Ні"
-    cgm_duration_label: "Вкажи тривалість використання (у роках)"
-    cgm_duration_placeholder: "Введи кількість років"
+    cgm_duration_label: "Як довго ти ним користувався?"
+    cgm_duration_placeholder: "Введи число"
+    cgm_duration_unit_weeks: "Тижні"
+    cgm_duration_unit_months: "Місяці"
+    cgm_duration_unit_years: "Роки"
     diabetic_label: "Ти маєш діабет?"
     diabetic_placeholder: "Обери статус"
     diabetes_type_label: "Тип діабету"
@@ -158,9 +162,19 @@ uk:
     format_a_label_short: "Генеричні"
     format_b_label_short: "Мої"
     format_c_label_short: "Змішані"
-    format_help_a: "Генеричні дані — генеричні дані (сенсорні дані не потрібні). 12 раундів із прикладом."
-    format_help_b: "Мої дані — власні дані. Завантаж свій файл і прогнозуй лише на ньому."
-    format_help_c: "Генеричні + мої дані — спробувати обидва варіанти. Ти завантажиш свій файл, але кожен раунд буде або з прикладу, або з твоїх даних."
+    format_help_a: "Генеричні дані — нічого завантажувати не потрібно. Просто грай на публічних довідкових даних."
+    format_help_b: "Мої дані — завантаж свій CSV і грай на своїй глюкозі."
+    format_help_c: "Генеричні + мої дані — комбінація. Частина раундів на публічних даних, частина на твоїх."
+    format_find_data_before: "Якщо не знаєш, де взяти свої дані, "
+    format_find_data_link: "шукай тут."
+    challenge_unknown_button: "Кинь виклик невідомому"
+    challenge_unknown_button_on: "Невідоме увімкнено"
+    challenge_unknown_help: "Лише для «Загальні» або «Загальні + мої дані», і лише якщо немає діабету або є тип 1."
+    challenge_unknown_help_nd: "Яка частка кривих має бути від людей із діабетом? 10%% означає, що один раунд із десяти використовує діабетичні дані."
+    challenge_unknown_help_t1: "Яка частка кривих має бути від людей без діабету? 10%% означає, що один раунд із десяти використовує недіабетичні дані."
+    challenge_unknown_slider_label: "Частка невідомих даних"
+    challenge_unknown_slider_nd: "Частка діабетичних даних"
+    challenge_unknown_slider_t1: "Частка недіабетичних даних"
     data_usage_consent_label: "Я погоджуюся на використання моїх завантажених CGM‑даних для цього дослідження."
     data_usage_consent_required: "Будь ласка, підтвердь згоду на використання даних, щоб продовжити."
 
@@ -227,6 +241,7 @@ uk:
     download_png_hint: "Збережи картку у PNG - чудово для історій в Instagram."
     generated_at: "Створено"
     play_again: "Грати ще раз"
+    unknown_stamp: "пішов у невідоме"
     copy_link: "Скопіювати посилання"
     copy_link_success: "Посилання скопійовано!"
     share_native: "Поділитися"
@@ -366,6 +381,7 @@ uk:
     units_line: "Одиниці: %{unit}"
     next_round: "Наступний раунд"
     view_complete_analysis: "Переглянути повний аналіз"
+    results: "Результати"
     graph_explanation: "На графіку показано вікно глюкози, яке ти прогнозував/ла. Помаранчева пунктирна лінія відокремлює відому передісторію (ліворуч) від години, яку ти передбачав/ла (праворуч). Твої прогнози показані червоним."
     data_source_label: "Джерело даних: %{source}"
     sensor_label: "Сенсор"
@@ -443,9 +459,10 @@ uk:
     no_ranking_yet: "Зіграй щонайменше %{min} раундів, щоб з’явитися в таблиці лідерів."
     per_round_metrics: "Метрики по раундах"
     start_over: "Вийти"
+    journey_title: "Ти завершив цю епічну подорож — хочеш почати нову?"
 
   switch_format:
-    title: "Спробувати інший варіант"
+    title: "Ти також можеш спробувати..."
     try_a: "Спробувати прикладові дані = використовувати загальні дані"
     try_b: "Спробувати мої дані = використовувати власні дані"
     try_c: "Спробувати приклад + мої дані = використовувати і загальні, і власні дані"
@@ -459,8 +476,29 @@ uk:
     line2: "Незалежно від результатів, не змінюй жодних медичних рішень на основі цього застосунку"
     line3: "Завжди консультуйся з лікарем перед прийняттям медичних рішень"
 
+
   faq:
     title: "Часті запитання"
+    ask_title: "Напиши своє запитання"
+    ask_intro: "Ми щось не відповіли або ти хочеш дізнатися більше? Напиши тут."
+    ask_placeholder: "Напиши запитання тут"
+    name_placeholder: "Ім'я (необов'язково)"
+    tags_label: "Теги"
+    ask_button: "Опублікувати запитання"
+    ask_thanks: "Дякуємо — твоє запитання на дошці."
+    ask_empty: "Спочатку напиши запитання."
+    tag_gameplay: "Гра"
+    tag_data: "Дані"
+    tag_privacy: "Приватність"
+    tag_download: "Завантаження"
+    tag_other: "Інше"
+    section_participant: "Учасник"
+    section_developer: "Розробник"
+    reply_placeholder: "Напиши відповідь"
+    reply_button: "Відповісти"
+    board_empty: "Ще немає запитань. Будь першим."
+    board_participant_title: "Запитання учасників"
+    board_developer_title: "Запитання розробників"
     sections:
       - title: "Чому це дослідження важливе"
         items:
@@ -533,6 +571,56 @@ uk:
               - **Немає тиску реального часу.** Спокійно малювати лінію прогнозу — це зовсім інше, ніж приймати рішення щодо дозування о другій ночі напівсонним.
 
               - **Приклад vs. власні дані.** Якщо ти граєш із вбудованими прикладовими даними, твоя точність може відрізнятися від прогнозування власної глюкози. Ми заохочуємо завантажити власний CGM-експорт (Dexcom, Libre, Medtronic або Nightscout) — твоя особиста інтуїція щодо власних патернів є частиною того, що робить порівняння з ML цікавим.
+      - title: "Як завантажити CSV з CGM"
+        id: download-csv
+        items:
+          - q: "Чому не можна експортувати з додатка на телефоні?"
+            a: "Більшість CGM-додатків на телефоні дають лише PDF-звіти. Сирий CSV береться з сайту виробника або з відкритих додатків на кшталт xDrip+ і Nightscout."
+          - q: "Dexcom (Clarity)"
+            a: >-
+              1. Відкрий [clarity.dexcom.com](https://clarity.dexcom.com) (США) або [clarity.dexcom.eu](https://clarity.dexcom.eu) (Європа) і увійди в акаунт Dexcom.
+
+              2. Відкрий будь-який звіт і натисни **Export** зверху.
+
+              3. Обери період (14, 30, 90 днів або свій) і завантаж CSV.
+
+
+              Додаток Clarity не вміє експортувати CSV — користуйся сайтом.
+
+
+              Відео: [завантаження в Clarity](https://www.youtube.com/watch?v=GTULvbiAkfc), [навігація Clarity](https://www.youtube.com/watch?v=hNSeKZXV1sM), [експорт G6 / Clarity](https://www.youtube.com/watch?v=7v-d_FKs6Oo).
+          - q: "Abbott FreeStyle Libre (LibreView)"
+            a: >-
+              1. Відкрий [libreview.com](https://www.libreview.com) і увійди тим самим акаунтом, що в додатку Libre.
+
+              2. Натисни значок **Glucose History** (хвиля тренду) зліва зверху.
+
+              3. Натисни **Download Glucose Data** справа зверху, пройди капчу і завантаж файл.
+
+
+              Не відкривай і не перезберігай файл в Excel — так можна зіпсувати дані. Завантажуй як є.
+
+
+              Відео: [налаштування LibreView](https://www.youtube.com/watch?v=xBa6JJEdqcI), [експорт TypeOneTalks](https://www.youtube.com/watch?v=l09GPGQXOLE).
+          - q: "Medtronic (CareLink)"
+            a: >-
+              1. Відкрий [carelink.minimed.com](https://carelink.minimed.com) і увійди.
+
+              2. Нові помпи (770G / 780G) синхронізуються через MiniMed Mobile. Старим потрібен CareLink USB або Contour Next Link.
+
+              3. Перейди в **Reports → Data Export (CSV)**.
+
+
+              Відео: [огляд CareLink](https://www.youtube.com/watch?v=WGO1YnVJ0eo), [налаштування завантажувача](https://www.youtube.com/watch?v=u_oC2EubVT4).
+          - q: "Glooko, Tidepool, xDrip+ або Nightscout"
+            a: >-
+              **Glooko:** [my.glooko.com](https://my.glooko.com) → Summary → Export as CSV.
+
+              **Tidepool:** Settings (шестерня) → Export My Data → обери дати → завантаж.
+
+              **xDrip+:** Меню → Import/Export → Export CSV (формат SiDiary).
+
+              **Nightscout:** встав URL свого сайту на екрані старту або прогнозу — файл не потрібен.
       - title: "Дані та конфіденційність"
         items:
           - q: "Чи зберігаються мої дані?"

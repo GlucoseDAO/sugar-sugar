@@ -22,6 +22,26 @@ from sugar_sugar.consent import (
 from sugar_sugar.i18n import t, t_list
 from sugar_sugar.config import MIN_USEFUL_ROUNDS, STORAGE_TYPE
 
+
+def how_it_works_children(locale: str) -> list[Any]:
+    """Teaser + numbered steps as headings so the global 16px rule cannot shrink them."""
+    steps = [
+        html.H2(
+            f"{index}. {item}",
+            className="how-it-works-step",
+            disable_n_clicks=True,
+        )
+        for index, item in enumerate(t_list("ui.landing.how_it_works_steps", locale=locale), start=1)
+    ]
+    return [
+        html.H2(
+            t("ui.landing.how_it_works_teaser", locale=locale),
+            className="how-it-works-teaser",
+            disable_n_clicks=True,
+        ),
+        html.Div(steps, className="how-it-works-steps", disable_n_clicks=True),
+    ]
+
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _PREDICTION_STATS_CSV = _PROJECT_ROOT / "data" / "input" / "prediction_statistics.csv"
 _PREDICTION_RANKING_CSV = _PROJECT_ROOT / "data" / "input" / "prediction_ranking.csv"
@@ -371,19 +391,7 @@ class LandingPage(html.Div):
                 ),
                 html.Div(
                     [
-                        html.H3(
-                            t("ui.landing.how_it_works", locale=locale),
-                            style={"fontSize": "22px", "fontWeight": "800", "color": "#1565c0", "marginBottom": "8px"},
-                            disable_n_clicks=True,
-                        ),
-                        html.Ul(
-                            [html.Li(item) for item in t_list("ui.landing.how_it_works_steps", locale=locale)],
-                            style={
-                                "marginBottom": "0",
-                                "color": "#334155",
-                                "lineHeight": "1.6",
-                            },
-                        ),
+                        *how_it_works_children(locale),
                     ],
                     style={
                         "background": "rgba(255,255,255,0.75)",
@@ -654,14 +662,7 @@ class LandingPageMobile(html.Div):
                 ),
                 html.Div(
                     [
-                        html.H3(
-                            t("ui.landing.how_it_works", locale=locale),
-                            style={"fontSize": "18px", "fontWeight": "800", "color": "#1565c0", "marginBottom": "6px"},
-                        ),
-                        html.Ul(
-                            [html.Li(item) for item in t_list("ui.landing.how_it_works_steps", locale=locale)],
-                            style={"margin": "0", "paddingLeft": "20px", "color": "#334155", "lineHeight": "1.6"},
-                        ),
+                        *how_it_works_children(locale),
                     ],
                     style={
                         "background": "rgba(255,255,255,0.75)",

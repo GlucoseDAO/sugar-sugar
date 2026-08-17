@@ -3,7 +3,7 @@ from functools import lru_cache
 from html import escape as html_escape
 from io import BytesIO
 import dash
-from dash import dcc, html, Output, Input, State, no_update, ctx
+from dash import ALL, dcc, html, Output, Input, State, no_update, ctx
 from dash.exceptions import PreventUpdate
 import plotly.graph_objs as go
 
@@ -1711,7 +1711,8 @@ def _staging_base_user_info() -> dict[str, Any]:
         "study_id": str(uuid.uuid4()),
         "run_id": str(uuid.uuid4()),
         "email": "staging@vanilla-sugar.local",
-        "age": 30, "gender": "F", "uses_cgm": True, "cgm_duration_years": 2,
+        "age": 30, "gender": "F", "uses_cgm": True,
+        "cgm_duration": [2, "years"], "cgm_duration_years": 2,
         "format": "A", "run_format": "A",
         "diabetic": True, "diabetic_type": "Type 1", "diabetes_duration": 6,
         "location": "Staging",
@@ -1996,6 +1997,7 @@ if _is_chart_mode:
         "age": 28,
         "gender": "F",
         "uses_cgm": True,
+        "cgm_duration": [1, "years"],
         "cgm_duration_years": 1,
         "format": _chart_format,
         "run_format": _chart_format,
@@ -2249,6 +2251,15 @@ app.clientside_callback(
             window.setTimeout(scrollPredictionChartToDrawArea, 900);
         }
         applyViewport();
+        if (pathname === '/faq' && window.location && window.location.hash) {
+            var targetId = window.location.hash.replace('#', '');
+            window.setTimeout(function() {
+                var el = document.getElementById(targetId);
+                if (el && el.scrollIntoView) {
+                    el.scrollIntoView({behavior: 'smooth', block: 'start'});
+                }
+            }, 80);
+        }
         if (window.__sugarPredictionViewportHandler) {
             window.removeEventListener('resize', window.__sugarPredictionViewportHandler);
             window.removeEventListener('orientationchange', window.__sugarPredictionViewportHandler);
@@ -3034,7 +3045,7 @@ def update_ending_text_on_language_change(
             )
         ]
 
-    finish_button_text = t("ui.ending.view_complete_analysis", locale=locale) if is_last_round else t("ui.common.finish_exit", locale=locale)
+    finish_button_text = t("ui.ending.results", locale=locale) if is_last_round else t("ui.common.finish_exit", locale=locale)
 
     return (
         t("ui.ending.title", locale=locale),
@@ -3218,6 +3229,115 @@ def create_info_page(*, locale: str, title: str, body: str) -> html.Div:
     )
 
 
+def _faq_tag_options(locale: str) -> list[dict[str, str]]:
+    from sugar_sugar.faq_board import allowed_faq_tags
+    return [
+        {"label": t(f"ui.faq.tag_{tag}", locale=locale), "value": tag}
+        for tag in allowed_faq_tags()
+    ]
+
+
+def _faq_section_options(locale: str) -> list[dict[str, str]]:
+    return [
+        {"label": t("ui.faq.section_participant", locale=locale), "value": "participant"},
+        {"label": t("ui.faq.section_developer", locale=locale), "value": "developer"},
+    ]
+
+
+def _faq_post_card(item: dict[str, Any], *, locale: str) -> html.Div:
+    qid = str(item.get("id") or "")
+    tags = [t(f"ui.faq.tag_{tag}", locale=locale) for tag in (item.get("tags") or [])]
+    replies = item.get("replies") or []
+    reply_nodes: list[Any] = []
+    for reply in replies:
+        who = t(
+            "ui.faq.section_developer" if reply.get("section") == "developer" else "ui.faq.section_participant",
+            locale=locale,
+        )
+        name = str(reply.get("name") or "").strip()
+        label = f"{who} · {name}" if name else who
+        reply_nodes.append(
+            html.Div(
+                [
+                    html.Div(label, style={"fontWeight": "700", "marginBottom": "4px"}, disable_n_clicks=True),
+                    html.Div(str(reply.get("text") or ""), disable_n_clicks=True),
+                ],
+                className="faq-reply",
+                disable_n_clicks=True,
+            )
+        )
+    name = str(item.get("name") or "").strip()
+    who = t(
+        "ui.faq.section_developer" if item.get("section") == "developer" else "ui.faq.section_participant",
+        locale=locale,
+    )
+    return html.Div(
+        [
+            html.Div(
+                f"{who}" + (f" · {name}" if name else ""),
+                style={"fontWeight": "700", "color": "#1e3a5f"},
+                disable_n_clicks=True,
+            ),
+            html.Div(
+                " · ".join(tags),
+                style={"color": "#64748b", "fontSize": "13px", "margin": "4px 0 8px"},
+                disable_n_clicks=True,
+            ),
+            html.Div(str(item.get("text") or ""), style={"whiteSpace": "pre-wrap"}, disable_n_clicks=True),
+            html.Div(reply_nodes, disable_n_clicks=True),
+            html.Div(
+                [
+                    dcc.Textarea(
+                        id={"type": "faq-reply-text", "index": qid},
+                        placeholder=t("ui.faq.reply_placeholder", locale=locale),
+                        style={"width": "100%", "minHeight": "70px", "marginTop": "10px"},
+                    ),
+                    dcc.RadioItems(
+                        id={"type": "faq-reply-section", "index": qid},
+                        options=_faq_section_options(locale),
+                        value="developer" if item.get("section") == "participant" else "participant",
+                        inline=True,
+                        style={"margin": "8px 0"},
+                    ),
+                    html.Button(
+                        t("ui.faq.reply_button", locale=locale),
+                        id={"type": "faq-reply-submit", "index": qid},
+                        className="ui blue button",
+                        n_clicks=0,
+                    ),
+                ],
+                className="faq-reply-form",
+            ),
+        ],
+        className="ui segment faq-question",
+        disable_n_clicks=True,
+    )
+
+
+def faq_board_children(*, locale: str) -> list[Any]:
+    from sugar_sugar.faq_board import load_faq_questions
+    items = load_faq_questions()
+    participants = [item for item in items if item.get("section") != "developer"]
+    developers = [item for item in items if item.get("section") == "developer"]
+    empty = html.Div(
+        t("ui.faq.board_empty", locale=locale),
+        style={"color": "#64748b", "fontStyle": "italic"},
+        disable_n_clicks=True,
+    )
+    return [
+        html.H2(t("ui.faq.board_participant_title", locale=locale), disable_n_clicks=True),
+        html.Div(
+            [_faq_post_card(item, locale=locale) for item in reversed(participants)] or [empty],
+            disable_n_clicks=True,
+        ),
+        html.H2(t("ui.faq.board_developer_title", locale=locale), disable_n_clicks=True),
+        html.Div(
+            [_faq_post_card(item, locale=locale) for item in reversed(developers)] or [empty],
+            disable_n_clicks=True,
+        ),
+    ]
+
+
 def create_faq_page(*, locale: str) -> html.Div:
     sections: list[Any] = t_raw("ui.faq.sections", locale=locale)
     section_divs: list[Any] = []
@@ -3243,6 +3363,10 @@ def create_faq_page(*, locale: str) -> html.Div:
                     disable_n_clicks=True,
                 )
             )
+        section_id = str(section.get("id") or "").strip()
+        section_kwargs: dict[str, Any] = {"disable_n_clicks": True}
+        if section_id:
+            section_kwargs["id"] = section_id
         section_divs.append(
             html.Div(
                 [
@@ -3253,13 +3377,63 @@ def create_faq_page(*, locale: str) -> html.Div:
                     ),
                     html.Div(items, disable_n_clicks=True),
                 ],
-                disable_n_clicks=True,
+                **section_kwargs,
             )
         )
     return html.Div(
         [
             html.H1(t("ui.faq.title", locale=locale), disable_n_clicks=True),
             html.Div(section_divs, disable_n_clicks=True),
+            html.Div(
+                [
+                    html.H2(t("ui.faq.ask_title", locale=locale), disable_n_clicks=True),
+                    html.Div(
+                        t("ui.faq.ask_intro", locale=locale),
+                        style={"marginBottom": "10px", "color": "#334155"},
+                        disable_n_clicks=True,
+                    ),
+                    dcc.Textarea(
+                        id="faq-ask-text",
+                        placeholder=t("ui.faq.ask_placeholder", locale=locale),
+                        style={"width": "100%", "minHeight": "110px"},
+                    ),
+                    dcc.Input(
+                        id="faq-ask-name",
+                        type="text",
+                        placeholder=t("ui.faq.name_placeholder", locale=locale),
+                        style={"width": "100%", "marginTop": "8px"},
+                    ),
+                    html.Div(
+                        t("ui.faq.tags_label", locale=locale),
+                        style={"fontWeight": "700", "margin": "10px 0 6px"},
+                        disable_n_clicks=True,
+                    ),
+                    dcc.Checklist(
+                        id="faq-ask-tags",
+                        options=_faq_tag_options(locale),
+                        value=[],
+                        inline=True,
+                    ),
+                    dcc.RadioItems(
+                        id="faq-ask-section",
+                        options=_faq_section_options(locale),
+                        value="participant",
+                        inline=True,
+                        style={"margin": "10px 0"},
+                    ),
+                    html.Button(
+                        t("ui.faq.ask_button", locale=locale),
+                        id="faq-ask-submit",
+                        className="ui green button",
+                        n_clicks=0,
+                    ),
+                    html.Div(id="faq-ask-status", style={"marginTop": "8px", "color": "#1b5e20"}),
+                ],
+                id="faq-ask-form",
+                className="ui segment",
+                style={"marginTop": "28px"},
+            ),
+            html.Div(faq_board_children(locale=locale), id="faq-board"),
         ],
         className="info-page",
         disable_n_clicks=True,
@@ -4465,10 +4639,34 @@ def create_ending_layout(
     _details_button_label = t("ui.ending.click_here_for_details", locale=locale)
 
     _finish_label = (
-        t("ui.ending.view_complete_analysis", locale=locale)
+        t("ui.ending.results", locale=locale)
         if is_last_round
         else t("ui.common.finish_exit", locale=locale)
     )
+    _finish_class = (
+        "ui green button finish-study-exit finish-study-results"
+        if is_last_round
+        else "ui primary button finish-study-exit"
+    )
+    _finish_style: dict[str, Any] = {
+        'backgroundColor': '#4CBB17' if is_last_round else '#007bff',
+        'color': 'white',
+        'padding': '0 22px' if is_last_round else '0',
+        'border': 'none',
+        'borderRadius': '8px',
+        'cursor': 'pointer',
+        'width': 'auto' if is_last_round else '48px',
+        'minWidth': '160px' if is_last_round else '48px',
+        'height': '48px',
+        'display': 'inline-flex',
+        'alignItems': 'center',
+        'justifyContent': 'center',
+        'lineHeight': '1' if not is_last_round else '1.2',
+        'margin': '0',
+        'flexShrink': '0',
+        'fontSize': '20px' if is_last_round else '18px',
+        'fontWeight': '700',
+    }
     return html.Div([
         html.H1(
             t("ui.ending.title", locale=locale),
@@ -4498,6 +4696,7 @@ def create_ending_layout(
                             events_df,
                             source_name=str(user_info.get('data_source_name') or '') if user_info else '',
                             hide_last_hour=False,
+                            locale=locale,
                         ),
                         id='ending-food-bubbles',
                         className='meal-food-bubble-strip',
@@ -4558,26 +4757,10 @@ def create_ending_layout(
                 html.Button(
                     _finish_label,
                     id='finish-study-button-ending',
-                    className='ui primary button finish-study-exit',
+                    className=_finish_class,
                     autoFocus=False,
                     title=_finish_label,
-                    style={
-                        'backgroundColor': '#007bff',
-                        'color': 'white',
-                        'padding': '0',
-                        'border': 'none',
-                        'borderRadius': '8px',
-                        'cursor': 'pointer',
-                        'width': '48px',
-                        'minWidth': '48px',
-                        'height': '48px',
-                        'display': 'inline-flex',
-                        'alignItems': 'center',
-                        'justifyContent': 'center',
-                        'lineHeight': '1',
-                        'margin': '0',
-                        'flexShrink': '0',
-                    }
+                    style=_finish_style,
                 ),
                 html.Button(
                     t("ui.ending.next_round", locale=locale),
@@ -4603,15 +4786,15 @@ def create_ending_layout(
                 ),
                 _switch_format_button(
                     "A", locale=locale, short=True,
-                    visible=is_last_round and "A" in switch_targets,
+                    visible=False,
                 ),
                 _switch_format_button(
                     "B", locale=locale, short=True,
-                    visible=is_last_round and "B" in switch_targets,
+                    visible=False,
                 ),
                 _switch_format_button(
                     "C", locale=locale, short=True,
-                    visible=is_last_round and "C" in switch_targets,
+                    visible=False,
                 ),
             ],
             id='ending-submit-row',
@@ -5576,6 +5759,18 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
             }
         ),
         html.Div(
+            t("ui.final.journey_title", locale=locale),
+            id='final-journey-title',
+            disable_n_clicks=True,
+        ),
+        html.H3(
+            t("ui.switch_format.title", locale=locale),
+            id='final-switch-format-title',
+            className='final-switch-format-title-visible' if switch_targets else '',
+            disable_n_clicks=True,
+            style={'display': 'block' if switch_targets else 'none'},
+        ),
+        html.Div(
             [
                 html.Button(
                     _exit_label,
@@ -5656,12 +5851,6 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
             id="switch-data-usage-consent",
             options=[{'label': t("ui.startup.data_usage_consent_label", locale=locale), 'value': 'agree'}],
             value=switch_data_consent_value,
-            style={'display': 'none'},
-        ),
-        html.H3(
-            t("ui.switch_format.title", locale=locale),
-            id='final-switch-format-title',
-            disable_n_clicks=True,
             style={'display': 'none'},
         ),
         html.Div(
@@ -5836,21 +6025,27 @@ def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) ->
      State('gender-dropdown', 'value'),
      State('cgm-dropdown', 'value'),
      State('cgm-duration-input', 'value'),
+     State('cgm-duration-unit', 'value'),
      State('format-dropdown', 'value'),
      State('data-usage-consent', 'value'),
      State('diabetic-dropdown', 'value'),
      State('diabetic-type-dropdown', 'value'),
      State('diabetes-duration-input', 'value'),
+     State('challenge-unknown-check', 'value'),
+     State('challenge-unknown-slider', 'value'),
      State('location-input', 'value'),
      State('user-info-store', 'data')],
     prevent_initial_call=True
 )
 def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
                        email: Optional[str], age: Optional[int | float],
-                       gender: Optional[str], uses_cgm: Optional[bool], cgm_duration_years: Optional[float],
+                       gender: Optional[str], uses_cgm: Optional[bool], cgm_duration_value: Optional[float],
+                       cgm_duration_unit: Optional[str],
                        format_value: Optional[str], data_usage_consent: Optional[list[str]],
                        diabetic: Optional[bool], diabetic_type: Optional[str],
-                       diabetes_duration: Optional[float], location: Optional[str],
+                       diabetes_duration: Optional[float],
+                       challenge_unknown: Optional[list[str] | bool], challenge_unknown_pct: Optional[float],
+                       location: Optional[str],
                        existing_user_info: Optional[Dict[str, Any]] = None) -> tuple[Any, ...]:
     """Handle start button on startup page.
 
@@ -5873,9 +6068,16 @@ def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
         stamp_upload_data_consent,
         validate_startup_form,
     )
+    from sugar_sugar.cgm_duration import cgm_duration_to_years, normalize_cgm_duration_unit
+    from sugar_sugar.challenge_unknown import (
+        challenge_unknown_checked,
+        challenge_unknown_eligible,
+        snap_challenge_pct,
+    )
 
     wants_contact = _wants_contact_from_user_info(existing_user_info)
     already_upload_consent = prior_upload_data_consent(existing_user_info)
+    duration_unit = normalize_cgm_duration_unit(cgm_duration_unit)
     validation = validate_startup_form(
         email=email,
         age=age,
@@ -5887,10 +6089,11 @@ def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
         diabetes_duration=diabetes_duration,
         location=location,
         uses_cgm=uses_cgm,
-        cgm_duration=cgm_duration_years,
+        cgm_duration=cgm_duration_value,
         wants_contact=wants_contact,
         locale=None,
         prior_upload_consent=already_upload_consent,
+        cgm_duration_unit=duration_unit,
     )
     _start_idle = (no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update)
     if not validation.form_complete:
@@ -5920,7 +6123,16 @@ def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
             'age': age,
             'gender': gender,
             'uses_cgm': uses_cgm_bool,
-            'cgm_duration_years': cgm_duration_years,
+            'cgm_duration': (
+                [cgm_duration_value, duration_unit]
+                if uses_cgm_bool and cgm_duration_value is not None
+                else None
+            ),
+            'cgm_duration_years': (
+                cgm_duration_to_years(cgm_duration_value, duration_unit)
+                if uses_cgm_bool
+                else None
+            ),
             'format': format_value,
             'run_format': format_value,
             # Startup B/C checkbox and/or landing upload consent — stamp both flags.
@@ -5931,8 +6143,22 @@ def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
             'diabetic': diabetic,
             'diabetic_type': diabetic_type,
             'diabetes_duration': diabetes_duration,
+            'challenge_unknown': (
+                challenge_unknown_checked(challenge_unknown)
+                and challenge_unknown_eligible(
+                    {'diabetic': diabetic, 'diabetic_type': diabetic_type, 'format': format_value},
+                    format_value,
+                )
+            ),
+            'challenge_unknown_pct': snap_challenge_pct(challenge_unknown_pct),
             'generic_intervention': generic_intervention_for_user(
-                {'diabetic': diabetic}
+                {
+                    'diabetic': diabetic,
+                    'diabetic_type': diabetic_type,
+                    'format': format_value,
+                    'challenge_unknown': challenge_unknown_checked(challenge_unknown),
+                    'challenge_unknown_pct': snap_challenge_pct(challenge_unknown_pct),
+                }
             ),
             'location': location,
             'rounds': info.get('rounds') or [],
@@ -6705,6 +6931,8 @@ def handle_share_results_button(
                 "format": current_format,
                 "uses_cgm": bool(user_info.get("uses_cgm", False)),
                 "max_rounds": int(user_info.get("max_rounds") or MAX_ROUNDS),
+                "challenge_unknown": bool(user_info.get("challenge_unknown", False)),
+                "challenge_unknown_pct": user_info.get("challenge_unknown_pct", ""),
             },
         }
         share_id: str = share_store.save_share(share_record)
@@ -8683,6 +8911,71 @@ def find_nearest_time(x: Union[str, float, datetime], df: pl.DataFrame) -> datet
 
 
 
+def register_faq_callbacks(app_instance: dash.Dash) -> None:
+    from sugar_sugar.faq_board import add_faq_question, add_faq_reply
+
+    @app_instance.callback(
+        [Output("faq-board", "children"),
+         Output("faq-ask-status", "children"),
+         Output("faq-ask-text", "value")],
+        Input("faq-ask-submit", "n_clicks"),
+        [State("faq-ask-text", "value"),
+         State("faq-ask-name", "value"),
+         State("faq-ask-tags", "value"),
+         State("faq-ask-section", "value"),
+         State("interface-language", "data")],
+        prevent_initial_call=True,
+    )
+    def submit_faq_question(
+        n_clicks: Optional[int],
+        text: Optional[str],
+        name: Optional[str],
+        tags: Optional[list[str]],
+        section: Optional[str],
+        interface_language: Optional[str],
+    ) -> tuple[Any, str, str]:
+        if not n_clicks:
+            raise PreventUpdate
+        locale = normalize_locale(interface_language)
+        posted = add_faq_question(text=text or "", section=section or "participant", tags=tags, name=name or "")
+        if posted is None:
+            return no_update, t("ui.faq.ask_empty", locale=locale), no_update
+        return faq_board_children(locale=locale), t("ui.faq.ask_thanks", locale=locale), ""
+
+    @app_instance.callback(
+        Output("faq-board", "children", allow_duplicate=True),
+        Input({"type": "faq-reply-submit", "index": ALL}, "n_clicks"),
+        [State({"type": "faq-reply-text", "index": ALL}, "value"),
+         State({"type": "faq-reply-section", "index": ALL}, "value"),
+         State({"type": "faq-reply-submit", "index": ALL}, "id"),
+         State("interface-language", "data")],
+        prevent_initial_call=True,
+    )
+    def submit_faq_reply(
+        n_clicks: list[Optional[int]],
+        texts: list[Optional[str]],
+        sections: list[Optional[str]],
+        ids: list[dict[str, str]],
+        interface_language: Optional[str],
+    ) -> Any:
+        if not n_clicks or not any(n_clicks):
+            raise PreventUpdate
+        triggered = ctx.triggered_id
+        if not isinstance(triggered, dict):
+            raise PreventUpdate
+        qid = str(triggered.get("index") or "")
+        locale = normalize_locale(interface_language)
+        for index, button_id in enumerate(ids or []):
+            if str(button_id.get("index")) == qid:
+                add_faq_reply(
+                    qid,
+                    text=str(texts[index] or ""),
+                    section=str(sections[index] or "developer"),
+                )
+                break
+        return faq_board_children(locale=locale)
+
+
 def _register_all_callbacks() -> None:
     """Register all Dash component callbacks (shared by ``main`` and ``chart``)."""
     global startup_page, landing_page, _callbacks_registered
@@ -8698,6 +8991,7 @@ def _register_all_callbacks() -> None:
     landing_page.register_callbacks(app)
     startup_page.register_callbacks(app)
     ending_page.register_callbacks(app)
+    register_faq_callbacks(app)
     _callbacks_registered = True
 
 

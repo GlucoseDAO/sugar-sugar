@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 import polars as pl
+import pytest
 
 from sugar_sugar.config import DEFAULT_POINTS
 from sugar_sugar.data import load_loop_chronological_data
@@ -22,7 +23,10 @@ from sugar_sugar.prediction_window_context import (
     window_has_carb_events,
 )
 from sugar_sugar.subject_sources import (
+    GENERIC_INTERVENTION_BIGIDEAS,
+    GENERIC_INTERVENTION_D1NAMO,
     GenericRoundWindow,
+    _weighted_pool_order,
     collect_generic_round_history,
     discover_generic_dataset_sources,
     discover_legacy_generic_sources,
@@ -182,6 +186,9 @@ def test_source_metadata_leads_with_diabetes_status() -> None:
         diabetic=False,
     )
     assert format_generic_source_metadata(non_diabetic, locale="en") == "Non-diabetic · Female"
+    assert "Non diabetic" in format_generic_source_metadata(non_diabetic, locale="ro")
+    assert "Non-diabetic" not in format_generic_source_metadata(non_diabetic, locale="ro")
+    assert "Fără diabet" not in format_generic_source_metadata(non_diabetic, locale="ro")
     status_only = GenericSourceMetadata(age="", gender="", weight="", diabetic=True)
     assert format_generic_source_metadata(status_only, locale="en") == "Diabetic"
 
@@ -257,6 +264,39 @@ def test_windows_conflict_blocks_exact_slice_key() -> None:
         slice_key="same",
     )
     assert windows_conflict(prior, duplicate)
+
+
+def test_weighted_pool_order_draws_then_keeps_others_as_fallback() -> None:
+    available = {
+        GENERIC_INTERVENTION_D1NAMO: [object()],
+        GENERIC_INTERVENTION_BIGIDEAS: [object()],
+    }
+    only_d1 = _weighted_pool_order(
+        {GENERIC_INTERVENTION_D1NAMO: 1.0, GENERIC_INTERVENTION_BIGIDEAS: 0.0},
+        available,
+    )
+    assert only_d1 == [GENERIC_INTERVENTION_D1NAMO]
+
+
+def test_single_pool_mix_does_not_cross_to_the_other_corpus() -> None:
+    d1 = discover_generic_dataset_sources(intervention=GENERIC_INTERVENTION_D1NAMO)
+    bi = discover_generic_dataset_sources(intervention=GENERIC_INTERVENTION_BIGIDEAS)
+    if not d1 or not bi:
+        pytest.skip("both D1NAMO and BIG IDEAs corpora are required")
+    history: list[GenericRoundWindow] = []
+    for _ in range(6):
+        selection = pick_unique_generic_window(
+            DEFAULT_POINTS,
+            history,
+            intervention="mix:d1namo=1.00",
+        )
+        assert selection.source.source_name.upper().startswith("D1NAMO")
+        history.append(
+            generic_round_window_from_df(
+                selection.window_df,
+                source_name=selection.source.source_name,
+            )
+        )
 
 
 def test_pick_unique_generic_window_avoids_used_slices() -> None:

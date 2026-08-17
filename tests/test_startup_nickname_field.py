@@ -29,11 +29,14 @@ START_BUTTON_STATE_IDS: frozenset[str] = frozenset(
         'gender-dropdown',
         'cgm-dropdown',
         'cgm-duration-input',
+        'cgm-duration-unit',
         'format-dropdown',
         'data-usage-consent',
         'diabetic-dropdown',
         'diabetic-type-dropdown',
         'diabetes-duration-input',
+        'challenge-unknown-check',
+        'challenge-unknown-slider',
         'location-input',
     }
 )
@@ -84,6 +87,13 @@ def test_nickname_input_exists_on_both_builders(startup_page: Any) -> None:
 def test_every_start_button_state_id_is_present(startup_page: Any) -> None:
     missing = START_BUTTON_STATE_IDS - _ids(startup_page)
     assert not missing, f"handle_start_button would never fire; missing: {sorted(missing)}"
+
+
+def test_challenge_unknown_is_a_checkbox_on_both_builders(startup_page: Any) -> None:
+    field = _find(startup_page, "challenge-unknown-check")
+    assert field is not None
+    assert field.id == "challenge-unknown-check"
+    assert any(option.get("value") == "on" for option in field.options)
 
 
 def test_nickname_is_length_capped_and_persistent(startup_page: Any) -> None:

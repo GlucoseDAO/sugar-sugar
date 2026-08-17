@@ -115,6 +115,18 @@ cd sugar-sugar
 uv sync
 ```
 
+### Updating an existing clone
+
+CGM experience is now stored as a `(value, unit)` pair (`6,months`) in `cgm_duration_years`. If you cloned the repo before that change and already have a local `data/input/prediction_statistics.csv`, rewrite the old integer-year cells once:
+
+```bash
+uv run migrate-cgm-duration
+```
+
+Bare numbers become `N,years`. Cells that are already `6,months` (or similar) are left as-is.
+
+### Generic datasets
+
 The [BIG IDEAs](https://physionet.org/content/big-ideas-glycemic-wearable/1.1.3/) and [D1NAMO](https://zenodo.org/records/5651217) datasets are not in git. Download local copies with:
 
 ```bash
@@ -135,7 +147,18 @@ Format A source policy (stored as `generic_intervention`):
 | Prediabetes | 75% BIG IDEAs / 25% D1NAMO each round |
 | LADA | 75% D1NAMO / 25% BIG IDEAs each round |
 
-BIG IDEAs meals have no photographs: the apple icon opens a notepad with the food-log description. D1NAMO meals still open the photo lightbox. Backdrop click closes either overlay.
+**Challenge the unknown** appears on `/startup` after the player answers **no diabetes** or **type 1**, for any format except B (own data). Tick the checkbox to opt in; the slider is the share of the *other* pool, in 10% steps from 10% to 100%. The default table above stays unless the box is ticked.
+
+| Player | Slider at 10% | Slider at 100% |
+|---|---|---|
+| No diabetes | 90% BIG IDEAs / 10% D1NAMO | 100% D1NAMO |
+| Type 1 | 90% D1NAMO / 10% BIG IDEAs | 100% BIG IDEAs |
+
+Type 2, prediabetes, and LADA already mix both corpora, so the control is hidden. Gestational stays on BIG IDEAs only. Format B (own data) never uses this.
+
+The chosen mix is stored as `generic_intervention` like `mix:bigideas=0.90,d1namo=0.10`, plus `challenge_unknown` / `challenge_unknown_pct` on the statistics row.
+
+BIG IDEAs meals have no photographs: the apple icon opens a notepad with the food-log description (translated for the active language). D1NAMO meals still open the photo lightbox. Backdrop click closes either overlay.
 
 ### Chrome / Chromium (for share-card image export)
 
