@@ -50,14 +50,36 @@ def files_url(rel_path: str) -> str:
     return f"{FILES_BASE}/{rel_path}"
 
 
-def _download_optional(url: str, dest: Path) -> bool:
-    try:
-        download_url(url, dest, show_progress=True, user_agent=USER_AGENT)
-        return True
-    except Exception as exc:
-        print(f"Skip {dest.name}: {exc}")
-        dest.unlink(missing_ok=True)
-        return False
+def _mirror_urls(rel_path: str) -> tuple[str, ...]:
+    """Mirrors for *rel_path*, best first.
+
+    ``physionet.org/files`` leads: the open S3 bucket mirrors this dataset only
+    up to 1.1.2, so every ``S3_BASE`` request for the pinned 1.1.3 is a 404.
+    S3 stays as a fallback for the day PhysioNet publishes 1.1.3 there — the
+    version is never mixed, both constants point at the same release.
+    """
+    return (files_url(rel_path), s3_url(rel_path))
+
+
+def _download_optional(rel_path: str, dest: Path) -> bool:
+    """Fetch *rel_path* from the first mirror that serves it.
+
+    A per-mirror 404 is expected traffic, not news; only a file that no mirror
+    serves is reported, so the log says how many files are missing rather than
+    how many requests were made.
+    """
+    errors: list[str] = []
+    for url in _mirror_urls(rel_path):
+        try:
+            download_url(url, dest, show_progress=True, user_agent=USER_AGENT)
+            return True
+        except Exception as exc:
+            errors.append(f"{url}: {exc}")
+            dest.unlink(missing_ok=True)
+    print(f"MISSING {dest.name} — no mirror served it:")
+    for error in errors:
+        print(f"    {error}")
+    return False
 
 
 def fetch_bigideas(dest: Path, *, force: bool = False) -> Path:
@@ -71,31 +93,51 @@ def fetch_bigideas(dest: Path, *, force: bool = False) -> Path:
             return dest
 
         print(f"Downloading BIG IDEAs Dexcom + food logs from PhysioNet ({PHYSIONET_PAGE})")
+        expected = 1 + 2 * len(SUBJECT_IDS)
         written = 0
         demo = dest / "Demographics.csv"
-        if force or not demo.is_file():
-            if _download_optional(s3_url("Demographics.csv"), demo) or _download_optional(
-                files_url("Demographics.csv"), demo
-            ):
-                written += 1
+        if demo.is_file() and not force:
+            written += 1
+        elif _download_optional("Demographics.csv", demo):
+            written += 1
 
+        incomplete: list[str] = []
         for subject_id in SUBJECT_IDS:
             folder = f"{subject_id:03d}"
             subject_dir = dest / folder
             subject_dir.mkdir(parents=True, exist_ok=True)
+            subject_files = 0
             for name in (f"Dexcom_{folder}.csv", f"Food_Log_{folder}.csv"):
                 target = subject_dir / name
                 if target.is_file() and not force:
-                    written += 1
+                    subject_files += 1
                     continue
-                rel = f"{folder}/{name}"
-                if _download_optional(s3_url(rel), target) or _download_optional(
-                    files_url(rel), target
-                ):
-                    written += 1
+                if _download_optional(f"{folder}/{name}", target):
+                    subject_files += 1
+            written += subject_files
+            # A subject is parseable only as a Dexcom export *plus* its food log.
+            if subject_files < 2:
+                incomplete.append(folder)
 
-        action.add_success_fields(written_files=written)
-        print(f"Wrote {written} files into {dest}")
+        complete_subjects = len(SUBJECT_IDS) - len(incomplete)
+        action.add_success_fields(
+            written_files=written,
+            expected_files=expected,
+            complete_subjects=complete_subjects,
+            incomplete_subjects=incomplete,
+        )
+        print(
+            f"Wrote {written}/{expected} files into {dest} "
+            f"({complete_subjects}/{len(SUBJECT_IDS)} subjects complete)"
+        )
+        if not demo.is_file():
+            print("WARNING: Demographics.csv is missing — subjects will have no age/gender.")
+        if incomplete:
+            raise FileNotFoundError(
+                f"BIG IDEAs is incomplete in {dest}: subjects {', '.join(incomplete)} "
+                "are missing a Dexcom export or a food log and cannot be played. "
+                "Re-run with --force once the mirror recovers."
+            )
         if not dataset_is_present(dest):
             raise FileNotFoundError(
                 f"BIG IDEAs Dexcom tables were not downloaded into {dest}"
