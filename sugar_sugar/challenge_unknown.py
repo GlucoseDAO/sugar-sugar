@@ -1,10 +1,11 @@
 """Challenge the unknown: mix the opposite Format A pool on purpose.
 
-Default Format A routing is fixed by diabetes status. Any player on Public or
-Public + My Data can opt in: half the rounds then come from the other corpus
-(D1NAMO vs BIG IDEAs). That is the hard direction — diabetic traces if the
-player is not diabetic, non-diabetic traces if they are. Format B (own data)
-never uses this.
+Default Format A routing is fixed by diabetes status. Only players whose
+default pool is already a single corpus can opt in: no diabetes (BIG IDEAs)
+or type 1 (D1NAMO). Type 2 / prediabetes / LADA already mix both corpora, so
+the checkbox is hidden. Gestational stays on BIG IDEAs and is not offered the
+challenge. Half the rounds then come from the other corpus. Format B (own
+data) never uses this.
 """
 from __future__ import annotations
 
@@ -51,20 +52,30 @@ def _format_code(
     return str(format_value if format_value is not None else info.get("format") or "").strip().upper()
 
 
+def _pure_pool_player(user_info: dict[str, Any] | None) -> bool:
+    """True for the two groups whose Format A default is one corpus, not a mix."""
+    info = user_info or {}
+    if info.get("diabetic") is True:
+        return is_type_1(info)
+    return info.get("diabetic") is False
+
+
 def challenge_unknown_visible(
     user_info: dict[str, Any] | None = None,
     format_value: Optional[str] = None,
 ) -> bool:
-    """Show for every diabetes answer except Format B (own data)."""
-    return _format_code(user_info, format_value) != "B"
+    """Show only for non-diabetic or type 1, on Public / Public + My Data."""
+    return challenge_unknown_eligible(user_info, format_value)
 
 
 def challenge_unknown_eligible(
     user_info: dict[str, Any] | None = None,
     format_value: Optional[str] = None,
 ) -> bool:
-    """True for generic / generic+own play, any diabetes status."""
-    return _format_code(user_info, format_value) in CHALLENGE_FORMATS
+    """True for Format A/C when the player is non-diabetic or type 1."""
+    return _format_code(user_info, format_value) in CHALLENGE_FORMATS and _pure_pool_player(
+        user_info
+    )
 
 
 def challenge_unknown_active(user_info: dict[str, Any] | None) -> bool:

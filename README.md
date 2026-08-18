@@ -148,14 +148,13 @@ Format A source policy (stored as `generic_intervention`):
 | Prediabetes | 75% BIG IDEAs / 25% D1NAMO each round |
 | LADA | 75% D1NAMO / 25% BIG IDEAs each round |
 
-**Challenge the unknown** appears on `/startup` for every diabetes answer, on any format except B (own data). Tick the checkbox to opt in: half the traces then come from the opposite group (diabetic data if you do not have diabetes, non-diabetic data if you do). The default table above stays unless the box is ticked.
+**Challenge the unknown** appears on `/startup` only for **no diabetes** or **type 1**, on Public or Public + My Data. Those two already play one corpus; the checkbox opts them into a 50/50 opposite mix. Type 2, prediabetes, and LADA already have mixed pools, so they do not see the box. Gestational stays on BIG IDEAs and is not offered the challenge. Format B (own data) never uses this.
 
 | Player | Challenge off | Challenge on |
 |---|---|---|
 | No diabetes | 100% BIG IDEAs | 50% BIG IDEAs / 50% D1NAMO |
-| Any diabetes type | type default above | 50% D1NAMO / 50% BIG IDEAs |
-
-Format B (own data) never uses this.
+| Type 1 | 100% D1NAMO | 50% D1NAMO / 50% BIG IDEAs |
+| Type 2 / prediabetes / LADA / gestational | type default above | not offered |
 
 The mix is stored as `generic_intervention` like `mix:bigideas=0.50,d1namo=0.50`, plus `challenge_unknown` / `challenge_unknown_pct` (always `50` when on) on the statistics row.
 
@@ -482,7 +481,7 @@ The research record. Also carries `paper_mention` / `paper_full_name` (copied fr
 | `diabetes_duration` | string / number | Years with diabetes, when given. |
 | `location` | free text | From `/startup`. |
 | `generic_intervention` | string | Format A source policy: `bigideas`, `d1namo`, `mix_t2`, or `mix:bigideas=0.50,d1namo=0.50`. Empty on older rows. |
-| `challenge_unknown` | `True` / `False` | Opted into Challenge the unknown (formats A/C). |
+| `challenge_unknown` | `True` / `False` | Opted into Challenge the unknown (formats A/C, non-diabetic or type 1 only). |
 | `challenge_unknown_pct` | integer or empty | Opposite-pool share. Always `50` when the challenge is on; empty when off. Older rows may still hold a slider value (10–100). |
 | `paper_mention` | `True` / `False` | Same opt-in as the consent file. |
 | `paper_full_name` | free text | Same name as the consent file. Only use it when `paper_mention` is true and the player completed at least 12 rounds. |

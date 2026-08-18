@@ -174,7 +174,7 @@ def generic_intervention_for_user(user_info: dict[str, Any] | None) -> str:
     type 2 → 50/50 mix
     prediabetes → 75% BIG IDEAs / 25% D1NAMO
     LADA → 75% D1NAMO / 25% BIG IDEAs
-    Challenge the unknown (any diabetes answer, formats A/C) → 50/50 opposite mix
+    Challenge the unknown (non-diabetic or type 1, formats A/C) → 50/50 opposite mix
     """
     if challenge_unknown_active(user_info):
         return encode_mix_policy(challenge_unknown_weights(user_info))
