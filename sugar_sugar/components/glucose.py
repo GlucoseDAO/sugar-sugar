@@ -207,8 +207,11 @@ class GlucoseChart(html.Div):
         "Insulin": {
             "icon": "syringe.svg",
             "color": "#7b1fa2",
-            "icon_size_x": 1.8,
-            "icon_size_y_frac": 0.07,
+            "icon_size_x": 2.7,
+            "icon_size_y_frac": 0.105,
+            "legend_sizex": 0.0525,
+            "legend_sizey": 0.105,
+            "hover_size": 42,
         },
         "Exercise": {
             "symbol": "star",
@@ -877,7 +880,7 @@ class GlucoseChart(html.Div):
             key=lambda m: (m["x"], type_order.get(str(m["event_type"]), 9))
         )
 
-        overlap_x = 1.2  # ~half of typical icon_size_x — treat as same column
+        overlap_x = 1.35  # ~half of typical icon_size_x — treat as same column
         stacks: list[list[dict[str, Any]]] = []
         for marker in markers:
             if stacks and abs(marker["x"] - stacks[-1][0]["x"]) <= overlap_x:
@@ -908,14 +911,14 @@ class GlucoseChart(html.Div):
         markers: list[dict[str, Any]],
         *,
         legend_name_by_type: dict[str, str],
-    ) -> list[tuple[str, str]]:
+    ) -> list[tuple[str, str, str]]:
         """Render stacked SVG icons + hover targets; return legend entries."""
         if not markers:
             return []
 
         y_min, y_max = self._calculate_y_axis_range()
         y_span = max(y_max - y_min, 1.0)
-        legend_entries: list[tuple[str, str]] = []
+        legend_entries: list[tuple[str, str, str]] = []
         seen_types: set[str] = set()
 
         by_type: dict[str, list[dict[str, Any]]] = {}
@@ -959,7 +962,7 @@ class GlucoseChart(html.Div):
                     showlegend=False,
                     marker=dict(
                         symbol="circle",
-                        size=28,
+                        size=int(style.get("hover_size", 28)),
                         color=str(style["color"]),
                         opacity=0.0,
                         line=dict(width=0),
@@ -969,15 +972,16 @@ class GlucoseChart(html.Div):
                 )
             )
             if event_type not in seen_types:
-                legend_entries.append((icon_uri, legend_name))
+                legend_entries.append((icon_uri, legend_name, event_type))
                 seen_types.add(event_type)
 
         return legend_entries
 
-    @staticmethod
+    @classmethod
     def _add_icon_legend(
+        cls,
         figure: go.Figure,
-        entries: list[tuple[str, str]],
+        entries: list[tuple[str, str, str]],
     ) -> None:
         """Paper-coord SVG + label so the legend matches the chart icons."""
         if not entries:
@@ -986,17 +990,23 @@ class GlucoseChart(html.Div):
         slot = 0.16
         right = 0.98
         start_x = right - slot * (len(entries) - 1)
-        for i, (uri, label) in enumerate(entries):
+        for i, (uri, label, event_type) in enumerate(entries):
             x = start_x + i * slot
+            style = cls.EVENT_STYLES.get(event_type, {})
+            sizex = float(style.get("legend_sizex", 0.035))
+            sizey = float(style.get("legend_sizey", 0.07))
+            icon_x = x - 0.06
+            # Label starts just after the icon, same gap as the original 0.035-wide slot.
+            label_x = icon_x + sizex / 2.0 + 0.0045
             figure.add_layout_image(
                 dict(
                     source=uri,
                     xref="paper",
                     yref="paper",
-                    x=x - 0.06,
+                    x=icon_x,
                     y=1.08,
-                    sizex=0.035,
-                    sizey=0.07,
+                    sizex=sizex,
+                    sizey=sizey,
                     xanchor="center",
                     yanchor="middle",
                     sizing="contain",
@@ -1006,7 +1016,7 @@ class GlucoseChart(html.Div):
             figure.add_annotation(
                 xref="paper",
                 yref="paper",
-                x=x - 0.038,
+                x=label_x,
                 y=1.08,
                 text=label,
                 showarrow=False,
@@ -1121,7 +1131,7 @@ class GlucoseChart(html.Div):
             margin=dict(
                 l=56 if self.hide_last_hour else 50,
                 r=20,
-                t=72,
+                t=84,
                 b=50,
             ),
             showlegend=True,
