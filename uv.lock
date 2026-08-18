@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
@@ -82,14 +82,14 @@ wheels = [
 
 [[package]]
 name = "cgm-format"
-version = "0.11.0"
+version = "0.12.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "polars" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/40/e2/2c22876af1773c3e8dc91908b5fd9d868e7565a144eda036ecf5c9fa1e55/cgm_format-0.11.0.tar.gz", hash = "sha256:6b920735766195667825b9768108e0aa03a6bbcd7846d526300398bc3fc77128", size = 489028, upload-time = "2026-08-16T21:14:21.898Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f8/0b/b2edc940dddf1a2716606f1f7e4a62e0b2e2cafde1bd77486ea61ff73169/cgm_format-0.12.0.tar.gz", hash = "sha256:e3d4f6acf76174068b2d9374d5fbbe37ac59499cdbe74ea0de08720a17ef47be", size = 560548, upload-time = "2026-08-18T16:50:49.5Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/92/54/97a8c6a776750a8adc53864fd5d07275189746e219b2ad9007286bd2d91e/cgm_format-0.11.0-py3-none-any.whl", hash = "sha256:97e25ae7330407b3c3ee20a41545b800d20858d0752e07432fb47adf9f28b4c3", size = 157031, upload-time = "2026-08-16T21:14:23.236Z" },
+    { url = "https://files.pythonhosted.org/packages/64/f6/59f6b14a555e41ccda94155f78002f81d99657a596d6f2106a931d7b6269/cgm_format-0.12.0-py3-none-any.whl", hash = "sha256:6f355ac83563fa40bd7c6da08fa6d39be80dd3bd0fd57dafb3e44bcc5cb5d51e", size = 161617, upload-time = "2026-08-18T16:50:47.776Z" },
 ]
 
 [package.optional-dependencies]
@@ -1866,7 +1866,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cgm-format", extras = ["cli"], specifier = ">=0.11.0" },
+    { name = "cgm-format", extras = ["cli"], specifier = ">=0.12.0" },
     { name = "dash", specifier = ">=4.1.0" },
     { name = "dash-ag-grid", specifier = ">=35.2.0" },
     { name = "dash-bootstrap-components", specifier = ">=2.0.4" },

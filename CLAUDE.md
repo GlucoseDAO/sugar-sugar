@@ -22,8 +22,31 @@ uv run serve runs gunicorn (production). uv run serve-staging (= uv run serve --
 `sugar_sugar/corpus.py` is the **single boundary** between the library's unified frames and the app's
 `(time, gl, prediction, age, user_id)` / `(time, event_type, event_subtype, insulin_value, …)` stores.
 `load_glucose_data` (`data.py`) routes to five loaders; only LOOP still parses by hand.
-The library floor is **cgm-format 0.11** (`pyproject.toml`) — that is the release that added
-BIG IDEAs, the last corpus the app parsed itself.
+The library floor is **cgm-format 0.12** (`pyproject.toml`). 0.11 was the release that added
+BIG IDEAs, the last corpus the app parsed itself; 0.12 added grid re-timing for training alignment.
+
+**What 0.12 changed for this app: the frame got one column wider, and nothing else.**
+`original_glucose` (the device's own reading, before any re-timing) joins both unified schemas, and
+`Quality.GRID_RETIMED = 64` joins the flag vocabulary. Every loader's `(time, gl, …)` /
+`(time, event_type, …)` output is **byte-identical to 0.11** across all five routes — verified over
+example.csv, Dexcom/Libre/Medtronic/Nightscout exports, `loop_467`, pre-0.12 unified CSVs, and the
+D1NAMO / BIG IDEAs / CGMacros corpora. Two reasons it is inert here:
+
+- **The app never runs the grid stages.** `synchronize_timestamps`, `interpolate_gaps`,
+  `prepare_for_inference` and `to_ml_format` are where 0.12's re-timing lives, and the app calls
+  none of them — only `split_glucose_events`. Glucose values reaching the chart are the device's,
+  never re-timed. If you ever do call `synchronize_timestamps`, note it now **rewrites glucose** at
+  each grid instant by default; pass `retime_glucose=False` for the old behaviour.
+- **`corpus.adapt_*` selects columns by name**, so the extra column is dropped at the boundary and
+  never reaches a `dcc.Store`. (This is what keeps the store-size contract below intact.)
+
+Pre-0.12 unified CSVs on disk stay readable: the parser backfills `original_glucose` from `glucose`
+per row, leaving it null only on rows that carry no glucose.
+
+**Why adopt a release the app is inert to:** those grid stages plus `to_ml_ready_df` *are* the
+inference path — they exist to align a trace with the shape the SugarOne model was trained on. Sugar
+Sugar has no AI player yet; when it gets one, that is the code it will run on, so the floor is here
+waiting instead of being raised under pressure later. Nothing needs to change for the human game.
 
 | Source | Parser | Why |
 |---|---|---|
@@ -35,10 +58,13 @@ BIG IDEAs, the last corpus the app parsed itself.
 
 Hard-won rules:
 
-- **`ExtendedFormatProcessor`, not `FormatProcessor`, for corpora.** Corpora target the 22-column
-  `CGM_SCHEMA_EXTENDED`; `FormatProcessor.schema` is the 10-column `CGM_SCHEMA` and dies with
-  `MalformedDataError: Schema has 10 columns, dataframe has 22 columns`. Never hardcode either — call
-  `corpus.unified_processor(df)`, which dispatches on the frame's column tuple.
+- **`ExtendedFormatProcessor`, not `FormatProcessor`, for corpora.** Corpora target the wide
+  `CGM_SCHEMA_EXTENDED`; `FormatProcessor.schema` is the narrow `CGM_SCHEMA` and dies with
+  `MalformedDataError: Schema has N columns, dataframe has M columns`. Never hardcode either width —
+  call `corpus.unified_processor(df)`, which dispatches on the frame's column tuple, read off the
+  library. **The widths grow between releases:** 0.11 was 10 and 22 columns, 0.12 added
+  `original_glucose` and made them **11 and 23**. Any hardcoded count silently misroutes every corpus
+  frame to the narrow processor.
 - **Meal detail rides in the extended schema's JSON `annotations` column**, not in real columns:
   D1NAMO uses `picture`/`description`, CGMacros `image_path`/`meal_type_raw`. `corpus.adapt_events_df`
   coalesces both vocabularies into `photo_path`/`meal_type`/`carbs_g`.

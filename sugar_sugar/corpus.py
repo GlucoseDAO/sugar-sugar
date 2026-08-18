@@ -85,11 +85,17 @@ PhotoResolver = Callable[[str], str]
 def unified_processor(unified_df: pl.DataFrame) -> Type[FormatProcessor]:
     """Pick the processor whose schema matches the frame's shape.
 
-    ``FormatProcessor.schema`` is the ten-column ``CGM_SCHEMA``; the research
-    corpora (and any uploaded unified-extended CSV) target the twenty-two-column
-    ``CGM_SCHEMA_EXTENDED`` and die against it with "Schema has 10 columns,
-    dataframe has 22 columns". Dispatch on the frame in front of us, mirroring
+    ``FormatProcessor.schema`` is the narrow ``CGM_SCHEMA``; the research corpora
+    (and any uploaded unified-extended CSV) target the wide
+    ``CGM_SCHEMA_EXTENDED`` and die against the narrow one with
+    ``MalformedDataError: Schema has N columns, dataframe has M columns``.
+    Dispatch on the frame in front of us, mirroring
     ``cgm_format.cgm_cli._processor_for``.
+
+    Both widths are read off the library rather than written down here, because
+    they grow: 0.11 was 10 and 22 columns, 0.12 added ``original_glucose`` to
+    both and made them 11 and 23. A hardcoded count would have made this
+    function route every corpus frame to the wrong processor.
     """
     if tuple(unified_df.columns) == tuple(CGM_SCHEMA_EXTENDED.get_column_names(data_only=False)):
         return ExtendedFormatProcessor
