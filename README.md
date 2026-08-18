@@ -159,7 +159,7 @@ Format B (own data) never uses this.
 
 The mix is stored as `generic_intervention` like `mix:bigideas=0.50,d1namo=0.50`, plus `challenge_unknown` / `challenge_unknown_pct` (always `50` when on) on the statistics row.
 
-An optional startup checkbox lets a player ask to be named in a later scientific paper. Tick it and enter a full name to be stored on the study/consent records; the acknowledgments list only includes people who played 12 or more rounds.
+An optional startup checkbox lets a player ask to be named in a later scientific paper. Tick it and enter a full name; that contributor-mention consent is stored only in `consent_agreement.csv` (not in the statistics or ranking files). The acknowledgments list only includes people who played 12 or more rounds.
 
 BIG IDEAs meals have no photographs: the apple icon opens a notepad with the food-log description (translated for the active language). D1NAMO meals still open the photo lightbox. Backdrop click closes either overlay.
 
