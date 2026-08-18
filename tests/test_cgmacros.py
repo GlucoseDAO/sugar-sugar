@@ -269,10 +269,21 @@ def test_meal_bubbles_and_food_line_use_photo() -> None:
         if getattr(shape.line, "dash", None) == "dot"
     ]
     assert dotted
-    food_labels = [
-        ann.text for ann in (figure.layout.annotations or []) if ann.text == "FOOD"
+    vertical_food_labels = [
+        ann.text
+        for ann in (figure.layout.annotations or [])
+        if ann.text == "FOOD"
     ]
-    assert food_labels
+    assert not vertical_food_labels
+    ro_bubbles = meal_food_bubble_children(
+        glucose_df,
+        events_df,
+        source_name="CGMacros-001.csv",
+        hide_last_hour=False,
+        locale="ro",
+    )
+    assert ro_bubbles
+    assert ro_bubbles[0].children[1].children == "MÂNCARE"
     assert t("ui.chart.food_label", locale="en") == "FOOD"
     assert t("ui.chart.food_label", locale="de") == "ESSEN"
     assert t("ui.chart.food_label", locale="fr") == "REPAS"

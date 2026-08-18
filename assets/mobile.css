@@ -2594,9 +2594,9 @@ html.mobile-device .meal-food-lightbox-note {
 }
 
 html.mobile-device .meal-food-speech-bubble {
-  width: 82px;
+  width: max-content;
   height: 36px;
-  padding: 0 7px 0 5px;
+  padding: 0 9px 0 6px;
   touch-action: manipulation;
 }
 

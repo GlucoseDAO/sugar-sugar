@@ -1412,9 +1412,10 @@ html:not(.mobile-device) #next-round-button {
   align-items: center;
   justify-content: center;
   gap: 3px;
-  width: 76px;
+  width: max-content;
   height: 32px;
-  padding: 0 6px 0 4px;
+  padding: 0 8px 0 5px;
+  white-space: nowrap;
   border: 2px solid #2e7d32;
   border-radius: 16px 16px 16px 5px;
   background: #ffffff;

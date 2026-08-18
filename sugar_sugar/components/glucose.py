@@ -485,7 +485,7 @@ class GlucoseChart(html.Div):
         self._add_glucose_trace(figure, locale=locale)
         self._add_prediction_traces(figure, locale=locale)
         self._add_event_markers(figure, locale=locale)
-        self._add_food_photo_guides(figure, locale=locale)
+        self._add_food_photo_guides(figure)
         self._update_layout(figure, locale=locale)
         
         return figure
@@ -821,8 +821,8 @@ class GlucoseChart(html.Div):
 
         self._add_icon_legend(figure, icon_legend_entries)
 
-    def _add_food_photo_guides(self, figure: go.Figure, *, locale: str) -> None:
-        """Thin green dotted meal line + translated FOOD label along it."""
+    def _add_food_photo_guides(self, figure: go.Figure) -> None:
+        """Thin green dotted meal line. The FOOD label lives in the HTML bubble."""
         clusters = cluster_visible_food_events(
             self._current_df,
             self._current_events,
@@ -831,7 +831,6 @@ class GlucoseChart(html.Div):
         )
         if not clusters:
             return
-        food_label = t("ui.chart.food_label", locale=locale)
         for cluster in clusters:
             x_pos = cluster.x_pos
             figure.add_shape(
@@ -844,19 +843,6 @@ class GlucoseChart(html.Div):
                 yref="paper",
                 line=dict(color=_FOOD_LINE_COLOR, width=1.5, dash="dot"),
                 layer="below",
-            )
-            figure.add_annotation(
-                x=x_pos,
-                y=0.52,
-                xref="x",
-                yref="paper",
-                text=food_label,
-                textangle=-90,
-                showarrow=False,
-                font=dict(size=11, color=_FOOD_LINE_COLOR),
-                xanchor="left",
-                yanchor="middle",
-                xshift=7,
             )
 
     @staticmethod
