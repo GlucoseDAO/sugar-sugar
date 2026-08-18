@@ -12,11 +12,17 @@ from typing import Any, Optional
 from eliot import start_action
 
 _FAQ_DIR_ENV: str = "SUGAR_FAQ_DIR"
+_FAQ_BOARD_ENABLED_ENV: str = "FAQ_BOARD_ENABLED"
 _ALLOWED_SECTIONS: frozenset[str] = frozenset({"participant", "developer"})
 _ALLOWED_TAGS: tuple[str, ...] = ("gameplay", "data", "privacy", "download", "other")
 _MAX_TEXT: int = 2000
 _MAX_NAME: int = 40
 _MAX_ITEMS: int = 400
+
+
+def faq_board_enabled() -> bool:
+    """Public ask/reply board. Off until bot protection exists; set FAQ_BOARD_ENABLED=1 to restore."""
+    return os.getenv(_FAQ_BOARD_ENABLED_ENV, "0").lower() in ("1", "true", "yes")
 
 
 def faq_board_path() -> Path:
@@ -84,6 +90,8 @@ def add_faq_question(
     tags: Optional[list[str]] = None,
     name: str = "",
 ) -> Optional[dict[str, Any]]:
+    if not faq_board_enabled():
+        return None
     body = _clean_text(text, limit=_MAX_TEXT)
     if not body:
         return None
@@ -110,6 +118,8 @@ def add_faq_reply(
     section: str,
     name: str = "",
 ) -> Optional[dict[str, Any]]:
+    if not faq_board_enabled():
+        return None
     body = _clean_text(text, limit=_MAX_TEXT)
     qid = str(question_id or "").strip()
     if not body or not qid:

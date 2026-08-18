@@ -85,7 +85,8 @@
 }
 
 /* Synthesis: title lives in HTML (not Plotly layout.title). Graph fills the card width. */
-.share-page .share-synthesis-headline {
+.share-page .share-synthesis-headline,
+.results-synthesis-card .share-synthesis-headline {
   text-align: center;
   color: #0f172a;
   font-size: clamp(1.15rem, 2.5vw, 1.4rem);
@@ -94,7 +95,8 @@
   margin: 0;
   padding: 2px 8px 2px 8px;
 }
-.share-page .share-synthesis-legend {
+.share-page .share-synthesis-legend,
+.results-synthesis-card .share-synthesis-legend {
   /* Legend row: lives between headline and dcc.Graph; not part of the canvas */
   line-height: 1;
 }
@@ -211,7 +213,11 @@
 .share-page .share-synthesis-graph,
 .share-page .share-synthesis-graph .js-plotly-plot,
 .share-page .share-synthesis-graph .plotly,
-.share-page .share-synthesis-graph .plotly-container {
+.share-page .share-synthesis-graph .plotly-container,
+.results-synthesis-card .share-synthesis-graph,
+.results-synthesis-card .share-synthesis-graph .js-plotly-plot,
+.results-synthesis-card .share-synthesis-graph .plotly,
+.results-synthesis-card .share-synthesis-graph .plotly-container {
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0;

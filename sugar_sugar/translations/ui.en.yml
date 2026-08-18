@@ -1,6 +1,6 @@
 en:
   common:
-    app_title: "Sugar Sugar"
+    app_title: "Sugar-Sugar"
     units: "Units"
     round_of: "Round %{current} of %{total}"
     go_to_start: "Go to Start Page"
@@ -24,13 +24,13 @@ en:
     zh: "中文"
 
   landing:
-    patient_consent_form_title: "Patient consent form"
+    patient_consent_form_title: "Study consent form"
     required_consents_title: "Required consents"
     optional_consents_title: "Optional consents"
     consent_upload_own_data: "I agree to upload my own CGM data for the optional tasks."
     tagline: "A game to test your glucose-predicting superpowers."
     how_it_works: "How it works"
-    how_it_works_teaser: "Three steps. One hour. Your gut vs the sensor."
+    how_it_works_teaser: "Three steps. One hour ahead. Your gut feeling vs the sensor."
     faq_button: "FAQ"
     how_it_works_steps:
       - "Draw how you think glucose will move in the next hour"
@@ -38,7 +38,7 @@ en:
       - "Find out how close you got"
     preview: "Preview"
     about_study_title: "About the study"
-    about_study_text: "We're studying how accurate humans are at predicting glucose trends, and what patterns experienced CGM users notice. If you choose to participate, your gameplay and uploaded CGM data may be used for further research."
+    about_study_text: "Can people predict where glucose will go next? Sugar-Sugar turns that question into a game. For people with diabetes, that next hour can decide food, insulin, and staying safe. You don’t need diabetes to play. Everyone leaves a human score researchers need.\n\nThis is a real study, cleared by the Ethics Committee of University Medical Center Rostock (Germany) - so please read the consent form and tick the required boxes."
     your_choices_title: "Your choices"
     your_choices_text: "By continuing you agree to participate in the study. Your gameplay may be stored for research."
     consent_receive_results: "I want to receive my results later"
@@ -69,15 +69,15 @@ en:
       - "Participation is voluntary and you can stop at any time."
     data_title: "Data use"
     data_bullets:
-      - "Sample (generic) data can be used without uploading any personal sensor data."
+      - "Public anonymized data from other people can be used without uploading any personal sensor data."
       - "If you upload a file, it may contain sensitive health information."
       - "We will only use the data according to your selections on the startup page."
     withdraw_title: "Withdrawal"
     withdraw_text: "You can stop participating at any time by closing the browser tab/window. If you want your data removed, please contact the study organizers."
 
   about:
-    title: "About Sugar Sugar"
-    body: "Sugar Sugar is a research tool designed to measure how accurately humans can predict future glucose trends."
+    title: "About Sugar-Sugar"
+    body: "Sugar-Sugar is a research tool designed to measure how accurately humans can predict future glucose trends."
     study_design_title: "Study design"
     download_pdf_label: "Download study design (PDF)"
     pdf_original_english_note: "(original in English)"
@@ -101,7 +101,7 @@ en:
 
   demo:
     title: "Demo"
-    body: "Try a quick demo of the Sugar Sugar glucose prediction game."
+    body: "Try a quick demo of the Sugar-Sugar glucose prediction game."
     fullscreen_video: "Watch fullscreen"
 
   startup:
@@ -157,25 +157,26 @@ en:
     consent_gate_hint: "Tick both required boxes above (18+ / read the terms, and data-protection consent) to continue."
     format_label: "Format"
     format_placeholder: "Choose an option"
-    format_a_label: "Generic Data"
+    format_a_label: "Public Data"
     format_b_label: "My Data"
-    format_c_label: "Generic + My Data"
-    format_a_label_short: "Generic"
+    format_c_label: "Public + My Data"
+    format_a_label_short: "Public"
     format_b_label_short: "Mine"
     format_c_label_short: "Combined"
-    format_help_a: "Generic data — you don't have to upload anything. Just play using public reference data."
+    format_help_a: "Public data — anonymized CGM traces from other people. You don't have to upload anything."
     format_help_b: "My data — upload your own CSV and play on your own glucose."
-    format_help_c: "Generic + My data — a combo. Some rounds use public data, some use yours."
+    format_help_c: "Public + My data — a combo. Some rounds use anonymized public traces, some use yours."
     format_find_data_before: "If you don't know where to find your data, "
     format_find_data_link: "search here."
     challenge_unknown_button: "Challenge the unknown"
     challenge_unknown_button_on: "Challenge the unknown — on"
-    challenge_unknown_help: "Only for Generic or Generic + My Data, and only if you have no diabetes or type 1."
-    challenge_unknown_help_nd: "How much of the traces should come from people with diabetes? 10%% means one in ten rounds uses diabetic data."
-    challenge_unknown_help_t1: "How much of the traces should come from people without diabetes? 10%% means one in ten rounds uses non-diabetic data."
-    challenge_unknown_slider_label: "Share of unknown data"
-    challenge_unknown_slider_nd: "Share of diabetic data"
-    challenge_unknown_slider_t1: "Share of non-diabetic data"
+    challenge_unknown_help: "If you select this, half of your traces will come from the opposite group — diabetic data if you do not have diabetes, non-diabetic data if you do. Only for Public or Public + My Data."
+    challenge_unknown_help_nd: "If you select this, half of your traces will come from people with diabetes."
+    challenge_unknown_help_t1: "If you select this, half of your traces will come from people without diabetes."
+    paper_mention_label: "I want to be mentioned in a scientific paper published after the study"
+    paper_mention_hint: "If you tick this and enter your full name, we will add you to the acknowledgments — but only if you play %{min_rounds} or more rounds."
+    paper_full_name_label: "Full name"
+    paper_full_name_placeholder: "First and last name"
     data_usage_consent_label: "I agree to the use of my uploaded CGM data for this study."
     data_usage_consent_required: "Please confirm data usage consent to continue."
     import_title: "Import your CGM data"
@@ -203,11 +204,11 @@ en:
     upload_prompt_1: "Drag and Drop or "
     upload_prompt_2: "Upload Your Data Here"
     upload_button: "Upload"
-    use_example_data: "Use Generic Data"
+    use_example_data: "Use Public Data"
     upload_required: "Upload required"
     upload_success: "Successfully loaded data from %{filename}. This data will be used for predictions."
-    example_data_now_using: "Now using generic data. Upload a CSV file for personalized analysis."
-    example_data_warning: "Currently using generic data. Upload your own Dexcom/Libre/Medtronic/Nightscout CSV file for personalized analysis."
+    example_data_now_using: "Now using public anonymized data. Upload a CSV file for personalized analysis."
+    example_data_warning: "Currently using public anonymized data. Upload your own Dexcom/Libre/Medtronic/Nightscout CSV file for personalized analysis."
     csv_tab_label: "CSV File"
     nightscout_tab_label: "Nightscout"
     nightscout_url_placeholder: "https://your-nightscout-site.com"
@@ -236,7 +237,7 @@ en:
     units_label: "Units:"
     upload_required_alert: "This format requires your own CGM data. Please upload a CSV file to start."
     upload_only_gate: "You chose to play with your own data only. To start playing, press the Upload button and select your file."
-    upload_mixed_gate: "You chose the mixed mode (generic + your own data). To continue, press the Upload button and select your CGM file — rounds then alternate between generic and your data."
+    upload_mixed_gate: "You chose the mixed mode (public + your own data). To continue, press the Upload button and select your CGM file — rounds then alternate between public anonymized traces and your data."
     upload_consent_recorded: "Consent recorded. You can now upload and use your CGM data in this session."
     no_upload_back_to_final: "No CGM data to upload? View your results from previous rounds"
 
@@ -246,9 +247,15 @@ en:
     progress_ready: "✓ Ready to submit!"
     progress_hidden_area: "Make predictions in the hidden area to submit"
     submit: "Submit"
+    finish_game: "Finish game"
+    finish_confirm_title: "Exit this game?"
+    finish_confirm_early: "You’ve completed %{current} of %{total} rounds. Fewer than %{min} rounds is too little for the study."
+    finish_confirm: "You’ve completed %{current} of %{total} rounds. Are you sure you want to exit?"
+    keep_playing: "Keep playing"
+    finish_anyway: "Finish anyway"
 
   mobile_warning:
-    text: "Note: Sugar Sugar is optimised for desktop at the moment. Mobile support is coming soon!"
+    text: "Note: Sugar-Sugar is optimised for desktop at the moment. Mobile support is coming soon!"
 
   orientation:
     # Retired: the portrait rotate-nag overlay was removed (single immersive
@@ -259,8 +266,8 @@ en:
 
   share:
     button_share: "Share my results"
-    title: "My Sugar Sugar results"
-    title_named: "%{name}'s Sugar Sugar results"
+    title: "My Sugar-Sugar results"
+    title_named: "%{name}'s Sugar-Sugar results"
     subtitle: "Can you predict glucose better than me? Try it!"
     download_png: "Download image"
     download_png_hint: "Save the card as PNG, perfect for Instagram stories."
@@ -300,7 +307,7 @@ en:
     og_title_unranked: "%{accuracy} accuracy predicting blood sugar — can you beat me?"
     expired_title: "This share link has expired"
     expired_body: "We could not find a scorecard for this URL. Play a round and you can share your own."
-    expired_cta: "Play Sugar Sugar"
+    expired_cta: "Play Sugar-Sugar"
     encouragement:
       excellent:
         lines:
@@ -488,12 +495,12 @@ en:
 
   switch_format:
     title: "You can also try..."
-    try_a: "Try Example Data = use generic data"
+    try_a: "Try Public Data = play on anonymized traces from other people"
     try_b: "Try My Data = use own data"
-    try_c: "Try Example + My Data = use both generic and own data"
-    try_a_short: "Try Generic Data"
+    try_c: "Try Public + My Data = use both public anonymized traces and your own data"
+    try_a_short: "Try Public Data"
     try_b_short: "Try My Data"
-    try_c_short: "Try Generic + My Data"
+    try_c_short: "Try Public + My Data"
     not_eligible_no_cgm: "B/C are only available if you said you have CGM data."
 
   results_disclaimer:
@@ -526,10 +533,10 @@ en:
     sections:
       - title: "Why this study matters"
         items:
-          - q: "What is Sugar Sugar?"
-            a: "Sugar Sugar is a web-based research app built with Dash. It turns glucose forecasting into an interactive game: you see part of a CGM trace, draw how you think it will continue, and then compare your prediction with the real values. The goal is to measure how accurately humans can anticipate short-term glucose dynamics."
+          - q: "What is Sugar-Sugar?"
+            a: "Sugar-Sugar is a web-based research app built with Dash. It turns glucose forecasting into an interactive game: you see part of a CGM trace, draw how you think it will continue, and then compare your prediction with the real values. The goal is to measure how accurately humans can anticipate short-term glucose dynamics."
           - q: "Is this a real research study?"
-            a: "Yes. Sugar Sugar is part of a real research effort. The study received clearance from the Ethics Committee of University Medicine Rostock (Universitätsmedizin Rostock) in Germany — we mention this as part of the study background so you know the research is conducted responsibly."
+            a: "Yes. Sugar-Sugar is part of a real research effort. The study received clearance from the Ethics Committee of University Medicine Rostock (Universitätsmedizin Rostock) in Germany — we mention this as part of the study background so you know the research is conducted responsibly."
           - q: "Why does predicting glucose matter for people with diabetes?"
             a: "For people with diabetes, accurate short-term glucose forecasts can support safer day-to-day decisions about insulin, carbohydrates, exercise, and timing. Better prediction can help reduce dangerous highs and lows and make glucose management less stressful."
           - q: "Why does predicting glucose matter for people without diabetes?"
@@ -569,9 +576,9 @@ en:
       - title: "How the study works"
         items:
           - q: "Who can participate?"
-            a: "Anyone 18+. CGM users are especially valuable, but non-CGM users can also play with generic data."
+            a: "Anyone 18+. CGM users are especially valuable, but non-CGM users can also play with public anonymized data."
           - q: "What CGM devices and formats are supported?"
-            a: "Dexcom, Libre, Medtronic, and Nightscout exports are supported. A generic sample dataset is also available if you don't have a CGM device."
+            a: "Dexcom, Libre, Medtronic, and Nightscout exports are supported. A public anonymized dataset is also available if you don't have a CGM device."
           - q: "How long does it take?"
             a: "Each round takes about 2–3 minutes. A full session (12 rounds) is around 30 minutes, but you can split it across multiple visits."
           - q: "Can I stop partway through and resume later?"
@@ -594,7 +601,7 @@ en:
 
               - **No real-time pressure.** Drawing a prediction line calmly is different from making a dosing decision at 2 AM while half asleep.
 
-              - **Example vs. own data.** If you play with the built-in example data, your accuracy may differ from predicting your own glucose. We encourage you to upload your own CGM export (Dexcom, Libre, Medtronic, or Nightscout) — your personal intuition about your own patterns is part of what makes the comparison with ML interesting.
+              - **Public vs. own data.** If you play with public anonymized traces, your accuracy may differ from predicting your own glucose. We encourage you to upload your own CGM export (Dexcom, Libre, Medtronic, or Nightscout) — your personal intuition about your own patterns is part of what makes the comparison with ML interesting.
       - title: "How to download your CGM CSV"
         id: download-csv
         items:

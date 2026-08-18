@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from sugar_sugar.app import create_final_layout
+from sugar_sugar.components.share import collect_playable_rounds
 
 
 def _by_id(node: Any, target: str) -> Any:
@@ -75,9 +76,12 @@ def test_action_row_sits_under_title_with_x_formats_then_share() -> None:
     assert _by_id(row, "switch-format-b").style["display"] == "inline-flex"
     assert _by_id(row, "switch-format-c").style["display"] == "inline-flex"
     assert _by_id(row, "switch-format-b").children == "Try My Data"
-    assert _by_id(row, "switch-format-c").children == "Try Generic + My Data"
+    assert _by_id(row, "switch-format-c").children == "Try Public + My Data"
     assert _by_id(row, "share-results-button").style["backgroundColor"] == "#4CBB17"
-    assert _by_id(row, "restart-button").style["backgroundColor"] == "#007bff"
+    restart = _by_id(row, "restart-button")
+    assert restart.className == "ui button finish-study-exit"
+    assert restart.style["backgroundColor"] == "#E81123"
+    assert restart.style["width"] == "48px"
 
 
 def test_played_formats_line_is_hidden() -> None:
@@ -96,6 +100,54 @@ def test_no_cgm_shows_only_x_and_share() -> None:
     assert _by_id(row, "switch-format-c").style["display"] == "none"
     assert _by_id(row, "restart-button") is not None
     assert _by_id(row, "share-results-button") is not None
+
+
+def test_collect_playable_rounds_merges_archives_and_tags_format() -> None:
+    user: dict[str, Any] = {
+        "format": "B",
+        "rounds": [{"round_number": 2, "prediction_table_data": []}],
+        "runs_by_format": {
+            "A": [{"rounds": [{"round_number": 1, "prediction_table_data": []}]}],
+        },
+    }
+    merged = collect_playable_rounds(user)
+    assert [r["format"] for r in merged] == ["A", "B"]
+    assert [r["round_number"] for r in merged] == [1, 2]
+
+
+def test_results_page_shows_synthesis_chart() -> None:
+    layout = create_final_layout(_user(uses_cgm=True, played=["A"]), "mg/dL", locale="en")
+    card = _by_id(layout, "final-synthesis-card")
+    assert card is not None
+    assert "results-synthesis-card" in (card.className or "")
+    graph = _by_id(layout, "final-synthesis-graph")
+    assert graph is not None
+    assert graph.figure is not None
+    assert len(graph.figure.data) > 0
+    texts = []
+    kids = card.children
+    if isinstance(kids, (list, tuple)):
+        for kid in kids:
+            child = getattr(kid, "children", None)
+            if isinstance(child, str):
+                texts.append(child)
+    assert "Next hour prediction error" in texts
+    top_ids = [getattr(child, "id", None) for child in layout.children]
+    assert top_ids.index("final-ranking-list") < top_ids.index(
+        "final-overall-metrics-container"
+    )
+    assert top_ids.index("final-overall-metrics-container") < top_ids.index(
+        "final-synthesis-card"
+    )
+
+
+def test_results_page_hides_synthesis_without_rounds() -> None:
+    user = _user(uses_cgm=False, played=["A"])
+    user["rounds"] = []
+    user["runs_by_format"] = {}
+    layout = create_final_layout(user, "mg/dL", locale="en")
+    assert _by_id(layout, "final-synthesis-card") is None
+    assert _by_id(layout, "final-synthesis-graph") is None
 
 
 def test_all_formats_played_hides_switch_buttons() -> None:

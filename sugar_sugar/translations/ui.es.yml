@@ -1,6 +1,6 @@
 es:
   common:
-    app_title: "Sugar Sugar"
+    app_title: "Sugar-Sugar"
     units: "Unidades"
     round_of: "Ronda %{current} de %{total}"
     go_to_start: "Ir a la página de inicio"
@@ -40,7 +40,7 @@ es:
       - "Descubre qué tan cerca estuviste"
     preview: "Vista previa"
     about_study_title: "Sobre el estudio"
-    about_study_text: "Estamos estudiando qué tan precisos son los humanos al predecir las tendencias de la glucosa y qué patrones notan los usuarios experimentados de CGM. Si eliges participar, tu juego y tus datos de CGM subidos pueden ser utilizados para investigaciones posteriores."
+    about_study_text: "¿Puede la gente predecir hacia dónde irá la glucosa? Sugar-Sugar convierte esa pregunta en un juego. Para las personas con diabetes, esa próxima hora puede decidir la comida, la insulina y mantenerse a salvo. No necesitas tener diabetes para jugar. Cada persona deja un resultado que los investigadores necesitan.\n\nEste es un estudio real, aprobado por el Comité de Ética del Centro Médico Universitario de Rostock (Alemania) - lee el formulario de consentimiento y marca las casillas obligatorias."
     your_choices_title: "Tus opciones"
     your_choices_text: "Al continuar aceptas participar en el estudio. Tu partida puede guardarse para investigación."
     consent_receive_results: "Quiero recibir mis resultados más tarde"
@@ -71,15 +71,15 @@ es:
       - "La participación es voluntaria y puedes detenerte en cualquier momento."
     data_title: "Uso de datos"
     data_bullets:
-      - "Se pueden usar datos de ejemplo (genéricos) sin subir ningún dato personal del sensor."
+      - "Se pueden usar datos públicos anonimizados de otras personas sin subir ningún dato personal del sensor."
       - "Si subes un archivo, este puede contener información de salud sensible."
       - "Solo usaremos los datos de acuerdo con tus selecciones en la página de inicio."
     withdraw_title: "Retirada"
     withdraw_text: "Puedes dejar de participar en cualquier momento cerrando la pestaña o ventana del navegador. Si deseas que se eliminen tus datos, ponte en contacto con los organizadores del estudio."
 
   about:
-    title: "Sobre Sugar Sugar"
-    body: "Sugar Sugar es una herramienta de investigación diseñada para medir qué tan precisos pueden ser los humanos al predecir las tendencias futuras de la glucosa."
+    title: "Sobre Sugar-Sugar"
+    body: "Sugar-Sugar es una herramienta de investigación diseñada para medir qué tan precisos pueden ser los humanos al predecir las tendencias futuras de la glucosa."
     study_design_title: "Diseño del estudio"
     download_pdf_label: "Descargar diseño del estudio (PDF)"
     pdf_original_english_note: "(original en inglés)"
@@ -103,7 +103,7 @@ es:
 
   demo:
     title: "Demo"
-    body: "Prueba una demo rápida del juego de predicción de glucosa Sugar Sugar."
+    body: "Prueba una demo rápida del juego de predicción de glucosa Sugar-Sugar."
     fullscreen_video: "Ver en pantalla completa"
 
   startup:
@@ -158,25 +158,26 @@ es:
     wizard_step: "Paso %{current} de %{total}"
     format_label: "Formato"
     format_placeholder: "Elige una opción"
-    format_a_label: "Datos genéricos"
+    format_a_label: "Datos públicos"
     format_b_label: "Mis datos"
-    format_c_label: "Genéricos + Mis datos"
-    format_a_label_short: "Genéricos"
+    format_c_label: "Públicos + Mis datos"
+    format_a_label_short: "Públicos"
     format_b_label_short: "Míos"
     format_c_label_short: "Combinados"
-    format_help_a: "Datos genéricos — no tienes que subir nada. Juega con datos públicos de referencia."
+    format_help_a: "Datos públicos — trazas CGM anonimizadas de otras personas. No tienes que subir nada."
     format_help_b: "Mis datos — sube tu propio CSV y juega con tu propia glucosa."
-    format_help_c: "Genéricos + Mis datos — una combinación. Algunas rondas usan datos públicos, otras los tuyos."
+    format_help_c: "Públicos + Mis datos — una combinación. Algunas rondas usan trazas públicas anonimizadas, otras las tuyas."
     format_find_data_before: "Si no sabes dónde encontrar tus datos, "
     format_find_data_link: "búscalos aquí."
     challenge_unknown_button: "Reta a lo desconocido"
     challenge_unknown_button_on: "Desconocido activado"
-    challenge_unknown_help: "Solo para Genéricos o Genéricos + mis datos, y solo si no tienes diabetes o tienes tipo 1."
-    challenge_unknown_help_nd: "¿Qué parte de las curvas debe venir de personas con diabetes? 10 %% significa que una de cada diez rondas usa datos diabéticos."
-    challenge_unknown_help_t1: "¿Qué parte de las curvas debe venir de personas sin diabetes? 10 %% significa que una de cada diez rondas usa datos no diabéticos."
-    challenge_unknown_slider_label: "Proporción de datos desconocidos"
-    challenge_unknown_slider_nd: "Proporción de datos diabéticos"
-    challenge_unknown_slider_t1: "Proporción de datos no diabéticos"
+    challenge_unknown_help: "Si marcas esta casilla, la mitad de las curvas vendrán del grupo contrario: datos diabéticos si no tienes diabetes, y no diabéticos si la tienes. Solo para Públicos o Públicos + mis datos."
+    challenge_unknown_help_nd: "Si marcas esta casilla, la mitad de las curvas vendrán de personas con diabetes."
+    challenge_unknown_help_t1: "Si marcas esta casilla, la mitad de las curvas vendrán de personas sin diabetes."
+    paper_mention_label: "Quiero que me mencionen en un artículo científico publicado después del estudio"
+    paper_mention_hint: "Si marcas esta casilla y escribes tu nombre completo, te incluiremos en los agradecimientos, pero solo si juegas %{min_rounds} rondas o más."
+    paper_full_name_label: "Nombre completo"
+    paper_full_name_placeholder: "Nombre y apellidos"
     data_usage_consent_label: "Acepto el uso de mis datos CGM subidos para este estudio."
     data_usage_consent_required: "Por favor confirma el consentimiento de uso de datos para continuar."
 
@@ -185,11 +186,11 @@ es:
     time_window_label: "Posición de la ventana de tiempo:"
     upload_prompt_1: "Arrastra y suelta o "
     upload_prompt_2: "Sube tus datos aquí"
-    use_example_data: "Usar datos genéricos"
+    use_example_data: "Usar datos públicos"
     upload_required: "Se requiere subir archivo"
     upload_success: "Datos cargados correctamente desde %{filename}. Estos datos se usarán para las predicciones."
-    example_data_now_using: "Ahora usando datos genéricos. Sube un archivo CSV para análisis personalizado."
-    example_data_warning: "Usando actualmente datos genéricos. Sube tu propio archivo CSV de Dexcom/Libre/Medtronic/Nightscout para análisis personalizado."
+    example_data_now_using: "Ahora usando datos públicos anonimizados. Sube un archivo CSV para análisis personalizado."
+    example_data_warning: "Usando actualmente datos públicos anonimizados. Sube tu propio archivo CSV de Dexcom/Libre/Medtronic/Nightscout para análisis personalizado."
     csv_tab_label: "Archivo CSV"
     nightscout_tab_label: "Nightscout"
     nightscout_url_placeholder: "https://tu-sitio-nightscout.com"
@@ -226,9 +227,15 @@ es:
     progress_ready: "✓ ¡Listo para enviar!"
     progress_hidden_area: "Haz predicciones en el área oculta para enviar"
     submit: "Enviar"
+    finish_game: "Finalizar partida"
+    finish_confirm_title: "¿Salir de esta partida?"
+    finish_confirm_early: "Has completado %{current} de %{total} rondas. Menos de %{min} rondas es demasiado poco para el estudio."
+    finish_confirm: "Has completado %{current} de %{total} rondas. ¿Seguro que quieres salir?"
+    keep_playing: "Seguir jugando"
+    finish_anyway: "Finalizar de todos modos"
 
   mobile_warning:
-    text: "Nota: Sugar Sugar está optimizado para escritorio en este momento. ¡El soporte para móviles llegará pronto!"
+    text: "Nota: Sugar-Sugar está optimizado para escritorio en este momento. ¡El soporte para móviles llegará pronto!"
 
   orientation:
     title: "GIRA TU TELÉFONO EN MODO HORIZONTAL PARA DIBUJAR"
@@ -236,8 +243,8 @@ es:
 
   share:
     button_share: "Compartir mis resultados"
-    title: "Mis resultados de Sugar Sugar"
-    title_named: "Resultados Sugar Sugar de %{name}"
+    title: "Mis resultados de Sugar-Sugar"
+    title_named: "Resultados Sugar-Sugar de %{name}"
     subtitle: "¿Puedes predecir la glucosa mejor que yo? ¡Inténtalo!"
     download_png: "Descargar imagen"
     download_png_hint: "Guarda la tarjeta como PNG, perfecta para las historias de Instagram."
@@ -277,7 +284,7 @@ es:
     og_title_unranked: "%{accuracy} de precisión prediciendo glucosa — ¿puedes superarme?"
     expired_title: "Este enlace de compartición ha expirado"
     expired_body: "No encontramos una tarjeta para esta URL. Juega una ronda y podrás compartir la tuya."
-    expired_cta: "Jugar a Sugar Sugar"
+    expired_cta: "Jugar a Sugar-Sugar"
     encouragement:
       excellent:
         lines:
@@ -465,12 +472,12 @@ es:
 
   switch_format:
     title: "También puedes probar..."
-    try_a: "Probar Datos de ejemplo = usar datos genéricos"
+    try_a: "Probar Datos públicos = jugar con trazas anonimizadas de otras personas"
     try_b: "Probar Mis datos = usar datos propios"
-    try_c: "Probar Ejemplo + Mis datos = usar tanto datos genéricos como propios"
-    try_a_short: "Datos genéricos"
+    try_c: "Probar Públicos + Mis datos = trazas públicas anonimizadas y las tuyas"
+    try_a_short: "Datos públicos"
     try_b_short: "Mis datos"
-    try_c_short: "Genéricos + Míos"
+    try_c_short: "Públicos + Míos"
     not_eligible_no_cgm: "B/C solo están disponibles si dijiste que tienes datos de CGM."
 
   results_disclaimer:
@@ -504,10 +511,10 @@ es:
     sections:
       - title: "Por qué es importante este estudio"
         items:
-          - q: "¿Qué es Sugar Sugar?"
-            a: "Sugar Sugar es una aplicación de investigación basada en la web construida con Dash. Convierte la previsión de glucosa en un juego interactivo: ves parte de un rastro de CGM, dibujas cómo crees que continuará y luego comparas tu predicción con los valores reales. El objetivo es medir con qué precisión pueden los humanos anticipar la dinámica de la glucosa a corto plazo."
+          - q: "¿Qué es Sugar-Sugar?"
+            a: "Sugar-Sugar es una aplicación de investigación basada en la web construida con Dash. Convierte la previsión de glucosa en un juego interactivo: ves parte de un rastro de CGM, dibujas cómo crees que continuará y luego comparas tu predicción con los valores reales. El objetivo es medir con qué precisión pueden los humanos anticipar la dinámica de la glucosa a corto plazo."
           - q: "¿Es este un estudio de investigación real?"
-            a: "Sí. Sugar Sugar es parte de un esfuerzo de investigación real. El estudio recibió la aprobación del comité de ética de University Medicine Rostock (Universitätsmedizin Rostock) en Alemania; mencionamos esto como parte del contexto del estudio para que sepa que la investigación se lleva a cabo de manera responsable."
+            a: "Sí. Sugar-Sugar es parte de un esfuerzo de investigación real. El estudio recibió la aprobación del comité de ética de University Medicine Rostock (Universitätsmedizin Rostock) en Alemania; mencionamos esto como parte del contexto del estudio para que sepa que la investigación se lleva a cabo de manera responsable."
           - q: "¿Por qué es importante predecir la glucosa para las personas con diabetes?"
             a: "Para las personas con diabetes, las previsiones precisas de glucosa a corto plazo pueden ayudar a tomar decisiones diarias más seguras sobre la insulina, los carbohidratos, el ejercicio y los horarios. Una mejor predicción puede ayudar a reducir los picos y caídas peligrosas y hacer que el control de la glucosa sea menos estresante."
           - q: "¿Por qué es importante predecir la glucosa para las personas sin diabetes?"
@@ -547,9 +554,9 @@ es:
       - title: "Cómo funciona el estudio"
         items:
           - q: "¿Quién puede participar?"
-            a: "Cualquier persona mayor de 18 años. Los usuarios de CGM son especialmente valiosos, pero los que no usan CGM también pueden jugar con datos genéricos."
+            a: "Cualquier persona mayor de 18 años. Los usuarios de CGM son especialmente valiosos, pero los que no usan CGM también pueden jugar con datos públicos anonimizados."
           - q: "¿Qué dispositivos y formatos de CGM son compatibles?"
-            a: "Se admiten exportaciones de Dexcom, Libre, Medtronic y Nightscout. También hay un conjunto de datos de muestra genérico disponible si no tienes un dispositivo CGM."
+            a: "Se admiten exportaciones de Dexcom, Libre, Medtronic y Nightscout. También hay un conjunto de datos públicos anonimizados si no tienes un dispositivo CGM."
           - q: "¿Cuánto tiempo se tarda?"
             a: "Cada ronda dura unos 2-3 minutos. Una sesión completa (12 rondas) dura unos 30 minutos, pero puedes dividirla en varias visitas."
           - q: "¿Puedo parar a mitad de camino y reanudarlo más tarde?"
@@ -572,7 +579,7 @@ es:
 
               - **Sin presión en tiempo real.** Dibujar una línea de predicción con calma es diferente de tomar una decisión de dosificación a las 2 de la madrugada medio dormido.
 
-              - **Datos de ejemplo vs. datos propios.** Si juegas con los datos de ejemplo incluidos, tu precisión puede diferir de la que obtendrías prediciendo tu propia glucosa. Te animamos a subir tu propia exportación de CGM (Dexcom, Libre, Medtronic o Nightscout): tu intuición personal sobre tus propios patrones es parte de lo que hace interesante la comparación con el ML.
+              - **Datos públicos vs. datos propios.** Si juegas con trazas públicas anonimizadas, tu precisión puede diferir de la que obtendrías prediciendo tu propia glucosa. Te animamos a subir tu propia exportación de CGM (Dexcom, Libre, Medtronic o Nightscout): tu intuición personal sobre tus propios patrones es parte de lo que hace interesante la comparación con el ML.
       - title: "Cómo descargar tu CSV de CGM"
         id: download-csv
         items:

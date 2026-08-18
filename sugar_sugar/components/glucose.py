@@ -151,18 +151,30 @@ def meal_food_bubble_children(
         extra: dict[str, str] = {}
         if count > 1:
             extra["data-count"] = str(count)
+        food_label = t("ui.chart.food_label", locale=locale)
+        accessible_label = t("ui.chart.event_carbohydrates", locale=locale)
         buttons.append(
             html.Button(
-                html.Img(
-                    src=_APPLE_ICON_SRC,
-                    className="meal-food-bubble-apple",
-                    alt="",
-                    disable_n_clicks=True,
-                ),
+                [
+                    html.Img(
+                        src=_APPLE_ICON_SRC,
+                        className="meal-food-bubble-apple",
+                        alt="",
+                        disable_n_clicks=True,
+                    ),
+                    html.Span(food_label, className="meal-food-bubble-label"),
+                    html.Span(
+                        "›",
+                        className="meal-food-bubble-open",
+                        **{"aria-hidden": "true"},
+                    ),
+                ],
                 id={"type": "meal-food-bubble", "index": _bubble_index_for_cluster(cluster)},
                 className="meal-food-speech-bubble",
                 type="button",
                 n_clicks=0,
+                title=accessible_label,
+                **{"aria-label": accessible_label},
                 style={"left": f"{left_pct:.3f}%"},
                 **extra,
             )
@@ -195,9 +207,8 @@ class GlucoseChart(html.Div):
         "Insulin": {
             "icon": "syringe.svg",
             "color": "#7b1fa2",
-            # Data-coordinate icon box (~2× the earlier layout-image size).
-            "icon_size_x": 2.8,
-            "icon_size_y_frac": 0.12,
+            "icon_size_x": 1.8,
+            "icon_size_y_frac": 0.07,
         },
         "Exercise": {
             "symbol": "star",

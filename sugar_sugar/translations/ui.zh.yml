@@ -1,6 +1,6 @@
 zh:
   common:
-    app_title: "Sugar Sugar"
+    app_title: "Sugar-Sugar"
     units: "单位"
     round_of: "第 %{current} 轮，共 %{total} 轮"
     go_to_start: "返回首页"
@@ -38,7 +38,7 @@ zh:
       - "看看你有多接近"
     preview: "预览"
     about_study_title: "关于本研究"
-    about_study_text: "我们正在研究人类在预测血糖趋势方面的准确性，以及经验丰富的 CGM 用户注意到的模式。如果您选择参与，您的游戏过程和上传的 CGM 数据可能会被用于进一步的研究。"
+    about_study_text: "人们能预测血糖接下来会怎么走吗？Sugar-Sugar 把这个问题变成了一场游戏。对糖尿病患者来说，接下来的一小时可能决定进食、胰岛素和安全。没有糖尿病也可以玩。每个人都会留下研究人员需要的结果。\n\n这是一项真实研究，已获罗斯托克大学医学中心伦理委员会（德国）批准 - 请阅读知情同意书并勾选必选项。"
     your_choices_title: "您的选择"
     your_choices_text: "继续即表示您同意参加本研究。您的游戏数据可能会被保存用于研究。"
     consent_receive_results: "我希望以后收到我的结果"
@@ -69,15 +69,15 @@ zh:
       - "参与是自愿的，您可以随时停止。"
     data_title: "数据使用"
     data_bullets:
-      - "可以使用示例（通用）数据，而无需上传任何个人传感器数据。"
+      - "可以使用他人的公开匿名数据，无需上传任何个人传感器数据。"
       - "如果您上传文件，它可能包含敏感的健康信息。"
       - "我们将仅根据您在启动页面上的选择使用数据。"
     withdraw_title: "退出"
     withdraw_text: "您可以随时通过关闭浏览器标签/窗口来停止参与。如果您希望删除您的数据，请联系研究组织者。"
 
   about:
-    title: "关于 Sugar Sugar"
-    body: "Sugar Sugar 是一个研究工具，旨在测量人类预测未来血糖趋势的准确性。"
+    title: "关于 Sugar-Sugar"
+    body: "Sugar-Sugar 是一个研究工具，旨在测量人类预测未来血糖趋势的准确性。"
     study_design_title: "研究设计"
     download_pdf_label: "下载研究设计 (PDF)"
     pdf_original_english_note: "（原文为英文）"
@@ -101,7 +101,7 @@ zh:
 
   demo:
     title: "演示"
-    body: "尝试 Sugar Sugar 血糖预测游戏的快速演示。"
+    body: "尝试 Sugar-Sugar 血糖预测游戏的快速演示。"
     fullscreen_video: "全屏观看"
 
   startup:
@@ -156,25 +156,26 @@ zh:
     wizard_step: "第 %{current}/%{total} 步"
     format_label: "格式"
     format_placeholder: "选择一个选项"
-    format_a_label: "通用数据"
+    format_a_label: "公开数据"
     format_b_label: "我的数据"
-    format_c_label: "通用 + 我的数据"
-    format_a_label_short: "通用"
+    format_c_label: "公开 + 我的数据"
+    format_a_label_short: "公开"
     format_b_label_short: "我的"
     format_c_label_short: "组合"
-    format_help_a: "通用数据 — 不用上传任何文件。直接用公开参考数据游玩。"
+    format_help_a: "公开数据 — 其他人的匿名 CGM 曲线。不用上传任何文件。"
     format_help_b: "我的数据 — 上传你自己的 CSV，用自己的血糖来玩。"
-    format_help_c: "通用 + 我的数据 — 两者结合。有的回合用公开数据，有的用你的。"
+    format_help_c: "公开 + 我的数据 — 两者结合。有的回合用公开匿名曲线，有的用你的。"
     format_find_data_before: "如果不知道去哪里找自己的数据，"
     format_find_data_link: "点这里查找。"
     challenge_unknown_button: "挑战未知"
     challenge_unknown_button_on: "未知已开启"
-    challenge_unknown_help: "仅适用于“通用”或“通用 + 我的数据”，且仅当你没有糖尿病或为 1 型时可用。"
-    challenge_unknown_help_nd: "多少曲线应来自糖尿病患者？10%% 表示十轮中有一轮使用糖尿病数据。"
-    challenge_unknown_help_t1: "多少曲线应来自非糖尿病者？10%% 表示十轮中有一轮使用非糖尿病数据。"
-    challenge_unknown_slider_label: "未知数据占比"
-    challenge_unknown_slider_nd: "糖尿病数据占比"
-    challenge_unknown_slider_t1: "非糖尿病数据占比"
+    challenge_unknown_help: "勾选后，一半曲线将来自对面一组：无糖尿病则用糖尿病数据，有糖尿病则用非糖尿病数据。仅适用于“公开”或“公开 + 我的数据”。"
+    challenge_unknown_help_nd: "勾选后，一半曲线将来自糖尿病患者。"
+    challenge_unknown_help_t1: "勾选后，一半曲线将来自非糖尿病者。"
+    paper_mention_label: "我希望在研究结束后发表的科学论文中被提及"
+    paper_mention_hint: "若勾选并填写全名，我们会将你列入致谢，但仅当你完成 %{min_rounds} 轮或更多。"
+    paper_full_name_label: "全名"
+    paper_full_name_placeholder: "姓名"
     data_usage_consent_label: "我同意将我上传的 CGM 数据用于本研究。"
     data_usage_consent_required: "请确认数据使用同意以继续。"
 
@@ -183,11 +184,11 @@ zh:
     time_window_label: "时间窗口位置："
     upload_prompt_1: "拖放或 "
     upload_prompt_2: "在此上传您的数据"
-    use_example_data: "使用通用数据"
+    use_example_data: "使用公开数据"
     upload_required: "需要上传"
     upload_success: "已成功从 %{filename} 加载数据。此数据将用于预测。"
-    example_data_now_using: "现在使用通用数据。上传 CSV 文件进行个性化分析。"
-    example_data_warning: "目前正在使用通用数据。上传您自己的 Dexcom/Libre/Medtronic/Nightscout CSV 文件进行个性化分析。"
+    example_data_now_using: "现在使用公开匿名数据。上传 CSV 文件进行个性化分析。"
+    example_data_warning: "目前正在使用公开匿名数据。上传您自己的 Dexcom/Libre/Medtronic/Nightscout CSV 文件进行个性化分析。"
     csv_tab_label: "CSV 文件"
     nightscout_tab_label: "Nightscout"
     nightscout_url_placeholder: "https://your-nightscout-site.com"
@@ -224,9 +225,15 @@ zh:
     progress_ready: "✓ 准备好提交！"
     progress_hidden_area: "在隐藏区域画出预测以提交"
     submit: "提交"
+    finish_game: "结束游戏"
+    finish_confirm_title: "退出本次游戏？"
+    finish_confirm_early: "你已完成 %{current}/%{total} 轮。少于 %{min} 轮对这项研究来说太少了。"
+    finish_confirm: "你已完成 %{current}/%{total} 轮。确定要退出吗？"
+    keep_playing: "继续游戏"
+    finish_anyway: "仍然结束"
 
   mobile_warning:
-    text: "注意：Sugar Sugar 目前针对桌面端进行了优化。移动端支持即将推出！"
+    text: "注意：Sugar-Sugar 目前针对桌面端进行了优化。移动端支持即将推出！"
 
   orientation:
     title: "请将手机旋转为横屏以进行绘制"
@@ -234,8 +241,8 @@ zh:
 
   share:
     button_share: "分享我的成绩"
-    title: "我的 Sugar Sugar 成绩"
-    title_named: "%{name} 的 Sugar Sugar 成绩"
+    title: "我的 Sugar-Sugar 成绩"
+    title_named: "%{name} 的 Sugar-Sugar 成绩"
     subtitle: "你能比我更准地预测血糖吗？来试试！"
     download_png: "下载图片"
     download_png_hint: "将成绩卡保存为 PNG，非常适合 Instagram 故事。"
@@ -275,7 +282,7 @@ zh:
     og_title_unranked: "%{accuracy} 准确率预测血糖 — 你能超过我吗？"
     expired_title: "此分享链接已失效"
     expired_body: "我们没找到对应的成绩卡。玩一轮游戏，就能分享你自己的成绩。"
-    expired_cta: "玩 Sugar Sugar"
+    expired_cta: "玩 Sugar-Sugar"
     encouragement:
       excellent:
         lines:
@@ -463,12 +470,12 @@ zh:
 
   switch_format:
     title: "你也可以试试..."
-    try_a: "尝试示例数据 = 使用通用数据"
+    try_a: "尝试公开数据 = 用他人的匿名曲线游玩"
     try_b: "尝试我的数据 = 使用自己的数据"
-    try_c: "尝试示例 + 我的数据 = 同时使用通用数据和自己的数据"
-    try_a_short: "尝试通用数据"
+    try_c: "尝试公开 + 我的数据 = 同时使用公开匿名数据和自己的数据"
+    try_a_short: "尝试公开数据"
     try_b_short: "尝试我的数据"
-    try_c_short: "尝试通用 + 我的"
+    try_c_short: "尝试公开 + 我的"
     not_eligible_no_cgm: "只有当您表示拥有 CGM 数据时，B/C 选项才可用。"
 
   results_disclaimer:
@@ -502,10 +509,10 @@ zh:
     sections:
       - title: "为什么这项研究很重要"
         items:
-          - q: "什么是 Sugar Sugar？"
-            a: "Sugar Sugar 是一款基于 Dash 构建的网络研究应用程序。它将血糖预测变成了一个互动游戏：您可以看到一部分 CGM 曲线，画出您认为它将如何继续，然后将您的预测与真实值进行比较。目标是衡量人类预测短期血糖动态的准确性。"
+          - q: "什么是 Sugar-Sugar？"
+            a: "Sugar-Sugar 是一款基于 Dash 构建的网络研究应用程序。它将血糖预测变成了一个互动游戏：您可以看到一部分 CGM 曲线，画出您认为它将如何继续，然后将您的预测与真实值进行比较。目标是衡量人类预测短期血糖动态的准确性。"
           - q: "这是一项真实的研究吗？"
-            a: "是的。Sugar Sugar 是真实研究项目的一部分。该研究获得了罗斯托克大学医学中心（Universitätsmedizin Rostock）伦理委员会的批准——我们提及这一点是为了让您知道研究是以负责任的方式进行的。"
+            a: "是的。Sugar-Sugar 是真实研究项目的一部分。该研究获得了罗斯托克大学医学中心（Universitätsmedizin Rostock）伦理委员会的批准——我们提及这一点是为了让您知道研究是以负责任的方式进行的。"
           - q: "为什么预测血糖对糖尿病患者很重要？"
             a: "对于糖尿病患者来说，准确的短期血糖预测可以支持关于胰岛素、碳水化合物、运动和时机的更安全的日常决策。更好的预测可以帮助减少危险的高血糖和低血糖，并减轻血糖管理的压力。"
           - q: "为什么预测血糖对非糖尿病患者很重要？"
@@ -533,9 +540,9 @@ zh:
       - title: "研究如何运作"
         items:
           - q: "谁可以参与？"
-            a: "任何 18 岁以上的人。CGM 用户特别有价值，但非 CGM 用户也可以使用通用数据进行游戏。"
+            a: "任何 18 岁以上的人。CGM 用户特别有价值，但非 CGM 用户也可以使用公开匿名数据进行游戏。"
           - q: "支持哪些 CGM 设备和格式？"
-            a: "支持 Dexcom、Libre、Medtronic 和 Nightscout 导出格式。如果您没有 CGM 设备，也可以使用通用示例数据集。"
+            a: "支持 Dexcom、Libre、Medtronic 和 Nightscout 导出格式。如果您没有 CGM 设备，也可以使用公开匿名数据集。"
           - q: "需要多长时间？"
             a: "每轮大约需要 2-3 分钟。完整的一节（12 轮）大约需要 30 分钟，但您可以分多次完成。"
           - q: "我可以中途停止并稍后继续吗？"
@@ -558,7 +565,7 @@ zh:
 
               - **没有实时压力。** 从容地画一条预测线，与凌晨两点半梦半醒时做用药决策，是完全不同的事情。
 
-              - **示例数据与自有数据的差异。** 如果您使用内置的示例数据，您的准确性可能与预测自己的血糖时不同。我们鼓励您上传自己的 CGM 导出数据（Dexcom、Libre、Medtronic 或 Nightscout）——您对自身模式的个人直觉正是与机器学习比较时最有趣的部分。
+              - **公开数据与自有数据的差异。** 如果您使用公开匿名曲线，您的准确性可能与预测自己的血糖时不同。我们鼓励您上传自己的 CGM 导出数据（Dexcom、Libre、Medtronic 或 Nightscout）——您对自身模式的个人直觉正是与机器学习比较时最有趣的部分。
       - title: "如何下载你的 CGM CSV"
         id: download-csv
         items:

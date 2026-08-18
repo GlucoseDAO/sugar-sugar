@@ -1,9 +1,10 @@
 """Challenge the unknown: mix the opposite Format A pool on purpose.
 
-Default Format A routing is fixed by diabetes status. Non-diabetic and type 1
-players can opt into a slider that injects the other corpus (D1NAMO vs BIG
-IDEAs) in 10% steps. Type 2 / prediabetes / LADA already have a mixture, so
-the control does not apply. Gestational stays on BIG IDEAs only.
+Default Format A routing is fixed by diabetes status. Any player on Public or
+Public + My Data can opt in: half the rounds then come from the other corpus
+(D1NAMO vs BIG IDEAs). That is the hard direction — diabetic traces if the
+player is not diabetic, non-diabetic traces if they are. Format B (own data)
+never uses this.
 """
 from __future__ import annotations
 
@@ -12,10 +13,9 @@ from typing import Any, Optional
 POOL_BIGIDEAS: str = "bigideas"
 POOL_D1NAMO: str = "d1namo"
 CHALLENGE_FORMATS: frozenset[str] = frozenset({"A", "C"})
-CHALLENGE_PCT_MIN: int = 10
-CHALLENGE_PCT_MAX: int = 100
-CHALLENGE_PCT_STEP: int = 10
-DEFAULT_CHALLENGE_PCT: int = 10
+# Fixed opposite-pool share so every opted-in player is comparable.
+CHALLENGE_UNKNOWN_PCT: int = 50
+CHALLENGE_OPPOSITE_SHARE: float = CHALLENGE_UNKNOWN_PCT / 100.0
 MIX_POLICY_PREFIX: str = "mix:"
 
 
@@ -30,12 +30,8 @@ def is_type_1(user_info: dict[str, Any] | None) -> bool:
     return _diabetes_kind(user_info) in {"type 1", "type1", "t1"}
 
 
-def challenge_unknown_diabetes_eligible(user_info: dict[str, Any] | None) -> bool:
-    """True after the player picks no diabetes, or type 1."""
-    info = user_info or {}
-    if info.get("diabetic") is False:
-        return True
-    return is_type_1(info)
+def is_diabetic(user_info: dict[str, Any] | None) -> bool:
+    return (user_info or {}).get("diabetic") is True
 
 
 def challenge_unknown_checked(raw: Any) -> bool:
@@ -47,35 +43,28 @@ def challenge_unknown_checked(raw: Any) -> bool:
     return False
 
 
+def _format_code(
+    user_info: dict[str, Any] | None,
+    format_value: Optional[str] = None,
+) -> str:
+    info = user_info or {}
+    return str(format_value if format_value is not None else info.get("format") or "").strip().upper()
+
+
 def challenge_unknown_visible(
     user_info: dict[str, Any] | None = None,
     format_value: Optional[str] = None,
 ) -> bool:
-    """Show after a no-diabetes or type-1 answer, unless Format B (own data)."""
-    info = user_info or {}
-    fmt = str(format_value if format_value is not None else info.get("format") or "").strip().upper()
-    if fmt == "B":
-        return False
-    return challenge_unknown_diabetes_eligible(info)
+    """Show for every diabetes answer except Format B (own data)."""
+    return _format_code(user_info, format_value) != "B"
 
 
 def challenge_unknown_eligible(
     user_info: dict[str, Any] | None = None,
     format_value: Optional[str] = None,
 ) -> bool:
-    """True for generic / generic+own play on a single-pool diabetes category."""
-    info = user_info or {}
-    fmt = str(format_value if format_value is not None else info.get("format") or "").strip().upper()
-    return challenge_unknown_diabetes_eligible(info) and fmt in CHALLENGE_FORMATS
-
-
-def snap_challenge_pct(raw: Any) -> int:
-    try:
-        value = int(round(float(raw)))
-    except (TypeError, ValueError):
-        return DEFAULT_CHALLENGE_PCT
-    stepped = int(round(value / CHALLENGE_PCT_STEP) * CHALLENGE_PCT_STEP)
-    return max(CHALLENGE_PCT_MIN, min(CHALLENGE_PCT_MAX, stepped))
+    """True for generic / generic+own play, any diabetes status."""
+    return _format_code(user_info, format_value) in CHALLENGE_FORMATS
 
 
 def challenge_unknown_active(user_info: dict[str, Any] | None) -> bool:
@@ -113,11 +102,10 @@ def parse_mix_policy(policy: str | None) -> dict[str, float] | None:
 
 
 def challenge_unknown_weights(user_info: dict[str, Any] | None) -> dict[str, float]:
-    """Percent of the *unknown* pool. The rest stays on the player's default corpus."""
-    pct = snap_challenge_pct((user_info or {}).get("challenge_unknown_pct"))
-    unknown = pct / 100.0
+    """Half the opposite pool; the rest stays on the player's home corpus."""
+    unknown = CHALLENGE_OPPOSITE_SHARE
     known = 1.0 - unknown
-    if is_type_1(user_info):
+    if is_diabetic(user_info):
         return {
             POOL_D1NAMO: known,
             POOL_BIGIDEAS: unknown,

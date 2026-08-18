@@ -1,6 +1,6 @@
 ro:
   common:
-    app_title: "Sugar Sugar"
+    app_title: "Sugar-Sugar"
     units: "Unități"
     round_of: "Runda %{current} din %{total}"
     go_to_start: "Mergi la pagina de start"
@@ -38,7 +38,7 @@ ro:
       - "Află cât de aproape ai fost"
     preview: "Previzualizare"
     about_study_title: "Despre studiu"
-    about_study_text: "Studiem cât de precis pot oamenii să prezică tendințele glucozei și ce tipare observă utilizatorii CGM cu experiență. Dacă alegi să participi, jocul tău și datele CGM încărcate pot fi folosite pentru cercetare ulterioară."
+    about_study_text: "Pot oamenii să prezică unde va merge glucoza în continuare? Sugar-Sugar transformă această întrebare într-un joc. Pentru persoanele cu diabet, următoarea oră poate decide mâncarea, insulina și siguranța. Nu trebuie să ai diabet ca să joci. Fiecare lasă un rezultat de care cercetătorii au nevoie.\n\nAcesta este un studiu real, aprobat de Comisia de etică a Centrului Medical Universitar Rostock (Germania) - citește formularul de consimțământ și bifează casetele obligatorii."
     your_choices_title: "Opțiunile tale"
     your_choices_text: "Continuând, ești de acord să participi la studiu. Jocul tău poate fi stocat pentru cercetare."
     consent_receive_results: "Vreau să primesc rezultatele mai târziu"
@@ -58,8 +58,8 @@ ro:
     games_slots_line: "%{total} jocuri, dar doar %{completed} finalizate"
 
   about:
-    title: "Despre Sugar Sugar"
-    body: "Sugar Sugar este un instrument de cercetare creat pentru a măsura cât de precis pot oamenii să prevadă tendințele viitoare ale glucozei. Participarea ta ne ajută să înțelegem intuiția umană și să îmbunătățim modelele de predicție."
+    title: "Despre Sugar-Sugar"
+    body: "Sugar-Sugar este un instrument de cercetare creat pentru a măsura cât de precis pot oamenii să prevadă tendințele viitoare ale glucozei. Participarea ta ne ajută să înțelegem intuiția umană și să îmbunătățim modelele de predicție."
     study_design_title: "Designul studiului"
     download_pdf_label: "Descarcă designul studiului (PDF)"
     pdf_original_english_note: "(originalul în engleză)"
@@ -83,7 +83,7 @@ ro:
 
   demo:
     title: "Demo"
-    body: "Încearcă o demonstrație rapidă a jocului Sugar Sugar de predicție a glucozei. Aceasta este o rundă de exemplu folosind date generice."
+    body: "Încearcă o demonstrație rapidă a jocului Sugar-Sugar de predicție a glucozei. Aceasta este o rundă de exemplu folosind date publice anonimizate."
     fullscreen_video: "Vizualizează pe tot ecranul"
 
   consent_form:
@@ -98,7 +98,7 @@ ro:
       - "Participarea este voluntară și te poți opri oricând."
     data_title: "Utilizarea datelor"
     data_bullets:
-      - "Datele exemplu (generice) pot fi folosite fără a încărca date personale de la senzor."
+      - "Datele publice anonimizate ale altor persoane pot fi folosite fără a încărca date personale de la senzor."
       - "Dacă încarci un fișier, acesta poate conține informații sensibile despre sănătate."
       - "Vom folosi datele doar conform selecțiilor tale de pe pagina de start."
     withdraw_title: "Retragere"
@@ -157,25 +157,26 @@ ro:
     wizard_step: "Pasul %{current} din %{total}"
     format_label: "Format"
     format_placeholder: "Alege o opțiune"
-    format_a_label: "Date generice"
+    format_a_label: "Date publice"
     format_b_label: "Datele mele"
-    format_c_label: "Date generice + datele mele"
-    format_a_label_short: "Generice"
+    format_c_label: "Date publice + datele mele"
+    format_a_label_short: "Publice"
     format_b_label_short: "Ale mele"
     format_c_label_short: "Combinate"
-    format_help_a: "Date generice — nu trebuie să încarci nimic. Joacă folosind date publice de referință."
+    format_help_a: "Date publice — curbe CGM anonimizate de la alte persoane. Nu trebuie să încarci nimic."
     format_help_b: "Datele mele — încarcă propriul CSV și joacă pe glucoza ta."
-    format_help_c: "Date generice + datele mele — o combinație. Unele runde folosesc date publice, altele pe ale tale."
+    format_help_c: "Date publice + datele mele — o combinație. Unele runde folosesc curbe publice anonimizate, altele pe ale tale."
     format_find_data_before: "Dacă nu știi de unde să-ți iei datele, "
     format_find_data_link: "caută aici."
     challenge_unknown_button: "Provoacă necunoscutul"
     challenge_unknown_button_on: "Necunoscutul e activ"
-    challenge_unknown_help: "Doar pentru Generic sau Generic + datele mele, și doar dacă nu ai diabet sau ai tip 1."
-    challenge_unknown_help_nd: "Cât din curbe să vină de la persoane cu diabet? 10%% înseamnă că una din zece runde folosește date diabetice."
-    challenge_unknown_help_t1: "Cât din curbe să vină de la persoane fără diabet? 10%% înseamnă că una din zece runde folosește date de la persoane fără diabet."
-    challenge_unknown_slider_label: "Ponderea datelor necunoscute"
-    challenge_unknown_slider_nd: "Ponderea datelor diabetice"
-    challenge_unknown_slider_t1: "Ponderea datelor de la persoane fără diabet"
+    challenge_unknown_help: "Dacă bifezi, jumătate din curbe vor veni din grupul opus — date de la persoane cu diabet dacă nu ai diabet, și invers. Doar pentru Publice sau Publice + datele mele."
+    challenge_unknown_help_nd: "Dacă bifezi, jumătate din curbe vor veni de la persoane cu diabet."
+    challenge_unknown_help_t1: "Dacă bifezi, jumătate din curbe vor veni de la persoane fără diabet."
+    paper_mention_label: "Vreau să fiu menționat într-un articol științific publicat după studiu"
+    paper_mention_hint: "Dacă bifezi și scrii numele complet, te adăugăm la mulțumiri — dar doar dacă joci cel puțin %{min_rounds} runde."
+    paper_full_name_label: "Nume complet"
+    paper_full_name_placeholder: "Prenume și nume"
     data_usage_consent_label: "Sunt de acord cu utilizarea datelor mele CGM încărcate pentru acest studiu."
     data_usage_consent_required: "Te rugăm să confirmi consimțământul pentru utilizarea datelor ca să continui."
     import_title: "Importă-ți datele CGM"
@@ -236,7 +237,7 @@ ro:
     units_label: "Unități:"
     upload_required_alert: "Acest format necesită propriile date CGM. Te rugăm să încarci un fișier CSV pentru a începe."
     upload_only_gate: "Ai ales să joci doar cu propriile date. Pentru a începe, apasă butonul Încarcă și selectează fișierul tău."
-    upload_mixed_gate: "Ai ales modul mixt (date generice + propriile date). Pentru a continua, apasă butonul Încarcă și selectează fișierul tău — rundele vor alterna apoi între date generice și ale tale."
+    upload_mixed_gate: "Ai ales modul mixt (date publice + propriile date). Pentru a continua, apasă butonul Încarcă și selectează fișierul tău — rundele vor alterna apoi între curbe publice anonimizate și ale tale."
     upload_consent_recorded: "Consimțământ înregistrat. Acum poți încărca și folosi datele CGM în această sesiune."
     no_upload_back_to_final: "Nu ai date CGM de încărcat? Vezi rezultatele din rundele anterioare"
 
@@ -246,9 +247,15 @@ ro:
     progress_ready: "✓ Gata de trimitere!"
     progress_hidden_area: "Fă predicții în zona ascunsă pentru a trimite"
     submit: "Trimite"
+    finish_game: "Încheie jocul"
+    finish_confirm_title: "Ieși din acest joc?"
+    finish_confirm_early: "Ai finalizat %{current} din %{total} runde. Mai puțin de %{min} runde este prea puțin pentru studiu."
+    finish_confirm: "Ai finalizat %{current} din %{total} runde. Sigur vrei să ieși?"
+    keep_playing: "Continuă jocul"
+    finish_anyway: "Încheie oricum"
 
   mobile_warning:
-    text: "Notă: Sugar Sugar este optimizat pentru desktop momentan. Suportul pentru mobil va veni în curând!"
+    text: "Notă: Sugar-Sugar este optimizat pentru desktop momentan. Suportul pentru mobil va veni în curând!"
 
   orientation:
     title: "ROTEȘTE TELEFONUL ÎN MOD PEISAJ PENTRU A DESENA"
@@ -256,8 +263,8 @@ ro:
 
   share:
     button_share: "Distribuie rezultatele"
-    title: "Rezultatele mele Sugar Sugar"
-    title_named: "Rezultatele Sugar Sugar ale lui %{name}"
+    title: "Rezultatele mele Sugar-Sugar"
+    title_named: "Rezultatele Sugar-Sugar ale lui %{name}"
     subtitle: "Poți prezice glicemia mai bine decât mine? Încearcă!"
     download_png: "Descarcă imaginea"
     download_png_hint: "Salvează cardul ca PNG, perfect pentru Stories pe Instagram."
@@ -297,7 +304,7 @@ ro:
     og_title_unranked: "%{accuracy} precizie la predicția glicemiei — poți să mă întreci?"
     expired_title: "Acest link de distribuire a expirat"
     expired_body: "Nu am găsit un card pentru această adresă. Joacă o rundă și poți distribui propriile tale rezultate."
-    expired_cta: "Joacă Sugar Sugar"
+    expired_cta: "Joacă Sugar-Sugar"
     encouragement:
       excellent:
         lines:
@@ -485,12 +492,12 @@ ro:
 
   switch_format:
     title: "Poți încerca și..."
-    try_a: "Încearcă date exemplu = folosește date generice"
+    try_a: "Încearcă date publice = joacă pe curbe anonimizate de la alte persoane"
     try_b: "Încearcă datele mele = folosește propriile date"
-    try_c: "Încearcă date exemplu + datele mele = folosește atât date generice, cât și proprii"
-    try_a_short: "Date generice"
+    try_c: "Încearcă date publice + datele mele = curbe publice anonimizate și ale tale"
+    try_a_short: "Date publice"
     try_b_short: "Datele mele"
-    try_c_short: "Generice + ale mele"
+    try_c_short: "Publice + ale mele"
     not_eligible_no_cgm: "B/C sunt disponibile doar dacă ai spus că ai date CGM."
 
   results_disclaimer:
@@ -524,10 +531,10 @@ ro:
     sections:
       - title: "De ce contează acest studiu"
         items:
-          - q: "Ce este Sugar Sugar?"
-            a: "Sugar Sugar este o aplicație web de cercetare construită cu Dash. Transformă prognozarea glucozei într-un joc interactiv: vezi o parte dintr-o curbă CGM, desenezi cum crezi că va continua, apoi compari predicția cu valorile reale. Scopul este să măsurăm cât de precis pot oamenii să anticipeze dinamica pe termen scurt a glucozei."
+          - q: "Ce este Sugar-Sugar?"
+            a: "Sugar-Sugar este o aplicație web de cercetare construită cu Dash. Transformă prognozarea glucozei într-un joc interactiv: vezi o parte dintr-o curbă CGM, desenezi cum crezi că va continua, apoi compari predicția cu valorile reale. Scopul este să măsurăm cât de precis pot oamenii să anticipeze dinamica pe termen scurt a glucozei."
           - q: "Este acesta un studiu de cercetare real?"
-            a: "Da. Sugar Sugar face parte dintr-un efort de cercetare real. Studiul a primit avizul comitetului de etică al University Medicine Rostock (Universitätsmedizin Rostock) din Germania — menționăm acest lucru ca parte a contextului studiului, pentru ca tu să știi că cercetarea este condusă responsabil."
+            a: "Da. Sugar-Sugar face parte dintr-un efort de cercetare real. Studiul a primit avizul comitetului de etică al University Medicine Rostock (Universitätsmedizin Rostock) din Germania — menționăm acest lucru ca parte a contextului studiului, pentru ca tu să știi că cercetarea este condusă responsabil."
           - q: "De ce contează prognozarea glucozei pentru persoanele cu diabet?"
             a: "Pentru persoanele cu diabet, prognozele precise pe termen scurt ale glucozei pot sprijini decizii zilnice mai sigure privind insulina, carbohidrații, exercițiile și momentul administrării. O predicție mai bună poate ajuta la reducerea valorilor periculoase și la gestionarea mai puțin stresantă a glucozei."
           - q: "De ce contează prognozarea glucozei pentru persoanele fără diabet?"
@@ -567,9 +574,9 @@ ro:
       - title: "Cum funcționează studiul"
         items:
           - q: "Cine poate participa?"
-            a: "Oricine are 18+ ani. Utilizatorii de CGM sunt deosebit de valoroși, dar și persoanele fără CGM pot juca cu date generice."
+            a: "Oricine are 18+ ani. Utilizatorii de CGM sunt deosebit de valoroși, dar și persoanele fără CGM pot juca cu date publice anonimizate."
           - q: "Ce dispozitive și formate CGM sunt acceptate?"
-            a: "Sunt acceptate exporturile Dexcom, Libre, Medtronic și Nightscout. Un set de date exemplu generic este de asemenea disponibil dacă nu ai un dispozitiv CGM."
+            a: "Sunt acceptate exporturile Dexcom, Libre, Medtronic și Nightscout. Un set de date publice anonimizate este de asemenea disponibil dacă nu ai un dispozitiv CGM."
           - q: "Cât timp durează?"
             a: "Fiecare rundă durează aproximativ 2–3 minute. O sesiune completă (12 runde) durează aproximativ 30 de minute, dar o poți împărți în mai multe vizite."
           - q: "Pot să mă opresc la jumătate și să reiau mai târziu?"
@@ -592,7 +599,7 @@ ro:
 
               - **Fără presiune în timp real.** A desena o linie de predicție în liniște este diferit de a lua o decizie de dozare la 2 dimineața pe jumătate adormit.
 
-              - **Date exemplu vs. date proprii.** Dacă joci cu datele exemplu incluse, precizia ta poate diferi față de prezicerea propriei glucoze. Te încurajăm să încarci propriul export CGM (Dexcom, Libre, Medtronic sau Nightscout) — intuiția ta personală despre propriile tipare este parte din ceea ce face comparația cu învățarea automată interesantă.
+              - **Date publice vs. date proprii.** Dacă joci cu curbe publice anonimizate, precizia ta poate diferi față de prezicerea propriei glucoze. Te încurajăm să încarci propriul export CGM (Dexcom, Libre, Medtronic sau Nightscout) — intuiția ta personală despre propriile tipare este parte din ceea ce face comparația cu învățarea automată interesantă.
       - title: "Cum îți descarci CSV-ul CGM"
         id: download-csv
         items:

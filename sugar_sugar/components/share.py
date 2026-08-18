@@ -1,7 +1,7 @@
 """Share-page component.
 
 Renders a Dash page at ``/share/<share_id>`` that lets the user show off
-their Sugar Sugar performance on social networks.
+their Sugar-Sugar performance on social networks.
 
 Public API
 ----------
@@ -9,6 +9,12 @@ Public API
     Returns a ``html.Div`` for the Dash page.  ``share_record`` is what
     ``share_store.load_share`` returned; it must contain at minimum a
     ``rounds`` list matching the shape used on ``/final``.
+- ``collect_playable_rounds(user_info)``:
+    Current run plus archived format runs, each tagged with ``format``.
+    Shared by ``/final`` and the Share button so both show the same rounds.
+- ``build_synthesis_card(share_record, *, locale, card_id=None, graph_id=None)``:
+    The HTML card (title, legend, figure, caption) used on ``/final`` and
+    ``/share``.
 - ``build_synthesis_figure(share_record, *, locale, show_title=False, figure_height=None, show_legend_in_figure=True)``:
     One stacked chart per data source format the user played (Generic,
     My data, or Mixed).  Each row is the **next prediction hour** only
@@ -62,9 +68,9 @@ _FORMAT_DRAW_ORDER: list[str] = ["A", "B", "C"]
 # scientific gradient.  When MULTIPLE formats share the page, each format gets
 # its own good-to-bad palette so the reader can tell panels apart at a glance.
 #
-#   A (Generic):           blue (good) -> cool grey (bad)
+#   A (Public):           blue (good) -> cool grey (bad)
 #   B (My Data):           orange (good) -> warm grey (bad)
-#   C (Generic + My Data): green (good) -> red (bad)
+#   C (Public + My Data): green (good) -> red (bad)
 #
 # The zero-percent line always uses the "good" end of the panel's palette.
 
@@ -286,6 +292,36 @@ def _formats_played_in_order(rounds: list[dict[str, Any]]) -> list[str]:
     return [f for f in _FORMAT_DRAW_ORDER if f in seen]
 
 
+def collect_playable_rounds(user_info: Optional[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Every finished round: archived format runs, then the current run.
+
+    Tags a missing ``format`` from the run key or the current session format so
+    the synthesis chart can split panels the same way the Share button does.
+    """
+    if not user_info:
+        return []
+    current_format: str = str(user_info.get("format") or "")
+    tagged_current: list[dict[str, Any]] = []
+    for rnd in list(user_info.get("rounds") or []):
+        tagged: dict[str, Any] = dict(rnd)
+        if not tagged.get("format"):
+            tagged["format"] = current_format
+        tagged_current.append(tagged)
+
+    archived_rounds: list[dict[str, Any]] = []
+    runs_by_format: dict[str, Any] = dict(user_info.get("runs_by_format") or {})
+    for fmt_key, runs in runs_by_format.items():
+        for run in (runs or []):
+            if not isinstance(run, dict):
+                continue
+            for rnd in (run.get("rounds") or []):
+                tagged = dict(rnd)
+                if not tagged.get("format"):
+                    tagged["format"] = fmt_key
+                archived_rounds.append(tagged)
+    return archived_rounds + tagged_current
+
+
 def _percent_error_series_for_round(
     r: dict[str, Any], hour_range: tuple[int, int]
 ) -> list[Optional[float]]:
@@ -469,7 +505,7 @@ def _safe_display_name(user_info: dict[str, Any]) -> str:
 
 
 def _share_results_title(name: str, *, locale: str) -> str:
-    """``My Sugar Sugar results``, or ``{name}'s …`` once a nickname exists."""
+    """``My Sugar-Sugar results``, or ``{name}'s …`` once a nickname exists."""
     loc: str = normalize_locale(locale)
     if name:
         return t("ui.share.title_named", locale=loc, name=name)
@@ -626,7 +662,7 @@ def _qrcode_png_data_uri(target_url: str) -> str:
 #                   quote. Nickname stamp sits in the bottom-left gap above
 #                   the generated-at timestamp, not over the stats.
 #   - Right column: the synthesis chart (per-panel format labels are OFF here to
-#                   avoid the "Generic data" annotation overlapping the card text).
+#                   avoid the "Public data" annotation overlapping the card text).
 #   - Footer band:  placement hero (left — same specifics as /final left
 #                   column: place, #rank, top %, MAE, format ranks) + QR.
 SHARE_CARD_WIDTH: int = 1200
@@ -1109,6 +1145,90 @@ def build_synthesis_figure(
     return fig
 
 
+def build_synthesis_card(
+    share_record: dict[str, Any],
+    *,
+    locale: str,
+    card_id: Optional[str] = None,
+    graph_id: Optional[str] = None,
+) -> html.Div:
+    """Title + legend + next-hour error chart + caption.
+
+    Used on ``/final`` (results) and ``/share`` so the player sees the same
+    trajectories without having to click Share.
+    """
+    loc: str = normalize_locale(locale)
+    rounds: list[dict[str, Any]] = list(share_record.get("rounds") or [])
+    n_panels: int = len(_formats_played_in_order(rounds))
+    graph_height: int = max(620, 130 * n_panels + 520)
+    graph_kwargs: dict[str, Any] = {}
+    if graph_id:
+        graph_kwargs["id"] = graph_id
+    card_kwargs: dict[str, Any] = {
+        "className": "results-synthesis-card",
+        "disable_n_clicks": True,
+        "style": {
+            "background": "white",
+            "borderRadius": "18px",
+            "boxShadow": "0 8px 24px rgba(15,23,42,0.08)",
+            "overflow": "hidden",
+            "marginTop": "14px",
+            "marginBottom": "20px",
+            "width": "100%",
+        },
+    }
+    if card_id:
+        card_kwargs["id"] = card_id
+    return html.Div(
+        [
+            html.Div(
+                t("ui.share.synthesis.title", locale=loc),
+                className="share-synthesis-headline",
+                disable_n_clicks=True,
+            ),
+            *(
+                (_synthesis_legend_row_html(share_record, locale=loc),)
+                if n_panels > 0
+                else ()
+            ),
+            dcc.Graph(
+                figure=build_synthesis_figure(
+                    share_record,
+                    locale=loc,
+                    show_title=False,
+                    show_legend_in_figure=False,
+                    figure_height=graph_height,
+                ),
+                className="share-synthesis-graph",
+                config={
+                    "displayModeBar": False,
+                    "scrollZoom": False,
+                    "staticPlot": True,
+                    "responsive": True,
+                },
+                style={
+                    "height": f"{graph_height}px",
+                    "minHeight": "400px",
+                    "width": "100%",
+                },
+                **graph_kwargs,
+            ),
+            html.Div(
+                t("ui.share.synthesis.caption", locale=loc),
+                style={
+                    "fontSize": "14px",
+                    "color": "#475569",
+                    "textAlign": "center",
+                    "padding": "6px 16px 16px 16px",
+                    "fontStyle": "italic",
+                },
+                disable_n_clicks=True,
+            ),
+        ],
+        **card_kwargs,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Landscape 1200x630 share card (1.91:1 — uncropped on FB / LinkedIn / X)
 # ---------------------------------------------------------------------------
@@ -1150,13 +1270,13 @@ def _wrap_text(text: str, max_chars: int, max_lines: int = 3) -> str:
 
 
 def _brand_colored_label(text: str) -> str:
-    """Bold label with the Sugar Sugar brand words coloured when present."""
+    """Bold label with the Sugar-Sugar brand words coloured when present."""
     escaped: str = html_escape(str(text or ""), quote=False)
-    brand: str = "Sugar Sugar"
+    brand: str = "Sugar-Sugar"
     if brand in escaped:
         escaped = escaped.replace(
             brand,
-            '<span style="color:#1565c0">Sugar Sugar</span>',
+            '<span style="color:#1565c0">Sugar-Sugar</span>',
         )
     return f"<b>{escaped}</b>"
 
@@ -1750,11 +1870,6 @@ def create_share_layout(
             disable_n_clicks=True,
         )
 
-    n_panels: int = len(_formats_played_in_order(rounds))
-    # Match dcc.Graph height to build_synthesis_figure(figure_height=...). Title and legend
-    # are in HTML; the figure has an ~8px top margin so nothing clips at the top edge.
-    graph_height: int = max(620, 130 * n_panels + 520)
-
     play_url: str = _play_url_from_share(share_url)
     quote_block: html.Div = html.Div(
         encourage,
@@ -1790,51 +1905,7 @@ def create_share_layout(
         disable_n_clicks=True,
     )
 
-    synthesis_card: html.Div = html.Div(
-        [
-            html.Div(
-                t("ui.share.synthesis.title", locale=loc),
-                className="share-synthesis-headline",
-                disable_n_clicks=True,
-            ),
-            *(
-                (_synthesis_legend_row_html(share_record, locale=loc),)
-                if n_panels > 0
-                else ()
-            ),
-            dcc.Graph(
-                figure=build_synthesis_figure(
-                    share_record,
-                    locale=loc,
-                    show_title=False,
-                    show_legend_in_figure=False,
-                    figure_height=graph_height,
-                ),
-                className="share-synthesis-graph",
-                config={
-                    "displayModeBar": False,
-                    "scrollZoom": False,
-                    "staticPlot": True,
-                    "responsive": True,
-                },
-                style={
-                    "height": f"{graph_height}px",
-                    "minHeight": "400px",
-                    "width": "100%",
-                },
-            ),
-            html.Div(
-                t("ui.share.synthesis.caption", locale=loc),
-                style={"fontSize": "14px", "color": "#475569", "textAlign": "center",
-                       "padding": "6px 16px 16px 16px", "fontStyle": "italic"},
-                disable_n_clicks=True,
-            ),
-        ],
-        style={"background": "white", "borderRadius": "18px",
-               "boxShadow": "0 8px 24px rgba(15,23,42,0.08)",
-               "overflow": "hidden", "marginTop": "14px", "width": "100%"},
-        disable_n_clicks=True,
-    )
+    synthesis_card: html.Div = build_synthesis_card(share_record, locale=loc)
 
     download_href: str = f"/share/{share_id}/image.png?lang={loc}"
 

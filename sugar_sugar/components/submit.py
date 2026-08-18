@@ -85,6 +85,104 @@ def hidden_area_is_complete(df: pl.DataFrame) -> bool:
     return max(nonzero) >= hidden.height - 1
 
 
+# Windows caption-button red — same close affordance on prediction, ending, final.
+WINDOWS_CLOSE_RED: str = "#E81123"
+FINISH_EXIT_BUTTON_CLASS: str = "ui button finish-study-exit"
+
+
+def finish_confirm_message(
+    *,
+    rounds_played: int,
+    max_rounds: int,
+    min_useful: int,
+    locale: str,
+) -> str:
+    """Copy for the exit confirmation, with a stronger warning below the study floor."""
+    message_key = (
+        "ui.submit.finish_confirm_early"
+        if rounds_played < min_useful
+        else "ui.submit.finish_confirm"
+    )
+    return t(
+        message_key,
+        locale=locale,
+        current=min(max(rounds_played, 0), max_rounds),
+        total=max_rounds,
+        min=min_useful,
+    )
+
+
+def finish_confirm_overlay(locale: str, *, source: str) -> html.Div:
+    """Page-local confirm card with source-specific ids.
+
+    It must be a child of the page root, not the clipped prediction action bar.
+    """
+    suffix = source.strip().lower()
+    return html.Div(
+        html.Div(
+            [
+                html.Div(
+                    t("ui.submit.finish_confirm_title", locale=locale),
+                    id=f"finish-confirm-title-{suffix}",
+                    className="finish-confirm-title",
+                    disable_n_clicks=True,
+                ),
+                html.Div(
+                    "",
+                    id=f"finish-confirm-message-{suffix}",
+                    className="finish-confirm-message",
+                    disable_n_clicks=True,
+                ),
+                html.Div(
+                    [
+                        html.Button(
+                            t("ui.submit.finish_anyway", locale=locale),
+                            id=f"finish-confirm-button-{suffix}",
+                            className="ui basic button",
+                        ),
+                        html.Button(
+                            t("ui.submit.keep_playing", locale=locale),
+                            id=f"finish-keep-playing-button-{suffix}",
+                            className="ui green button",
+                        ),
+                    ],
+                    className="finish-confirm-actions",
+                    disable_n_clicks=True,
+                ),
+            ],
+            className="finish-confirm-card",
+            disable_n_clicks=True,
+        ),
+        id=f"finish-confirm-overlay-{suffix}",
+        className="finish-confirm-overlay",
+        style={"display": "none"},
+        disable_n_clicks=True,
+    )
+
+
+def finish_exit_button_style() -> dict[str, Any]:
+    """Compact red close control; CSS paints the × on top of the hidden label."""
+    return {
+        "backgroundColor": WINDOWS_CLOSE_RED,
+        "color": "white",
+        "padding": "0",
+        "border": "none",
+        "borderRadius": "8px",
+        "cursor": "pointer",
+        "width": "48px",
+        "minWidth": "48px",
+        "height": "48px",
+        "display": "inline-flex",
+        "alignItems": "center",
+        "justifyContent": "center",
+        "lineHeight": "1",
+        "margin": "0",
+        "flexShrink": "0",
+        "fontSize": "18px",
+        "fontWeight": "700",
+    }
+
+
 # `SubmitComponent()` is also constructed per prediction-page render
 # (create_prediction_layout), so the one-shot ranking migration is gated to run
 # once per process rather than on every render -- it reads five CSVs.
@@ -155,23 +253,11 @@ class SubmitComponent(html.Div):
             html.Div(
                 [
                     html.Button(
-                        t("ui.common.finish_exit", locale=self._locale),
+                        t("ui.submit.finish_game", locale=self._locale),
                         id="finish-study-button",
-                        className="ui primary button finish-study-exit",
-                        title=t("ui.common.finish_exit", locale=self._locale),
-                        style={
-                            'width': '48px',
-                            'minWidth': '48px',
-                            'fontSize': '18px',
-                            'padding': '0',
-                            'textAlign': 'center',
-                            'display': 'inline-flex',
-                            'alignItems': 'center',
-                            'justifyContent': 'center',
-                            'lineHeight': '1',
-                            'height': '48px',
-                            'flexShrink': '0',
-                        }
+                        className=FINISH_EXIT_BUTTON_CLASS,
+                        title=t("ui.submit.finish_game", locale=self._locale),
+                        style=finish_exit_button_style(),
                     ),
                     html.Button(
                         t("ui.submit.submit", locale=self._locale),
@@ -609,8 +695,48 @@ class SubmitComponent(html.Div):
             glucose_df, _ = load_glucose_data(path)
             return _time_list(glucose_df.slice(max(0, window_start), window_size))
 
+        def _round_context_entry(
+            *,
+            round_info: dict[str, Any],
+            round_number: int,
+            times: list[str],
+            fallback_source: str,
+            fallback_is_example: bool,
+        ) -> dict[str, Any]:
+            """Metadata needed to trace one result back to its source window."""
+            table_data = round_info.get('prediction_table_data') or []
+            prediction_row = table_data[1] if len(table_data) >= 2 else {}
+            prediction_start_time = ""
+            for index, time_value in enumerate(times):
+                predicted = prediction_row.get(f"t{index}", "-")
+                if predicted not in ("-", "", None):
+                    prediction_start_time = str(time_value)
+                    break
+
+            if "is_example_data" in round_info:
+                is_example = bool(round_info.get("is_example_data"))
+            else:
+                is_example = fallback_is_example
+            return {
+                "round_number": round_number,
+                "format": str(round_info.get("format") or version),
+                "data_source_name": _round_source_name(round_info, fallback_source),
+                "is_example_data": is_example,
+                "generic_slice_key": str(round_info.get("generic_slice_key") or ""),
+                "prediction_window_start_index": int(
+                    round_info.get("prediction_window_start") or 0
+                ),
+                "prediction_window_size": int(
+                    round_info.get("prediction_window_size") or len(times)
+                ),
+                "window_start_time": str(times[0]) if times else "",
+                "prediction_start_time": prediction_start_time,
+                "window_end_time": str(times[-1]) if times else "",
+            }
+
         # Per-round + overall metrics (computed in mg/dL, regardless of UI unit)
         per_round_metrics: list[dict[str, Any]] = []
+        round_context: list[dict[str, Any]] = []
         if rounds:
             for round_info in rounds:
                 table_data = round_info.get('prediction_table_data') or []
@@ -623,6 +749,15 @@ class SubmitComponent(html.Div):
                     fallback_source=str(user_info.get('data_source_name', '')),
                     fallback_is_example=bool(user_info.get('is_example_data', True)),
                 ))
+                window_size = int(round_info.get('prediction_window_size') or 0)
+                times = _resolve_round_times(round_info, window_size) if window_size > 0 else []
+                round_context.append(_round_context_entry(
+                    round_info=round_info,
+                    round_number=round_number,
+                    times=times,
+                    fallback_source=str(user_info.get('data_source_name', '')),
+                    fallback_is_example=bool(user_info.get('is_example_data', True)),
+                ))
         elif user_info.get('prediction_table_data'):
             table_data = user_info.get('prediction_table_data', []) or []
             m = _metrics_from_table(table_data)
@@ -630,6 +765,15 @@ class SubmitComponent(html.Div):
                 round_number=1,
                 metrics=m,
                 round_info=user_info,
+                fallback_source=str(user_info.get('data_source_name', '')),
+                fallback_is_example=bool(user_info.get('is_example_data', True)),
+            ))
+            window_size = int(user_info.get('prediction_window_size') or 0)
+            times = _resolve_round_times(user_info, window_size) if window_size > 0 else []
+            round_context.append(_round_context_entry(
+                round_info=user_info,
+                round_number=1,
+                times=times,
                 fallback_source=str(user_info.get('data_source_name', '')),
                 fallback_is_example=bool(user_info.get('is_example_data', True)),
             ))
@@ -716,6 +860,8 @@ class SubmitComponent(html.Div):
             'generic_intervention': user_info.get('generic_intervention', ''),
             'challenge_unknown': bool(user_info.get('challenge_unknown', False)),
             'challenge_unknown_pct': user_info.get('challenge_unknown_pct', ''),
+            'paper_mention': bool(user_info.get('paper_mention', False)),
+            'paper_full_name': str(user_info.get('paper_full_name') or ''),
             'location': user_info.get('location', ''),
             'rounds_played': rounds_played,
             # Clear naming: "real" == ground truth, "predicted" == user prediction
@@ -728,6 +874,7 @@ class SubmitComponent(html.Div):
             'overall_rmse_mgdl': overall['rmse'],
             'overall_mape_pct': overall['mape'],
             'per_round_metrics': str(per_round_metrics),
+            'round_context': str(round_context),
         }
         
         def _upgrade_and_upsert_csv(
@@ -817,24 +964,31 @@ class SubmitComponent(html.Div):
             actual_values_run: list[dict[str, Any]] = []
             prediction_times_run: list[dict[str, Any]] = []
             per_round: list[dict[str, Any]] = []
+            contexts: list[dict[str, Any]] = []
             for round_idx, round_info in enumerate(run_rounds, start=1):
                 table_data = round_info.get('prediction_table_data') or []
                 m = _metrics_from_table(table_data)
+                round_number = int(round_info.get('round_number') or round_idx)
                 per_round.append(_per_round_metric_entry(
-                    round_number=int(round_info.get('round_number') or round_idx),
+                    round_number=round_number,
                     metrics=m,
                     round_info=round_info,
                     fallback_source=source_name,
                     fallback_is_example=is_example,
                 ))
-                if len(table_data) < 2:
-                    continue
                 window_size = int(round_info.get('prediction_window_size') or 0)
-                if window_size <= 0:
+                times = _resolve_round_times(round_info, window_size) if window_size > 0 else []
+                contexts.append(_round_context_entry(
+                    round_info=round_info,
+                    round_number=round_number,
+                    times=times,
+                    fallback_source=source_name,
+                    fallback_is_example=is_example,
+                ))
+                if len(table_data) < 2 or window_size <= 0:
                     continue
                 actual_row = table_data[0]
                 prediction_row = table_data[1]
-                times = _resolve_round_times(round_info, window_size)
                 for i in range(window_size):
                     time_key = f"t{i}"
                     pred_str = prediction_row.get(time_key, "-")
@@ -867,6 +1021,8 @@ class SubmitComponent(html.Div):
                 'generic_intervention': user_info.get('generic_intervention', ''),
                 'challenge_unknown': bool(user_info.get('challenge_unknown', False)),
                 'challenge_unknown_pct': user_info.get('challenge_unknown_pct', ''),
+                'paper_mention': bool(user_info.get('paper_mention', False)),
+                'paper_full_name': str(user_info.get('paper_full_name') or ''),
                 'location': user_info.get('location', ''),
                 'rounds_played': rounds_n,
                 'predicted_values': str(parameters_run),
@@ -877,6 +1033,7 @@ class SubmitComponent(html.Div):
                 'overall_rmse_mgdl': overall_m['rmse'],
                 'overall_mape_pct': overall_m['mape'],
                 'per_round_metrics': str(per_round),
+                'round_context': str(contexts),
             }
             return row, overall_m, rounds_n
 

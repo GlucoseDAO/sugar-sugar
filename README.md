@@ -4,9 +4,9 @@ A game to test your glucose-predicting superpowers! 🎯
 
 > 🎵 The name "sugar-sugar" was inspired by a scientific remake of The Archies' classic hit song ["Sugar, Sugar"](https://www.youtube.com/watch?v=jJvAL-iiLnQ) from 1969!
 
-## What is Sugar Sugar?
+## What is Sugar-Sugar?
 
-Sugar Sugar is a web-based research app built with [Plotly Dash](https://dash.plotly.com/). It turns glucose forecasting into an interactive game: you see part of a CGM trace, draw how you think it will continue, then compare your prediction with the real values. Your accuracy is measured with standard forecasting metrics (MAE, RMSE, MAPE).
+Sugar-Sugar is a web-based research app built with [Plotly Dash](https://dash.plotly.com/). It turns glucose forecasting into an interactive game: you see part of a CGM trace, draw how you think it will continue, then compare your prediction with the real values. Your accuracy is measured with standard forecasting metrics (MAE, RMSE, MAPE).
 
 ## Why this study matters
 
@@ -26,11 +26,11 @@ For a deep dive into state-of-the-art ML approaches to glucose prediction, see [
 
 ## Ethics approval and study credibility
 
-Sugar Sugar is part of a real research effort. The study received clearance from the Ethics Committee of University Medicine Rostock (Ethikkommission der Universitätsmedizin Rostock), Germany. It is an open-source, community-driven project run by [GlucoseDAO](https://github.com/GlucoseDAO).
+Sugar-Sugar is part of a real research effort. The study received clearance from the Ethics Committee of University Medicine Rostock (Ethikkommission der Universitätsmedizin Rostock), Germany. It is an open-source, community-driven project run by [GlucoseDAO](https://github.com/GlucoseDAO).
 
 ## How the gameplay works
 
-1. **Load your data** — Upload a Dexcom, Libre, Medtronic, or Nightscout file, or use the built-in generic sample dataset.
+1. **Load your data** — Upload a Dexcom, Libre, Medtronic, or Nightscout file, or play on public anonymized CGM traces from other people.
 2. **Make predictions** — Click and drag on the glucose chart to draw your forecast for the hidden hour ahead.
 3. **Compare results** — Your predictions are compared against the actual glucose values.
 4. **See your accuracy** — Get MAE, RMSE, and MAPE metrics showing how close you were.
@@ -125,14 +125,15 @@ uv run migrate-cgm-duration
 
 Bare numbers become `N,years`. Cells that are already `6,months` (or similar) are left as-is.
 
-### Generic datasets
+### Public datasets
 
-The [BIG IDEAs](https://physionet.org/content/big-ideas-glycemic-wearable/1.1.3/) and [D1NAMO](https://zenodo.org/records/5651217) datasets are not in git. Download local copies with:
+The [BIG IDEAs](https://physionet.org/content/big-ideas-glycemic-wearable/1.1.3/) and [D1NAMO](https://zenodo.org/records/5651217) datasets are not in git. They are optional for `uv run start` — Format A falls back to `data/example.csv` when they are missing — but needed for the real study mix:
 
 ```bash
-uv run download-bigideas
-uv run download-d1namo
+uv run download
 ```
+
+That fetches both. Already-present copies are skipped; `--force` re-downloads. The per-dataset commands remain (`uv run download-bigideas`, `uv run download-d1namo`). CGMacros is unused in Format A — pass `--all` or run `uv run download-cgmacros` if you need it.
 
 `download-bigideas` pulls only Dexcom + food-log CSVs (the full PhysioNet zip is 4.7 GB of Empatica streams and is not used).
 
@@ -147,16 +148,18 @@ Format A source policy (stored as `generic_intervention`):
 | Prediabetes | 75% BIG IDEAs / 25% D1NAMO each round |
 | LADA | 75% D1NAMO / 25% BIG IDEAs each round |
 
-**Challenge the unknown** appears on `/startup` after the player answers **no diabetes** or **type 1**, for any format except B (own data). Tick the checkbox to opt in; the slider is the share of the *other* pool, in 10% steps from 10% to 100%. The default table above stays unless the box is ticked.
+**Challenge the unknown** appears on `/startup` for every diabetes answer, on any format except B (own data). Tick the checkbox to opt in: half the traces then come from the opposite group (diabetic data if you do not have diabetes, non-diabetic data if you do). The default table above stays unless the box is ticked.
 
-| Player | Slider at 10% | Slider at 100% |
+| Player | Challenge off | Challenge on |
 |---|---|---|
-| No diabetes | 90% BIG IDEAs / 10% D1NAMO | 100% D1NAMO |
-| Type 1 | 90% D1NAMO / 10% BIG IDEAs | 100% BIG IDEAs |
+| No diabetes | 100% BIG IDEAs | 50% BIG IDEAs / 50% D1NAMO |
+| Any diabetes type | type default above | 50% D1NAMO / 50% BIG IDEAs |
 
-Type 2, prediabetes, and LADA already mix both corpora, so the control is hidden. Gestational stays on BIG IDEAs only. Format B (own data) never uses this.
+Format B (own data) never uses this.
 
-The chosen mix is stored as `generic_intervention` like `mix:bigideas=0.90,d1namo=0.10`, plus `challenge_unknown` / `challenge_unknown_pct` on the statistics row.
+The mix is stored as `generic_intervention` like `mix:bigideas=0.50,d1namo=0.50`, plus `challenge_unknown` / `challenge_unknown_pct` (always `50` when on) on the statistics row.
+
+An optional startup checkbox lets a player ask to be named in a later scientific paper. Tick it and enter a full name to be stored on the study/consent records; the acknowledgments list only includes people who played 12 or more rounds.
 
 BIG IDEAs meals have no photographs: the apple icon opens a notepad with the food-log description (translated for the active language). D1NAMO meals still open the photo lightbox. Backdrop click closes either overlay.
 
@@ -329,13 +332,13 @@ pitfalls.
 Preview the share page with synthetic prediction data — no need to play a full game:
 
 ```bash
-uv run share                            # single-format (Generic), 12 rounds
-uv run share --formats "A,B,C"          # multi-format: Generic + My Data + Mixed
+uv run share                            # single-format (Public), 12 rounds
+uv run share --formats "A,B,C"          # multi-format: Public + My Data + Mixed
 uv run share --formats "A,B" --rounds 8 # custom round count
 uv run share --locale de                # test in German
 ```
 
-Formats: **A** = Generic, **B** = My Data, **C** = Mixed. Rounds cycle through formats evenly (e.g. 12 rounds with A,B,C → 4 rounds each). The command generates a share record, saves it to disk, and opens the browser at `/share/<id>`. Useful for testing the share card PNG, OG tags, social buttons, and per-format colour palettes.
+Formats: **A** = Public (anonymized traces from other people), **B** = My Data, **C** = Mixed. Rounds cycle through formats evenly (e.g. 12 rounds with A,B,C → 4 rounds each). The command generates a share record, saves it to disk, and opens the browser at `/share/<id>`. Useful for testing the share card PNG, OG tags, social buttons, and per-format colour palettes.
 
 To render the social-card PNGs for manual inspection across every supported
 translation, use the deterministic preview script:

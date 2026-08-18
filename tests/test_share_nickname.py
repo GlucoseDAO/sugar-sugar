@@ -31,21 +31,21 @@ def _walk(node: Any) -> list[Any]:
 
 def test_anonymous_title_says_my() -> None:
     setup_i18n()
-    assert _share_results_title("", locale="en") == "My Sugar Sugar results"
+    assert _share_results_title("", locale="en") == "My Sugar-Sugar results"
     assert "Ninja" not in _share_results_title("", locale="en")
 
 
 def test_named_title_uses_the_nickname_in_every_locale() -> None:
     setup_i18n()
     expected: dict[str, str] = {
-        "en": "Ninja's Sugar Sugar results",
+        "en": "Ninja's Sugar-Sugar results",
         "de": "Sugar-Sugar-Ergebnisse von Ninja",
-        "fr": "Résultats Sugar Sugar de Ninja",
-        "es": "Resultados Sugar Sugar de Ninja",
-        "ro": "Rezultatele Sugar Sugar ale lui Ninja",
-        "ru": "Результаты Ninja в Sugar Sugar",
-        "uk": "Результати Ninja у Sugar Sugar",
-        "zh": "Ninja 的 Sugar Sugar 成绩",
+        "fr": "Résultats Sugar-Sugar de Ninja",
+        "es": "Resultados Sugar-Sugar de Ninja",
+        "ro": "Rezultatele Sugar-Sugar ale lui Ninja",
+        "ru": "Результаты Ninja в Sugar-Sugar",
+        "uk": "Результати Ninja у Sugar-Sugar",
+        "zh": "Ninja 的 Sugar-Sugar 成绩",
     }
     for locale, title in expected.items():
         assert _share_results_title("Ninja", locale=locale) == title
@@ -74,8 +74,8 @@ def test_share_page_stamps_the_nickname() -> None:
     assert stamp is not None
     assert stamp.children == "SugarNinja"
     texts = [n.children for n in nodes if isinstance(getattr(n, "children", None), str)]
-    assert "SugarNinja's Sugar Sugar results" in texts
-    assert "My Sugar Sugar results" not in texts
+    assert "SugarNinja's Sugar-Sugar results" in texts
+    assert "My Sugar-Sugar results" not in texts
 
 
 def test_anonymous_share_page_has_no_stamp() -> None:
@@ -89,7 +89,7 @@ def test_anonymous_share_page_has_no_stamp() -> None:
     nodes = _walk(layout)
     assert not any(getattr(n, "className", None) == "share-name-stamp" for n in nodes)
     texts = [n.children for n in nodes if isinstance(getattr(n, "children", None), str)]
-    assert "My Sugar Sugar results" in texts
+    assert "My Sugar-Sugar results" in texts
 
 
 def test_share_card_png_figure_stamps_the_nickname() -> None:
@@ -112,7 +112,7 @@ def test_share_card_png_figure_stamps_the_nickname() -> None:
     assert abs(float(stamp.textangle)) <= 12
     titles = _plain(" ".join(str(a.text or "") for a in annotations))
     assert "SugarNinja" in titles
-    assert "My Sugar Sugar results" not in titles
+    assert "My Sugar-Sugar results" not in titles
 
 
 def test_share_page_stamps_challenge_the_unknown() -> None:
@@ -181,4 +181,4 @@ def test_anonymous_share_card_has_no_rotated_stamp() -> None:
     annotations = list(fig.layout.annotations or [])
     assert not any(abs(float(a.textangle or 0)) > 1 for a in annotations)
     titles = _plain(" ".join(str(a.text or "") for a in annotations))
-    assert "My Sugar Sugar results" in titles
+    assert "My Sugar-Sugar results" in titles

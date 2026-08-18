@@ -222,7 +222,10 @@ def test_close_meal_photos_cluster_into_one_composite_bubble() -> None:
     assert bubbles[0].id["index"].startswith("composite:")
     assert "photos/one.jpg" in bubbles[0].id["index"]
     assert "photos/two.jpg" in bubbles[0].id["index"]
-    assert bubbles[0].to_plotly_json()["props"].get("data-count") == "2"
+    bubble_props = bubbles[0].to_plotly_json()["props"]
+    assert bubble_props.get("data-count") == "2"
+    assert bubble_props["aria-label"] == "Carbohydrates"
+    assert bubble_props["children"][1].children == "FOOD"
 
 
 def test_lightbox_uses_fixed_composite_tiles() -> None:
