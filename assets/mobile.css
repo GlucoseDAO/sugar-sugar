@@ -942,6 +942,23 @@ html.mobile-device .final-nickname-save {
   width: 100%;
   min-height: 44px;
 }
+html.mobile-device .final-nickname-share {
+  width: 100%;
+  min-height: 44px;
+}
+html.mobile-device .final-finish-card {
+  max-width: 100%;
+}
+
+/* Auto-advance countdown on /ending: stack so the tap target keeps its own row. */
+html.mobile-device .ending-auto-next-row {
+  flex-wrap: wrap;
+  gap: 8px !important;
+}
+html.mobile-device .ending-auto-next-pause {
+  min-height: 36px;
+  padding: 4px 10px;
+}
 
 /* Number fields (age, CGM/diabetes duration): Dash renders its own
    `.dash-input-stepper` -/+ buttons inside the input wrapper.  Once the input

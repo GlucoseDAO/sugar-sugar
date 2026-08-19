@@ -44,6 +44,13 @@ STORAGE_TYPE: str = os.getenv("STORAGE_TYPE", "local")
 MAX_ROUNDS: int = int(os.getenv("MAX_ROUNDS", "12"))
 MIN_USEFUL_ROUNDS: int = int(os.getenv("MIN_USEFUL_ROUNDS", str(max(1, MAX_ROUNDS // 2))))
 
+# Gamified pacing: how long the between-rounds results page (`/ending`) stays up
+# before it starts the next round on its own. The "Next round" button remains, so
+# this only removes a click -- it never removes the choice. 0 disables the timer
+# entirely (every round then waits for a click, the pre-gamification behaviour).
+# Never fires on the last round: that one ends in Finish -> /final instead.
+ENDING_AUTO_ADVANCE_SECONDS: int = int(os.getenv("ENDING_AUTO_ADVANCE_SECONDS", "5"))
+
 # Umami analytics. Defaults use the same-domain Caddy proxy so common
 # cross-domain analytics blocklists do not match the tracker URL.
 UMAMI_SCRIPT_URL: str = os.getenv("UMAMI_SCRIPT_URL", "https://sugar-sugar.study/stats/script.js").strip()
@@ -88,5 +95,7 @@ DASH_DEBUG: bool = _env_bool("DASH_DEBUG", DEBUG_MODE)
 # 23: meal-food-lightbox close also clears the image src (same 4 Outputs as open).
 # 24: clustered meal bubbles open a composite gallery (extra gallery children Output).
 # 25: composite gallery uses fixed img slots (clientside cannot create Img children).
-DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "25"))
+# 26: gamified pacing -- /ending auto-advance interval (extra Input on
+#     handle_next_round_button) and the /final name card's Save & Share callback.
+DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "26"))
 

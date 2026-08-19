@@ -276,10 +276,66 @@ Architecture in one paragraph: the static viewport meta is **`width=device-width
 - **localStorage is device-local; cross-device resume goes through the resume code.** Session stores are all `STORAGE_TYPE=local` (per-device). The bridge is `resume_store.py` (`data/resume/<code>.json`): a server-side snapshot keyed by `user_info['resume_code']`, auto-saved at meaningful boundaries by `auto_snapshot_session` (triggers on user_info/navigation/unit/language — **not** every drawline; dataframes come via `State`). Redeem on another device via `?resume=<code>` (universal), the landing-page resume box, or the code shown on the resume dialog. The code is assigned at consent (`handle_landing_continue` / `handle_start_button`). **If you add a new game-state store, add it to `_resume_payload` / `_restore_outputs_from_code`** or it won't transfer. Resume codes are session-transfer tokens — treat like a login link, not a public id.
 - **Screenshot `/ending`, `/final`, `/share` via the staging nodes, not click-through.** The harness `result` group runs `uv run start` with `_STAGING_MODE=1` and hits `/staging/ending`, `/staging/final`, `/staging/share` (→ a synthetic `/share/<id>`). These render the real builders with synthetic data — deterministic, no drawing/submit automation. The synthetic rounds don't populate the per-round metrics table on `/final` (or "Prediction Results" on `/ending`); those boxes read empty in the shots — a data quirk, not a layout bug.
 
+## Gamified round pacing: one click per round, Finish -> name -> share
+
+Two deliberate shortcuts through the round loop. Both keep every old affordance --
+they remove clicks, not choices.
+
+**1. `/ending` starts the next round by itself** after
+`config.ENDING_AUTO_ADVANCE_SECONDS` (default 5, `0` disables the whole feature and
+restores the click-per-round behaviour). The green "Next round" button is untouched
+and still advances instantly; a quiet "Stay on results" link (`ending-auto-next-pause`)
+cancels the timer for a player who wants to open the metrics folds. There is no
+resume -- a countdown the player just cancelled must not creep back.
+
+- **Armed by Submit only.** `handle_submit_button` sets `user_info['auto_advance_pending']`;
+  `handle_finish_study_from_prediction` (Exit) clears it, and `handle_next_round_button`
+  consumes it. So arriving at `/ending` by Finish/Exit — or re-rendering it on a language
+  switch or cold-load restore — never pulls the player into another round.
+- **Two intervals, on purpose.** `ending-auto-next-tick` (1 s, repaints the caption) and
+  `ending-auto-next-timer` (single shot, `max_intervals=1`, actually advances). The
+  advance callback carries `user-info-store` — every round's `prediction_table_data` —
+  up with each firing, so it must fire **once** per round-end, not once a second. See the
+  store-size note below: a client store is re-uploaded on every callback that declares it.
+  The ticker's callback reads nothing but the locale.
+- **Both intervals stay mounted even when dormant** (only `disabled` toggles). A Dash
+  callback fires only while *every* component it references is in the layout, and
+  `handle_next_round_button` takes the advance interval as an `Input` — dropping the
+  component would silence the **button** too.
+- `handle_next_round_button` decides from its arguments (`n_intervals >= 1`), not from
+  `ctx.triggered_id`, so the same function is callable straight from a test.
+
+**2. The last round ends at Finish, on `/final`.** `SubmitComponent.is_last_round`
+relabels the Submit button to "Finish" (amber) on the final round, and
+`handle_submit_button` then stores the round and routes to **`/final`** instead of
+`/ending` — there is no next round, so the between-rounds page would only add a click.
+`/ending` is still reachable at the last round via Exit and still shows "Results".
+
+- `update_submit_button_state` takes `user-info-store` as **State** for that relabel.
+  Safe: the store is in the base layout, and `current-window-df` (an `Input`) changes on
+  every round, so the label is recomputed whenever the round number can have moved.
+- **`/final`'s first card is the name-entry step** (`final-finish-card`, built by
+  `_nickname_editor_children`): the field plus `final-nickname-save` (stores, stays) and
+  `final-nickname-share` ("Save & Share" -> stores, then straight to `/share/<id>`).
+  It is mounted whenever `/final` has rounds — including for a player who already named
+  themselves at startup (pre-filled, editable) and for a run too short to be ranked (the
+  name still reaches the share card and their next run). The old gating on board presence
+  is gone.
+- The editor is **no longer inside `_final_leaderboard_children`**, so `save_final_nickname`
+  re-rendering the board cannot unmount the field the player is typing into, and the
+  `final-nickname-*` ids cannot be duplicated. With **no rounds at all** the card renders
+  empty and hidden, and those ids are legitimately absent — their callbacks just never fire.
+- `_persist_nickname` and `_share_id_for_session` are the shared halves, so Save,
+  Save & Share and the `share-results-button` cannot drift apart. Save & Share builds the
+  record from the **updated** session, so the card carries the name just typed.
+
+Locked down by `tests/test_gamified_flow.py`.
+
 ## Session persistence & navigation contract
 
 These are the expected behaviours that every change must preserve. Treat regressions here as bugs.
 
+0. **Round loop.** `/prediction` → Submit → `/ending` → (click or 5 s countdown) → `/prediction` …, and on the **last** round Submit reads "Finish" and goes straight to `/final`. See [Gamified round pacing](#gamified-round-pacing-one-click-per-round-finish---name---share) above; `/ending` remains reachable at the last round via Exit.
 1. **First visit → consent form.** A new user lands on `/` (landing page with embedded consent form). She fills it in, proceeds to `/startup` → `/prediction`. No resume dialog, no redirect.
 2. **Cross-session resume (localStorage).** The game can span many rounds. All session state (`user-info-store`, `full-df`, `last-visited-page`, etc.) lives in localStorage. If the user closes the browser and reopens hours later, `restore_page_on_load` detects the persisted state, and because `session-active` (sessionStorage) is gone the **resume dialog** appears asking "Continue" or "Start Over".
 3. **In-session tab switching (no dialog).** While mid-game the user can click "The Study", "FAQ", "Contact us", etc. and then click "Game" to return. Navbar links use `dcc.Link` (client-side routing, no page reload), so all stores stay populated. `redirect_landing_to_game` silently redirects `/` → the last game page. **No resume dialog must appear in this flow.**
@@ -344,7 +400,7 @@ These are the expected behaviours that every change must preserve. Treat regress
 - `_STATEFUL_PAGES` (`/prediction`, `/ending`) skip full `page-content` re-renders on language change to preserve interactive/chart state. Each stateful page needs its own `update_*_text_on_language_change` callback that targets individual element IDs. `/final` is **not** stateful — it re-renders fully via `update_on_language_change`.
 - When adding a new stateful page or translatable text to an existing one, every translatable element needs a stable `id` and a corresponding `Output` in the page's language-change callback. Otherwise the text stays in the old language.
 - Large static markdown documents (study design, consent-style content) should keep using the server-rendered `static_markdown.py` iframe path; `dcc.Markdown` can misrender or fail on the 100KB+ study document because it loads asynchronously via `react-markdown`.
-- The prediction area is 12 points (1 hour at 5-min intervals); the game requires predictions drawn to the end of the hidden area before submit. `MAX_ROUNDS` is configurable via `.env` (defaults to 12).
+- The prediction area is 12 points (1 hour at 5-min intervals); the game requires predictions drawn to the end of the hidden area before submit. `MAX_ROUNDS` is configurable via `.env` (defaults to 12), as is `ENDING_AUTO_ADVANCE_SECONDS` (defaults to 5; `0` turns the `/ending` auto-advance off).
 - CGM file uploads are parsed in `sugar_sugar/data.py` via `cgm-format` (`FormatParser.parse_file` + `FormatProcessor.split_glucose_events`) and then adapted to the app's existing glucose/events store schemas.
 - Plotly charts on `/prediction` (`GlucoseChart` in `sugar_sugar/components/glucose.py`) and `/ending` (`ending-static-graph` in `app.py`) use `config={'displayModeBar': False, ...}` — the Plotly toolbar (camera/zoom/pan icons) is hidden on purpose. The chart's outer div and inner `dcc.Graph` both set `style={'touchAction': 'none'}` so browser pinch/pan gestures don't fight Plotly's `drawline` handler on mobile.
 - The clientside persist callback never writes `/` to `last-visited-page` — only `/startup`, `/prediction`, `/ending`, `/final`. Writing `/` would clobber a deeper stored page and break the resume dialog. Exit from `/prediction` always goes to `/ending` (never directly `/final`); exit from `/ending` with no completed rounds goes to `/` (landing), otherwise to `/final`.

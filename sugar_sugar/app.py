@@ -68,6 +68,7 @@ from sugar_sugar.config import (
     DEBUG_MODE,
     DEPLOY_URL,
     DEPLOY_BUILD,
+    ENDING_AUTO_ADVANCE_SECONDS,
     MAX_ROUNDS,
     MIN_USEFUL_ROUNDS,
     SHARE_FORMATS,
@@ -1740,6 +1741,9 @@ def _staging_ending_args() -> tuple[dict, dict, dict[str, Any]]:
         "prediction_window_start": start,
         "prediction_window_size": len(window_df),
         "prediction_table_data": _staging_ptd_from_window(window_df),
+        # Arm the auto-advance so /staging/ending shows the countdown row the way a
+        # real post-Submit page does (round 1 of MAX_ROUNDS, so never the last).
+        "auto_advance_pending": True,
     })
     return (
         dataframe_to_store_dict(window_df),
@@ -2976,6 +2980,7 @@ def update_prediction_text_on_language_change(
      Output('ending-local-storage-note', 'children'),
      Output('finish-study-button-ending', 'children'),
      Output('next-round-button', 'children'),
+     Output('ending-auto-next-pause', 'children'),
      Output('ending-switch-format-title', 'children'),
      Output('switch-format-c', 'children'),
      Output('switch-format-a', 'children'),
@@ -3073,6 +3078,10 @@ def update_ending_text_on_language_change(
         t("ui.ending.local_storage_note", locale=locale),
         finish_button_text,
         t("ui.ending.next_round", locale=locale),
+        # The countdown caption itself is not routed through here: two callbacks on
+        # one Output would need allow_duplicate, and `tick_auto_advance_countdown`
+        # repaints it in the new language within a second anyway.
+        t("ui.ending.auto_next_stay", locale=locale),
         t("ui.switch_format.title", locale=locale),
         t("ui.switch_format.try_c_short", locale=locale),
         t("ui.switch_format.try_a_short", locale=locale),
@@ -4667,6 +4676,23 @@ def create_ending_layout(
         'fontSize': '20px' if is_last_round else '18px',
         'fontWeight': '700',
     }
+
+    # Gamified pacing: the results page starts the next round by itself after
+    # ENDING_AUTO_ADVANCE_SECONDS, so an ordinary round costs one click (Submit)
+    # instead of two. The "Next round" button stays exactly where it was -- this
+    # removes a click, never the choice -- and "Stay on results" stops the timer
+    # for a player who wants to open the metrics folds.
+    #
+    # `auto_advance_pending` is written by `handle_submit_button` and cleared by
+    # the Exit path (`handle_finish_study_from_prediction`), so landing here via
+    # Finish/Exit never whisks the player into another round. It is never set on
+    # the last round: that one ends at Finish -> /final.
+    auto_seconds: int = max(0, int(ENDING_AUTO_ADVANCE_SECONDS))
+    auto_advance: bool = bool(
+        auto_seconds > 0
+        and not is_last_round
+        and (user_info or {}).get('auto_advance_pending')
+    )
     return html.Div([
         html.H1(
             t("ui.ending.title", locale=locale),
@@ -4811,6 +4837,58 @@ def create_ending_layout(
                 'padding': '0 10px',
                 'flexShrink': '0',
             },
+        ),
+        html.Div(
+            [
+                html.Span(
+                    t("ui.ending.auto_next_in", locale=locale, seconds=auto_seconds),
+                    id='ending-auto-next-note',
+                    className='ending-auto-next-note',
+                ),
+                html.Button(
+                    t("ui.ending.auto_next_stay", locale=locale),
+                    id='ending-auto-next-pause',
+                    type='button',
+                    className='ending-auto-next-pause',
+                ),
+            ],
+            id='ending-auto-next-row',
+            className='ending-auto-next-row',
+            disable_n_clicks=True,
+            style={
+                'display': 'flex' if auto_advance else 'none',
+                'flexDirection': 'row',
+                'justifyContent': 'center',
+                'alignItems': 'center',
+                'gap': '12px',
+                'marginTop': '6px',
+                'flexShrink': '0',
+            },
+        ),
+        # Both intervals are mounted on every /ending render and only `disabled`
+        # toggles: a Dash callback fires solely while *every* component it
+        # references is in the layout, and `handle_next_round_button` takes the
+        # second one as an Input -- dropping it when auto-advance is off would
+        # silence the Next round *button* too.
+        #
+        # They are split on purpose. The 1 s ticker only repaints the caption, and
+        # its callback reads nothing but the locale. The advance is a single shot at
+        # the end, because *that* callback carries `user-info-store` (every round's
+        # table data) up with each firing -- see the store-size note in CLAUDE.md.
+        # One upload per round-end instead of one per second.
+        dcc.Interval(
+            id='ending-auto-next-tick',
+            interval=1000,
+            n_intervals=0,
+            max_intervals=auto_seconds if auto_advance else 0,
+            disabled=not auto_advance,
+        ),
+        dcc.Interval(
+            id='ending-auto-next-timer',
+            interval=max(1, auto_seconds) * 1000,
+            n_intervals=0,
+            max_intervals=1 if auto_advance else 0,
+            disabled=not auto_advance,
         ),
         html.Div(id="switch-format-error", disable_n_clicks=True, style={'margin': '0'}),
         dcc.Checklist(
@@ -5163,9 +5241,16 @@ def _nickname_editor_children(
 ) -> list[Any]:
     """The "your name on the leaderboard" box shown on ``/final``.
 
-    Only mounted when the player has board presence *and* did not already type
-    a nickname at startup.  Deliberately absent from the public ``/highscore``
-    page, which is session-free.
+    This is the **arcade name-entry step** the Finish button lands on, so it is
+    mounted whenever ``/final`` has rounds to name -- including for a player who
+    already typed a nickname at startup (the field is then pre-filled and they can
+    change it) and for a run too short to be ranked (the name still rides along to
+    the share card, and to the board if they play on).  It stays deliberately
+    absent from the public ``/highscore`` page, which is session-free.
+
+    Two buttons sit next to the field: ``final-nickname-save`` stores the name and
+    stays on the page, ``final-nickname-share`` stores it and continues to the
+    share page in one click.
     Its ids are ``final-nickname-*`` rather than the ``/startup`` ``nickname-input``:
     a Dash callback only fires when *every* one of its components is in the layout,
     so reusing the id would drag the startup validation callback onto ``/final`` and
@@ -5201,7 +5286,14 @@ def _nickname_editor_children(
                 html.Button(
                     t("ui.final.nickname_save", locale=locale),
                     id='final-nickname-save',
-                    className="ui small green button final-nickname-save",
+                    n_clicks=0,
+                    className="ui small basic button final-nickname-save",
+                ),
+                html.Button(
+                    t("ui.final.nickname_share", locale=locale),
+                    id='final-nickname-share',
+                    n_clicks=0,
+                    className="ui small green button final-nickname-share",
                 ),
             ],
             className="final-nickname-row",
@@ -5228,17 +5320,16 @@ def _final_leaderboard_children(
     locale: str,
     unit: str,
     user_info: Optional[Dict[str, Any]] = None,
-    offer_nickname: Optional[bool] = None,
 ) -> list[Any]:
     """Inner children of the ``final-ranking-list`` wrapper.
 
     Split out of :func:`_build_final_leaderboard` so ``save_final_nickname`` can
     re-render the board in place after the player renames themselves.
 
-    The nickname box is skipped when they already typed one at startup
-    (``user_info['nickname']``).  ``save_final_nickname`` passes
-    ``offer_nickname=True`` so the just-saved editor (and its Dash ids) stay
-    mounted for the status line.
+    The name-entry box is **not** here: it is the finish step and lives in its own
+    card above the board (see :func:`_nickname_editor_children`), so re-rendering
+    the board after a save cannot unmount the field the player just typed into --
+    nor duplicate its ids.
     """
     hero_inner: list[Any] = _leaderboard_hero_children(overall, locale=locale, unit=unit)
     if not hero_inner:
@@ -5297,25 +5388,8 @@ def _final_leaderboard_children(
     )
     right_children: list[Any] = [board] if board is not None else []
 
-    # Only offer the rename box once the player actually has a board presence --
-    # short runs stay off the ranking CSVs, so a nickname would have nothing to
-    # label.  Skip it entirely when they already picked a name at startup.
-    already_named: bool = bool(normalize_nickname((user_info or {}).get("nickname")))
-    show_editor: bool = not already_named if offer_nickname is None else offer_nickname
-    has_rank: bool = bool(overall and overall.get("rank") is not None) or any(
-        board and board.get("rank") is not None for _, board in per_format
-    )
-    if (left_children or right_children) and show_editor and has_rank:
-        left_children.append(
-            html.Div(
-                _nickname_editor_children(user_info, locale=locale),
-                className="final-nickname-editor",
-                disable_n_clicks=True,
-            )
-        )
-
     # Two columns (inline styles so layout does not depend on asset cache):
-    # left  = your placement / #rank / top% / MAE / data-source ranks + rename box
+    # left  = your placement / #rank / top% / MAE / data-source ranks
     # right = full player list (nicknames or anonymous Player N + highlighted You)
     split: Optional[html.Div] = None
     if left_children or right_children:
@@ -5739,6 +5813,19 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
         })
 
     _exit_label = t("ui.final.start_over", locale=locale)
+
+    # The finish step: Finish on the last round lands here, so the name field and
+    # its Save & Share button sit near the top rather than tucked inside the board.
+    # Empty (and hidden) when there is nothing to name -- with no rounds there is
+    # no score to label and nothing to share, and the `final-nickname-*` ids are
+    # then legitimately absent, so their callbacks simply never fire.
+    name_card: Any = html.Div(
+        _nickname_editor_children(user_info, locale=locale) if rounds else [],
+        id='final-finish-card',
+        className='final-nickname-editor final-finish-card',
+        disable_n_clicks=True,
+        style={} if rounds else {'display': 'none'},
+    )
     return html.Div([
         html.H1(t("ui.final.title", locale=locale), id='final-title', style={
             'textAlign': 'center',
@@ -5758,6 +5845,7 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
                 'color': '#2c5282'
             }
         ),
+        name_card,
         html.Div(
             t("ui.final.journey_title", locale=locale),
             id='final-journey-title',
@@ -6447,6 +6535,17 @@ def handle_submit_button(
         user_info["last_submit_round_number"] = pending_round_number
         user_info["last_submit_n_clicks"] = int(n_clicks)
 
+        # On the last round the button reads "Finish" (see
+        # SubmitComponent.update_submit_button_state) and lands straight on
+        # /final -- the highscore-like page that asks for a leaderboard name and
+        # offers Save & Share. /ending is the *between-rounds* page; there is no
+        # next round to advance to, so showing it would only add a click.
+        max_rounds_for_run = int(user_info.get('max_rounds') or MAX_ROUNDS)
+        is_last_round = pending_round_number >= max_rounds_for_run
+        # Arms the /ending countdown. Only Submit sets it: arriving at /ending via
+        # Finish/Exit must never start another round by itself.
+        user_info['auto_advance_pending'] = not is_last_round
+
         user_info = append_round_from_window(user_info, current_df, slider_value)
         
         # Debug: Check what predictions we have
@@ -6473,7 +6572,12 @@ def handle_submit_button(
                 'user_id': df_in.get_column('user_id').to_list()
             }
         
-        return '/ending', user_info, chart_mode, convert_df_to_dict(current_df)
+        return (
+            '/final' if is_last_round else '/ending',
+            user_info,
+            chart_mode,
+            convert_df_to_dict(current_df),
+        )
 
     return no_update, no_update, no_update, no_update
 
@@ -6488,17 +6592,37 @@ def handle_submit_button(
      Output('data-source-name', 'data', allow_duplicate=True),
      Output('randomization-initialized', 'data', allow_duplicate=True),
      Output('initial-slider-value', 'data', allow_duplicate=True)],
-    [Input('next-round-button', 'n_clicks')],
+    [Input('next-round-button', 'n_clicks'),
+     Input('ending-auto-next-timer', 'n_intervals')],
     [State('user-info-store', 'data')],
     prevent_initial_call=True
 )
 def handle_next_round_button(
     n_clicks: Optional[int],
+    n_intervals: Optional[int],
     user_info: Optional[Dict[str, Any]],
 ) -> Tuple[str, Dict[str, Any], Dict[str, bool], Dict[str, List[Any]], Dict[str, List[Any]], bool, str, bool, int]:
-    print(f"DEBUG handle_next_round_button FIRED: n_clicks={n_clicks}")
-    if not n_clicks or not user_info:
-        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+    """Start the next round -- clicked, or handed over by the /ending countdown.
+
+    Both paths do exactly the same work, so the auto-advance cannot drift away
+    from the button. The interval ticks once a second purely to drive the visible
+    countdown; only its **last** tick advances.
+    """
+    print(f"DEBUG handle_next_round_button FIRED: n_clicks={n_clicks} n_intervals={n_intervals}")
+    stay: Tuple[Any, ...] = (no_update,) * 9
+    # `ending-auto-next-timer` is a single shot (max_intervals=1) that only exists
+    # armed, so any tick at all means the countdown ran out. Deliberately read off
+    # the arguments rather than the callback context: same decision, and the
+    # function stays callable straight from a test.
+    fired_by_timer: bool = ENDING_AUTO_ADVANCE_SECONDS > 0 and int(n_intervals or 0) >= 1
+    if not fired_by_timer and not n_clicks:
+        return stay  # type: ignore[return-value]
+    if not user_info:
+        return stay  # type: ignore[return-value]
+
+    # One timer per results page: consumed here so a later re-render of /ending
+    # (a language switch, a cold-load restore) does not re-arm it.
+    user_info = {**user_info, 'auto_advance_pending': False}
 
     rounds: list[dict[str, Any]] = user_info.get('rounds') or []
     max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS)
@@ -6583,6 +6707,53 @@ def handle_next_round_button(
 
 
 @app.callback(
+    Output('ending-auto-next-note', 'children'),
+    Input('ending-auto-next-tick', 'n_intervals'),
+    State('interface-language', 'data'),
+    prevent_initial_call=True,
+)
+def tick_auto_advance_countdown(
+    n_intervals: Optional[int],
+    interface_language: Optional[str],
+) -> str:
+    """Render the visible half of the /ending auto-advance.
+
+    Only the caption is written here; `handle_next_round_button` owns the actual
+    advance on the final tick. Locale is read as ``State`` rather than routed
+    through `update_ending_text_on_language_change`, because two callbacks writing
+    one Output would need `allow_duplicate` -- and a tick is at most a second away.
+    """
+    locale = normalize_locale(interface_language)
+    remaining = max(0, ENDING_AUTO_ADVANCE_SECONDS - int(n_intervals or 0))
+    if remaining <= 0:
+        return t("ui.ending.auto_next_now", locale=locale)
+    return t("ui.ending.auto_next_in", locale=locale, seconds=remaining)
+
+
+@app.callback(
+    [Output('ending-auto-next-tick', 'disabled'),
+     Output('ending-auto-next-timer', 'disabled'),
+     Output('ending-auto-next-row', 'style')],
+    Input('ending-auto-next-pause', 'n_clicks'),
+    State('ending-auto-next-row', 'style'),
+    prevent_initial_call=True,
+)
+def pause_auto_advance(
+    n_clicks: Optional[int],
+    row_style: Optional[Dict[str, Any]],
+) -> Tuple[bool, bool, Dict[str, Any]]:
+    """"Stay on results": stop the countdown and hide it.
+
+    The green "Next round" button is untouched, so the player still leaves with a
+    single click whenever they are done reading. There is deliberately no resume:
+    a timer the player just cancelled must not creep back.
+    """
+    if not n_clicks:
+        raise PreventUpdate
+    return True, True, {**(row_style or {}), 'display': 'none'}
+
+
+@app.callback(
     [Output('url', 'pathname', allow_duplicate=True),
      Output('user-info-store', 'data', allow_duplicate=True),
      Output('glucose-chart-mode', 'data', allow_duplicate=True),
@@ -6614,6 +6785,9 @@ def handle_finish_study_from_prediction(
 
     before = len((user_info or {}).get("rounds") or [])
     info = capture_complete_round_on_exit(user_info, current_df_data, slider_value)
+    # Exiting is a deliberate stop: never let the /ending countdown pull the
+    # player back into another round.
+    info['auto_advance_pending'] = False
     rounds: list[dict[str, Any]] = info.get("rounds") or []
     current_complete = False
     if current_df_data:
@@ -6685,6 +6859,31 @@ def handle_back_to_final_from_upload(n_clicks: Optional[int]) -> Tuple[str, Dict
     raise PreventUpdate
 
 
+def _persist_nickname(
+    user_info: Dict[str, Any],
+    raw_nickname: Optional[str],
+) -> Dict[str, Any]:
+    """Write the leaderboard nickname onto **this study's** ranking rows.
+
+    Shared by both buttons on the ``/final`` name card (Save, Save & Share) so the
+    two cannot drift apart. Matches on ``study_id`` only, never on ``email_key``:
+    every board slot keeps the name it was set under, so a returning player picking
+    a new name does not rewrite their older entries. The nickname is a public
+    display label and never enters the study record.
+    """
+    nickname: str = normalize_nickname(raw_nickname)
+    updated: Dict[str, Any] = dict(user_info)
+    updated['nickname'] = nickname
+    with start_action(action_type=u"persist_nickname", named=bool(nickname)) as action:
+        rows_changed = submit_component.set_study_nickname(
+            study_id=str(user_info.get('study_id') or ''),
+            key=email_key(user_info.get('email')),
+            nickname=nickname,
+        )
+        action.log(message_type=u"nickname_saved", rows_changed=rows_changed)
+    return updated
+
+
 @app.callback(
     [Output('final-nickname-status', 'children'),
      Output('user-info-store', 'data', allow_duplicate=True),
@@ -6714,17 +6913,9 @@ def save_final_nickname(
 
     locale = normalize_locale(interface_language)
     unit = glucose_unit if glucose_unit in ('mg/dL', 'mmol/L') else 'mg/dL'
-    nickname = normalize_nickname(raw_nickname)
     study_id = str(user_info.get('study_id') or '')
     key = email_key(user_info.get('email'))
-
-    with start_action(action_type=u"save_final_nickname", named=bool(nickname)) as action:
-        updated_info: Dict[str, Any] = dict(user_info)
-        updated_info['nickname'] = nickname
-        rows_changed = submit_component.set_study_nickname(
-            study_id=study_id, key=key, nickname=nickname
-        )
-        action.log(message_type=u"nickname_saved", rows_changed=rows_changed)
+    updated_info: Dict[str, Any] = _persist_nickname(user_info, raw_nickname)
 
     # Re-read the CSVs so the board shows the new name without a page reload.
     runs_by_format: dict[str, list[dict[str, Any]]] = dict(updated_info.get('runs_by_format') or {})
@@ -6761,7 +6952,6 @@ def save_final_nickname(
             locale=locale,
             unit=unit,
             user_info=updated_info,
-            offer_nickname=True,
         ),
     )
 
@@ -6853,28 +7043,21 @@ def handle_share_play_again(n_clicks: Optional[int]) -> tuple:
     return _full_session_reset()
 
 
-@app.callback(
-    Output('url', 'pathname', allow_duplicate=True),
-    [Input('share-results-button', 'n_clicks')],
-    [State('user-info-store', 'data'),
-     State('interface-language', 'data')],
-    prevent_initial_call=True,
-)
-def handle_share_results_button(
-    n_clicks: Optional[int],
-    user_info: Optional[Dict[str, Any]],
+def _share_id_for_session(
+    user_info: Dict[str, Any],
+    *,
     interface_language: Optional[str],
-) -> str:
-    """Persist a share record and navigate the user to the public share page.
+) -> Optional[str]:
+    """Persist a share record for this session and return its id (``None`` if empty).
 
-    The share record MUST capture every round the user has played across
-    every format they've tried, not just the currently-active run.  The
-    final page shows both; the share page must do the same or it'd hide
-    prior achievements.
+    The record MUST capture every round the user has played across every format
+    they've tried, not just the currently-active run.  The final page shows both;
+    the share page must do the same or it'd hide prior achievements.
+
+    Shared by the ``/final`` Share button and the name card's Save & Share, which
+    passes the *just-renamed* ``user_info`` so the share card carries the new name.
     """
-    if not n_clicks or not user_info:
-        raise PreventUpdate
-    with start_action(action_type=u"handle_share_results_button") as action:
+    with start_action(action_type=u"build_share_record") as action:
         current_rounds: list[dict[str, Any]] = list(user_info.get("rounds") or [])
         current_format: str = str(user_info.get("format") or "")
 
@@ -6902,7 +7085,7 @@ def handle_share_results_button(
         all_rounds: list[dict[str, Any]] = archived_rounds + tagged_current
         if not all_rounds:
             action.log(message_type=u"no_rounds_to_share")
-            raise PreventUpdate
+            return None
 
         # Figure out which formats the user has actually played (for the
         # ranking block).  Include the current format if it has rounds.
@@ -6944,7 +7127,65 @@ def handle_share_results_button(
             current_rounds=len(tagged_current),
             played_formats=sorted(played_formats),
         )
+    return share_id
+
+
+@app.callback(
+    Output('url', 'pathname', allow_duplicate=True),
+    [Input('share-results-button', 'n_clicks')],
+    [State('user-info-store', 'data'),
+     State('interface-language', 'data')],
+    prevent_initial_call=True,
+)
+def handle_share_results_button(
+    n_clicks: Optional[int],
+    user_info: Optional[Dict[str, Any]],
+    interface_language: Optional[str],
+) -> str:
+    """Share button on ``/final``: persist the record, go to the public share page."""
+    if not n_clicks or not user_info:
+        raise PreventUpdate
+    share_id: Optional[str] = _share_id_for_session(
+        user_info, interface_language=interface_language
+    )
+    if not share_id:
+        raise PreventUpdate
     return f"/share/{share_id}"
+
+
+@app.callback(
+    [Output('url', 'pathname', allow_duplicate=True),
+     Output('user-info-store', 'data', allow_duplicate=True),
+     Output('final-nickname-status', 'children', allow_duplicate=True)],
+    Input('final-nickname-share', 'n_clicks'),
+    [State('final-nickname-input', 'value'),
+     State('user-info-store', 'data'),
+     State('interface-language', 'data')],
+    prevent_initial_call=True,
+)
+def handle_save_and_share(
+    n_clicks: Optional[int],
+    raw_nickname: Optional[str],
+    user_info: Optional[Dict[str, Any]],
+    interface_language: Optional[str],
+) -> Tuple[Any, Dict[str, Any], str]:
+    """Save & Share: the name typed on ``/final`` to the share page in one click.
+
+    Saves through the same helper as the plain Save button, then builds the share
+    record from the **updated** session so the card shows the name just entered.
+    A session with nothing to share keeps the saved name and stays put.
+    """
+    if not n_clicks or not user_info:
+        raise PreventUpdate
+    locale = normalize_locale(interface_language)
+    updated_info: Dict[str, Any] = _persist_nickname(user_info, raw_nickname)
+    share_id: Optional[str] = _share_id_for_session(
+        updated_info, interface_language=interface_language
+    )
+    saved_text: str = t("ui.final.nickname_saved", locale=locale)
+    if not share_id:
+        return no_update, updated_info, saved_text
+    return f"/share/{share_id}", updated_info, saved_text
 
 
 # Clientside: clipboard copy for the "Copy link" button on the share page.

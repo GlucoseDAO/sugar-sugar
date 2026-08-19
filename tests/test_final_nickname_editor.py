@@ -187,15 +187,22 @@ def _finished_user(study_id: str = "s1") -> dict[str, Any]:
     }
 
 
-def test_editor_hidden_when_startup_already_named(ranking_root: Path) -> None:
-    """Don't ask again on /final if they already typed a nickname at startup."""
+def test_startup_nickname_is_prefilled_not_hidden(ranking_root: Path) -> None:
+    """A player who named themselves at startup still gets the finish card.
+
+    Finish on the last round lands on /final, so the field is the name-entry step
+    of the game -- it is pre-filled with the nickname they already have and can be
+    changed, rather than being withheld.
+    """
     key = nickname_module.email_key("ann@x.com")
     _overall(ranking_root).write_text(_HEADER + _row("s1", key=key), encoding="utf-8")
     user = _finished_user()
     user["nickname"] = "Ninja"
-    ids = _ids(create_final_layout(user, "mg/dL", locale="en"))
-    assert "final-nickname-input" not in ids
+    layout = create_final_layout(user, "mg/dL", locale="en")
+    ids = _ids(layout)
+    assert "final-nickname-input" in ids
     assert "final-ranking-list" in ids
+    assert _input_value([layout]) == "Ninja"
 
 
 def test_final_page_renders_the_editor_ids(ranking_root: Path) -> None:
@@ -205,7 +212,12 @@ def test_final_page_renders_the_editor_ids(ranking_root: Path) -> None:
     _overall(ranking_root).write_text(_HEADER + _row("s1", key=key), encoding="utf-8")
 
     ids = _ids(create_final_layout(_finished_user(), "mg/dL", locale="en"))
-    assert {"final-nickname-input", "final-nickname-save", "final-nickname-status"} <= ids
+    assert {
+        "final-nickname-input",
+        "final-nickname-save",
+        "final-nickname-share",
+        "final-nickname-status",
+    } <= ids
     # The wrapper the save callback swaps must be there too.
     assert "final-ranking-list" in ids
 
@@ -217,10 +229,20 @@ def test_highscore_page_has_no_editor(ranking_root: Path) -> None:
     assert not any(component_id.startswith("final-nickname") for component_id in ids)
 
 
-def test_no_editor_when_the_player_has_no_board_presence(ranking_root: Path) -> None:
-    """"Play only" participants are never written to the ranking CSVs."""
+def test_editor_offered_even_without_board_presence(ranking_root: Path) -> None:
+    """A run too short to be ranked still gets the name field.
+
+    The name is not only a board label: Save & Share stamps it on the share card,
+    and it follows the player onto their next (rankable) run.
+    """
     ids = _ids(create_final_layout(_finished_user(), "mg/dL", locale="en"))
-    assert "final-nickname-input" not in ids
+    assert {"final-nickname-input", "final-nickname-save", "final-nickname-share"} <= ids
+
+
+def test_no_editor_without_any_round(ranking_root: Path) -> None:
+    """Nothing played -> nothing to name and nothing to share."""
+    ids = _ids(create_final_layout({"study_id": "s1", "format": "A"}, "mg/dL", locale="en"))
+    assert not any(cid.startswith("final-nickname") for cid in ids)
 
 
 def test_editor_states_the_nickname_is_optional_and_public(ranking_root: Path) -> None:
