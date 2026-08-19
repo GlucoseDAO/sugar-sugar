@@ -220,6 +220,7 @@ ro:
     nightscout_url_required: "Te rugăm să introduci un URL Nightscout."
     nightscout_consent_required: "Te rugăm să acorzi consimțământul pentru utilizarea datelor înainte de a încărca date din Nightscout."
     current_data_source: "Sursa curentă de date:"
+    source_short: "Sursă:"
     diabetic: "Diabetic"
     non_diabetic: "Non diabetic"
     weight_label: "Greutate"

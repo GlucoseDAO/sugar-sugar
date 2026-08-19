@@ -280,7 +280,10 @@ def challenge_unknown_children(locale: str) -> html.Div:
             ),
         ],
         id="challenge-unknown-wrap",
-        style={"display": "block", "margin": "12px 0 20px 0"},
+        # Hidden until `update_challenge_unknown_visibility` confirms eligibility.
+        # A `block` default flashes the checkbox at type 2 / prediabetes / LADA
+        # players on first paint, which is exactly who must never be offered it.
+        style={"display": "none", "margin": "12px 0 20px 0"},
         disable_n_clicks=True,
     )
 

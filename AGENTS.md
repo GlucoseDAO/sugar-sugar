@@ -17,8 +17,41 @@ uv run download-d1namo fetches the public D1NAMO (Dubosson) T1D subset into `dat
 
 Format A source policy (`generic_intervention`): no diabetes / gestational → BIG IDEAs; type 1 → D1NAMO; type 2 → 50/50 mix each round; prediabetes → 75% BIG IDEAs / 25% D1NAMO; LADA → 75% D1NAMO / 25% BIG IDEAs. BIG IDEAs meals have no photos — the apple icon opens a text notepad (backdrop click closes, same as the D1NAMO photo lightbox).
 uv run serve runs gunicorn (production). uv run serve-staging (= uv run serve --staging) sets `_STAGING_MODE=1` and adds prod+ test routes under `/staging/*` (`/staging/ending`, `/staging/final`, `/staging/share`, `/staging/prediction`, `/staging` index) that jump to prefilled states for remote testing **without altering production logic** (flag off = byte-identical). Staging deploy: `https://vanilla-sugar.glucosedao.org/`. See `docs/share-ops.md` → "Staging Mode".
+The public FAQ ask/reply board at the bottom of `/faq` is **off by default** (`FAQ_BOARD_ENABLED=0` in `.env.template`) until it has bot protection; the flag hides the post form *and* the list of existing questions, and `add_faq_question` / `add_faq_reply` refuse writes while it is off. The curated FAQ entries always render.
 
 ## Known Dash pitfalls
+
+### `allow_duplicate` hashes the INPUTS, so same-trigger writers collide
+
+Dash derives the duplicate-output suffix from the callback's inputs alone
+(`create_callback_id` → `_hash_inputs`, `dash/_utils.py`). Two callbacks writing the same
+property off the *same* `Input` therefore hash to the **identical** output id and the
+renderer aborts the whole page with "Duplicate callback outputs" — `uv run chart` served a
+blank `/prediction`. Without `debug` the page rendered but one writer was silently moot, and
+which one won was never defined.
+
+`compact_events_store` and `initialize_data_on_url_change` both wrote `events-df` off
+`Input('url', 'pathname')`, which is how this shipped. Two writers of one store on one trigger
+were also a last-writer-wins race.
+
+**Rule:** `allow_duplicate=True` is not a licence to add another writer. When the trigger is the
+same, fold the work into the existing callback (`compacted_events_store` is now a plain helper
+called from `initialize_data_on_url_change`). Any future pathname-keyed `events-df` writer belongs
+there too. `tests/test_callback_output_ids.py` fails the build if two callbacks ever share an
+output id again.
+
+### A callback fires only when EVERY Input and State is mounted
+
+`suppress_callback_exceptions=True` lets you *register* callbacks for ids that are not always in
+the tree; at fire time Dash still needs all of them present. A confirm handler that listed both
+`finish-study-button` (`/prediction` only) and `finish-study-button-ending` (`/ending` only) could
+never fire on either page — the exit button did nothing. Same rule as the `/startup` vs `consent-*`
+trap below.
+
+**Rule:** a callback may only span ids that render together. Page-scoped flows get page-scoped ids:
+`finish-confirm-*-prediction` (may read `time-slider`) and `finish-confirm-*-ending` (must not).
+Keep each overlay and its context store in the same layout builder so a callback can never see half
+of them. Locked down by `tests/test_callback_output_ids.py`; full postmortem in `docs/known-issues.md`.
 
 ### n_clicks corruption on static pages (issue #29)
 

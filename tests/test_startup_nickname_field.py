@@ -141,3 +141,15 @@ def test_wizard_step_count_is_unchanged() -> None:
     assert WIZARD_STEPS == 6
     assert all(f'mobile-step-{i}' in ids for i in range(WIZARD_STEPS))
     assert f'mobile-step-{WIZARD_STEPS}' not in ids
+
+
+def test_challenge_unknown_wrap_starts_hidden(startup_page: Any) -> None:
+    """Eligibility is decided by a callback, so the default paint must hide it.
+
+    A `display: block` default flashed "Challenge the unknown" at type 2 /
+    prediabetes / LADA players before `update_challenge_unknown_visibility`
+    resolved -- the exact groups the control is not offered to.
+    """
+    wrap = _find(startup_page, "challenge-unknown-wrap")
+    assert wrap is not None
+    assert (wrap.style or {}).get("display") == "none"

@@ -13,10 +13,13 @@ import unicodedata
 from typing import Any, Final
 
 from sugar_sugar.challenge_unknown import challenge_unknown_checked
+from sugar_sugar.config import MAX_ROUNDS
 
 MAX_PAPER_NAME_LENGTH: Final[int] = 80
-# Acknowledgments only include people who completed a full 12-round game (or more).
-PAPER_MENTION_MIN_ROUNDS: Final[int] = 12
+# Acknowledgments only include people who completed a full game (or more). Derived
+# from MAX_ROUNDS rather than hardcoded: the form copy renders this number, so a
+# deployment that shortens the game would otherwise promise an unreachable floor.
+PAPER_MENTION_MIN_ROUNDS: Final[int] = MAX_ROUNDS
 
 
 def normalize_paper_full_name(raw: Any) -> str:

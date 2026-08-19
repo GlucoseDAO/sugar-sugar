@@ -1,6 +1,10 @@
 # Known issues
 
-Open problems we have not decided to fix yet. Add a short repro and the Dash IDs involved so a later pass can judge whether the cost is worth it.
+Postmortems for problems that cost real debugging time — open ones we have not decided to fix, and
+resolved ones whose failure mode would otherwise be reintroduced. Every entry carries a **Status**
+line. Add a short repro and the Dash IDs involved so a later pass can judge whether the cost is worth
+it. Rules general enough to bind future work also belong in the "Known Dash pitfalls" section of
+`CLAUDE.md` / `AGENTS.md`, which is what agents read first.
 
 ## Finish confirm: page-only button IDs in a shared callback
 

@@ -31,10 +31,6 @@ def is_type_1(user_info: dict[str, Any] | None) -> bool:
     return _diabetes_kind(user_info) in {"type 1", "type1", "t1"}
 
 
-def is_diabetic(user_info: dict[str, Any] | None) -> bool:
-    return (user_info or {}).get("diabetic") is True
-
-
 def challenge_unknown_checked(raw: Any) -> bool:
     """True when the startup checklist (or a leftover bool store) is opted in."""
     if raw is True:
@@ -113,10 +109,16 @@ def parse_mix_policy(policy: str | None) -> dict[str, float] | None:
 
 
 def challenge_unknown_weights(user_info: dict[str, Any] | None) -> dict[str, float]:
-    """Half the opposite pool; the rest stays on the player's home corpus."""
+    """Half the opposite pool; the rest stays on the player's home corpus.
+
+    Keyed on type 1, not on ``diabetic`` alone: only type 1 has D1NAMO as its home
+    corpus. The two agree for every player who reaches here (``challenge_unknown_active``
+    admits only non-diabetic and type 1), but a gestational player -- diabetic, yet
+    routed to BIG IDEAs -- would come out inverted under the looser test.
+    """
     unknown = CHALLENGE_OPPOSITE_SHARE
     known = 1.0 - unknown
-    if is_diabetic(user_info):
+    if is_type_1(user_info):
         return {
             POOL_D1NAMO: known,
             POOL_BIGIDEAS: unknown,

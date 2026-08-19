@@ -224,6 +224,12 @@ points Umami pageview requests at the same-domain `/stats` proxy.
 tags, share URLs, `/robots.txt`, `/sitemap.xml`, and `/llms.txt`. Set it in
 production and restart the server after changing it.
 
+`FAQ_BOARD_ENABLED` controls the public ask/reply board at the bottom of `/faq`. It
+defaults to **off** (unauthenticated posting with no bot protection); the curated FAQ
+entries above it are unaffected. Set `FAQ_BOARD_ENABLED=1` to restore the form — and,
+with it, the list of previously posted questions, which is hidden while the flag is off.
+Posts already on disk under `data/faq/` are never deleted by toggling the flag.
+
 ### Running the app
 
 ```bash

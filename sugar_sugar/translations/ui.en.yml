@@ -220,6 +220,7 @@ en:
     nightscout_url_required: "Please enter a Nightscout URL."
     nightscout_consent_required: "Please grant data usage consent before loading Nightscout data."
     current_data_source: "Current Data Source:"
+    source_short: "Source:"
     diabetic: "Diabetic"
     non_diabetic: "Non-diabetic"
     weight_label: "Weight"

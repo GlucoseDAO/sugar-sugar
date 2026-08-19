@@ -201,6 +201,7 @@ de:
     nightscout_url_required: "Bitte gib eine Nightscout-URL ein."
     nightscout_consent_required: "Bitte erteile die Einwilligung zur Datennutzung, bevor du Nightscout-Daten lädst."
     current_data_source: "Aktuelle Datenquelle:"
+    source_short: "Quelle:"
     diabetic: "Diabetiker"
     non_diabetic: "Nicht-diabetisch"
     weight_label: "Gewicht"

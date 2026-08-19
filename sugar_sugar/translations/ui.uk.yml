@@ -200,6 +200,7 @@ uk:
     nightscout_url_required: "Будь ласка, введи URL-адресу Nightscout."
     nightscout_consent_required: "Будь ласка, надай згоду на використання даних перед завантаженням даних із Nightscout."
     current_data_source: "Поточне джерело даних:"
+    source_short: "Джерело:"
     diabetic: "Діабет"
     non_diabetic: "Без діабету"
     weight_label: "Вага"

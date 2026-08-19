@@ -217,7 +217,8 @@ def _source_window_time_range(window_df: pl.DataFrame) -> str:
 
 
 def _source_plaque_label(locale: str) -> str:
-    return "Source:" if locale == "en" else t("ui.header.current_data_source", locale=locale)
+    """Short plaque label. `current_data_source` is the long form used elsewhere."""
+    return t("ui.header.source_short", locale=locale)
 
 
 def _ending_source_plaque_children(

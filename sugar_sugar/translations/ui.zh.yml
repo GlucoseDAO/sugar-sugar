@@ -200,6 +200,7 @@ zh:
     nightscout_url_required: "请输入 Nightscout 网址。"
     nightscout_consent_required: "请在加载 Nightscout 数据前授予数据使用同意。"
     current_data_source: "当前数据源："
+    source_short: "数据来源："
     diabetic: "糖尿病"
     non_diabetic: "非糖尿病"
     weight_label: "体重"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from sugar_sugar.config import MAX_ROUNDS
 from sugar_sugar.paper_mention import (
     MAX_PAPER_NAME_LENGTH,
     PAPER_MENTION_MIN_ROUNDS,
@@ -25,4 +26,5 @@ def test_paper_full_name_is_normalized_and_capped() -> None:
 
 
 def test_paper_mention_min_rounds_is_a_full_game() -> None:
-    assert PAPER_MENTION_MIN_ROUNDS == 12
+    """The floor tracks MAX_ROUNDS: the form copy renders this exact number."""
+    assert PAPER_MENTION_MIN_ROUNDS == MAX_ROUNDS
