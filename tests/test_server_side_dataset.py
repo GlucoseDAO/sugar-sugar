@@ -437,7 +437,7 @@ def test_handle_next_round_button_arity_has_no_full_df() -> None:
         "rounds": [], "max_rounds": 12, "current_round_number": 1,
         "is_example_data": True, "data_source_name": "example.csv",
     }
-    result = handle_next_round_button(1, user_info)
+    result = handle_next_round_button(1, 0, user_info)
     # url, user-info, chart-mode, current-window, events, is-example, source,
     # randomization-initialized, initial-slider  == 9 (full-df dropped).
     assert len(result) == 9

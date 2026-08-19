@@ -18,6 +18,7 @@ Python module name.
 | Session resume / navigation | All game pages (`/startup` … `/final`) | [§ Session & navigation](#session--navigation) |
 | Landing & consent | `/`, `/consent-form` | [§ Landing & consent](#landing--consent) |
 | Prediction chart | `/prediction` | [§ Prediction chart](#prediction-chart) |
+| Round pacing & finish step | `/ending`, `/final` | [§ Round pacing & the finish step](#round-pacing--the-finish-step) |
 | Share page & OG cards | `/share/<id>`, Flask OG routes | [docs/share-ops.md](share-ops.md) |
 | Mobile layout | All routes (UA + CSS) | [docs/mobile-version.md](mobile-version.md) |
 | Bundled browser assets | `assets/` (auto-served by Dash) | [§ Asset build & cache busting](#asset-build--cache-busting) |
@@ -228,6 +229,58 @@ uv run chart --file /path/to/export.csv --unit mmol/L --locale de
 | `uv run chart` lands on landing | Debug reloader fork — env-var prefill pattern; restart once |
 | Time slider wrong after resume | `time-slider` needs `persistence=True` |
 | Mobile drawline offset | Do not CSS-rotate chart; see mobile doc |
+
+---
+
+## Round pacing & the finish step
+
+### What the user sees
+
+Submit a round → the results page shows the round scored against the actual hour and
+counts down (`Next round in 5 s`) → the next round starts on its own. The green
+**Next round** button still advances immediately, and **Stay on results** cancels the
+countdown so the metrics folds can be read at leisure.
+
+On the **last** round the Submit button reads **Finish** (amber). It records that round
+and goes to **`/final`**, whose first card asks for a leaderboard name with two buttons:
+**Save** (stores it, stays) and **Save & Share** (stores it, then `/share/<id>`).
+
+### Where each layer lives
+
+| Layer | Path | Role |
+|-------|------|------|
+| Countdown row + both intervals | `app.py` → `create_ending_layout` | `ending-auto-next-row`, `-note`, `-pause`, `-tick` (1 s caption), `-timer` (single-shot advance) |
+| Caption | `app.py` → `tick_auto_advance_countdown` | Reads only the locale, so the per-second firing stays cheap |
+| Cancel | `app.py` → `pause_auto_advance` | Disables **both** intervals, hides the row; no resume |
+| Advance | `app.py` → `handle_next_round_button` | Same body for the click and the timer's single tick |
+| Arm / disarm | `handle_submit_button` (arms), `handle_finish_study_from_prediction` (clears), `handle_next_round_button` (consumes) | `user_info['auto_advance_pending']` |
+| "Finish" relabel | `components/submit.py` → `is_last_round`, `update_submit_button_state` | Label + amber `#f2711c`; takes `user-info-store` as State |
+| Name card | `app.py` → `_nickname_editor_children`, `create_final_layout` | `final-finish-card` holding `final-nickname-input` / `-save` / `-share` / `-status` |
+| Save / share halves | `app.py` → `_persist_nickname`, `_share_id_for_session` | Shared by Save and Save & Share; `_share_id_for_session` reuses `build_final_share_record` + `share_store.ensure_share`, the pair `/final`'s embedded panel is built from |
+| Knob | `config.ENDING_AUTO_ADVANCE_SECONDS` (`.env`) | Default 5; `0` disables the auto-advance entirely |
+| Tests | `tests/test_gamified_flow.py` | Arming rules, both intervals, caption, pause, routing, Save & Share |
+
+### Why two intervals
+
+The advance callback declares `user-info-store`, and a client store is uploaded with
+**every** callback that declares it — that store holds every round's
+`prediction_table_data`. So the advance is a single shot at the end of the countdown
+(one upload per round-end), while the 1 s ticker drives only the caption and reads
+nothing but the locale.
+
+Both stay mounted when auto-advance is off, with only `disabled` toggled: a Dash
+callback fires solely while every component it references is in the layout, so
+dropping the advance interval would silence the Next round **button** as well.
+
+### Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| Rounds advance after Exit / a language switch on `/ending` | Something set `auto_advance_pending` outside Submit — only `handle_submit_button` may arm it |
+| Next round button dead, no countdown | The `ending-auto-next-timer` interval is missing from the layout; it must be mounted (disabled) on every `/ending` render |
+| Last round still says "Submit" | `update_submit_button_state` lost its `user-info-store` State, or `current_round_number` / `max_rounds` are unset |
+| `/final` shows no name field | Only when the session has **no rounds**; otherwise check `final-finish-card` in `create_final_layout` |
+| Auto-advance unwanted in a deployment | `ENDING_AUTO_ADVANCE_SECONDS=0` |
 
 ---
 

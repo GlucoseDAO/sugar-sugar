@@ -44,6 +44,13 @@ STORAGE_TYPE: str = os.getenv("STORAGE_TYPE", "local")
 MAX_ROUNDS: int = int(os.getenv("MAX_ROUNDS", "12"))
 MIN_USEFUL_ROUNDS: int = int(os.getenv("MIN_USEFUL_ROUNDS", str(max(1, MAX_ROUNDS // 2))))
 
+# Gamified pacing: how long the between-rounds results page (`/ending`) stays up
+# before it starts the next round on its own. The "Next round" button remains, so
+# this only removes a click -- it never removes the choice. 0 disables the timer
+# entirely (every round then waits for a click, the pre-gamification behaviour).
+# Never fires on the last round: that one ends in Finish -> /final instead.
+ENDING_AUTO_ADVANCE_SECONDS: int = int(os.getenv("ENDING_AUTO_ADVANCE_SECONDS", "5"))
+
 # Umami analytics. Defaults use the same-domain Caddy proxy so common
 # cross-domain analytics blocklists do not match the tracker URL.
 UMAMI_SCRIPT_URL: str = os.getenv("UMAMI_SCRIPT_URL", "https://sugar-sugar.study/stats/script.js").strip()
@@ -92,5 +99,7 @@ DASH_DEBUG: bool = _env_bool("DASH_DEBUG", DEBUG_MODE)
 # 27: Results loading overlay (clientside) so /final's slow display_page is not a second click.
 # 28: Glucose chart cartesian area grown (tighter margins, automargin off, resize).
 # 29: Chart paper pulled to the food bubble / footer; form 100vh keyboard gap.
-DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "34"))
+# 30: gamified pacing -- /ending auto-advance interval (extra Input on
+#     handle_next_round_button) and the /final name card's Save & Share callback.
+DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "35"))
 

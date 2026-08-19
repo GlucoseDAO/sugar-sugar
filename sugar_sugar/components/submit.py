@@ -9,7 +9,7 @@ import csv
 import shutil
 from pathlib import Path
 from eliot import start_action
-from sugar_sugar.config import PREDICTION_HOUR_OFFSET, STORAGE_TYPE
+from sugar_sugar.config import MAX_ROUNDS, PREDICTION_HOUR_OFFSET, STORAGE_TYPE
 from sugar_sugar.components.metrics import MetricsComponent
 from sugar_sugar.data import load_glucose_data
 from sugar_sugar.i18n import t, normalize_locale
@@ -199,6 +199,24 @@ def finish_exit_button_style() -> dict[str, Any]:
         "fontSize": "18px",
         "fontWeight": "700",
     }
+
+
+def is_last_round(user_info: Optional[dict[str, Any]]) -> bool:
+    """True when the round on screen is the run's last one.
+
+    Drives the Submit -> "Finish" relabel: `handle_submit_button` then stores the
+    round and goes straight to ``/final`` (leaderboard name + Save & Share) instead
+    of the between-rounds ``/ending`` page, and no auto-advance is armed.
+
+    Reads ``current_round_number`` -- written both when a round is appended and when
+    the next one starts -- and falls back to the count of stored rounds for a session
+    saved before that key existed.
+    """
+    info: dict[str, Any] = user_info or {}
+    rounds_done: int = len(info.get('rounds') or [])
+    max_rounds: int = int(info.get('max_rounds') or MAX_ROUNDS)
+    current: int = int(info.get('current_round_number') or (rounds_done + 1))
+    return current >= max_rounds
 
 
 # `SubmitComponent()` is also constructed per prediction-page render
@@ -1225,20 +1243,40 @@ class SubmitComponent(html.Div):
             [Input('current-window-df', 'data'),
              Input('interface-language', 'data'),
              Input('user-agent', 'data')],
+            [State('user-info-store', 'data')],
             prevent_initial_call=False
         )
         def update_submit_button_state(
             df_data: Optional[dict[str, Any]],
             interface_language: Optional[str],
             user_agent: Optional[str],
+            user_info: Optional[dict[str, Any]],
         ) -> tuple[bool, str, dict[str, Any], str, dict[str, Any]]:
-            """Enable submit button only when there are predictions to the end of the hidden area"""
+            """Enable submit button only when there are predictions to the end of the hidden area.
+
+            On the **last** round the same button reads "Finish" and is amber instead
+            of green: `handle_submit_button` then stores the round and goes straight to
+            ``/final`` (name + Save & Share) rather than the between-rounds page.
+            ``user-info-store`` is safe as ``State`` here -- it lives in the base
+            layout, and `current-window-df` changes on every round, so the label is
+            recomputed whenever the round number can have moved.
+            """
             locale = normalize_locale(interface_language)
-            ready_text = (
-                f"✓ {t('ui.submit.submit', locale=locale)}"
-                if _is_mobile_ua(user_agent)
-                else t("ui.submit.progress_ready", locale=locale)
+            last_round: bool = is_last_round(user_info)
+            idle_label = (
+                t("ui.submit.finish", locale=locale)
+                if last_round
+                else t("ui.submit.submit", locale=locale)
             )
+            ready_text = (
+                f"✓ {idle_label}"
+                if _is_mobile_ua(user_agent)
+                else t(
+                    "ui.submit.progress_finish_ready" if last_round else "ui.submit.progress_ready",
+                    locale=locale,
+                )
+            )
+            ready_colour = '#f2711c' if last_round else '#4CBB17'
             base_style = {
                 'width': '300px',
                 'fontSize': '25px',
@@ -1261,7 +1299,7 @@ class SubmitComponent(html.Div):
             if not df_data:
                 disabled_style = {**base_style, 'backgroundColor': '#cccccc', 'color': '#666666', 'cursor': 'not-allowed'}
                 label_style = {**base_label_style, 'color': '#6c757d'}
-                return True, t("ui.submit.submit", locale=locale), disabled_style, t("ui.submit.progress_no_data", locale=locale), label_style
+                return True, idle_label, disabled_style, t("ui.submit.progress_no_data", locale=locale), label_style
             
             # Reconstruct DataFrame to check for predictions
             df = self._reconstruct_dataframe_from_dict(df_data)
@@ -1303,7 +1341,7 @@ class SubmitComponent(html.Div):
                 print(f"DEBUG: first_point_is_snapped: {first_point_is_snapped}, user_predictions_count: {user_predictions_count}, required: {required_user_predictions}")
                 
                 if predictions_to_end:
-                    enabled_style = {**base_style, 'backgroundColor': '#4CBB17', 'color': 'white', 'cursor': 'pointer'}
+                    enabled_style = {**base_style, 'backgroundColor': ready_colour, 'color': 'white', 'cursor': 'pointer'}
                     label_style = {**base_label_style, 'display': 'none'}
                     return False, ready_text, enabled_style, "", label_style
                 else:
@@ -1315,11 +1353,11 @@ class SubmitComponent(html.Div):
                         done=user_predictions_count,
                         total=required_user_predictions,
                     )
-                    return True, t("ui.submit.submit", locale=locale), disabled_style, status_text, label_style
+                    return True, idle_label, disabled_style, status_text, label_style
             else:
                 disabled_style = {**base_style, 'backgroundColor': '#cccccc', 'color': '#666666', 'cursor': 'not-allowed'}
                 label_style = {**base_label_style, 'color': '#6c757d'}
-                return True, t("ui.submit.submit", locale=locale), disabled_style, t("ui.submit.progress_hidden_area", locale=locale), label_style
+                return True, idle_label, disabled_style, t("ui.submit.progress_hidden_area", locale=locale), label_style
 
     def _reconstruct_dataframe_from_dict(self, df_data: dict[str, list[Any]]) -> pl.DataFrame:
         """Reconstruct a Polars DataFrame from stored dictionary data"""
