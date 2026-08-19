@@ -372,7 +372,7 @@ en:
     title_accuracy_metrics: "Accuracy Metrics"
     no_metrics_available: "No metrics available"
     desc:
-      mae: "Average difference between predicted and actual values"
+      mae: "Mean absolute error — by how many glucose units your guess missed on average"
       mse: "Emphasizes larger prediction errors"
       rmse: "Similar to MAE but penalizes large errors more"
       mape: "Average percentage difference from actual values"

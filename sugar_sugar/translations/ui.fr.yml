@@ -349,7 +349,7 @@ fr:
     title_accuracy_metrics: "Métriques de précision"
     no_metrics_available: "Aucune métrique disponible"
     desc:
-      mae: "Différence moyenne entre les valeurs prédites et réelles"
+      mae: "Erreur absolue moyenne — de combien d'unités de glucose ta prédiction s'est trompée en moyenne"
       mse: "Accentue les erreurs de prédiction plus importantes"
       rmse: "Similaire à la MAE mais pénalise davantage les erreurs importantes"
       mape: "Différence moyenne en pourcentage par rapport aux valeurs réelles"

@@ -369,7 +369,7 @@ ro:
     title_accuracy_metrics: "Metrici de acuratețe"
     no_metrics_available: "Nu sunt disponibile metrici"
     desc:
-      mae: "Diferența medie între valorile prezise și cele reale"
+      mae: "Eroarea absolută medie — cu câte unități de glucoză a greșit predicția ta în medie"
       mse: "Pune accent pe erorile de predicție mai mari"
       rmse: "Similar cu MAE, dar penalizează mai mult erorile mari"
       mape: "Diferența procentuală medie față de valorile reale"

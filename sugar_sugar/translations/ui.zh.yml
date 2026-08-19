@@ -347,7 +347,7 @@ zh:
     title_accuracy_metrics: "准确性指标"
     no_metrics_available: "无可用指标"
     desc:
-      mae: "预测值与实际值之间的平均差异"
+      mae: "平均绝对误差——你的预测平均偏离实际血糖多少个单位"
       mse: "强调较大的预测误差"
       rmse: "类似于 MAE，但对大误差惩罚更多"
       mape: "与实际值之间的平均百分比差异"

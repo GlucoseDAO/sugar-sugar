@@ -348,7 +348,7 @@ de:
     title_accuracy_metrics: "Genauigkeitsmetriken"
     no_metrics_available: "Keine Metriken verfügbar"
     desc:
-      mae: "Durchschnittliche Abweichung zwischen Vorhersage und Messwert"
+      mae: "Mittlerer absoluter Fehler — um wie viele Glukose-Einheiten deine Vorhersage im Schnitt daneben lag"
       mse: "Gewichtet größere Vorhersagefehler stärker"
       rmse: "Ähnlich wie MAE, bestraft große Fehler stärker"
       mape: "Durchschnittliche prozentuale Abweichung vom Messwert"
