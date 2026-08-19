@@ -334,14 +334,16 @@ ro:
     synthesis:
       title: "Eroarea de predicție în ora următoare"
       x_axis: "Timp (minute de la începutul orei următoare ascunse; fiecare pas de 5 min)"
-      x_axis_time: "Timp"
+      x_axis_time: "Minute înainte"
       y_axis: "Eroare procentuală față de valoarea reală (la fiecare pas de 5 min)"
       y_axis_short: "Eroare"
-      legend_zero: "Fără abatere"
-      legend_variability: "Linie de variabilitate"
+      legend_zero: "Predicție perfectă (0%%)"
+      legend_variability: "Eroarea ta — o linie pe rundă"
+      dir_high: "↑ ai estimat prea sus"
+      dir_low: "↓ ai estimat prea jos"
       legend_error: "Eroare față de valoarea reală, o linie per rundă"
       round_hover: "Rundă"
-      caption: "Fiecare rând este o sursă de date pe care ai folosit-o. Timpul este ora următoare completă (toți pașii de 5 minute). Y este procentul de abatere față de valoarea reală. Zona umbrită dintre linie și zero arată acea rundă."
+      caption: "Fiecare linie colorată este o rundă; câte un panou pentru fiecare sursă de date jucată. Linia neagră de 0%% înseamnă o predicție perfectă — punctele de deasupra au estimat glicemia reală prea sus, cele de dedesubt prea jos."
       empty: "Nu există date pentru grafic."
 
   chart:
@@ -408,6 +410,7 @@ ro:
     title: "Rezumatul predicției"
     prediction_results: "Rezultatele predicției"
     click_here_for_details: "Click aici pentru detalii"
+    hide_details: "Ascunde detaliile"
     units_line: "Unități: %{unit}"
     next_round: "Runda următoare"
     view_complete_analysis: "Vezi analiza completă"
@@ -490,6 +493,11 @@ ro:
     per_round_metrics: "Metrici pe rundă"
     start_over: "Ieșire"
     journey_title: "Ai terminat această călătorie epică — vrei să începi alta?"
+    journey_title_done: "Ai terminat această călătorie epică — mulțumim pentru contribuția la cercetare!"
+    hero_summary: "În medie, predicțiile tale au fost cu %{mae} %{unit} pe lângă — aproximativ %{mape}%% din valoarea reală"
+    col_round: "Rundă"
+    col_points: "Puncte comparate"
+    stats_note: "Pentru statisticieni: MSE %{mse} · RMSE %{rmse} %{unit}"
 
   switch_format:
     title: "Poți încerca și..."

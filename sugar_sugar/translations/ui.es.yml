@@ -314,14 +314,16 @@ es:
     synthesis:
       title: "Error de predicción en la próxima hora"
       x_axis: "Tiempo (minutos desde el inicio de la siguiente hora oculta; cada paso de 5 min)"
-      x_axis_time: "Tiempo"
+      x_axis_time: "Minutos hacia adelante"
       y_axis: "Error porcentual respecto al valor real (en cada paso de 5 min)"
       y_axis_short: "Error"
-      legend_zero: "Sin desviación"
-      legend_variability: "Línea de variabilidad"
+      legend_zero: "Predicción perfecta (0 %%)"
+      legend_variability: "Tu error — una línea por ronda"
+      dir_high: "↑ estimaste de más"
+      dir_low: "↓ estimaste de menos"
       legend_error: "Error vs real, una línea por ronda"
       round_hover: "Ronda"
-      caption: "Cada fila es una fuente que usaste. Tiempo = la hora siguiente completa (todos los pasos de 5 min). Y = porcentaje del real. El área entre la línea y cero muestra esa ronda."
+      caption: "Cada línea de color es una ronda; un panel por cada fuente de datos que jugaste. La línea negra del 0%% es una predicción perfecta — los puntos por encima estimaron la glucosa real de más y los de debajo, de menos."
       empty: "No hay datos del gráfico."
 
   chart:
@@ -388,6 +390,7 @@ es:
     title: "Resumen de predicción"
     prediction_results: "Resultados de la predicción"
     click_here_for_details: "Haz clic aquí para ver los detalles"
+    hide_details: "Ocultar detalles"
     units_line: "Unidades: %{unit}"
     next_round: "Siguiente ronda"
     view_complete_analysis: "Ver análisis completo"
@@ -470,6 +473,11 @@ es:
     per_round_metrics: "Métricas por ronda"
     start_over: "Salir"
     journey_title: "Has terminado este viaje épico — ¿quieres empezar otro?"
+    journey_title_done: "Has terminado este viaje épico — ¡gracias por contribuir a la investigación!"
+    hero_summary: "En promedio tus predicciones se desviaron %{mae} %{unit} — alrededor del %{mape}%% del valor real"
+    col_round: "Ronda"
+    col_points: "Puntos comparados"
+    stats_note: "Para estadísticos: MSE %{mse} · RMSE %{rmse} %{unit}"
 
   switch_format:
     title: "También puedes probar..."

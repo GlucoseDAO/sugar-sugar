@@ -15,6 +15,9 @@ plus a handful of precomputed stats.  If the schema grows, upgrade here.
 """
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import json
 import os
 import secrets
@@ -24,9 +27,12 @@ from typing import Any, Optional
 
 from eliot import start_action
 
+from sugar_sugar.nickname import deployment_salt
+
 
 _SHARE_DIR_ENV: str = "SUGAR_SHARE_DIR"
 _SHARE_ID_LEN: int = 10  # ~60 bits of entropy; short, URL-safe.
+_DETERMINISTIC_ID_LEN: int = 12  # base64url chars = 72 bits; unguessable, path-safe.
 
 
 def _share_dir() -> Path:
@@ -52,26 +58,65 @@ def _new_share_id() -> str:
     return secrets.token_urlsafe(_SHARE_ID_LEN * 2)
 
 
-def save_share(record: dict[str, Any]) -> str:
-    """Persist `record` to disk and return the generated share id.
-
-    Writes are atomic: serialise to a temp file in the same directory then
-    rename over the target so concurrent readers never observe a partial
-    JSON document.
-    """
-    share_id: str = _new_share_id()
+def _write_record(share_id: str, record: dict[str, Any]) -> None:
+    """Atomic write: temp file in the same directory, then rename over the
+    target, so concurrent readers never observe a partial JSON document."""
     directory: Path = _share_dir()
     target: Path = directory / f"{share_id}.json"
+    fd, tmp_path = tempfile.mkstemp(prefix=f".{share_id}.", suffix=".tmp", dir=str(directory))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(record, fh, ensure_ascii=False, separators=(",", ":"))
+        os.replace(tmp_path, target)
+    except BaseException:
+        Path(tmp_path).unlink(missing_ok=True)
+        raise
 
+
+def save_share(record: dict[str, Any]) -> str:
+    """Persist `record` under a fresh random id and return that id."""
+    share_id: str = _new_share_id()
     with start_action(action_type=u"save_share", share_id=share_id):
-        fd, tmp_path = tempfile.mkstemp(prefix=f".{share_id}.", suffix=".tmp", dir=str(directory))
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                json.dump(record, fh, ensure_ascii=False, separators=(",", ":"))
-            os.replace(tmp_path, target)
-        except BaseException:
-            Path(tmp_path).unlink(missing_ok=True)
-            raise
+        _write_record(share_id, record)
+    return share_id
+
+
+def deterministic_share_id(record: dict[str, Any]) -> str:
+    """Content-addressed share id: the same game state always maps to one id.
+
+    `/final` renders its share panel eagerly (no click), so the record must be
+    creatable at render time without minting a new file on every render.  The
+    id is a salted HMAC of the record's substantive content — the rounds plus
+    the trimmed `user_info` — so revisits and language changes reuse the
+    existing file, while a new round (or a nickname change) yields a fresh id
+    and re-freezes the record.  `created_at`, `locale` and `rankings` are
+    deliberately excluded: they can differ between renders of the same game
+    state.  The deployment salt keeps ids unguessable even for someone who
+    knows the full content.
+    """
+    content: dict[str, Any] = {
+        "rounds": record.get("rounds") or [],
+        "user_info": record.get("user_info") or {},
+    }
+    canonical: str = json.dumps(content, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    digest: bytes = hmac.new(
+        b"share-id:" + deployment_salt(), canonical.encode("utf-8"), hashlib.sha256
+    ).digest()
+    return base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")[:_DETERMINISTIC_ID_LEN]
+
+
+def ensure_share(record: dict[str, Any]) -> str:
+    """Persist `record` under its content-addressed id if absent; return the id.
+
+    Idempotent by design: the first render of a given game state writes the
+    file (freezing `created_at` and `rankings` as of that moment); later
+    renders just return the same id.
+    """
+    share_id: str = deterministic_share_id(record)
+    if (_share_dir() / f"{share_id}.json").is_file():
+        return share_id
+    with start_action(action_type=u"ensure_share", share_id=share_id):
+        _write_record(share_id, record)
     return share_id
 
 

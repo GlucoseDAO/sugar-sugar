@@ -337,14 +337,16 @@ en:
     synthesis:
       title: "Next hour prediction error"
       x_axis: "Time (minutes from the start of the hidden next hour; every 5-min step)"
-      x_axis_time: "Time"
+      x_axis_time: "Minutes ahead"
       y_axis: "Percent error vs actual (at each 5 min step)"
       y_axis_short: "Error"
-      legend_zero: "No deviation"
-      legend_variability: "Variability line"
+      legend_zero: "Perfect prediction (0%%)"
+      legend_variability: "Your error — one line per round"
+      dir_high: "↑ guessed too high"
+      dir_low: "↓ guessed too low"
       legend_error: "Error vs actual, one line per round"
       round_hover: "Round"
-      caption: "Each row is a data source you used. Time is the full next hour (all 5-minute steps). Y is percent off actual. The shaded area between the line and zero shows that run."
+      caption: "Each coloured line is one round; one panel per data source you played. The black 0%% line means a perfect prediction — points above it guessed higher than the real glucose, points below guessed lower."
       empty: "No chart data available."
 
   chart:
@@ -411,6 +413,7 @@ en:
     title: "Prediction Summary"
     prediction_results: "Prediction Results"
     click_here_for_details: "Click here for details"
+    hide_details: "Hide details"
     units_line: "Units: %{unit}"
     next_round: "Next round"
     view_complete_analysis: "View complete analysis"
@@ -493,6 +496,11 @@ en:
     per_round_metrics: "Per-round metrics"
     start_over: "Exit"
     journey_title: "You have finished this epic journey — want to start another?"
+    journey_title_done: "You have finished this epic journey — thank you for contributing to the research!"
+    hero_summary: "On average your predictions were off by %{mae} %{unit} — about %{mape}%% away from the real value"
+    col_round: "Round"
+    col_points: "Points compared"
+    stats_note: "For statisticians: MSE %{mse} · RMSE %{rmse} %{unit}"
 
   switch_format:
     title: "You can also try..."

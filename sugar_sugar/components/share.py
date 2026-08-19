@@ -877,6 +877,28 @@ def build_synthesis_figure(
                 bgcolor="rgba(255,255,255,0.88)",
                 borderpad=3,
             )
+        if show_format_row_annotations and row_idx == 1:
+            # Direct labels beat legends for lay readers: teach the y-direction
+            # semantics once, inside the top panel (above 0 = guessed too high,
+            # below 0 = guessed too low). Right-aligned to avoid the format
+            # label in the upper-left corner.
+            for dir_key, dir_y, dir_anchor in (
+                ("ui.share.synthesis.dir_high", 0.97, "top"),
+                ("ui.share.synthesis.dir_low", 0.03, "bottom"),
+            ):
+                fig.add_annotation(
+                    xref="x domain",
+                    yref=y_dom,
+                    x=0.99,
+                    y=dir_y,
+                    xanchor="right",
+                    yanchor=dir_anchor,
+                    text=t(dir_key, locale=loc),
+                    showarrow=False,
+                    font=dict(size=11, color="#64748b"),
+                    bgcolor="rgba(255,255,255,0.85)",
+                    borderpad=2,
+                )
 
         # 1) Gradient hatch only between y=0 and the variability chord
         for r in rounds_f:
@@ -1674,49 +1696,27 @@ def _share_discord_button(label: str) -> html.Button:
     )
 
 
-def create_expired_layout(*, locale: str) -> html.Div:
-    """Minimal page shown when a share URL does not resolve."""
-    loc: str = normalize_locale(locale)
-    return html.Div(
-        [
-            html.H1(t("ui.share.expired_title", locale=loc),
-                    style={"fontSize": "32px", "marginBottom": "16px", "color": "#0f172a"}),
-            html.P(t("ui.share.expired_body", locale=loc),
-                   style={"fontSize": "18px", "color": "#475569", "maxWidth": "560px",
-                          "marginBottom": "28px", "lineHeight": "1.6"}),
-            html.A(
-                t("ui.share.expired_cta", locale=loc),
-                href="/",
-                className="ui green button",
-                style={"padding": "14px 28px", "fontSize": "18px"},
-            ),
-        ],
-        className="info-page",
-        disable_n_clicks=True,
-        style={"textAlign": "center"},
-    )
-
-
-def create_share_layout(
+def build_share_panel(
     share_record: dict[str, Any],
     *,
     share_id: str,
     share_url: str,
     locale: str,
+    include_play_again: bool = False,
 ) -> html.Div:
-    """Render the full share page for a valid share record."""
+    """Share actions for a persisted share record: download, copy, socials.
+
+    Shared between the public ``/share/<id>`` page and the inline share panel
+    on ``/final`` so the two stay identical.  ``include_play_again`` adds the
+    recipient-only "Play again" button — it belongs on ``/share/<id>`` where
+    the visitor has no other way into the game, not on ``/final`` where the
+    player already has the Exit / switch-format actions.
+    """
     loc: str = normalize_locale(locale)
     rounds: list[dict[str, Any]] = list(share_record.get("rounds") or [])
     stats: dict[str, Any] = compute_aggregate_stats(rounds)
-    user_info: dict[str, Any] = dict(share_record.get("user_info") or {})
-    name: str = _safe_display_name(user_info)
-
-    mae: float = stats.get("mae_mgdl", float("nan"))
-    rmse: float = stats.get("rmse_mgdl", float("nan"))
-    mard: float = stats.get("mape", float("nan"))
     accuracy: float = stats.get("accuracy", float("nan"))
     accuracy_str: str = f"{_format_number(accuracy)}%" if not math.isnan(accuracy) else "?"
-    mard_str: str = f"{_format_number(mard)}%" if not math.isnan(mard) else "?"
     rounds_played: int = int(stats.get("rounds_played") or 0)
     best_entry: Optional[dict[str, Any]] = _best_ranking_entry(share_record)
     percentile: Optional[int] = best_entry.get("percentile") if best_entry else None
@@ -1736,8 +1736,6 @@ def create_share_layout(
             accuracy=accuracy_str,
             rounds=rounds_played,
         )
-    encourage: str = encouragement_text(stats, loc, seed=share_id)
-    generated_at: Optional[str] = _format_generated_at(share_record, locale=loc)
 
     encoded_url: str = urllib.parse.quote(share_url, safe="")
     encoded_text: str = urllib.parse.quote(invite_text, safe="")
@@ -1789,6 +1787,112 @@ def create_share_layout(
         style={"display": "flex", "flexWrap": "wrap", "gap": "10px",
                "justifyContent": "center", "marginTop": "16px"},
     )
+
+    download_href: str = f"/share/{share_id}/image.png?lang={loc}"
+    action_children: list[Any] = [
+        html.A(
+            [html.I(className="fas fa-download", style={"marginRight": "8px"}),
+             t("ui.share.download_png", locale=loc)],
+            href=download_href,
+            download=f"sugar-sugar-{share_id}.png",
+            className="ui green button share-action-button",
+        ),
+        html.Span(
+            t("ui.share.copy_link_success", locale=loc),
+            id="share-copy-link-feedback",
+            style={"color": "#16a34a", "fontWeight": "600", "opacity": "0",
+                   "transition": "opacity 0.2s ease-in"},
+            disable_n_clicks=True,
+        ),
+    ]
+    if include_play_again:
+        action_children.append(
+            html.Button(
+                [html.I(className="fas fa-play", style={"marginRight": "8px"}),
+                 t("ui.share.play_again", locale=loc)],
+                id="share-play-again-button",
+                n_clicks=0,
+                className="ui button share-action-button",
+            )
+        )
+    action_buttons: html.Div = html.Div(
+        action_children,
+        style={"marginTop": "20px", "textAlign": "center", "display": "flex",
+               "justifyContent": "center", "alignItems": "center", "gap": "10px",
+               "flexWrap": "wrap", "position": "relative"},
+        disable_n_clicks=True,
+    )
+
+    url_store: html.Div = html.Div(
+        share_url, id="share-url-value",
+        style={"display": "none"}, disable_n_clicks=True,
+    )
+
+    return html.Div(
+        [
+            url_store,
+            action_buttons,
+            share_buttons,
+            html.Div(
+                t("ui.share.download_png_hint", locale=loc),
+                style={"fontSize": "13px", "color": "#94a3b8",
+                       "textAlign": "center", "marginTop": "14px"},
+                disable_n_clicks=True,
+            ),
+        ],
+        className="share-panel",
+        disable_n_clicks=True,
+    )
+
+
+def create_expired_layout(*, locale: str) -> html.Div:
+    """Minimal page shown when a share URL does not resolve."""
+    loc: str = normalize_locale(locale)
+    return html.Div(
+        [
+            html.H1(t("ui.share.expired_title", locale=loc),
+                    style={"fontSize": "32px", "marginBottom": "16px", "color": "#0f172a"}),
+            html.P(t("ui.share.expired_body", locale=loc),
+                   style={"fontSize": "18px", "color": "#475569", "maxWidth": "560px",
+                          "marginBottom": "28px", "lineHeight": "1.6"}),
+            html.A(
+                t("ui.share.expired_cta", locale=loc),
+                href="/",
+                className="ui green button",
+                style={"padding": "14px 28px", "fontSize": "18px"},
+            ),
+        ],
+        className="info-page",
+        disable_n_clicks=True,
+        style={"textAlign": "center"},
+    )
+
+
+def create_share_layout(
+    share_record: dict[str, Any],
+    *,
+    share_id: str,
+    share_url: str,
+    locale: str,
+) -> html.Div:
+    """Render the full share page for a valid share record."""
+    loc: str = normalize_locale(locale)
+    rounds: list[dict[str, Any]] = list(share_record.get("rounds") or [])
+    stats: dict[str, Any] = compute_aggregate_stats(rounds)
+    user_info: dict[str, Any] = dict(share_record.get("user_info") or {})
+    name: str = _safe_display_name(user_info)
+
+    mae: float = stats.get("mae_mgdl", float("nan"))
+    rmse: float = stats.get("rmse_mgdl", float("nan"))
+    mard: float = stats.get("mape", float("nan"))
+    accuracy: float = stats.get("accuracy", float("nan"))
+    accuracy_str: str = f"{_format_number(accuracy)}%" if not math.isnan(accuracy) else "?"
+    mard_str: str = f"{_format_number(mard)}%" if not math.isnan(mard) else "?"
+    rounds_played: int = int(stats.get("rounds_played") or 0)
+    best_entry: Optional[dict[str, Any]] = _best_ranking_entry(share_record)
+    percentile: Optional[int] = best_entry.get("percentile") if best_entry else None
+    encourage: str = encouragement_text(stats, loc, seed=share_id)
+    generated_at: Optional[str] = _format_generated_at(share_record, locale=loc)
 
     def stat_tile(label: str, value: str, sub: str = "") -> html.Div:
         children: list[Any] = [
@@ -1907,41 +2011,12 @@ def create_share_layout(
 
     synthesis_card: html.Div = build_synthesis_card(share_record, locale=loc)
 
-    download_href: str = f"/share/{share_id}/image.png?lang={loc}"
-
-    action_buttons: html.Div = html.Div(
-        [
-            html.A(
-                [html.I(className="fas fa-download", style={"marginRight": "8px"}),
-                 t("ui.share.download_png", locale=loc)],
-                href=download_href,
-                download=f"sugar-sugar-{share_id}.png",
-                className="ui green button share-action-button",
-            ),
-            html.Span(
-                t("ui.share.copy_link_success", locale=loc),
-                id="share-copy-link-feedback",
-                style={"color": "#16a34a", "fontWeight": "600", "opacity": "0",
-                       "transition": "opacity 0.2s ease-in"},
-                disable_n_clicks=True,
-            ),
-            html.Button(
-                [html.I(className="fas fa-play", style={"marginRight": "8px"}),
-                 t("ui.share.play_again", locale=loc)],
-                id="share-play-again-button",
-                n_clicks=0,
-                className="ui button share-action-button",
-            ),
-        ],
-        style={"marginTop": "20px", "textAlign": "center", "display": "flex",
-               "justifyContent": "center", "alignItems": "center", "gap": "10px",
-               "flexWrap": "wrap", "position": "relative"},
-        disable_n_clicks=True,
-    )
-
-    url_store: html.Div = html.Div(
-        share_url, id="share-url-value",
-        style={"display": "none"}, disable_n_clicks=True,
+    share_panel: html.Div = build_share_panel(
+        share_record,
+        share_id=share_id,
+        share_url=share_url,
+        locale=loc,
+        include_play_again=True,
     )
 
     header_children: list[Any] = [
@@ -1978,18 +2053,15 @@ def create_share_layout(
     unknown: Optional[html.Div] = (
         _unknown_stamp(locale=loc) if _challenge_unknown_on(user_info) else None
     )
-    main_stack: list[Any] = [url_store]
-    main_stack.extend(
-        [
-            html.Div(
-                header_children,
-                style={"paddingTop": "8px"},
-                disable_n_clicks=True,
-            ),
-            stats_row,
-            quote_block,
-        ]
-    )
+    main_stack: list[Any] = [
+        html.Div(
+            header_children,
+            style={"paddingTop": "8px"},
+            disable_n_clicks=True,
+        ),
+        stats_row,
+        quote_block,
+    ]
     if played_line is not None:
         main_stack.append(played_line)
     main_stack.append(synthesis_card)
@@ -2004,18 +2076,7 @@ def create_share_layout(
         )
     else:
         main_stack.append(qr_block)
-    main_stack.extend(
-        [
-            action_buttons,
-            share_buttons,
-            html.Div(
-                t("ui.share.download_png_hint", locale=loc),
-                style={"fontSize": "13px", "color": "#94a3b8",
-                       "textAlign": "center", "marginTop": "14px"},
-                disable_n_clicks=True,
-            ),
-        ]
-    )
+    main_stack.append(share_panel)
 
     return html.Div(
         main_stack,

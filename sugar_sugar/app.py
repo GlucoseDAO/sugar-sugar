@@ -106,6 +106,7 @@ from sugar_sugar.components.landing import LandingPage, LandingPageMobile
 from sugar_sugar.components.consent_form import ConsentFormPage
 from sugar_sugar.components.submit import (
     FINISH_EXIT_BUTTON_CLASS,
+    WINDOWS_CLOSE_RED,
     SubmitComponent,
     finish_confirm_message,
     finish_confirm_overlay,
@@ -118,6 +119,7 @@ from sugar_sugar.components.ending import EndingPage
 from sugar_sugar.components.navbar import NavBar, MobileNavBar
 from sugar_sugar.components.share import (
     build_share_card_figure,
+    build_share_panel,
     build_synthesis_card,
     collect_playable_rounds,
     create_expired_layout,
@@ -5819,6 +5821,43 @@ def _build_aggregate_table_data(rounds: list[dict[str, Any]]) -> list[dict[str, 
     return [actual_row, prediction_row]
 
 
+def build_final_share_record(user_info: Dict[str, Any], *, locale: str) -> Optional[dict[str, Any]]:
+    """JSON-safe share record for the player's full game state, or None without rounds.
+
+    Captures every round across every format (current run + archived
+    `runs_by_format`), the frozen rankings, and a trimmed `user_info`.  The
+    record intentionally drops heavyweight stores (`full-df`, `events-df`) --
+    everything the share page needs already lives in `prediction_table_data`.
+    """
+    all_rounds: list[dict[str, Any]] = collect_playable_rounds(user_info)
+    if not all_rounds:
+        return None
+    played_formats: set[str] = {str(r.get("format") or "") for r in all_rounds}
+    played_formats.discard("")
+    study_id: str = str(user_info.get("study_id") or "")
+    rankings: dict[str, Any] = compute_share_rankings(
+        study_id, sorted(played_formats), key=email_key(user_info.get("email"))
+    )
+    return {
+        "schema_version": 2,
+        "created_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "locale": normalize_locale(locale),
+        "rounds": all_rounds,
+        "played_formats": sorted(played_formats, key=lambda x: FORMAT_ORDER.get(str(x), 999)),
+        "rankings": rankings,
+        "user_info": {
+            "name": str(user_info.get("name") or ""),
+            "nickname": normalize_nickname(user_info.get("nickname")),
+            "study_id": study_id,
+            "format": str(user_info.get("format") or ""),
+            "uses_cgm": bool(user_info.get("uses_cgm", False)),
+            "max_rounds": int(user_info.get("max_rounds") or MAX_ROUNDS),
+            "challenge_unknown": bool(user_info.get("challenge_unknown", False)),
+            "challenge_unknown_pct": user_info.get("challenge_unknown_pct", ""),
+        },
+    }
+
+
 def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], *, locale: str) -> html.Div:
     rounds: list[dict[str, Any]] = user_info.get('rounds') or []
     # If current rounds are empty (e.g. user just switched format), fall back to the
@@ -5878,7 +5917,14 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
     metrics_component_final = MetricsComponent()
     aggregate_table_data = _convert_table_data_units(_build_aggregate_table_data(rounds), unit)
     overall_metrics = metrics_component_final._calculate_metrics_from_table_data(aggregate_table_data)
-    overall_metrics_display = MetricsComponent.create_ending_metrics_display(overall_metrics, locale=locale) if overall_metrics else [
+    # Player-facing cards show only MAE and MAPE, with lay titles and units;
+    # MSE/RMSE are statistician detail and live inside the per-round fold.
+    overall_metrics_display = MetricsComponent.create_ending_metrics_display(
+        overall_metrics,
+        locale=locale,
+        metrics_subset=['MAE', 'MAPE'],
+        unit=unit,
+    ) if overall_metrics else [
         html.H3(t("ui.metrics.title_accuracy_metrics", locale=locale), style={'textAlign': 'center'}),
         html.Div(
             t("ui.metrics.no_metrics_available", locale=locale),
@@ -5891,6 +5937,31 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
             }
         )
     ]
+
+    def _overall_metric(name: str) -> Optional[float]:
+        metric = (overall_metrics or {}).get(name) or {}
+        value = metric.get('value')
+        return float(value) if value is not None else None
+
+    # Plain-language headline: the one number a regular player actually wants,
+    # in glucose units, before any acronym appears on the page.
+    hero_mae: Optional[float] = _overall_metric('MAE')
+    hero_mape: Optional[float] = _overall_metric('MAPE')
+    hero_line: Optional[html.Div] = None
+    if hero_mae is not None and hero_mape is not None:
+        hero_line = html.Div(
+            t(
+                "ui.final.hero_summary",
+                locale=locale,
+                mae=f"{hero_mae:.1f}",
+                unit=unit,
+                mape=f"{hero_mape:.1f}",
+            ),
+            id='final-hero-summary',
+            disable_n_clicks=True,
+        )
+    stats_mse: Optional[float] = _overall_metric('MSE')
+    stats_rmse: Optional[float] = _overall_metric('RMSE')
 
     round_rows: list[dict[str, Any]] = []
     for round_info in rounds:
@@ -5928,7 +5999,40 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
         else None
     )
 
+    # Inline share section: the share flow is part of /final itself -- no
+    # separate button, no navigation.  The record is content-addressed
+    # (`ensure_share`), so re-renders (language change, revisits) reuse the
+    # same file and URL; a new round yields a fresh id.
+    share_record: Optional[dict[str, Any]] = build_final_share_record(user_info, locale=locale)
+    share_section: Optional[html.Div] = None
+    if share_record is not None:
+        final_share_id: str = share_store.ensure_share(share_record)
+        share_section = html.Div(
+            [
+                html.H3(
+                    t("ui.share.button_share", locale=locale),
+                    style={
+                        'textAlign': 'center',
+                        'marginBottom': '4px',
+                        'fontSize': 'clamp(18px, 3vw, 24px)',
+                    },
+                ),
+                build_share_panel(
+                    share_record,
+                    share_id=final_share_id,
+                    share_url=_build_share_url(final_share_id),
+                    locale=locale,
+                ),
+            ],
+            id='final-share-panel',
+            disable_n_clicks=True,
+            style={'width': '100%', 'boxSizing': 'border-box'},
+        )
+
     _exit_label = t("ui.final.start_over", locale=locale)
+    # "Want to start another?" is only asked when there is a format left to
+    # start; otherwise the sentence would dangle with no "yes" button.
+    journey_key: str = "ui.final.journey_title" if switch_targets else "ui.final.journey_title_done"
     return html.Div([
         html.H1(t("ui.final.title", locale=locale), id='final-title', style={
             'textAlign': 'center',
@@ -5936,6 +6040,29 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
             'fontSize': 'clamp(24px, 4vw, 48px)',
             'padding': '0 10px'
         }),
+        # Medical disclaimer FIRST: for a diabetic audience "do not change
+        # medical decisions based on this app" must be seen, so it sits under
+        # the title — compact and without a dismiss icon — instead of two
+        # screens below the fold.
+        html.Div(
+            [
+                html.P(t("ui.results_disclaimer.line1", locale=locale), id='final-disclaimer-line1', style={'margin': '0'}),
+                html.P(t("ui.results_disclaimer.line2", locale=locale), id='final-disclaimer-line2', style={'margin': '0'}),
+                html.P(t("ui.results_disclaimer.line3", locale=locale), id='final-disclaimer-line3', style={'margin': '0'}),
+            ],
+            id='final-disclaimer',
+            className='ui warning message final-disclaimer-compact',
+            disable_n_clicks=True,
+            style={
+                'display': 'block',
+                'maxWidth': '900px',
+                'margin': '0 auto 14px auto',
+                'fontSize': '13px',
+                'lineHeight': '1.45',
+                'padding': '10px 16px',
+                'textAlign': 'center',
+            },
+        ),
         html.Div(
             t("ui.final.rounds_played", locale=locale, played=len(rounds), total=max_rounds),
             id='final-rounds-played',
@@ -5948,8 +6075,120 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
                 'color': '#2c5282'
             }
         ),
+        *([hero_line] if hero_line is not None else []),
+        leaderboard,
+        *([share_section] if share_section is not None else []),
+        *([synthesis_card] if synthesis_card is not None else []),
         html.Div(
-            t("ui.final.journey_title", locale=locale),
+            overall_metrics_display,
+            id='final-overall-metrics-container',
+            disable_n_clicks=True,
+            style={
+                'padding': 'clamp(10px, 2vw, 20px)',
+                'backgroundColor': 'white',
+                'borderRadius': '10px',
+                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+                'marginBottom': '20px',
+                'width': '100%',
+                'boxSizing': 'border-box'
+            }
+        ),
+        html.Div(
+            [
+                html.H3(
+                    t("ui.final.per_round_metrics", locale=locale),
+                    id='final-per-round-title',
+                    style={
+                        'textAlign': 'center',
+                        'marginBottom': '12px',
+                        'fontSize': 'clamp(18px, 3vw, 24px)',
+                    },
+                ),
+                html.Details(
+                    [
+                        html.Summary(
+                            [
+                                html.Span(
+                                    t("ui.ending.click_here_for_details", locale=locale),
+                                    className='fold-label-show',
+                                ),
+                                html.Span(
+                                    t("ui.ending.hide_details", locale=locale),
+                                    className='fold-label-hide',
+                                ),
+                            ],
+                            id='final-per-round-details-toggle',
+                            className='ending-fold-button',
+                        ),
+                        *([
+                            html.Div(
+                                t(
+                                    "ui.final.stats_note",
+                                    locale=locale,
+                                    mse=f"{stats_mse:.2f}",
+                                    rmse=f"{stats_rmse:.2f}",
+                                    unit=unit,
+                                ),
+                                id='final-stats-note',
+                                style={
+                                    'textAlign': 'center',
+                                    'margin': '12px 0 0 0',
+                                    'color': '#64748b',
+                                    'fontSize': '13px',
+                                },
+                            )
+                        ] if stats_mse is not None and stats_rmse is not None else []),
+                        html.Div(
+                            t("ui.ending.units_line", locale=locale, unit=unit),
+                            id='final-units-line',
+                            style={
+                                'textAlign': 'center',
+                                'margin': '12px 0 10px 0',
+                                'color': '#4a5568',
+                                'fontSize': '14px',
+                            },
+                        ),
+                        build_readonly_ag_grid(
+                            table_id='final-rounds-table',
+                            row_data=round_rows,
+                            column_defs=build_readonly_column_defs(
+                                [
+                                    {'name': t("ui.final.col_round", locale=locale), 'id': 'Round', 'type': 'numeric'},
+                                    {'name': t("ui.final.col_points", locale=locale), 'id': 'Pairs', 'type': 'numeric'},
+                                    {'name': 'MAE', 'id': 'MAE', 'type': 'numeric'},
+                                    {'name': 'MSE', 'id': 'MSE', 'type': 'numeric'},
+                                    {'name': 'RMSE', 'id': 'RMSE', 'type': 'numeric'},
+                                    {'name': 'MAPE', 'id': 'MAPE', 'type': 'numeric'},
+                                ],
+                                fixed_decimal_fields={'MAE', 'MSE', 'RMSE', 'MAPE'},
+                            ),
+                            style={
+                                'width': '100%',
+                                'overflowX': 'auto',
+                                'marginTop': '8px',
+                            },
+                        ),
+                    ],
+                    className='ending-fold',
+                ),
+            ],
+            id='final-per-round-section',
+            disable_n_clicks=True,
+            style={
+                'marginBottom': '20px',
+                'padding': 'clamp(10px, 2vw, 20px)',
+                'backgroundColor': 'white',
+                'borderRadius': '10px',
+                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+                'width': '100%',
+                'boxSizing': 'border-box',
+            },
+        ),
+        # Actions LAST: you leave after seeing everything, not before. The
+        # destructive Exit (wipes the session) is a labelled button, never a
+        # bare icon, and never the first interactive element on the page.
+        html.Div(
+            t(journey_key, locale=locale),
             id='final-journey-title',
             disable_n_clicks=True,
         ),
@@ -5962,13 +6201,6 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
         ),
         html.Div(
             [
-                html.Button(
-                    _exit_label,
-                    id='restart-button',
-                    className=FINISH_EXIT_BUTTON_CLASS,
-                    title=_exit_label,
-                    style=finish_exit_button_style(),
-                ),
                 _switch_format_button(
                     "A", locale=locale, short=True, visible="A" in switch_targets,
                 ),
@@ -5979,29 +6211,26 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
                     "C", locale=locale, short=True, visible="C" in switch_targets,
                 ),
                 html.Button(
-                    t("ui.share.button_share", locale=locale),
-                    id='share-results-button',
-                    n_clicks=0,
-                    className="ui green button",
+                    _exit_label,
+                    id='restart-button',
+                    className='ui button final-exit-button',
+                    title=_exit_label,
                     style={
-                        'backgroundColor': '#4CBB17',
+                        'backgroundColor': WINDOWS_CLOSE_RED,
                         'color': 'white',
-                        'padding': '0 16px',
+                        'height': '48px',
+                        'padding': '0 28px',
                         'border': 'none',
                         'borderRadius': '8px',
-                        'fontSize': '16px',
+                        'fontSize': '17px',
                         'fontWeight': '700',
                         'cursor': 'pointer',
-                        'height': '48px',
-                        'minHeight': '48px',
                         'display': 'inline-flex',
                         'alignItems': 'center',
                         'justifyContent': 'center',
                         'lineHeight': '1.2',
                         'margin': '0',
-                        'whiteSpace': 'nowrap',
-                        'flex': '1 1 auto',
-                        'maxWidth': '280px',
+                        'flexShrink': '0',
                     },
                 ),
             ],
@@ -6032,102 +6261,6 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
             id='final-played-formats',
             disable_n_clicks=True,
             style={'display': 'none'},
-        ),
-        leaderboard,
-        html.Div(
-            overall_metrics_display,
-            id='final-overall-metrics-container',
-            disable_n_clicks=True,
-            style={
-                'padding': 'clamp(10px, 2vw, 20px)',
-                'backgroundColor': 'white',
-                'borderRadius': '10px',
-                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
-                'marginBottom': '20px',
-                'width': '100%',
-                'boxSizing': 'border-box'
-            }
-        ),
-        *([synthesis_card] if synthesis_card is not None else []),
-        html.Div(
-            [
-                html.H3(
-                    t("ui.final.per_round_metrics", locale=locale),
-                    id='final-per-round-title',
-                    style={
-                        'textAlign': 'center',
-                        'marginBottom': '12px',
-                        'fontSize': 'clamp(18px, 3vw, 24px)',
-                    },
-                ),
-                html.Details(
-                    [
-                        html.Summary(
-                            t("ui.ending.click_here_for_details", locale=locale),
-                            id='final-per-round-details-toggle',
-                            className='ending-fold-button',
-                        ),
-                        html.Div(
-                            t("ui.ending.units_line", locale=locale, unit=unit),
-                            id='final-units-line',
-                            style={
-                                'textAlign': 'center',
-                                'margin': '12px 0 10px 0',
-                                'color': '#4a5568',
-                                'fontSize': '14px',
-                            },
-                        ),
-                        build_readonly_ag_grid(
-                            table_id='final-rounds-table',
-                            row_data=round_rows,
-                            column_defs=build_readonly_column_defs(
-                                [
-                                    {'name': 'Round', 'id': 'Round', 'type': 'numeric'},
-                                    {'name': 'Pairs', 'id': 'Pairs', 'type': 'numeric'},
-                                    {'name': 'MAE', 'id': 'MAE', 'type': 'numeric'},
-                                    {'name': 'MSE', 'id': 'MSE', 'type': 'numeric'},
-                                    {'name': 'RMSE', 'id': 'RMSE', 'type': 'numeric'},
-                                    {'name': 'MAPE', 'id': 'MAPE', 'type': 'numeric'},
-                                ],
-                                fixed_decimal_fields={'MAE', 'MSE', 'RMSE', 'MAPE'},
-                            ),
-                            style={
-                                'width': '100%',
-                                'overflowX': 'auto',
-                                'marginTop': '8px',
-                            },
-                        ),
-                    ],
-                    className='ending-fold',
-                ),
-            ],
-            disable_n_clicks=True,
-            style={
-                'marginBottom': '20px',
-                'padding': 'clamp(10px, 2vw, 20px)',
-                'backgroundColor': 'white',
-                'borderRadius': '10px',
-                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
-                'width': '100%',
-                'boxSizing': 'border-box',
-            },
-        ),
-        # Disclaimer after results (same idea as /ending: chart/results first).
-        html.Div(
-            [
-                html.I(className="close icon"),
-                html.P(t("ui.results_disclaimer.line1", locale=locale), id='final-disclaimer-line1', style={'margin': '0'}),
-                html.P(t("ui.results_disclaimer.line2", locale=locale), id='final-disclaimer-line2', style={'margin': '0'}),
-                html.P(t("ui.results_disclaimer.line3", locale=locale), id='final-disclaimer-line3', style={'margin': '0'}),
-            ],
-            className='ui warning message',
-            disable_n_clicks=True,
-            style={
-                'maxWidth': '900px',
-                'margin': '0 auto 20px auto',
-                'fontSize': '14px',
-                'lineHeight': '1.4',
-            },
         ),
     ], disable_n_clicks=True, style={
         'maxWidth': '100%',
@@ -7221,80 +7354,14 @@ def handle_share_play_again(n_clicks: Optional[int]) -> tuple:
     return _full_session_reset()
 
 
-@app.callback(
-    Output('url', 'pathname', allow_duplicate=True),
-    [Input('share-results-button', 'n_clicks')],
-    [State('user-info-store', 'data'),
-     State('interface-language', 'data')],
-    prevent_initial_call=True,
-)
-def handle_share_results_button(
-    n_clicks: Optional[int],
-    user_info: Optional[Dict[str, Any]],
-    interface_language: Optional[str],
-) -> str:
-    """Persist a share record and navigate the user to the public share page.
+# NOTE: there is deliberately no share callback anymore.  The share flow is
+# part of /final itself: `create_final_layout` builds the record via
+# `build_final_share_record`, persists it with `share_store.ensure_share`
+# (content-addressed, so re-renders reuse the file), and renders
+# `build_share_panel` eagerly.  /share/<id> remains the recipient-facing page.
 
-    The share record MUST capture every round the user has played across
-    every format they've tried, not just the currently-active run.  The
-    final page shows both; the share page must do the same or it'd hide
-    prior achievements.
-    """
-    if not n_clicks or not user_info:
-        raise PreventUpdate
-    with start_action(action_type=u"handle_share_results_button") as action:
-        current_format: str = str(user_info.get("format") or "")
-        current_n: int = len(user_info.get("rounds") or [])
-        all_rounds: list[dict[str, Any]] = collect_playable_rounds(user_info)
-        if not all_rounds:
-            action.log(message_type=u"no_rounds_to_share")
-            raise PreventUpdate
-        archived_n: int = max(0, len(all_rounds) - current_n)
-
-        # Figure out which formats the user has actually played (for the
-        # ranking block).  Include the current format if it has rounds.
-        played_formats: set[str] = {str(r.get("format") or "") for r in all_rounds}
-        played_formats.discard("")
-
-        study_id: str = str(user_info.get("study_id") or "")
-        rankings: dict[str, Any] = compute_share_rankings(
-            study_id, sorted(played_formats), key=email_key(user_info.get("email"))
-        )
-
-        # Strip the share record to JSON-safe primitives so it survives a
-        # round-trip through JSON on disk.  `prediction_table_data` is already
-        # a list of {str: str}; round_info is shallow dicts of primitives.
-        share_record: dict[str, Any] = {
-            "schema_version": 2,
-            "created_at": datetime.now().astimezone().isoformat(timespec="seconds"),
-            "locale": normalize_locale(interface_language),
-            "rounds": all_rounds,
-            "played_formats": sorted(played_formats, key=lambda x: FORMAT_ORDER.get(str(x), 999)),
-            "rankings": rankings,
-            "user_info": {
-                "name": str(user_info.get("name") or ""),
-                "nickname": normalize_nickname(user_info.get("nickname")),
-                "study_id": study_id,
-                "format": current_format,
-                "uses_cgm": bool(user_info.get("uses_cgm", False)),
-                "max_rounds": int(user_info.get("max_rounds") or MAX_ROUNDS),
-                "challenge_unknown": bool(user_info.get("challenge_unknown", False)),
-                "challenge_unknown_pct": user_info.get("challenge_unknown_pct", ""),
-            },
-        }
-        share_id: str = share_store.save_share(share_record)
-        action.log(
-            message_type=u"share_saved",
-            share_id=share_id,
-            total_rounds=len(all_rounds),
-            archived_rounds=archived_n,
-            current_rounds=current_n,
-            played_formats=sorted(played_formats),
-        )
-    return f"/share/{share_id}"
-
-
-# Clientside: clipboard copy for the "Copy link" button on the share page.
+# Clientside: clipboard copy for the "Copy link" button on the share panel
+# (present on both /final and /share/<id>).
 app.clientside_callback(
     """
     function(n_clicks, url) {

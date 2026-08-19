@@ -313,14 +313,16 @@ de:
     synthesis:
       title: "Vorhersagefehler in der nächsten Stunde"
       x_axis: "Zeit (Minuten ab Beginn der verborgenen nächsten Stunde, jeder 5-Min-Schritt)"
-      x_axis_time: "Zeit"
+      x_axis_time: "Minuten voraus"
       y_axis: "Fehler vs. Istwert, in Prozent des Istwerts"
       y_axis_short: "Fehler"
-      legend_zero: "Keine Abweichung"
-      legend_variability: "Variationslinie"
+      legend_zero: "Perfekte Vorhersage (0 %%)"
+      legend_variability: "Dein Fehler — eine Linie pro Runde"
+      dir_high: "↑ zu hoch geschätzt"
+      dir_low: "↓ zu niedrig geschätzt"
       legend_error: "Fehler vs. Istwert, eine Linie pro Runde"
       round_hover: "Runde"
-      caption: "Jede Zeile ist eine genutzte Datenquelle. Zeit = volle nächste Stunde (alle 5-Min-Schritte). Y ist prozentual zum Istwert. Die Fläche zwischen Linie und Null zeigt die Runde."
+      caption: "Jede farbige Linie ist eine Runde; ein Feld pro genutzter Datenquelle. Die schwarze 0%%-Linie ist eine perfekte Vorhersage — Punkte darüber haben den echten Glukosewert zu hoch geschätzt, Punkte darunter zu niedrig."
       empty: "Keine Chart-Daten."
 
   chart:
@@ -387,6 +389,7 @@ de:
     title: "Vorhersage‑Zusammenfassung"
     prediction_results: "Vorhersage‑Ergebnisse"
     click_here_for_details: "Hier klicken für Details"
+    hide_details: "Details ausblenden"
     units_line: "Einheiten: %{unit}"
     next_round: "Nächste Runde"
     view_complete_analysis: "Komplette Analyse ansehen"
@@ -469,6 +472,11 @@ de:
     per_round_metrics: "Metriken pro Runde"
     start_over: "Beenden"
     journey_title: "Du hast diese epische Reise beendet — möchtest du eine neue starten?"
+    journey_title_done: "Du hast diese epische Reise beendet — danke für deinen Beitrag zur Forschung!"
+    hero_summary: "Im Durchschnitt lagen deine Vorhersagen %{mae} %{unit} daneben — etwa %{mape}%% vom echten Wert entfernt"
+    col_round: "Runde"
+    col_points: "Verglichene Punkte"
+    stats_note: "Für Statistiker: MSE %{mse} · RMSE %{rmse} %{unit}"
 
   switch_format:
     title: "Du kannst auch ausprobieren..."

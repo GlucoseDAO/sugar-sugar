@@ -19,16 +19,31 @@ gets involved.
 
 ## Share Record Lifecycle
 
-The final page's `share-results-button` is handled by
-`handle_share_results_button()` in `sugar_sugar/app.py`.
+The share flow is part of `/final` itself — there is no share button and no
+share callback. `create_final_layout()` in `sugar_sugar/app.py`:
 
-That callback:
+1. Builds the record via `build_final_share_record()`: merges current rounds
+   with archived `runs_by_format`, tags every round with its data-source
+   format (`A`, `B`, or `C`), computes rankings, and trims `user_info` to a
+   small JSON-safe subset.
+2. Persists it with `share_store.ensure_share()` under a **content-addressed
+   id** — a salted HMAC (`nickname.deployment_salt()`, domain prefix
+   `share-id:`) of the rounds plus the trimmed `user_info`. `created_at`,
+   `locale` and `rankings` are excluded from the hash, so revisits and
+   language changes reuse the existing file and URL instead of minting a new
+   record per render; a new round (or a nickname change) yields a fresh id.
+   The write is skipped when the file already exists, which freezes
+   `created_at` and the rankings at the first render of that game state.
+3. Renders the share panel (download / copy-link / social buttons, built by
+   `build_share_panel` in `sugar_sugar/components/share.py`) as a regular
+   `/final` section right after the leaderboard — the share impulse peaks at
+   the ranking, so the panel precedes the synthesis graph and metric detail.
 
-1. Merges current rounds with archived `runs_by_format`.
-2. Tags every round with its data-source format (`A`, `B`, or `C`).
-3. Computes and freezes overall plus per-format rankings.
-4. Writes a small JSON-safe share record.
-5. Redirects the browser to `/share/<share_id>`.
+The owner never leaves `/final`. The public `/share/<share_id>` page still
+exists — it is what the social links point at and what recipients open — but
+it is a recipient-facing page, not a step in the owner's flow. Old records are
+never deleted, so previously shared URLs keep working after the player plays
+more rounds (which simply produces a new id).
 
 Share records are stored by `sugar_sugar/share_store.py` as one JSON file per
 share:

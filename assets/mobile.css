@@ -1193,19 +1193,15 @@ html.mobile-device #final-action-row {
   padding: 0 8px !important;
   overflow-x: auto;
 }
-html.mobile-device #final-action-row #share-results-button {
-  height: 44px !important;
-  min-height: 44px !important;
-  font-size: 14px !important;
-  min-width: 120px;
-  padding: 0 12px !important;
-}
+/* Labelled Exit button on /final: keep it compact but never icon-only. */
 html.mobile-device #restart-button {
-  width: 44px !important;
-  min-width: 44px !important;
-  max-width: 44px !important;
+  width: auto !important;
+  min-width: 96px !important;
+  max-width: none !important;
   height: 44px !important;
-  flex: 0 0 44px !important;
+  padding: 0 20px !important;
+  font-size: 15px !important;
+  flex: 0 0 auto !important;
 }
 html.mobile-device #finish-study-button-ending.finish-study-results {
   width: auto !important;

@@ -312,14 +312,16 @@ zh:
     synthesis:
       title: "下一小时预测误差"
       x_axis: "时间（从隐藏的下一小时起点算起的分钟数，每 5 分钟一个点）"
-      x_axis_time: "时间"
+      x_axis_time: "未来分钟数"
       y_axis: "相对实际值的误差百分比（每 5 分钟一个点）"
       y_axis_short: "误差"
-      legend_zero: "无偏差"
-      legend_variability: "波动线"
+      legend_zero: "完美预测（0%%）"
+      legend_variability: "你的误差 — 每回合一条线"
+      dir_high: "↑ 预测偏高"
+      dir_low: "↓ 预测偏低"
       legend_error: "相对实际值的误差，每轮一条线"
       round_hover: "轮次"
-      caption: "每一行对应你使用过的一种数据源。时间轴覆盖整段下一小时（每 5 分钟一个点）。纵轴为相对实际值的误差百分比。折线与零线之间的阴影区域表示该轮的表现。"
+      caption: "每条彩色线代表一个回合；每个数据来源占一个面板。黑色 0%% 线表示完美预测 — 线上方的点预测值高于实际血糖，下方的点低于实际血糖。"
       empty: "暂无图表数据。"
 
   chart:
@@ -386,6 +388,7 @@ zh:
     title: "预测总结"
     prediction_results: "预测结果"
     click_here_for_details: "点击此处查看详情"
+    hide_details: "隐藏详情"
     units_line: "单位：%{unit}"
     next_round: "下一轮"
     view_complete_analysis: "查看完整分析"
@@ -468,6 +471,11 @@ zh:
     per_round_metrics: "每轮指标"
     start_over: "退出"
     journey_title: "你已经走完这段史诗旅程 — 想再来一局吗？"
+    journey_title_done: "你已经走完这段史诗旅程 — 感谢你为研究做出的贡献！"
+    hero_summary: "平均而言，你的预测偏差为 %{mae} %{unit} — 约为实际值的 %{mape}%%"
+    col_round: "回合"
+    col_points: "对比点数"
+    stats_note: "统计指标：MSE %{mse} · RMSE %{rmse} %{unit}"
 
   switch_format:
     title: "你也可以试试..."

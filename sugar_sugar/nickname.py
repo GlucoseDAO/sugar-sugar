@@ -88,6 +88,17 @@ def _salt() -> bytes:
     return generated.encode("utf-8")
 
 
+def deployment_salt() -> bytes:
+    """Deployment-stable secret salt for HMAC-derived public identifiers.
+
+    Shared by :func:`email_key` and the content-addressed share ids in
+    ``share_store`` (each HMAC uses its own domain prefix, so the derived
+    keys never collide across uses).  Same stability warning as the module
+    docstring: never rotate it.
+    """
+    return _salt()
+
+
 def email_key(email: Optional[str]) -> str:
     """Non-reversible grouping key for an address; ``""`` when there is no email.
 

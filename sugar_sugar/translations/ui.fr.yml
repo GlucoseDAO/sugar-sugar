@@ -314,14 +314,16 @@ fr:
     synthesis:
       title: "Erreur de prédiction sur l’heure suivante"
       x_axis: "Temps (minutes depuis le début de l’heure masquée suivante — chaque pas de 5 min)"
-      x_axis_time: "Temps"
+      x_axis_time: "Minutes à venir"
       y_axis: "Écart relatif, en pourcentage du mesuré"
       y_axis_short: "Écart"
-      legend_zero: "Aucun écart"
-      legend_variability: "Courbe de variabilité"
+      legend_zero: "Prédiction parfaite (0 %%)"
+      legend_variability: "Ton erreur — une ligne par manche"
+      dir_high: "↑ estimé trop haut"
+      dir_low: "↓ estimé trop bas"
       legend_error: "Écart vs mesuré, une courbe par manche"
       round_hover: "Manche"
-      caption: "Chaque ligne est une source utilisée. Temps = heure suivante entière (tous les pas de 5 min). Y = pourcentage par rapport au mesuré. L’aire entre la courbe et zéro représente la manche."
+      caption: "Chaque ligne colorée est une manche ; un panneau par source de données jouée. La ligne noire à 0 %% correspond à une prédiction parfaite — les points au-dessus ont estimé la glycémie réelle trop haut, ceux en dessous trop bas."
       empty: "Aucune donnée graphique."
 
   chart:
@@ -388,6 +390,7 @@ fr:
     title: "Résumé de la prédiction"
     prediction_results: "Résultats de la prédiction"
     click_here_for_details: "Clique ici pour les détails"
+    hide_details: "Masquer les détails"
     units_line: "Unités : %{unit}"
     next_round: "Manche suivante"
     view_complete_analysis: "Voir l'analyse complète"
@@ -470,6 +473,11 @@ fr:
     per_round_metrics: "Métriques par manche"
     start_over: "Quitter"
     journey_title: "Tu as terminé ce voyage épique — envie d'en commencer un autre ?"
+    journey_title_done: "Tu as terminé ce voyage épique — merci de contribuer à la recherche !"
+    hero_summary: "En moyenne, tes prédictions étaient à %{mae} %{unit} de la réalité — environ %{mape}%% de la valeur réelle"
+    col_round: "Manche"
+    col_points: "Points comparés"
+    stats_note: "Pour les statisticiens : MSE %{mse} · RMSE %{rmse} %{unit}"
 
   switch_format:
     title: "Tu peux aussi essayer..."

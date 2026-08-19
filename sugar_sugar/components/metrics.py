@@ -150,13 +150,36 @@ class MetricsComponent(html.Div):
         *,
         locale: str = "en",
         include_title: bool = True,
+        metrics_subset: Optional[list[str]] = None,
+        unit: Optional[str] = None,
     ) -> list[Any]:
         """Create metrics display for the ending page.
 
         When ``include_title`` is False the H3 is omitted (e.g. foldable summary
         already shows the title).
+
+        ``metrics_subset`` limits the cards to the given metric names in the
+        given order (``/final`` shows only MAE and MAPE; MSE/RMSE live in the
+        per-round details fold there). ``unit`` appends the glucose unit to
+        MAE/RMSE values so a number is never shown without one. Card titles
+        keep the established acronyms — the plain-words explanation belongs in
+        the description line, never in a renamed title.
         """
         print(f"DEBUG: create_ending_metrics_display called with stored metrics: {bool(stored_metrics)}")
+
+        if stored_metrics and metrics_subset is not None:
+            stored_metrics = {
+                name: stored_metrics[name]
+                for name in metrics_subset
+                if name in stored_metrics
+            }
+
+        def _card_value(metric: str, value: float) -> str:
+            if metric == "MAPE":
+                return f"{value:.2f}%"
+            if unit and metric in ("MAE", "RMSE"):
+                return f"{value:.2f} {unit}"
+            return f"{value:.2f}"
 
         title: list[Any] = []
         if include_title:
@@ -191,7 +214,7 @@ class MetricsComponent(html.Div):
                             'display': 'block',
                             'marginBottom': '8px',
                         }),
-                        html.Div(f"{data['value']:.2f}" + ("%" if metric == "MAPE" else ""),
+                        html.Div(_card_value(metric, float(data['value'])),
                                style={
                                    'fontSize': 'clamp(18px, 3vw, 24px)',
                                    'color': '#2c5282',
