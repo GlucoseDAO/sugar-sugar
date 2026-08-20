@@ -42,6 +42,10 @@ def _chart_request_is_mobile() -> bool:
 _FOOD_LINE_COLOR: str = "#2e7d32"
 _APPLE_ICON_SRC: str = "/assets/images/apple.svg"
 _FOOD_CLUSTER_X_GAP: float = 1.8
+# Where a meal marker sits when it falls inside the hidden hour, as a fraction of
+# the y-axis span. Deliberately not the meal's real glucose value -- that is the
+# number the player is being asked to predict.
+_HIDDEN_MARKER_Y_FRAC: float = 0.88
 FOOD_COMPOSITE_MAX: int = 6
 _FOOD_COMPOSITE_PREFIX: str = "composite:"
 
@@ -97,14 +101,14 @@ def cluster_visible_food_events(
     events_df: pl.DataFrame,
     *,
     source_name: str,
-    hide_last_hour: bool,
 ) -> list[FoodEventCluster]:
-    """Group meal markers that would overlap into one clickable cluster."""
+    """Group meal markers that would overlap into one clickable cluster.
+
+    Meals in the predicted hour are included: see `visible_food_photo_events`.
+    """
     if window_df.height == 0:
         return []
-    meals = visible_food_photo_events(
-        window_df, events_df, hide_last_hour=hide_last_hour
-    )
+    meals = visible_food_photo_events(window_df, events_df)
     items: list[tuple[float, str, str]] = []
     for meal in meals:
         event_time = meal["time"]
@@ -157,10 +161,9 @@ def meal_food_bubble_children(
     events_df: pl.DataFrame,
     *,
     source_name: str,
-    hide_last_hour: bool,
     locale: str = "en",
 ) -> list[html.Button]:
-    """HTML speech bubbles above the plot, one per visible meal cluster."""
+    """HTML speech bubbles above the plot, one per meal cluster in the window."""
     if window_df.height == 0:
         return []
     n_points = float(len(window_df))
@@ -169,7 +172,6 @@ def meal_food_bubble_children(
         window_df,
         events_df,
         source_name=source_name,
-        hide_last_hour=hide_last_hour,
     ):
         cluster = FoodEventCluster(
             x_pos=cluster.x_pos,
@@ -407,7 +409,6 @@ class GlucoseChart(html.Div):
                     df,
                     events_df,
                     source_name=str(source_name or ""),
-                    hide_last_hour=hide_last_hour_flag,
                     locale=locale,
                 )
                 return figure, bubbles
@@ -751,9 +752,17 @@ class GlucoseChart(html.Div):
         """Adds event markers (insulin syringe, exercise, carb apple) to the figure.
 
         Insulin/carbs use SVG ``layout_image`` markers (plotly.js does not render
-        custom ``path://`` symbols from Python). On the prediction page
-        (``hide_last_hour``), those icons appear only in known history — never
-        in the last hour — so they cannot tip the draw. Results show all.
+        custom ``path://`` symbols from Python).
+
+        On the prediction page (``hide_last_hour``) **meals stay visible in the
+        predicted hour** — a player always knows when they ate, and hiding it
+        made them draw a flat line into a post-meal rise they had no way to see
+        coming. Insulin keeps its old behaviour and is dropped past the boundary.
+
+        A meal past the boundary is pinned to a neutral rail near the top of the
+        plot instead of sitting at its true glucose height, which would hand over
+        the very value being predicted, and gets a dotted guide line so its
+        timing is unambiguous without the glucose trace behind it.
         """
         if self._current_events.height == 0:
             return
@@ -775,9 +784,13 @@ class GlucoseChart(html.Div):
 
         y_min, y_max = self._calculate_y_axis_range()
         y_span = max(y_max - y_min, 1.0)
+        # Neutral rail for markers past the prediction boundary: high enough to
+        # read as "not a glucose value", low enough to leave room for stacking.
+        hidden_marker_y = y_min + _HIDDEN_MARKER_Y_FRAC * y_span
 
         # Collect insulin/carb icons first so near-identical x positions can stack.
         icon_markers: list[dict[str, Any]] = []
+        hidden_marker_x: list[float] = []
         for event_type in ("Insulin", "Carbohydrates"):
             style = self.EVENT_STYLES[event_type]
             events = window_events.filter(pl.col("event_type") == event_type)
@@ -789,8 +802,12 @@ class GlucoseChart(html.Div):
                 continue
             for event_time in events.get_column("time"):
                 x_pos, glucose_value = self._event_xy_for_time(event_time)
-                if self.hide_last_hour and x_pos > float(known_end_idx):
+                past_boundary = self.hide_last_hour and x_pos > float(known_end_idx)
+                if past_boundary and event_type != "Carbohydrates":
                     continue
+                if past_boundary:
+                    # Never place it at the hidden glucose value -- that is the answer.
+                    glucose_value = hidden_marker_y
                 event_row = events.filter(pl.col("time") == event_time)
                 if event_type == "Carbohydrates":
                     photo = (
@@ -817,6 +834,8 @@ class GlucoseChart(html.Div):
                         f"{legend_name_by_type[event_type]}"
                         f"<br>{event_time.strftime('%H:%M')}"
                     )
+                if past_boundary:
+                    hidden_marker_x.append(x_pos)
                 icon_markers.append(
                     {
                         "event_type": event_type,
@@ -826,6 +845,22 @@ class GlucoseChart(html.Div):
                         "style": style,
                     }
                 )
+
+        # Without the glucose trace behind it, an icon alone reads as floating;
+        # the guide line ties it to a time on the axis (same treatment the
+        # photo/note meals already get from _add_food_photo_guides).
+        for x_pos in hidden_marker_x:
+            figure.add_shape(
+                type="line",
+                x0=x_pos,
+                x1=x_pos,
+                y0=0,
+                y1=1,
+                xref="x",
+                yref="paper",
+                line=dict(color=_FOOD_LINE_COLOR, width=1.5, dash="dot"),
+                layer="below",
+            )
 
         self._stack_icon_markers(icon_markers, y_span=y_span, y_max=y_max)
         icon_legend_entries = self._draw_icon_markers(
@@ -873,7 +908,6 @@ class GlucoseChart(html.Div):
             self._current_df,
             self._current_events,
             source_name=str(self._current_source or ""),
-            hide_last_hour=self.hide_last_hour,
         )
         if not clusters:
             return

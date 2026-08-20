@@ -164,20 +164,21 @@ def _pad_window(base: pl.DataFrame, *, hours_before: int = 0, hours_after: int =
     return pl.concat([part.cast(schema) for part in parts])
 
 
-def test_food_photos_in_last_hour_are_hidden() -> None:
+def test_food_photos_in_last_hour_stay_visible() -> None:
+    """A meal inside the predicted hour must show while the player draws.
+
+    It used to be clipped at the prediction boundary and only appeared on the
+    results screen, so the player drew into a post-meal rise with no way to see
+    it coming. Only the meal's timing is revealed -- the glucose trace for that
+    hour is still hidden, and the marker is pinned to a neutral height.
+    """
     glucose_df, events_df = load_cgmacros_data(SUBJECT_001)
     visible = _pad_window(glucose_df, hours_after=2)
-    shown = visible_food_photo_events(visible, events_df, hide_last_hour=True)
-    assert len(shown) == 2
+    assert len(visible_food_photo_events(visible, events_df)) == 2
+
+    # This slice puts a meal inside the last (hidden) hour.
     hidden_slice = _pad_window(glucose_df, hours_before=2)
-    last_hour_hidden = visible_food_photo_events(
-        hidden_slice, events_df, hide_last_hour=True
-    )
-    assert last_hour_hidden == []
-    revealed = visible_food_photo_events(
-        hidden_slice, events_df, hide_last_hour=False
-    )
-    assert len(revealed) == 1
+    assert len(visible_food_photo_events(hidden_slice, events_df)) == 1
 
 
 def test_close_meal_photos_cluster_into_one_composite_bubble() -> None:
@@ -205,7 +206,6 @@ def test_close_meal_photos_cluster_into_one_composite_bubble() -> None:
         window_df,
         events_df,
         source_name="CGMacros-001.csv",
-        hide_last_hour=False,
     )
     assert len(clusters) == 1
     assert clusters[0].photo_urls == [
@@ -216,7 +216,6 @@ def test_close_meal_photos_cluster_into_one_composite_bubble() -> None:
         window_df,
         events_df,
         source_name="CGMacros-001.csv",
-        hide_last_hour=False,
     )
     assert len(bubbles) == 1
     assert bubbles[0].id["index"].startswith("composite:")
@@ -253,7 +252,6 @@ def test_meal_bubbles_and_food_line_use_photo() -> None:
         glucose_df,
         events_df,
         source_name="CGMacros-001.csv",
-        hide_last_hour=False,
     )
     indexes = {bubble.id["index"] for bubble in bubbles}
     assert "/cgmacros/CGMacros-001/photo/photos/meal-before.jpg" in indexes
@@ -279,7 +277,6 @@ def test_meal_bubbles_and_food_line_use_photo() -> None:
         glucose_df,
         events_df,
         source_name="CGMacros-001.csv",
-        hide_last_hour=False,
         locale="ro",
     )
     assert ro_bubbles

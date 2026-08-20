@@ -164,7 +164,6 @@ def test_meal_bubbles_open_notepad_not_photo() -> None:
         glucose_df,
         events_df,
         source_name="BIGIDEAS-001.csv",
-        hide_last_hour=False,
     )
     assert len(bubbles) == 1
     note = events_df.get_column("food_note").to_list()[0]

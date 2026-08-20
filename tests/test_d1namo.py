@@ -194,7 +194,6 @@ def test_meal_bubbles_use_d1namo_photo_url() -> None:
         glucose_df,
         events_df,
         source_name="D1NAMO-001.csv",
-        hide_last_hour=False,
     )
     assert len(bubbles) == 1
     assert bubbles[0].id["index"] == "/d1namo/001/photo/pictures/meal.jpg"

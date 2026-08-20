@@ -36,7 +36,6 @@ import polars as pl
 from cgm_format import FormatParser
 from eliot import start_action
 
-from sugar_sugar.config import PREDICTION_HOUR_OFFSET
 from sugar_sugar.corpus import adapt_unified, empty_events_frame
 from sugar_sugar.download_cgmacros import default_dest, dataset_is_present
 
@@ -425,28 +424,34 @@ def window_has_visible_food_photo(
     window_df: pl.DataFrame,
     events_df: pl.DataFrame,
 ) -> bool:
-    """True when a meal photo sits in the visible (non-hidden) part of the window."""
-    return bool(visible_food_photo_events(window_df, events_df, hide_last_hour=True))
+    """True when a meal photo sits anywhere in the window."""
+    return bool(visible_food_photo_events(window_df, events_df))
 
 
 def visible_food_photo_events(
     window_df: pl.DataFrame,
     events_df: pl.DataFrame,
-    *,
-    hide_last_hour: bool,
 ) -> list[dict[str, object]]:
-    """Meal rows that have a photo and are allowed to render on this slice."""
+    """Meal rows carrying a photo or note, anywhere in the window.
+
+    Meals are **not** clipped at the prediction boundary.  A meal inside the
+    hidden hour used to stay invisible until the results screen, so a player
+    drew a flat or falling line into what was actually a post-meal rise and only
+    found out afterwards -- the marker did not just withhold a hint, it made the
+    displayed history misleading.  Nobody predicts their own glucose without
+    knowing they are about to eat, so the marker belongs on the chart while the
+    prediction is being drawn.
+
+    Only the *timing* is revealed.  The glucose trace for the hidden hour stays
+    hidden, and `GlucoseChart._add_event_markers` pins markers past the boundary
+    to a neutral height so the icon cannot be read off as the answer.
+    """
     if window_df.height == 0 or events_df.height == 0:
         return []
     if "photo_path" not in events_df.columns or "time" not in events_df.columns:
         return []
     start_time = window_df.get_column("time")[0]
-    if hide_last_hour and window_df.height > PREDICTION_HOUR_OFFSET:
-        visible_end = window_df.get_column("time")[
-            window_df.height - PREDICTION_HOUR_OFFSET - 1
-        ]
-    else:
-        visible_end = window_df.get_column("time")[-1]
+    visible_end = window_df.get_column("time")[-1]
     rows: list[dict[str, object]] = []
     for row in events_df.iter_rows(named=True):
         photo = str(row.get("photo_path") or "").strip()

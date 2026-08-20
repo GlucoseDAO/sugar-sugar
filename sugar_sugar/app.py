@@ -4945,7 +4945,6 @@ def create_ending_layout(
                             df,
                             events_df,
                             source_name=str(user_info.get('data_source_name') or '') if user_info else '',
-                            hide_last_hour=False,
                             locale=locale,
                         ),
                         id='ending-food-bubbles',
