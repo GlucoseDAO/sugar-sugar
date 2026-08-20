@@ -3,8 +3,9 @@
 // The counter exists only on the landing page, but this file is served
 // everywhere. The MutationObserver below therefore does the least it can: at
 // most one querySelectorAll per animation frame, however many mutations Dash
-// fires, and it disconnects once a counter has been animated (the element is
-// re-created on language change, so it re-arms via the Dash navigation render).
+// fires. It stays connected for the session because the counter element is
+// re-created on language change and client-side navigation; the per-element
+// `data-animated` flag is what stops it re-animating.
 (function () {
   var DURATION_MS = 1200;
   var scanQueued = false;

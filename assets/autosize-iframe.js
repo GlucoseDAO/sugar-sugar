@@ -60,6 +60,11 @@
         }
         frame.setAttribute(WIRED_ATTR, "1");
         frame.addEventListener("load", function () {
+            // A srcdoc change (language switch on /about) replaces the inner
+            // document, so the observer from the previous one is now watching a
+            // detached node. Clear the flag or observeContent() would no-op and
+            // late reflow past the settle window would never re-fit.
+            frame._autosizeObserved = false;
             resizeFrame(frame);
             observeContent(frame);
             settle(frame);
