@@ -92,14 +92,16 @@ def test_landing_counter_mentions_completers_and_the_punchline(
 
     counter = games_played_counter("en")
     children = list(counter.children)
-    assert children[0].children == "2 gamers played so far"
+    assert children[0].children == "2 players so far"
     assert children[0].className == "games-played-completed"
     assert children[1].className == "games-played-count"
     props = children[1].to_plotly_json().get("props") or {}
     assert props.get("data-target") == "1"
-    assert children[2].children == "completed the task"
+    assert children[2].children == "of them completed the task"
     assert "Be part of the victors" in children[3].children
-    assert children[4].children == "2 games, but only 1 completed"
+    assert children[4].children == (
+        "2 games started, 1 finished — one person can play several times"
+    )
     assert children[4].className == "games-played-slots"
 
 

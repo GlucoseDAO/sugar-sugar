@@ -53,9 +53,9 @@ ro:
     games_played_so_far_count: "%{count} jocuri jucate până acum"
     gamers_played_so_far_count: "%{count} jucători până acum"
     games_played_completed: "dintre care %{count} au finalizat sarcina"
-    completed_the_task_label: "au finalizat sarcina"
+    completed_the_task_label: "dintre ei au finalizat sarcina"
     victors_punchline: "Fii printre învingători — ieși în evidență din mulțime"
-    games_slots_line: "%{total} jocuri, dar doar %{completed} finalizate"
+    games_slots_line: "%{total} jocuri începute, %{completed} finalizate — o persoană poate juca de mai multe ori"
 
   about:
     title: "Despre Sugar-Sugar"

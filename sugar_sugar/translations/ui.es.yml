@@ -55,9 +55,9 @@ es:
     games_played_so_far_count: "%{count} partidas jugadas hasta ahora"
     gamers_played_so_far_count: "%{count} jugadores hasta ahora"
     games_played_completed: "de las cuales %{count} completaron la tarea"
-    completed_the_task_label: "completaron la tarea"
+    completed_the_task_label: "de ellos completaron la tarea"
     victors_punchline: "Únete a los vencedores — destaca entre la multitud"
-    games_slots_line: "%{total} partidas, pero solo %{completed} completadas"
+    games_slots_line: "%{total} partidas empezadas, %{completed} terminadas — una persona puede jugar varias veces"
 
   consent_form:
     title: "Aviso de consentimiento"

@@ -51,11 +51,11 @@ en:
     take_me_in: "Take me in"
     games_played_so_far: "Games played so far"
     games_played_so_far_count: "%{count} games played so far"
-    gamers_played_so_far_count: "%{count} gamers played so far"
+    gamers_played_so_far_count: "%{count} players so far"
     games_played_completed: "out of which %{count} completed the task"
-    completed_the_task_label: "completed the task"
+    completed_the_task_label: "of them completed the task"
     victors_punchline: "Be part of the victors — stand out of the crowd"
-    games_slots_line: "%{total} games, but only %{completed} completed"
+    games_slots_line: "%{total} games started, %{completed} finished — one person can play several times"
 
   consent_form:
     title: "Consent notice"
