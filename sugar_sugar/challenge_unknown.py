@@ -1,9 +1,11 @@
 """Challenge the unknown: mix the opposite Format A pool on purpose.
 
-Default Format A routing is fixed by diabetes status. Non-diabetic and type 1
-players can opt into a slider that injects the other corpus (D1NAMO vs BIG
-IDEAs) in 10% steps. Type 2 / prediabetes / LADA already have a mixture, so
-the control does not apply. Gestational stays on BIG IDEAs only.
+Default Format A routing is fixed by diabetes status. Only players whose
+default pool is already a single corpus can opt in: no diabetes (BIG IDEAs)
+or type 1 (D1NAMO). Type 2 / prediabetes / LADA already mix both corpora, so
+the checkbox is hidden. Gestational stays on BIG IDEAs and is not offered the
+challenge. Half the rounds then come from the other corpus. Format B (own
+data) never uses this.
 """
 from __future__ import annotations
 
@@ -12,10 +14,9 @@ from typing import Any, Optional
 POOL_BIGIDEAS: str = "bigideas"
 POOL_D1NAMO: str = "d1namo"
 CHALLENGE_FORMATS: frozenset[str] = frozenset({"A", "C"})
-CHALLENGE_PCT_MIN: int = 10
-CHALLENGE_PCT_MAX: int = 100
-CHALLENGE_PCT_STEP: int = 10
-DEFAULT_CHALLENGE_PCT: int = 10
+# Fixed opposite-pool share so every opted-in player is comparable.
+CHALLENGE_UNKNOWN_PCT: int = 50
+CHALLENGE_OPPOSITE_SHARE: float = CHALLENGE_UNKNOWN_PCT / 100.0
 MIX_POLICY_PREFIX: str = "mix:"
 
 
@@ -30,14 +31,6 @@ def is_type_1(user_info: dict[str, Any] | None) -> bool:
     return _diabetes_kind(user_info) in {"type 1", "type1", "t1"}
 
 
-def challenge_unknown_diabetes_eligible(user_info: dict[str, Any] | None) -> bool:
-    """True after the player picks no diabetes, or type 1."""
-    info = user_info or {}
-    if info.get("diabetic") is False:
-        return True
-    return is_type_1(info)
-
-
 def challenge_unknown_checked(raw: Any) -> bool:
     """True when the startup checklist (or a leftover bool store) is opted in."""
     if raw is True:
@@ -47,35 +40,38 @@ def challenge_unknown_checked(raw: Any) -> bool:
     return False
 
 
+def _format_code(
+    user_info: dict[str, Any] | None,
+    format_value: Optional[str] = None,
+) -> str:
+    info = user_info or {}
+    return str(format_value if format_value is not None else info.get("format") or "").strip().upper()
+
+
+def _pure_pool_player(user_info: dict[str, Any] | None) -> bool:
+    """True for the two groups whose Format A default is one corpus, not a mix."""
+    info = user_info or {}
+    if info.get("diabetic") is True:
+        return is_type_1(info)
+    return info.get("diabetic") is False
+
+
 def challenge_unknown_visible(
     user_info: dict[str, Any] | None = None,
     format_value: Optional[str] = None,
 ) -> bool:
-    """Show after a no-diabetes or type-1 answer, unless Format B (own data)."""
-    info = user_info or {}
-    fmt = str(format_value if format_value is not None else info.get("format") or "").strip().upper()
-    if fmt == "B":
-        return False
-    return challenge_unknown_diabetes_eligible(info)
+    """Show only for non-diabetic or type 1, on Public / Public + My Data."""
+    return challenge_unknown_eligible(user_info, format_value)
 
 
 def challenge_unknown_eligible(
     user_info: dict[str, Any] | None = None,
     format_value: Optional[str] = None,
 ) -> bool:
-    """True for generic / generic+own play on a single-pool diabetes category."""
-    info = user_info or {}
-    fmt = str(format_value if format_value is not None else info.get("format") or "").strip().upper()
-    return challenge_unknown_diabetes_eligible(info) and fmt in CHALLENGE_FORMATS
-
-
-def snap_challenge_pct(raw: Any) -> int:
-    try:
-        value = int(round(float(raw)))
-    except (TypeError, ValueError):
-        return DEFAULT_CHALLENGE_PCT
-    stepped = int(round(value / CHALLENGE_PCT_STEP) * CHALLENGE_PCT_STEP)
-    return max(CHALLENGE_PCT_MIN, min(CHALLENGE_PCT_MAX, stepped))
+    """True for Format A/C when the player is non-diabetic or type 1."""
+    return _format_code(user_info, format_value) in CHALLENGE_FORMATS and _pure_pool_player(
+        user_info
+    )
 
 
 def challenge_unknown_active(user_info: dict[str, Any] | None) -> bool:
@@ -113,9 +109,14 @@ def parse_mix_policy(policy: str | None) -> dict[str, float] | None:
 
 
 def challenge_unknown_weights(user_info: dict[str, Any] | None) -> dict[str, float]:
-    """Percent of the *unknown* pool. The rest stays on the player's default corpus."""
-    pct = snap_challenge_pct((user_info or {}).get("challenge_unknown_pct"))
-    unknown = pct / 100.0
+    """Half the opposite pool; the rest stays on the player's home corpus.
+
+    Keyed on type 1, not on ``diabetic`` alone: only type 1 has D1NAMO as its home
+    corpus. The two agree for every player who reaches here (``challenge_unknown_active``
+    admits only non-diabetic and type 1), but a gestational player -- diabetic, yet
+    routed to BIG IDEAs -- would come out inverted under the looser test.
+    """
+    unknown = CHALLENGE_OPPOSITE_SHARE
     known = 1.0 - unknown
     if is_type_1(user_info):
         return {

@@ -36,7 +36,8 @@ START_BUTTON_STATE_IDS: frozenset[str] = frozenset(
         'diabetic-type-dropdown',
         'diabetes-duration-input',
         'challenge-unknown-check',
-        'challenge-unknown-slider',
+        'paper-mention-check',
+        'paper-full-name-input',
         'location-input',
     }
 )
@@ -94,6 +95,18 @@ def test_challenge_unknown_is_a_checkbox_on_both_builders(startup_page: Any) -> 
     assert field is not None
     assert field.id == "challenge-unknown-check"
     assert any(option.get("value") == "on" for option in field.options)
+    assert _find(startup_page, "challenge-unknown-slider") is None
+
+
+def test_paper_mention_fields_exist_on_both_builders(startup_page: Any) -> None:
+    check = _find(startup_page, "paper-mention-check")
+    name = _find(startup_page, "paper-full-name-input")
+    wrap = _find(startup_page, "paper-full-name-wrap")
+    assert check is not None
+    assert any(option.get("value") == "on" for option in check.options)
+    assert name is not None
+    assert wrap is not None
+    assert (wrap.style or {}).get("display") == "none"
 
 
 def test_nickname_is_length_capped_and_persistent(startup_page: Any) -> None:
@@ -116,6 +129,9 @@ def test_mobile_nickname_is_in_the_identity_step_not_the_consent_step() -> None:
     assert consent_step is not None and identity_step is not None
     assert 'nickname-input' not in _ids(consent_step)
     assert 'nickname-input' in _ids(identity_step)
+    assert 'paper-mention-check' not in _ids(consent_step)
+    assert 'paper-mention-check' in _ids(identity_step)
+    assert 'paper-full-name-input' in _ids(identity_step)
 
 
 def test_wizard_step_count_is_unchanged() -> None:
@@ -125,3 +141,15 @@ def test_wizard_step_count_is_unchanged() -> None:
     assert WIZARD_STEPS == 6
     assert all(f'mobile-step-{i}' in ids for i in range(WIZARD_STEPS))
     assert f'mobile-step-{WIZARD_STEPS}' not in ids
+
+
+def test_challenge_unknown_wrap_starts_hidden(startup_page: Any) -> None:
+    """Eligibility is decided by a callback, so the default paint must hide it.
+
+    A `display: block` default flashed "Challenge the unknown" at type 2 /
+    prediabetes / LADA players before `update_challenge_unknown_visibility`
+    resolved -- the exact groups the control is not offered to.
+    """
+    wrap = _find(startup_page, "challenge-unknown-wrap")
+    assert wrap is not None
+    assert (wrap.style or {}).get("display") == "none"

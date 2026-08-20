@@ -1,12 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
-  <!-- Vector syringe (needle down) — insulin event marker -->
-  <g stroke="#7b1fa2" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-    <path fill="#ce93d8" d="M18 6h12v4H18z"/>
-    <rect x="17" y="10" width="14" height="18" rx="2" fill="#e1bee7"/>
-    <path fill="none" d="M21 16h6M21 21h6"/>
-    <path fill="none" d="M24 28v10"/>
-    <path fill="none" d="M20 38h8"/>
-    <path fill="none" d="M24 38v6"/>
-    <path fill="none" d="M20 4h8"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Diagonal insulin syringe, shaped to remain recognizable at chart-marker size. -->
+  <g transform="rotate(38 32 32)" stroke="#7b1fa2" stroke-width="2.5"
+     stroke-linecap="round" stroke-linejoin="round">
+    <!-- Plunger and finger rest -->
+    <path d="M7 22v20M7 32h11" fill="none"/>
+    <path d="M4 22h6M4 42h6" fill="none"/>
+
+    <!-- Barrel flanges and body -->
+    <path d="M18 20v24M14 20h8M14 44h8" fill="none"/>
+    <rect x="18" y="23" width="29" height="18" rx="2.5" fill="#f3e5f5"/>
+    <path d="M32 24.25h13.75v15.5H32z" fill="#ce93d8" stroke="none"/>
+
+    <!-- Measurement marks -->
+    <path d="M23 23v6M28 23v4M33 23v6M38 23v4" fill="none"/>
+
+    <!-- Needle hub and needle -->
+    <path d="M47 27h5v10h-5z" fill="#e1bee7"/>
+    <path d="M52 32h9" fill="none"/>
+    <path d="M61 32l2-1" fill="none"/>
   </g>
 </svg>

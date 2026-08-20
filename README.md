@@ -4,9 +4,9 @@ A game to test your glucose-predicting superpowers! 🎯
 
 > 🎵 The name "sugar-sugar" was inspired by a scientific remake of The Archies' classic hit song ["Sugar, Sugar"](https://www.youtube.com/watch?v=jJvAL-iiLnQ) from 1969!
 
-## What is Sugar Sugar?
+## What is Sugar-Sugar?
 
-Sugar Sugar is a web-based research app built with [Plotly Dash](https://dash.plotly.com/). It turns glucose forecasting into an interactive game: you see part of a CGM trace, draw how you think it will continue, then compare your prediction with the real values. Your accuracy is measured with standard forecasting metrics (MAE, RMSE, MAPE).
+Sugar-Sugar is a web-based research app built with [Plotly Dash](https://dash.plotly.com/). It turns glucose forecasting into an interactive game: you see part of a CGM trace, draw how you think it will continue, then compare your prediction with the real values. Your accuracy is measured with standard forecasting metrics (MAE, RMSE, MAPE).
 
 ## Why this study matters
 
@@ -26,11 +26,11 @@ For a deep dive into state-of-the-art ML approaches to glucose prediction, see [
 
 ## Ethics approval and study credibility
 
-Sugar Sugar is part of a real research effort. The study received clearance from the Ethics Committee of University Medicine Rostock (Ethikkommission der Universitätsmedizin Rostock), Germany. It is an open-source, community-driven project run by [GlucoseDAO](https://github.com/GlucoseDAO).
+Sugar-Sugar is part of a real research effort. The study received clearance from the Ethics Committee of University Medicine Rostock (Ethikkommission der Universitätsmedizin Rostock), Germany. It is an open-source, community-driven project run by [GlucoseDAO](https://github.com/GlucoseDAO).
 
 ## How the gameplay works
 
-1. **Load your data** — Upload a Dexcom, Libre, Medtronic, or Nightscout file, or use the built-in generic sample dataset.
+1. **Load your data** — Upload a Dexcom, Libre, Medtronic, or Nightscout file, or play on public anonymized CGM traces from other people.
 2. **Make predictions** — Click and drag on the glucose chart to draw your forecast for the hidden hour ahead.
 3. **Compare results** — Your predictions are compared against the actual glucose values.
 4. **See your accuracy** — Get MAE, RMSE, and MAPE metrics showing how close you were.
@@ -50,7 +50,7 @@ Until you choose to submit, everything stays in your own browser's localStorage.
 
 Raw uploaded CGM files are used only to run the game and are not kept permanently.
 
-The on-disk study files (`data/input/consent_agreement.csv`, `prediction_statistics.csv`, `prediction_ranking*.csv`) and the per-round `data_source_name` / `generic_slice_key` fields are documented in [docs/technical-specification.md → Study CSVs](docs/technical-specification.md#study-csvs).
+The on-disk study files live in `data/input/` (`consent_agreement.csv`, `prediction_statistics.csv`, `prediction_ranking*.csv`). Column layouts, types, and examples are in [Annex: study CSV layouts](#annex-study-csv-layouts) below. Maintainer notes (when each file is written, older-row caveats) are in [docs/technical-specification.md → Study CSVs](docs/technical-specification.md#study-csvs).
 
 ## Resume and study integrity
 
@@ -125,14 +125,15 @@ uv run migrate-cgm-duration
 
 Bare numbers become `N,years`. Cells that are already `6,months` (or similar) are left as-is.
 
-### Generic datasets
+### Public datasets
 
-The [BIG IDEAs](https://physionet.org/content/big-ideas-glycemic-wearable/1.1.3/) and [D1NAMO](https://zenodo.org/records/5651217) datasets are not in git. Download local copies with:
+The [BIG IDEAs](https://physionet.org/content/big-ideas-glycemic-wearable/1.1.3/) and [D1NAMO](https://zenodo.org/records/5651217) datasets are not in git. They are optional for `uv run start` — Format A falls back to `data/example.csv` when they are missing — but needed for the real study mix:
 
 ```bash
-uv run download-bigideas
-uv run download-d1namo
+uv run download
 ```
+
+That fetches both. Already-present copies are skipped; `--force` re-downloads. The per-dataset commands remain (`uv run download-bigideas`, `uv run download-d1namo`). CGMacros is unused in Format A — pass `--all` or run `uv run download-cgmacros` if you need it.
 
 `download-bigideas` pulls only Dexcom + food-log CSVs (the full PhysioNet zip is 4.7 GB of Empatica streams and is not used).
 
@@ -147,16 +148,17 @@ Format A source policy (stored as `generic_intervention`):
 | Prediabetes | 75% BIG IDEAs / 25% D1NAMO each round |
 | LADA | 75% D1NAMO / 25% BIG IDEAs each round |
 
-**Challenge the unknown** appears on `/startup` after the player answers **no diabetes** or **type 1**, for any format except B (own data). Tick the checkbox to opt in; the slider is the share of the *other* pool, in 10% steps from 10% to 100%. The default table above stays unless the box is ticked.
+**Challenge the unknown** appears on `/startup` only for **no diabetes** or **type 1**, on Public or Public + My Data. Those two already play one corpus; the checkbox opts them into a 50/50 opposite mix. Type 2, prediabetes, and LADA already have mixed pools, so they do not see the box. Gestational stays on BIG IDEAs and is not offered the challenge. Format B (own data) never uses this.
 
-| Player | Slider at 10% | Slider at 100% |
+| Player | Challenge off | Challenge on |
 |---|---|---|
-| No diabetes | 90% BIG IDEAs / 10% D1NAMO | 100% D1NAMO |
-| Type 1 | 90% D1NAMO / 10% BIG IDEAs | 100% BIG IDEAs |
+| No diabetes | 100% BIG IDEAs | 50% BIG IDEAs / 50% D1NAMO |
+| Type 1 | 100% D1NAMO | 50% D1NAMO / 50% BIG IDEAs |
+| Type 2 / prediabetes / LADA / gestational | type default above | not offered |
 
-Type 2, prediabetes, and LADA already mix both corpora, so the control is hidden. Gestational stays on BIG IDEAs only. Format B (own data) never uses this.
+The mix is stored as `generic_intervention` like `mix:bigideas=0.50,d1namo=0.50`, plus `challenge_unknown` / `challenge_unknown_pct` (always `50` when on) on the statistics row.
 
-The chosen mix is stored as `generic_intervention` like `mix:bigideas=0.90,d1namo=0.10`, plus `challenge_unknown` / `challenge_unknown_pct` on the statistics row.
+An optional startup checkbox lets a player ask to be named in a later scientific paper. Tick it and enter a full name; that opt-in is written to both `consent_agreement.csv` and `prediction_statistics.csv` (`paper_mention` + `paper_full_name`). Ranking files do not get the name. The acknowledgments list only includes people who played 12 or more rounds.
 
 BIG IDEAs meals have no photographs: the apple icon opens a notepad with the food-log description (translated for the active language). D1NAMO meals still open the photo lightbox. Backdrop click closes either overlay.
 
@@ -221,6 +223,12 @@ points Umami pageview requests at the same-domain `/stats` proxy.
 `DEPLOY_URL` is the canonical public origin used for Open Graph/Twitter preview
 tags, share URLs, `/robots.txt`, `/sitemap.xml`, and `/llms.txt`. Set it in
 production and restart the server after changing it.
+
+`FAQ_BOARD_ENABLED` controls the public ask/reply board at the bottom of `/faq`. It
+defaults to **off** (unauthenticated posting with no bot protection); the curated FAQ
+entries above it are unaffected. Set `FAQ_BOARD_ENABLED=1` to restore the form — and,
+with it, the list of previously posted questions, which is hidden while the flag is off.
+Posts already on disk under `data/faq/` are never deleted by toggling the flag.
 
 ### Running the app
 
@@ -329,13 +337,13 @@ pitfalls.
 Preview the share page with synthetic prediction data — no need to play a full game:
 
 ```bash
-uv run share                            # single-format (Generic), 12 rounds
-uv run share --formats "A,B,C"          # multi-format: Generic + My Data + Mixed
+uv run share                            # single-format (Public), 12 rounds
+uv run share --formats "A,B,C"          # multi-format: Public + My Data + Mixed
 uv run share --formats "A,B" --rounds 8 # custom round count
 uv run share --locale de                # test in German
 ```
 
-Formats: **A** = Generic, **B** = My Data, **C** = Mixed. Rounds cycle through formats evenly (e.g. 12 rounds with A,B,C → 4 rounds each). The command generates a share record, saves it to disk, and opens the browser at `/share/<id>`. Useful for testing the share card PNG, OG tags, social buttons, and per-format colour palettes.
+Formats: **A** = Public (anonymized traces from other people), **B** = My Data, **C** = Mixed. Rounds cycle through formats evenly (e.g. 12 rounds with A,B,C → 4 rounds each). The command generates a share record, saves it to disk, and opens the browser at `/share/<id>`. Useful for testing the share card PNG, OG tags, social buttons, and per-format colour palettes.
 
 To render the social-card PNGs for manual inspection across every supported
 translation, use the deterministic preview script:
@@ -422,6 +430,129 @@ State management uses Dash `dcc.Store` components. The storage backend is contro
 | `local` (default) | Persists in `localStorage` — survives browser restarts. |
 | `session` | Persists in `sessionStorage` — cleared when the tab closes. |
 | `memory` | Lives only in React state — cleared on any page refresh. |
+
+## Annex: study CSV layouts
+
+Server-side research exports under `data/input/` (gitignored except empty headers). One **person** is a `study_id`. One **format run** (A, then later B, …) is a `run_id`. Stats and ranking upsert on `study_id` + `run_id`. Booleans are stored as the strings `True` / `False`. Nested lists are a Python `str(list)` — parse with `ast.literal_eval`, not `json.loads` (the quotes are single). Metrics are always **mg/dL**.
+
+| File | One row is | Written when |
+|---|---|---|
+| `consent_agreement.csv` | one person | Consent / Start; later upload-consent upserts the same row |
+| `prediction_statistics.csv` | one format run | Start (0-round stub), every Submit, Finish/Exit |
+| `prediction_ranking.csv` | one finished game (`format=ALL`, cumulative) | Submit / Finish from `/ending` (not chart Exit) |
+| `prediction_ranking_{A,B,C}.csv` | one format run | Same as ranking, only that format |
+
+### `consent_agreement.csv`
+
+Consent flags only. No predictions, no nickname, no email. `paper_full_name` is the publication opt-in, not a leaderboard label.
+
+| Header | Format | Contents |
+|---|---|---|
+| `study_id` | UUID string | Person id. Join key to the other CSVs. |
+| `number` | integer | Sequential study number (from stats `max(number)+1`). |
+| `timestamp` | `YYYY-MM-DD HH:MM:SS` | Consent (or last upsert) time. |
+| `gdpr_consent` | `True` / `False` | Mandatory GDPR box. |
+| `upload_own_data` | `True` / `False` | Player ticked “I will upload my CGM”. |
+| `play_only` | `True` / `False` | Always `False` now (legacy; old sessions may still say `True`). |
+| `participate_in_study` | `True` / `False` | Always `True` after 18+ + GDPR. |
+| `receive_results_later` | `True` / `False` | Optional: email results later. |
+| `keep_up_to_date` | `True` / `False` | Optional: project updates. |
+| `no_selection` | `True` / `False` | `True` when neither optional email box was ticked. |
+| `consent_use_uploaded_data` | `True` / `False` | Late consent that the uploaded file may be used. |
+| `consent_use_uploaded_data_timestamp` | `YYYY-MM-DD HH:MM:SS` or empty | When that late consent was given. |
+| `paper_mention` | `True` / `False` | Opted in to be named in a later paper **and** entered a full name. |
+| `paper_full_name` | free text, max 80 chars | Name for the acknowledgments list. Use only with `paper_mention` and ≥12 rounds. |
+
+### `prediction_statistics.csv`
+
+The research record. Also carries `paper_mention` / `paper_full_name` (copied from the session at each save).
+
+| Header | Format | Contents |
+|---|---|---|
+| `study_id` | UUID string | Person. |
+| `run_id` | UUID string | This format run. Empty on some pre-`run_id` rows. |
+| `number` | integer | Sequential study number. |
+| `timestamp` | `YYYY-MM-DD HH:MM:SS` | Last save of this run. |
+| `email` | email string | Address as entered (separate from ranking; see consent notice). |
+| `format` | `A` / `B` / `C` | A = public traces, B = own data, C = mixed (odd public / even own). |
+| `is_example_data` | `True` / `False` | Run-level flag: **last round only**. Do not use this to classify Format C rounds. |
+| `data_source_name` | filename | Run-level source: **last round only**. Format A may be `BIGIDEAS-001.csv` / `D1NAMO-002.csv`; B is the upload filename; C is whichever side played last. Use `per_round_metrics` for the real list. |
+| `age` | integer | From `/startup`. |
+| `user_id` | integer | Adapter default (`1`), not a public id. |
+| `gender` | string | From `/startup`. |
+| `uses_cgm` | `True` / `False` | From `/startup`. |
+| `cgm_duration_years` | `value,unit` | e.g. `6,months` or `3,years`. Older rows may still be a bare year integer. |
+| `diabetic` | string | From `/startup`. |
+| `diabetic_type` | string | e.g. `Type 1`, `Type 2`, `LADA`, empty if no diabetes. |
+| `diabetes_duration` | string / number | Years with diabetes, when given. |
+| `location` | free text | From `/startup`. |
+| `generic_intervention` | string | Format A source policy: `bigideas`, `d1namo`, `mix_t2`, or `mix:bigideas=0.50,d1namo=0.50`. Empty on older rows. |
+| `challenge_unknown` | `True` / `False` | Opted into Challenge the unknown (formats A/C, non-diabetic or type 1 only). |
+| `challenge_unknown_pct` | integer or empty | Opposite-pool share. Always `50` when the challenge is on; empty when off. Older rows may still hold a slider value (10–100). |
+| `paper_mention` | `True` / `False` | Same opt-in as the consent file. |
+| `paper_full_name` | free text | Same name as the consent file. Only use it when `paper_mention` is true and the player completed at least 12 rounds. |
+| `rounds_played` | integer | Completed rounds in this run (`0` = Start stub). |
+| `predicted_values` | `str(list)` of `{version, round, value}` | User prediction, mg/dL. Example item: `{'version': 'A', 'round': 2, 'value': '119.6'}`. |
+| `real_values` | same shape | Ground truth, mg/dL. Aligned by index with `predicted_values`. |
+| `prediction_times` | same shape | Window timestamps (`YYYY-MM-DD HH:MM:SS`). |
+| `overall_mae_mgdl` | float | Mean absolute error over every point in the run. |
+| `overall_mse_mgdl` | float | Mean squared error. |
+| `overall_rmse_mgdl` | float | Root mean squared error. |
+| `overall_mape_pct` | float | Mean absolute percentage error. |
+| `per_round_metrics` | `str(list)` of dicts | Per-round trace (see below). |
+| `round_context` | `str(list)` of dicts | Source file + window start/end + first predicted timestamp, per round. Empty on older rows. |
+
+`per_round_metrics` item:
+
+```python
+{
+  "round_number": 2,
+  "mae": 8.4,
+  "mse": 93.4,
+  "rmse": 9.7,
+  "mape": 7.7,
+  "data_source_name": "BIGIDEAS-001.csv",  # or the upload filename
+  "is_example_data": True,                 # False = own uploaded file
+  "generic_slice_key": "a1b2c3…",          # SHA-256 of time+glucose in the window
+}
+```
+
+`round_context` item:
+
+```python
+{
+  "round_number": 2,
+  "format": "A",
+  "data_source_name": "BIGIDEAS-001.csv",
+  "is_example_data": True,
+  "generic_slice_key": "a1b2c3…",
+  "prediction_window_start_index": 24,
+  "prediction_window_size": 36,
+  "window_start_time": "2019-10-23 06:17:22",
+  "prediction_start_time": "2019-10-23 07:17:22",
+  "window_end_time": "2019-10-23 08:17:22",
+}
+```
+
+### `prediction_ranking.csv` and `prediction_ranking_{A,B,C}.csv`
+
+Leaderboard bookkeeping. **No email and no paper-mention name.** `nickname` and `email_key` live only here.
+
+| Header | Format | Contents |
+|---|---|---|
+| `study_id` | UUID string | Same person as stats. |
+| `run_id` | UUID string | Same run as stats. |
+| `number` | integer | Sequential study number. |
+| `timestamp` | `YYYY-MM-DD HH:MM:SS` | Last ranking write. |
+| `email_key` | 16 hex chars | Salted HMAC-SHA256 of the casefolded address. Merges one player across devices. Never rotate `RANKING_EMAIL_SALT` / `data/.ranking_salt`. |
+| `nickname` | free text or empty | Optional public display label. Absent from stats and consent on purpose. |
+| `format` | `A` / `B` / `C` or `ALL` | Per-source files use A/B/C; the overall file uses `ALL` (cumulative across formats). |
+| `rounds_played` | integer | Overall file is cumulative (12 then 24 if they played two formats). |
+| `is_example_data` | `True` / `False` | Run-level only (last source, or mixed on `ALL`). |
+| `data_source_name` | filename or `multiple` | Run-level only (`multiple` on `ALL` when sources differ). |
+| `overall_mae_mgdl` … `overall_mape_pct` | float | Same units as stats. |
+
+The public `/highscore` board hides runs below `MIN_USEFUL_ROUNDS` (default 6). Statistics keep every submitted round, including 1-round and Start-only stubs.
 
 ## Known issues
 

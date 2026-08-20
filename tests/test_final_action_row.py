@@ -1,9 +1,16 @@
-"""Complete Analysis puts Exit, remaining formats, and Share on one row under the title."""
+"""Complete Analysis layout: results first, actions last, labelled Exit.
+
+The page order is title -> disclaimer -> rounds -> hero summary -> leaderboard
+-> share -> synthesis -> metrics -> per-round fold -> journey/switch/Exit row.
+The destructive Exit is a labelled button at the bottom, never an icon-only
+red X at the top.
+"""
 from __future__ import annotations
 
 from typing import Any
 
 from sugar_sugar.app import create_final_layout
+from sugar_sugar.components.share import collect_playable_rounds
 
 
 def _by_id(node: Any, target: str) -> Any:
@@ -49,7 +56,7 @@ def _user(*, uses_cgm: bool, played: list[str]) -> dict[str, Any]:
     }
 
 
-def test_action_row_sits_under_title_with_x_formats_then_share() -> None:
+def test_action_row_sits_at_bottom_with_labelled_exit() -> None:
     layout = create_final_layout(_user(uses_cgm=True, played=["A"]), "mg/dL", locale="en")
     journey = _by_id(layout, "final-journey-title")
     assert journey is not None
@@ -62,12 +69,12 @@ def test_action_row_sits_under_title_with_x_formats_then_share() -> None:
     row = _by_id(layout, "final-action-row")
     assert row is not None
     child_ids = [getattr(child, "id", None) for child in row.children]
+    # Affirmative answers ("Try ...") come before the destructive Exit.
     assert child_ids == [
-        "restart-button",
         "switch-format-a",
         "switch-format-b",
         "switch-format-c",
-        "share-results-button",
+        "restart-button",
     ]
     assert row.style["flexWrap"] == "nowrap"
 
@@ -75,9 +82,34 @@ def test_action_row_sits_under_title_with_x_formats_then_share() -> None:
     assert _by_id(row, "switch-format-b").style["display"] == "inline-flex"
     assert _by_id(row, "switch-format-c").style["display"] == "inline-flex"
     assert _by_id(row, "switch-format-b").children == "Try My Data"
-    assert _by_id(row, "switch-format-c").children == "Try Generic + My Data"
-    assert _by_id(row, "share-results-button").style["backgroundColor"] == "#4CBB17"
-    assert _by_id(row, "restart-button").style["backgroundColor"] == "#007bff"
+    assert _by_id(row, "switch-format-c").children == "Try Public + My Data"
+    restart = _by_id(row, "restart-button")
+    # Labelled, not icon-only: the destructive Exit must say what it does.
+    assert restart.className == "ui button final-exit-button"
+    assert restart.children == "Exit"
+    assert restart.style["backgroundColor"] == "#E81123"
+    assert "width" not in restart.style
+
+    # The action row is the last visible section: after the per-round fold.
+    top_ids = [getattr(child, "id", None) for child in layout.children]
+    assert top_ids.index("final-per-round-section") < top_ids.index("final-action-row")
+    assert top_ids.index("final-journey-title") < top_ids.index("final-action-row")
+
+
+def test_results_come_before_actions_with_disclaimer_and_hero_on_top() -> None:
+    layout = create_final_layout(_user(uses_cgm=True, played=["A"]), "mg/dL", locale="en")
+    top_ids = [getattr(child, "id", None) for child in layout.children]
+    # Disclaimer right under the title, before any result.
+    assert top_ids.index("final-disclaimer") < top_ids.index("final-rounds-played")
+    # Plain-language hero summary before the leaderboard.
+    assert top_ids.index("final-hero-summary") < top_ids.index("final-ranking-list")
+    hero = _by_id(layout, "final-hero-summary")
+    assert "mg/dL" in hero.children
+    assert "%" in hero.children
+    # Disclaimer has no dismiss icon (it must stay visible).
+    disclaimer = _by_id(layout, "final-disclaimer")
+    child_classes = [getattr(kid, "className", "") for kid in disclaimer.children]
+    assert "close icon" not in child_classes
 
 
 def test_played_formats_line_is_hidden() -> None:
@@ -95,7 +127,55 @@ def test_no_cgm_shows_only_x_and_share() -> None:
     assert _by_id(row, "switch-format-b").style["display"] == "none"
     assert _by_id(row, "switch-format-c").style["display"] == "none"
     assert _by_id(row, "restart-button") is not None
-    assert _by_id(row, "share-results-button") is not None
+
+
+def test_collect_playable_rounds_merges_archives_and_tags_format() -> None:
+    user: dict[str, Any] = {
+        "format": "B",
+        "rounds": [{"round_number": 2, "prediction_table_data": []}],
+        "runs_by_format": {
+            "A": [{"rounds": [{"round_number": 1, "prediction_table_data": []}]}],
+        },
+    }
+    merged = collect_playable_rounds(user)
+    assert [r["format"] for r in merged] == ["A", "B"]
+    assert [r["round_number"] for r in merged] == [1, 2]
+
+
+def test_results_page_shows_synthesis_chart() -> None:
+    layout = create_final_layout(_user(uses_cgm=True, played=["A"]), "mg/dL", locale="en")
+    card = _by_id(layout, "final-synthesis-card")
+    assert card is not None
+    assert "results-synthesis-card" in (card.className or "")
+    graph = _by_id(layout, "final-synthesis-graph")
+    assert graph is not None
+    assert graph.figure is not None
+    assert len(graph.figure.data) > 0
+    texts = []
+    kids = card.children
+    if isinstance(kids, (list, tuple)):
+        for kid in kids:
+            child = getattr(kid, "children", None)
+            if isinstance(child, str):
+                texts.append(child)
+    assert "Next hour prediction error" in texts
+    top_ids = [getattr(child, "id", None) for child in layout.children]
+    # Leaderboard -> share -> synthesis graph -> metric cards: the share
+    # impulse peaks right after the ranking, and detail follows.
+    assert top_ids.index("final-ranking-list") < top_ids.index("final-share-panel")
+    assert top_ids.index("final-share-panel") < top_ids.index("final-synthesis-card")
+    assert top_ids.index("final-synthesis-card") < top_ids.index(
+        "final-overall-metrics-container"
+    )
+
+
+def test_results_page_hides_synthesis_without_rounds() -> None:
+    user = _user(uses_cgm=False, played=["A"])
+    user["rounds"] = []
+    user["runs_by_format"] = {}
+    layout = create_final_layout(user, "mg/dL", locale="en")
+    assert _by_id(layout, "final-synthesis-card") is None
+    assert _by_id(layout, "final-synthesis-graph") is None
 
 
 def test_all_formats_played_hides_switch_buttons() -> None:

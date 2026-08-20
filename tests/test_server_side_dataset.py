@@ -136,6 +136,109 @@ def test_save_statistics_uses_per_round_window_times(tmp_path: Path) -> None:
     assert times2[-1] in pt
 
 
+def test_save_statistics_records_round_context(tmp_path: Path) -> None:
+    """Each result remains traceable to its source and exact time window."""
+    import csv
+
+    submit = SubmitComponent()
+    submit._stats_csv_path = tmp_path / "prediction_statistics.csv"
+    submit._ranking_csv_path = tmp_path / "prediction_ranking.csv"
+    submit._ranking_by_format_paths = {k: tmp_path / f"r_{k}.csv" for k in ("A", "B", "C")}
+
+    window = _window_with_predictions()
+    times = _times(window)
+    prediction_start_index = len(window) - PREDICTION_HOUR_OFFSET
+    user_info: dict[str, Any] = {
+        "study_id": "round-context",
+        "run_id": "run-a",
+        "number": 1,
+        "consent_completed": True,
+        "format": "A",
+        "run_format": "A",
+        "age": 40,
+        "rounds": [
+            {
+                "round_number": 1,
+                "prediction_window_start": 123,
+                "prediction_window_size": len(window),
+                "prediction_table_data": _table_data(window),
+                "window_times": times,
+                "format": "A",
+                "is_example_data": True,
+                "data_source_name": "BIGIDEAS-001.csv",
+                "generic_slice_key": "slice-abc",
+            }
+        ],
+    }
+    submit.save_statistics(user_info, write_ranking=False)
+
+    with submit._stats_csv_path.open(newline="") as file_handle:
+        row = list(csv.DictReader(file_handle))[0]
+    context = ast.literal_eval(row["round_context"])
+    assert context == [
+        {
+            "round_number": 1,
+            "format": "A",
+            "data_source_name": "BIGIDEAS-001.csv",
+            "is_example_data": True,
+            "generic_slice_key": "slice-abc",
+            "prediction_window_start_index": 123,
+            "prediction_window_size": len(window),
+            "window_start_time": times[0],
+            "prediction_start_time": times[prediction_start_index],
+            "window_end_time": times[-1],
+        }
+    ]
+
+
+def test_round_context_upgrade_preserves_existing_statistics_rows(tmp_path: Path) -> None:
+    """Adding round_context must not rewrite or discard previously saved games."""
+    import csv
+
+    submit = SubmitComponent()
+    submit._stats_csv_path = tmp_path / "prediction_statistics.csv"
+    submit._ranking_csv_path = tmp_path / "prediction_ranking.csv"
+    submit._ranking_by_format_paths = {k: tmp_path / f"r_{k}.csv" for k in ("A", "B", "C")}
+    submit._stats_csv_path.write_text(
+        "study_id,run_id,format,predicted_values\n"
+        "existing-game,old-run,A,old-predictions\n",
+        encoding="utf-8",
+    )
+
+    window = _window_with_predictions()
+    submit.save_statistics(
+        {
+            "study_id": "new-game",
+            "run_id": "new-run",
+            "number": 33,
+            "consent_completed": True,
+            "format": "A",
+            "run_format": "A",
+            "age": 40,
+            "rounds": [
+                {
+                    "round_number": 1,
+                    "prediction_window_size": len(window),
+                    "prediction_table_data": _table_data(window),
+                    "window_times": _times(window),
+                    "format": "A",
+                    "is_example_data": True,
+                    "data_source_name": "example.csv",
+                }
+            ],
+        },
+        write_ranking=False,
+    )
+
+    with submit._stats_csv_path.open(newline="") as file_handle:
+        rows = list(csv.DictReader(file_handle))
+    by_study = {row["study_id"]: row for row in rows}
+    assert set(by_study) == {"existing-game", "new-game"}
+    assert by_study["existing-game"]["predicted_values"] == "old-predictions"
+    assert by_study["existing-game"]["round_context"] == ""
+    assert ast.literal_eval(by_study["new-game"]["round_context"])[0]["data_source_name"] == "example.csv"
+
+
 def test_save_statistics_records_per_round_generic_sources(tmp_path: Path) -> None:
     """Format A picks a new generic subject each round; the stats CSV must
     keep every source, not only the last ``user_info['data_source_name']``."""

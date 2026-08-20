@@ -17,7 +17,7 @@ import dash_bootstrap_components as dbc
 import os
 import sys
 import typer
-from flask import Response, send_file as flask_send_file, request as flask_request
+from flask import Response, has_request_context, send_file as flask_send_file, request as flask_request
 import uuid
 from dotenv import load_dotenv
 from eliot import start_action, start_task
@@ -104,13 +104,24 @@ from sugar_sugar.components.ag_grid import build_readonly_ag_grid, build_readonl
 from sugar_sugar.components.startup import StartupPage, StartupPageMobile
 from sugar_sugar.components.landing import LandingPage, LandingPageMobile
 from sugar_sugar.components.consent_form import ConsentFormPage
-from sugar_sugar.components.submit import SubmitComponent, hidden_area_is_complete
+from sugar_sugar.components.submit import (
+    FINISH_EXIT_BUTTON_CLASS,
+    WINDOWS_CLOSE_RED,
+    SubmitComponent,
+    finish_confirm_message,
+    finish_confirm_overlay,
+    finish_exit_button_style,
+    hidden_area_is_complete,
+)
 from sugar_sugar.encouragement import pick_bracket
 from sugar_sugar.components.header import HeaderComponent, make_csv_upload
 from sugar_sugar.components.ending import EndingPage
 from sugar_sugar.components.navbar import NavBar, MobileNavBar
 from sugar_sugar.components.share import (
     build_share_card_figure,
+    build_share_panel,
+    build_synthesis_card,
+    collect_playable_rounds,
     create_expired_layout,
     create_share_layout,
 )
@@ -192,6 +203,77 @@ def _build_source_metadata_line(
     return ""
 
 
+def _source_window_time_range(window_df: pl.DataFrame) -> str:
+    if window_df.is_empty() or "time" not in window_df.columns:
+        return ""
+    times = window_df.get_column("time")
+    start = times[0]
+    end = times[-1]
+
+    def _hhmm(value: Any) -> str:
+        if hasattr(value, "strftime"):
+            return value.strftime("%H:%M")
+        return datetime.fromisoformat(str(value)).strftime("%H:%M")
+
+    return f"{_hhmm(start)}-{_hhmm(end)}"
+
+
+def _source_plaque_label(locale: str) -> str:
+    """Short plaque label. `current_data_source` is the long form used elsewhere."""
+    return t("ui.header.source_short", locale=locale)
+
+
+def _ending_source_plaque_children(
+    *,
+    user_info: Optional[Dict[str, Any]],
+    window_df: pl.DataFrame,
+    events_df: pl.DataFrame,
+    locale: str,
+) -> list[Any]:
+    """Same plaque as /prediction: bold metadata, then Source + file + time."""
+    data_source_name = Path(str((user_info or {}).get("data_source_name") or "")).name
+    is_example = bool((user_info or {}).get("is_example_data", True))
+    metadata_line = _build_source_metadata_line(
+        source_name=data_source_name,
+        user_info=user_info,
+        is_example_data=is_example,
+        window_df=window_df,
+        events_df=events_df,
+        locale=locale,
+    )
+    return [
+        html.Div(
+            metadata_line,
+            id="ending-source-metadata",
+            className="prediction-source-metadata",
+            disable_n_clicks=True,
+        ),
+        html.Div(
+            [
+                html.Label(
+                    _source_plaque_label(locale),
+                    id="ending-source-label",
+                    className="prediction-source-label",
+                ),
+                html.Div(
+                    data_source_name,
+                    id="ending-source-name",
+                    className="prediction-source-name",
+                    disable_n_clicks=True,
+                ),
+                html.Div(
+                    _source_window_time_range(window_df),
+                    id="ending-source-time",
+                    className="prediction-source-time",
+                    disable_n_clicks=True,
+                ),
+            ],
+            className="prediction-source-line",
+            disable_n_clicks=True,
+        ),
+    ]
+
+
 def _load_generic_round_window(
     points: int,
     rounds: list[dict[str, Any]] | None = None,
@@ -269,7 +351,7 @@ def _show_prediction_upload_consent(user_info: Optional[Dict[str, Any]], *, show
     return not _upload_data_consent_given(user_info)
 
 
-SITE_TITLE: str = "Sugar Sugar"
+SITE_TITLE: str = "Sugar-Sugar"
 SITE_DESCRIPTION: str = (
     "Test your glucose prediction skills, compare your forecasts with real CGM data, "
     "and help establish a human baseline for glucose forecasting research."
@@ -281,14 +363,14 @@ OG_PREVIEW_SIZE: tuple[int, int] = (1200, 630)
 # image instead of serving a stale crop from their own caches.
 SHARE_CARD_IMAGE_VERSION: int = 5
 PUBLIC_ROUTES: tuple[tuple[str, str, str], ...] = (
-    ("/", "Sugar Sugar", SITE_DESCRIPTION),
-    ("/about", "About Sugar Sugar", "Learn why the Sugar Sugar glucose prediction study matters."),
-    ("/faq", "Sugar Sugar FAQ", "Answers to common questions about the Sugar Sugar study and gameplay."),
-    ("/demo", "Video Instructions", "Watch how to play the Sugar Sugar glucose prediction game."),
-    ("/contact", "Contact GlucoseDAO", "Get in touch with the Sugar Sugar team."),
+    ("/", "Sugar-Sugar", SITE_DESCRIPTION),
+    ("/about", "About Sugar-Sugar", "Learn why the Sugar-Sugar glucose prediction study matters."),
+    ("/faq", "Sugar-Sugar FAQ", "Answers to common questions about the Sugar-Sugar study and gameplay."),
+    ("/demo", "Video Instructions", "Watch how to play the Sugar-Sugar glucose prediction game."),
+    ("/contact", "Contact GlucoseDAO", "Get in touch with the Sugar-Sugar team."),
     (
         "/highscore",
-        "Sugar Sugar Highscore",
+        "Sugar-Sugar Highscore",
         "Anonymous leaderboard of human glucose prediction accuracy, ranked by mean absolute error.",
     ),
 )
@@ -759,6 +841,40 @@ def events_within_window(events_df: pl.DataFrame, window_df: pl.DataFrame) -> pl
 def events_store_for_window(events_df: pl.DataFrame, window_df: pl.DataFrame) -> Dict[str, List[Any]]:
     """Window-trimmed events as a session-store dictionary (see events_within_window)."""
     return events_dataframe_to_store_dict(events_within_window(events_df, window_df))
+
+
+def compacted_events_store(
+    events_data: Optional[Dict[str, List[Any]]],
+    window_data: Optional[Dict[str, List[Any]]],
+) -> Any:
+    """Trim a whole-subject `events-df` store left in localStorage by an older build.
+
+    Returns ``no_update`` when there is nothing to shrink, so a caller can hand
+    the result straight to an ``Output``.
+
+    New rounds already store only the window's events, but a session that was
+    mid-game across the deploy keeps the multi-megabyte store in localStorage and
+    re-uploads it with every callback that reads `events-df` -- the slowness this
+    fixes would otherwise persist for the rest of that round. Navigation is a
+    cheap, always reached moment to shrink it; trimmed sessions no-op.
+
+    Works on the store dicts rather than DataFrames because that is what
+    localStorage holds; `events_within_window` is the DataFrame equivalent.
+    """
+    if not events_data or not window_data:
+        return no_update
+    event_times: list[Any] = events_data.get('time') or []
+    window_times: list[Any] = window_data.get('time') or []
+    if not event_times or not window_times:
+        return no_update
+    if any(len(column) != len(event_times) for column in events_data.values()):
+        return no_update
+    # Store timestamps are fixed-width ISO strings, so string order is chronological.
+    start, end = window_times[0], window_times[-1]
+    keep = [i for i, stamp in enumerate(event_times) if start <= stamp <= end]
+    if len(keep) == len(event_times):
+        return no_update
+    return {key: [values[i] for i in keep] for key, values in events_data.items()}
 
 
 def get_random_data_window(
@@ -1249,15 +1365,15 @@ app = dash.Dash(
         {"property": "og:image:type", "content": "image/png"},
         {"property": "og:image:width", "content": str(OG_PREVIEW_SIZE[0])},
         {"property": "og:image:height", "content": str(OG_PREVIEW_SIZE[1])},
-        {"property": "og:image:alt", "content": "Sugar Sugar glucose prediction game preview card."},
+        {"property": "og:image:alt", "content": "Sugar-Sugar glucose prediction game preview card."},
         {"name": "twitter:card", "content": "summary_large_image"},
         {"name": "twitter:title", "content": f"{SITE_TITLE} - Glucose Prediction Game"},
         {"name": "twitter:description", "content": SITE_DESCRIPTION},
         {"name": "twitter:image", "content": _site_og_image_url()},
-        {"name": "twitter:image:alt", "content": "Sugar Sugar glucose prediction game preview card."},
+        {"name": "twitter:image:alt", "content": "Sugar-Sugar glucose prediction game preview card."},
     ],
 )
-app.title = "Sugar Sugar - Glucose Prediction Game"
+app.title = "Sugar-Sugar - Glucose Prediction Game"
 
 server = app.server
 
@@ -1414,9 +1530,9 @@ def _build_llms_txt() -> str:
         for route, _title, description in PUBLIC_ROUTES
     )
     return (
-        "# Sugar Sugar\n\n"
+        "# Sugar-Sugar\n\n"
         f"{SITE_DESCRIPTION}\n\n"
-        "Sugar Sugar is a Dash research app from GlucoseDAO. Participants predict "
+        "Sugar-Sugar is a Dash research app from GlucoseDAO. Participants predict "
         "the next hour of CGM glucose values, compare predictions with ground truth, "
         "and can share a public performance summary.\n\n"
         "## Public Routes\n\n"
@@ -2091,6 +2207,11 @@ app.layout = html.Div([
     # cold load lands before hydration -- see _restoring_layout). Memory: a fresh
     # page load must start over at False.
     dcc.Store(id='game-stores-hydrated', data=False, storage_type='memory'),
+    # Two-step /final fill: display_page writes phase 1 with the shell, then
+    # fill_final_leaderboard advances to 2 and fill_final_share paints the card.
+    # Memory so a reload starts over. Never put an Interval in page-content —
+    # a dcc.Interval created as a callback output does not tick (01:53 /final).
+    dcc.Store(id='final-fill-step', data=None, storage_type='memory'),
     # Server-side truth about whether the drawing chart is actually on screen.
     # The `route-prediction` <html> class (and every prediction-only CSS rule,
     # incl. the `:not(.route-prediction)` mobile overflow/tap-reliability
@@ -2119,6 +2240,16 @@ app.layout = html.Div([
     html.Div(id='navbar-container', children=[], disable_n_clicks=True),
 
     html.Div(id='page-content', children=[], disable_n_clicks=True),
+    # Must sit immediately after #page-content: CSS :has(#final-title) hides it
+    # once display_page replaces ending with /final. Shown clientside on the
+    # first Results click so the still-visible ending button is not clicked again
+    # while create_final_layout runs (~3s).
+    html.Div(
+        html.Div("…", className="results-loading-card", disable_n_clicks=True),
+        id="results-loading-overlay",
+        className="results-loading-overlay",
+        disable_n_clicks=True,
+    ),
 
     html.Div(
         [
@@ -2797,7 +2928,13 @@ def _is_mobile_ua(ua: Optional[str]) -> bool:
 
 
 def _is_mobile_request() -> bool:
-    """Detect a mobile client from the current Flask request's User-Agent."""
+    """Detect a mobile client from the current Flask request's User-Agent.
+
+    Tests and CLI builders have no request: treat them as desktop so layout
+    construction never depends on a live HTTP context.
+    """
+    if not has_request_context():
+        return False
     return _is_mobile_ua(flask_request.headers.get('User-Agent', ''))
 
 
@@ -2826,7 +2963,8 @@ def _navbar(*, locale: str, pathname: Optional[str]) -> html.Div:
 @app.callback(
     [Output('page-content', 'children', allow_duplicate=True),
      Output('mobile-warning', 'children', allow_duplicate=True),
-     Output('navbar-container', 'children', allow_duplicate=True)],
+     Output('navbar-container', 'children', allow_duplicate=True),
+     Output('final-fill-step', 'data', allow_duplicate=True)],
     [Input('interface-language', 'data')],
     [State('url', 'pathname'),
      State('user-info-store', 'data'),
@@ -2835,6 +2973,24 @@ def _navbar(*, locale: str, pathname: Optional[str]) -> html.Div:
     prevent_initial_call=True,
 )
 def update_on_language_change(
+    interface_language: Optional[str],
+    pathname: Optional[str],
+    user_info: Optional[Dict[str, Any]],
+    user_agent: Optional[str],
+    glucose_unit: Optional[str],
+) -> tuple:
+    page, warning, navbar = _update_language_page(
+        interface_language, pathname, user_info, user_agent, glucose_unit
+    )
+    kick: Any = (
+        {"phase": 1, "nonce": time.time_ns()}
+        if pathname == "/final" and user_info and page is not no_update
+        else no_update
+    )
+    return page, warning, navbar, kick
+
+
+def _update_language_page(
     interface_language: Optional[str],
     pathname: Optional[str],
     user_info: Optional[Dict[str, Any]],
@@ -2850,6 +3006,29 @@ def update_on_language_change(
     navbar = _navbar(locale=locale, pathname=pathname)
 
     if pathname in _STATEFUL_PAGES:
+        # /prediction still renders the landing/consent page when consent is
+        # missing, so a language switch there has to rebuild that page rather
+        # than leave it half-translated. Skipping the rebuild updates the navbar
+        # only, which is what keeps the live chart (and the drawn line) alive.
+        #
+        # `user_info` is State, and `interface-language` is a localStorage store
+        # like any other: on a cold load onto /prediction it hydrates while
+        # user-info-store may still read None, and any stored locale other than
+        # the layout default fires this callback. None there means "the stores
+        # have not arrived yet", NOT "this player never consented" -- rebuilding
+        # landing on it unmounts `_restoring_layout`, and with it the
+        # session-restore-poll that is the only component able to re-render the
+        # route. The player is then stranded on the consent form with the URL
+        # still /prediction (the August 2026 report this placeholder fixed).
+        # Today user-info-store happens to hydrate first because it sits earlier
+        # in the layout; that ordering is not guaranteed and must not be relied on.
+        if (
+            pathname == '/prediction'
+            and user_info is not None
+            and not _renders_prediction_chart(pathname, user_info)
+        ):
+            warning_content = render_mobile_warning(user_agent, locale=locale)
+            return _landing_builder(locale=locale), warning_content, navbar
         return no_update, no_update, navbar
 
     warning_content = render_mobile_warning(user_agent, locale=locale)
@@ -2859,7 +3038,7 @@ def update_on_language_change(
             return staging_layout, warning_content, navbar
     if pathname == '/final':
         if user_info:
-            return create_final_layout(user_info, glucose_unit, locale=locale), warning_content, navbar
+            return create_final_layout(user_info, glucose_unit, locale=locale, eager=False), warning_content, navbar
         return no_update, no_update, navbar
     if pathname and pathname.startswith('/share/'):
         share_id = pathname.split('/share/', 1)[1].strip('/').split('/', 1)[0]
@@ -2900,6 +3079,7 @@ def update_on_language_change(
      Output('prediction-units-label', 'children'),
      Output('prediction-consent-label', 'children'),
      Output('finish-study-button', 'children'),
+     Output('finish-study-button', 'title'),
      Output('nightscout-load-button', 'children')],
     [Input('interface-language', 'data')],
     [State('url', 'pathname')],
@@ -2953,7 +3133,8 @@ def update_prediction_text_on_language_change(
         t("ui.header.time_window_label", locale=locale),
         t("ui.chart.y_axis_label", locale=locale),
         t("ui.startup.data_usage_consent_label", locale=locale),
-        t("ui.common.finish_exit", locale=locale),
+        t("ui.submit.finish_game", locale=locale),
+        t("ui.submit.finish_game", locale=locale),
         t("ui.header.nightscout_load_button", locale=locale),
     )
 
@@ -2965,6 +3146,7 @@ def update_prediction_text_on_language_change(
      Output('ending-disclaimer-line3', 'children'),
      Output('ending-gamification', 'children'),
      Output('ending-units-line', 'children'),
+     Output('ending-source-info', 'children'),
      Output('ending-graph-explanation', 'children'),
      Output('ending-prediction-results-title', 'children'),
      Output('ending-prediction-details-toggle', 'children'),
@@ -2984,7 +3166,9 @@ def update_prediction_text_on_language_change(
     [Input('interface-language', 'data')],
     [State('url', 'pathname'),
      State('user-info-store', 'data'),
-     State('glucose-unit', 'data')],
+     State('glucose-unit', 'data'),
+     State('current-window-df', 'data'),
+     State('events-df', 'data')],
     prevent_initial_call=True,
 )
 def update_ending_text_on_language_change(
@@ -2992,6 +3176,8 @@ def update_ending_text_on_language_change(
     pathname: Optional[str],
     user_info: Optional[Dict[str, Any]],
     glucose_unit: Optional[str],
+    current_df_data: Optional[Dict],
+    events_df_data: Optional[Dict],
 ) -> tuple:
     """Update translatable text on the ending page when language changes."""
     if pathname != '/ending':
@@ -3045,7 +3231,28 @@ def update_ending_text_on_language_change(
             )
         ]
 
-    finish_button_text = t("ui.ending.results", locale=locale) if is_last_round else t("ui.common.finish_exit", locale=locale)
+    finish_button_text = t("ui.ending.results", locale=locale) if is_last_round else t("ui.submit.finish_game", locale=locale)
+
+    empty_events = pl.DataFrame(
+        {"time": [], "event_type": [], "event_subtype": [], "insulin_value": []}
+    )
+    if current_df_data:
+        window_df = reconstruct_dataframe_from_dict(current_df_data)
+    else:
+        window_df = pl.DataFrame(
+            {"time": [], "gl": [], "prediction": [], "age": [], "user_id": []}
+        )
+    events_df = (
+        reconstruct_events_dataframe_from_dict(events_df_data)
+        if events_df_data
+        else empty_events
+    )
+    source_plaque = _ending_source_plaque_children(
+        user_info=user_info,
+        window_df=window_df,
+        events_df=events_df,
+        locale=locale,
+    )
 
     return (
         t("ui.ending.title", locale=locale),
@@ -3062,6 +3269,7 @@ def update_ending_text_on_language_change(
             is_last_round=is_last_round,
         ).children,
         t("ui.ending.units_line", locale=locale, unit=unit),
+        source_plaque,
         t("ui.ending.graph_explanation", locale=locale),
         t("ui.ending.prediction_results", locale=locale),
         t("ui.ending.click_here_for_details", locale=locale),
@@ -3084,7 +3292,8 @@ def update_ending_text_on_language_change(
 @app.callback(
     [Output('page-content', 'children'),
      Output('mobile-warning', 'children'),
-     Output('navbar-container', 'children')],
+     Output('navbar-container', 'children'),
+     Output('final-fill-step', 'data')],
     [Input('url', 'pathname'),
      Input('game-stores-hydrated', 'data')],
     [State('interface-language', 'data'),
@@ -3096,6 +3305,37 @@ def update_ending_text_on_language_change(
     prevent_initial_call=False
 )
 def display_page(
+    pathname: Optional[str],
+    stores_hydrated: Optional[bool],
+    interface_language: Optional[str],
+    user_info: Optional[Dict[str, Any]],
+    current_df_data: Optional[Dict],
+    events_df_data: Optional[Dict],
+    glucose_unit: Optional[str],
+    user_agent: Optional[str],
+) -> tuple[html.Div, Optional[html.Div], html.Div, Any]:
+    page, warning, navbar = _render_page(
+        pathname,
+        stores_hydrated,
+        interface_language,
+        user_info,
+        current_df_data,
+        events_df_data,
+        glucose_unit,
+        user_agent,
+    )
+    ready = _game_stores_ready(pathname, user_info, current_df_data)
+    # ``no_update`` on every other route: writing None here would re-fire the
+    # /final fill callbacks after Exit has already unmounted their outputs.
+    kick: Any = (
+        {"phase": 1, "nonce": time.time_ns()}
+        if pathname == "/final" and user_info and ready
+        else no_update
+    )
+    return page, warning, navbar, kick
+
+
+def _render_page(
     pathname: Optional[str],
     stores_hydrated: Optional[bool],
     interface_language: Optional[str],
@@ -3192,7 +3432,7 @@ def display_page(
                         )
                     ], style={'textAlign': 'center'})
                 ]), warning_content, navbar
-            return create_final_layout(user_info, glucose_unit, locale=locale), warning_content, navbar
+            return create_final_layout(user_info, glucose_unit, locale=locale, eager=False), warning_content, navbar
         if pathname and pathname.startswith('/share/'):
             share_id = pathname.split('/share/', 1)[1].strip('/').split('/', 1)[0]
             record = share_store.load_share(share_id) if share_id else None
@@ -3339,6 +3579,8 @@ def faq_board_children(*, locale: str) -> list[Any]:
 
 
 def create_faq_page(*, locale: str) -> html.Div:
+    from sugar_sugar.faq_board import faq_board_enabled
+
     sections: list[Any] = t_raw("ui.faq.sections", locale=locale)
     section_divs: list[Any] = []
     for section in sections:
@@ -3380,64 +3622,72 @@ def create_faq_page(*, locale: str) -> html.Div:
                 **section_kwargs,
             )
         )
+    children: list[Any] = [
+        html.H1(t("ui.faq.title", locale=locale), disable_n_clicks=True),
+        html.Div(section_divs, disable_n_clicks=True),
+    ]
+    if faq_board_enabled():
+        children.extend(_faq_board_form_children(locale=locale))
     return html.Div(
-        [
-            html.H1(t("ui.faq.title", locale=locale), disable_n_clicks=True),
-            html.Div(section_divs, disable_n_clicks=True),
-            html.Div(
-                [
-                    html.H2(t("ui.faq.ask_title", locale=locale), disable_n_clicks=True),
-                    html.Div(
-                        t("ui.faq.ask_intro", locale=locale),
-                        style={"marginBottom": "10px", "color": "#334155"},
-                        disable_n_clicks=True,
-                    ),
-                    dcc.Textarea(
-                        id="faq-ask-text",
-                        placeholder=t("ui.faq.ask_placeholder", locale=locale),
-                        style={"width": "100%", "minHeight": "110px"},
-                    ),
-                    dcc.Input(
-                        id="faq-ask-name",
-                        type="text",
-                        placeholder=t("ui.faq.name_placeholder", locale=locale),
-                        style={"width": "100%", "marginTop": "8px"},
-                    ),
-                    html.Div(
-                        t("ui.faq.tags_label", locale=locale),
-                        style={"fontWeight": "700", "margin": "10px 0 6px"},
-                        disable_n_clicks=True,
-                    ),
-                    dcc.Checklist(
-                        id="faq-ask-tags",
-                        options=_faq_tag_options(locale),
-                        value=[],
-                        inline=True,
-                    ),
-                    dcc.RadioItems(
-                        id="faq-ask-section",
-                        options=_faq_section_options(locale),
-                        value="participant",
-                        inline=True,
-                        style={"margin": "10px 0"},
-                    ),
-                    html.Button(
-                        t("ui.faq.ask_button", locale=locale),
-                        id="faq-ask-submit",
-                        className="ui green button",
-                        n_clicks=0,
-                    ),
-                    html.Div(id="faq-ask-status", style={"marginTop": "8px", "color": "#1b5e20"}),
-                ],
-                id="faq-ask-form",
-                className="ui segment",
-                style={"marginTop": "28px"},
-            ),
-            html.Div(faq_board_children(locale=locale), id="faq-board"),
-        ],
+        children,
         className="info-page",
         disable_n_clicks=True,
     )
+
+
+def _faq_board_form_children(*, locale: str) -> list[Any]:
+    return [
+        html.Div(
+            [
+                html.H2(t("ui.faq.ask_title", locale=locale), disable_n_clicks=True),
+                html.Div(
+                    t("ui.faq.ask_intro", locale=locale),
+                    style={"marginBottom": "10px", "color": "#334155"},
+                    disable_n_clicks=True,
+                ),
+                dcc.Textarea(
+                    id="faq-ask-text",
+                    placeholder=t("ui.faq.ask_placeholder", locale=locale),
+                    style={"width": "100%", "minHeight": "110px"},
+                ),
+                dcc.Input(
+                    id="faq-ask-name",
+                    type="text",
+                    placeholder=t("ui.faq.name_placeholder", locale=locale),
+                    style={"width": "100%", "marginTop": "8px"},
+                ),
+                html.Div(
+                    t("ui.faq.tags_label", locale=locale),
+                    style={"fontWeight": "700", "margin": "10px 0 6px"},
+                    disable_n_clicks=True,
+                ),
+                dcc.Checklist(
+                    id="faq-ask-tags",
+                    options=_faq_tag_options(locale),
+                    value=[],
+                    inline=True,
+                ),
+                dcc.RadioItems(
+                    id="faq-ask-section",
+                    options=_faq_section_options(locale),
+                    value="participant",
+                    inline=True,
+                    style={"margin": "10px 0"},
+                ),
+                html.Button(
+                    t("ui.faq.ask_button", locale=locale),
+                    id="faq-ask-submit",
+                    className="ui green button",
+                    n_clicks=0,
+                ),
+                html.Div(id="faq-ask-status", style={"marginTop": "8px", "color": "#1b5e20"}),
+            ],
+            id="faq-ask-form",
+            className="ui segment",
+            style={"marginTop": "28px"},
+        ),
+        html.Div(faq_board_children(locale=locale), id="faq-board"),
+    ]
 
 @lru_cache(maxsize=4)
 def _study_design_markdown(locale: str) -> str:
@@ -3997,7 +4247,9 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
                 id="prediction-mobile-actions",
                 className="has-upload" if upload_strip_visible else "",
             ),
-        ], id='prediction-chart-submit-wrap', style={'flex': '1'})
+        ], id='prediction-chart-submit-wrap', style={'flex': '1'}),
+        dcc.Store(id='finish-confirm-context-prediction', data=None, storage_type='memory'),
+        finish_confirm_overlay(locale, source="prediction"),
     ], id="prediction-page", className="prediction-page", style={
         'margin': '0 auto',
         'padding': '0 20px',
@@ -4348,6 +4600,7 @@ def _build_gamification_section(
 
     reaction = _pick_reaction(mae, current_round, locale)
     personal_best = _is_personal_best(mae, rounds)
+    celebrate_class = "ending-celebrate" if is_last_round else ""
 
     reaction_parts: list[Any] = []
     if reaction:
@@ -4358,14 +4611,15 @@ def _build_gamification_section(
         reaction_parts.append(html.Span(
             t("ui.ending.personal_best", locale=locale),
             id="ending-personal-best",
+            className=celebrate_class,
             style={
                 "fontWeight": "bold",
                 "color": "#b8860b",
                 "backgroundColor": "#fff8e1",
-                "padding": "2px 10px",
+                "padding": "4px 12px" if is_last_round else "2px 10px",
                 "borderRadius": "12px",
                 "border": "1px solid #f0d060",
-                "fontSize": "13px",
+                "fontSize": "18px" if is_last_round else "13px",
             },
         ))
     if not reaction_parts:
@@ -4375,15 +4629,16 @@ def _build_gamification_section(
     children.append(html.Div(
         reaction_parts,
         id="ending-reaction-line",
+        className=celebrate_class,
         disable_n_clicks=True,
         style={
             "textAlign": "center",
-            "fontSize": "14px",
+            "fontSize": "24px" if is_last_round else "14px",
             "color": "#2c5282",
-            "fontWeight": "500",
+            "fontWeight": "700" if is_last_round else "500",
             "marginBottom": "0",
             "minHeight": "0",
-            "lineHeight": "1.3",
+            "lineHeight": "1.35",
         },
     ))
 
@@ -4391,13 +4646,14 @@ def _build_gamification_section(
     children.append(html.Div(
         milestone or "",
         id="ending-milestone",
+        className=celebrate_class,
         disable_n_clicks=True,
         style={
             "textAlign": "center",
-            "fontSize": "13px",
+            "fontSize": "22px" if is_last_round else "13px",
             "color": "#1b5e20",
-            "fontWeight": "700",
-            "marginTop": "2px",
+            "fontWeight": "800" if is_last_round else "700",
+            "marginTop": "6px" if is_last_round else "2px",
             "minHeight": "0",
             "display": "block" if milestone else "none",
         },
@@ -4418,18 +4674,24 @@ def _build_gamification_section(
         }
     ))
 
-    return html.Div(children, id="ending-gamification", disable_n_clicks=True, style={
-        "maxWidth": "100%",
-        "margin": "0 auto",
-        "padding": "8px 14px 6px 14px",
-        "backgroundColor": "#f0f7ff",
-        "borderRadius": "10px",
-        "border": "1px solid #c5d9f0",
-        "boxShadow": "0 1px 4px rgba(0,0,0,0.06)",
-        "width": "100%",
-        "boxSizing": "border-box",
-        "flexShrink": "0",
-    })
+    return html.Div(
+        children,
+        id="ending-gamification",
+        className="ending-gamification-complete" if is_last_round else "",
+        disable_n_clicks=True,
+        style={
+            "maxWidth": "100%",
+            "margin": "0 auto",
+            "padding": "12px 16px 10px 16px" if is_last_round else "8px 14px 6px 14px",
+            "backgroundColor": "#fff8e1" if is_last_round else "#f0f7ff",
+            "borderRadius": "10px",
+            "border": "1px solid #f0d060" if is_last_round else "1px solid #c5d9f0",
+            "boxShadow": "0 1px 4px rgba(0,0,0,0.06)",
+            "width": "100%",
+            "boxSizing": "border-box",
+            "flexShrink": "0",
+        },
+    )
 
 
 def _switch_format_button(
@@ -4603,24 +4865,12 @@ def create_ending_layout(
     show_switch_data_consent = False
     switch_data_consent_value: list[str] = []
 
-    data_source_name = str(user_info.get('data_source_name') or '') if user_info else ''
-    is_example = bool(user_info.get('is_example_data', True)) if user_info else True
-
-    subject_parts: list[str] = []
-    if data_source_name:
-        subject_parts.append(t("ui.ending.data_source_label", locale=locale, source=Path(data_source_name).name))
-    metadata_line = _build_source_metadata_line(
-        source_name=data_source_name,
+    source_plaque = _ending_source_plaque_children(
         user_info=user_info,
-        is_example_data=is_example,
         window_df=df,
         events_df=events_df,
         locale=locale,
     )
-    if metadata_line:
-        subject_parts.append(metadata_line)
-
-    subject_info_line = " — ".join(subject_parts) if subject_parts else ""
 
     _fold_box_style: dict[str, Any] = {
         'marginBottom': '20px',
@@ -4641,32 +4891,32 @@ def create_ending_layout(
     _finish_label = (
         t("ui.ending.results", locale=locale)
         if is_last_round
-        else t("ui.common.finish_exit", locale=locale)
+        else t("ui.submit.finish_game", locale=locale)
     )
     _finish_class = (
-        "ui green button finish-study-exit finish-study-results"
+        "ui huge green button finish-study-exit finish-study-results"
         if is_last_round
-        else "ui primary button finish-study-exit"
+        else FINISH_EXIT_BUTTON_CLASS
     )
     _finish_style: dict[str, Any] = {
-        'backgroundColor': '#4CBB17' if is_last_round else '#007bff',
+        'backgroundColor': '#4CBB17',
         'color': 'white',
-        'padding': '0 22px' if is_last_round else '0',
+        'padding': '0 48px',
         'border': 'none',
-        'borderRadius': '8px',
+        'borderRadius': '14px',
         'cursor': 'pointer',
-        'width': 'auto' if is_last_round else '48px',
-        'minWidth': '160px' if is_last_round else '48px',
-        'height': '48px',
+        'width': 'auto',
+        'minWidth': '320px',
+        'height': '80px',
         'display': 'inline-flex',
         'alignItems': 'center',
         'justifyContent': 'center',
-        'lineHeight': '1' if not is_last_round else '1.2',
+        'lineHeight': '1.2',
         'margin': '0',
         'flexShrink': '0',
-        'fontSize': '20px' if is_last_round else '18px',
-        'fontWeight': '700',
-    }
+        'fontSize': '32px',
+        'fontWeight': '800',
+    } if is_last_round else finish_exit_button_style()
     return html.Div([
         html.H1(
             t("ui.ending.title", locale=locale),
@@ -4704,6 +4954,8 @@ def create_ending_layout(
                     ),
                     dcc.Graph(
                         id='ending-static-graph',
+                        # Same compact figure + resize contract as /prediction
+                        # (GlucoseChart._COMPACT_MARGIN, assets/compact-chart.js).
                         figure=GlucoseChart.build_static_figure(
                             df,
                             events_df,
@@ -4711,6 +4963,7 @@ def create_ending_layout(
                             unit=unit,
                             locale=locale,
                             prediction_boundary=len(df) - PREDICTION_HOUR_OFFSET,
+                            compact=_is_mobile_request(),
                         ),
                         config={
                             'displayModeBar': False,
@@ -4721,6 +4974,7 @@ def create_ending_layout(
                             'editable': False,
                         },
                         style={'height': '100%', 'flex': '1', 'minHeight': '0'},
+                        responsive=True,
                     ),
                 ],
                 disable_n_clicks=True,
@@ -4812,6 +5066,12 @@ def create_ending_layout(
                 'flexShrink': '0',
             },
         ),
+        html.Div(
+            source_plaque,
+            id='ending-source-info',
+            className='prediction-source-plaque',
+            disable_n_clicks=True,
+        ),
         html.Div(id="switch-format-error", disable_n_clicks=True, style={'margin': '0'}),
         dcc.Checklist(
             id="switch-data-usage-consent",
@@ -4835,14 +5095,20 @@ def create_ending_layout(
                 style={
                     'backgroundColor': '#ffffff',
                     'color': '#2185d0',
-                    'padding': 'clamp(10px, 1.6vw, 14px) clamp(16px, 2.4vw, 22px)',
+                    'padding': '10px 22px',
                     'border': '1px solid #2185d0',
                     'borderRadius': '8px',
-                    'fontSize': 'clamp(14px, 2vw, 18px)',
+                    'fontSize': '16px',
                     'fontWeight': '700',
                     'cursor': 'pointer',
-                    'maxWidth': '400px',
-                    'width': '100%',
+                    'width': 'auto',
+                    'maxWidth': '100%',
+                    'boxSizing': 'border-box',
+                    'display': 'inline-flex',
+                    'alignItems': 'center',
+                    'justifyContent': 'center',
+                    'textAlign': 'center',
+                    'lineHeight': '1.3',
                 },
             ),
             id='ending-copy-link-row',
@@ -4876,18 +5142,6 @@ def create_ending_layout(
                 'margin': '12px auto 8px auto',
                 'fontSize': '14px',
                 'lineHeight': '1.4',
-            },
-        ),
-        html.Div(
-            subject_info_line,
-            id='ending-source-info',
-            disable_n_clicks=True,
-            style={
-                'textAlign': 'center',
-                'marginBottom': '4px',
-                'color': '#4a5568',
-                'fontSize': '13px',
-                'display': 'block' if subject_info_line else 'none',
             },
         ),
         html.Div(
@@ -4970,6 +5224,8 @@ def create_ending_layout(
             disable_n_clicks=True,
             style=_fold_box_style,
         ),
+        dcc.Store(id='finish-confirm-context-ending', data=None, storage_type='memory'),
+        finish_confirm_overlay(locale, source="ending"),
     ], id="ending-page", className="ending-page", disable_n_clicks=True, style={
         'maxWidth': '100%',
         'width': '100%',
@@ -5394,6 +5650,90 @@ def _build_final_leaderboard(
     )
 
 
+def _final_ranking_snapshots(
+    user_info: Dict[str, Any],
+) -> tuple[Optional[dict[str, Any]], list[tuple[str, dict[str, Any]]]]:
+    """Read ranking CSVs for the formats this player actually ran."""
+    rounds: list[dict[str, Any]] = user_info.get("rounds") or []
+    current_format = str(user_info.get("format") or "A")
+    runs_by_format: dict[str, list[dict[str, Any]]] = dict(user_info.get("runs_by_format") or {})
+    already_played: set[str] = {str(fmt) for fmt, runs in runs_by_format.items() if runs}
+    if rounds:
+        already_played.add(current_format)
+    played_formats: list[str] = sorted(already_played, key=lambda x: FORMAT_ORDER.get(str(x), 999))
+    study_id = str(user_info.get("study_id") or "")
+    leaderboard_key = email_key(user_info.get("email"))
+    per_format_boards: list[tuple[str, dict[str, Any]]] = []
+    for fmt in played_formats:
+        if fmt not in ("A", "B", "C"):
+            continue
+        board = _leaderboard_snapshot(
+            project_root / "data" / "input" / f"prediction_ranking_{fmt}.csv",
+            study_id=study_id,
+            key=leaderboard_key,
+            format_filter=fmt,
+        )
+        if board is not None:
+            per_format_boards.append((fmt, board))
+    overall_board = _leaderboard_snapshot(
+        project_root / "data" / "input" / "prediction_ranking.csv",
+        study_id=study_id,
+        key=leaderboard_key,
+        format_filter="ALL",
+    )
+    return overall_board, per_format_boards
+
+
+def _final_share_section_children(
+    user_info: Dict[str, Any],
+    *,
+    locale: str,
+) -> list[Any]:
+    """Persist the share record and return the /final share panel children."""
+    share_record: Optional[dict[str, Any]] = build_final_share_record(user_info, locale=locale)
+    if share_record is None:
+        return []
+    final_share_id: str = share_store.ensure_share(share_record)
+    return [
+        html.H3(
+            t("ui.share.button_share", locale=locale),
+            style={
+                "textAlign": "center",
+                "marginBottom": "4px",
+                "fontSize": "clamp(18px, 3vw, 24px)",
+            },
+        ),
+        build_share_panel(
+            share_record,
+            share_id=final_share_id,
+            share_url=_build_share_url(final_share_id),
+            locale=locale,
+        ),
+    ]
+
+
+def _final_synthesis_inner(
+    user_info: Dict[str, Any],
+    *,
+    locale: str,
+) -> list[Any]:
+    """Inner nodes of the synthesis card (the wrapper already has the id)."""
+    synthesis_rounds: list[dict[str, Any]] = collect_playable_rounds(user_info)
+    if not synthesis_rounds:
+        return []
+    card = build_synthesis_card(
+        {"rounds": synthesis_rounds},
+        locale=locale,
+        graph_id="final-synthesis-graph",
+    )
+    kids = card.children
+    if isinstance(kids, (list, tuple)):
+        return list(kids)
+    if kids is None:
+        return []
+    return [kids]
+
+
 HIGHSCORE_TOP_N: int = 20
 HIGHSCORE_FORMAT_TOP_N: int = 10
 
@@ -5641,7 +5981,50 @@ def _build_aggregate_table_data(rounds: list[dict[str, Any]]) -> list[dict[str, 
     return [actual_row, prediction_row]
 
 
-def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], *, locale: str) -> html.Div:
+def build_final_share_record(user_info: Dict[str, Any], *, locale: str) -> Optional[dict[str, Any]]:
+    """JSON-safe share record for the player's full game state, or None without rounds.
+
+    Captures every round across every format (current run + archived
+    `runs_by_format`), the frozen rankings, and a trimmed `user_info`.  The
+    record intentionally drops heavyweight stores (`full-df`, `events-df`) --
+    everything the share page needs already lives in `prediction_table_data`.
+    """
+    all_rounds: list[dict[str, Any]] = collect_playable_rounds(user_info)
+    if not all_rounds:
+        return None
+    played_formats: set[str] = {str(r.get("format") or "") for r in all_rounds}
+    played_formats.discard("")
+    study_id: str = str(user_info.get("study_id") or "")
+    rankings: dict[str, Any] = compute_share_rankings(
+        study_id, sorted(played_formats), key=email_key(user_info.get("email"))
+    )
+    return {
+        "schema_version": 2,
+        "created_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "locale": normalize_locale(locale),
+        "rounds": all_rounds,
+        "played_formats": sorted(played_formats, key=lambda x: FORMAT_ORDER.get(str(x), 999)),
+        "rankings": rankings,
+        "user_info": {
+            "name": str(user_info.get("name") or ""),
+            "nickname": normalize_nickname(user_info.get("nickname")),
+            "study_id": study_id,
+            "format": str(user_info.get("format") or ""),
+            "uses_cgm": bool(user_info.get("uses_cgm", False)),
+            "max_rounds": int(user_info.get("max_rounds") or MAX_ROUNDS),
+            "challenge_unknown": bool(user_info.get("challenge_unknown", False)),
+            "challenge_unknown_pct": user_info.get("challenge_unknown_pct", ""),
+        },
+    }
+
+
+def create_final_layout(
+    user_info: Dict[str, Any],
+    glucose_unit: Optional[str],
+    *,
+    locale: str,
+    eager: bool = True,
+) -> html.Div:
     rounds: list[dict[str, Any]] = user_info.get('rounds') or []
     # If current rounds are empty (e.g. user just switched format), fall back to the
     # most recently archived run so results are still visible.
@@ -5653,7 +6036,6 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
             rounds = list(latest_run.get('rounds') or [])
     max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS)
     unit = glucose_unit if glucose_unit in ('mg/dL', 'mmol/L') else 'mg/dL'
-    study_id = str(user_info.get('study_id') or '')
     current_format = str(user_info.get("format") or "A")
     uses_cgm = bool(user_info.get("uses_cgm", False))
     allowed_formats: list[str] = (["C", "B", "A"] if uses_cgm else ["A"])
@@ -5665,42 +6047,42 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
     # Consent is handled on the prediction page (B/C upload flow).
     show_switch_data_consent = False
     switch_data_consent_value: list[str] = []
-    played_formats: list[str] = sorted(already_played, key=lambda x: FORMAT_ORDER.get(str(x), 999))
 
-    leaderboard_key = email_key(user_info.get('email'))
-    per_format_boards: list[tuple[str, dict[str, Any]]] = []
-    for fmt in played_formats:
-        if fmt not in ("A", "B", "C"):
-            continue
-        board = _leaderboard_snapshot(
-            project_root / 'data' / 'input' / f'prediction_ranking_{fmt}.csv',
-            study_id=study_id,
-            key=leaderboard_key,
-            format_filter=fmt,
+    if eager:
+        overall_board, per_format_boards = _final_ranking_snapshots(user_info)
+        leaderboard = _build_final_leaderboard(
+            overall=overall_board,
+            per_format=per_format_boards,
+            locale=locale,
+            unit=unit,
+            user_info=user_info,
         )
-        if board is not None:
-            per_format_boards.append((fmt, board))
-
-    # Always show cumulative overall ranking ("ALL"), updated after each finished run.
-    overall_board = _leaderboard_snapshot(
-        project_root / 'data' / 'input' / 'prediction_ranking.csv',
-        study_id=study_id,
-        key=leaderboard_key,
-        format_filter="ALL",
-    )
-
-    leaderboard = _build_final_leaderboard(
-        overall=overall_board,
-        per_format=per_format_boards,
-        locale=locale,
-        unit=unit,
-        user_info=user_info,
-    )
+    else:
+        leaderboard = html.Div(
+            [
+                html.H3(
+                    t("ui.final.ranking_title", locale=locale),
+                    id="final-ranking-title",
+                    className="final-leaderboard-title",
+                ),
+            ],
+            id="final-ranking-list",
+            className="final-leaderboard",
+            disable_n_clicks=True,
+            style={"display": "block"},
+        )
 
     metrics_component_final = MetricsComponent()
     aggregate_table_data = _convert_table_data_units(_build_aggregate_table_data(rounds), unit)
     overall_metrics = metrics_component_final._calculate_metrics_from_table_data(aggregate_table_data)
-    overall_metrics_display = MetricsComponent.create_ending_metrics_display(overall_metrics, locale=locale) if overall_metrics else [
+    # Player-facing cards show only MAE and MAPE, with lay titles and units;
+    # MSE/RMSE are statistician detail and live inside the per-round fold.
+    overall_metrics_display = MetricsComponent.create_ending_metrics_display(
+        overall_metrics,
+        locale=locale,
+        metrics_subset=['MAE', 'MAPE'],
+        unit=unit,
+    ) if overall_metrics else [
         html.H3(t("ui.metrics.title_accuracy_metrics", locale=locale), style={'textAlign': 'center'}),
         html.Div(
             t("ui.metrics.no_metrics_available", locale=locale),
@@ -5713,6 +6095,31 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
             }
         )
     ]
+
+    def _overall_metric(name: str) -> Optional[float]:
+        metric = (overall_metrics or {}).get(name) or {}
+        value = metric.get('value')
+        return float(value) if value is not None else None
+
+    # Plain-language headline: the one number a regular player actually wants,
+    # in glucose units, before any acronym appears on the page.
+    hero_mae: Optional[float] = _overall_metric('MAE')
+    hero_mape: Optional[float] = _overall_metric('MAPE')
+    hero_line: Optional[html.Div] = None
+    if hero_mae is not None and hero_mape is not None:
+        hero_line = html.Div(
+            t(
+                "ui.final.hero_summary",
+                locale=locale,
+                mae=f"{hero_mae:.1f}",
+                unit=unit,
+                mape=f"{hero_mape:.1f}",
+            ),
+            id='final-hero-summary',
+            disable_n_clicks=True,
+        )
+    stats_mse: Optional[float] = _overall_metric('MSE')
+    stats_rmse: Optional[float] = _overall_metric('RMSE')
 
     round_rows: list[dict[str, Any]] = []
     for round_info in rounds:
@@ -5738,7 +6145,49 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
             'MAPE': _metric_value('MAPE'),
         })
 
+    synthesis_rounds: list[dict[str, Any]] = collect_playable_rounds(user_info)
+    if eager:
+        synthesis_card = (
+            build_synthesis_card(
+                {"rounds": synthesis_rounds},
+                locale=locale,
+                card_id="final-synthesis-card",
+                graph_id="final-synthesis-graph",
+            )
+            if synthesis_rounds
+            else None
+        )
+        share_kids = _final_share_section_children(user_info, locale=locale)
+        share_section: Optional[html.Div] = (
+            html.Div(
+                share_kids,
+                id="final-share-panel",
+                disable_n_clicks=True,
+                style={"width": "100%", "boxSizing": "border-box"},
+            )
+            if share_kids
+            else None
+        )
+    else:
+        # Stable ids so the deferred callback can fill them after first paint.
+        # Empty nodes stay hidden via :empty CSS until the tick writes children.
+        share_section = html.Div(
+            [],
+            id="final-share-panel",
+            disable_n_clicks=True,
+            style={"width": "100%", "boxSizing": "border-box"},
+        )
+        synthesis_card = html.Div(
+            [],
+            id="final-synthesis-card",
+            className="results-synthesis-card",
+            disable_n_clicks=True,
+        )
+
     _exit_label = t("ui.final.start_over", locale=locale)
+    # "Want to start another?" is only asked when there is a format left to
+    # start; otherwise the sentence would dangle with no "yes" button.
+    journey_key: str = "ui.final.journey_title" if switch_targets else "ui.final.journey_title_done"
     return html.Div([
         html.H1(t("ui.final.title", locale=locale), id='final-title', style={
             'textAlign': 'center',
@@ -5746,6 +6195,29 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
             'fontSize': 'clamp(24px, 4vw, 48px)',
             'padding': '0 10px'
         }),
+        # Medical disclaimer FIRST: for a diabetic audience "do not change
+        # medical decisions based on this app" must be seen, so it sits under
+        # the title — compact and without a dismiss icon — instead of two
+        # screens below the fold.
+        html.Div(
+            [
+                html.P(t("ui.results_disclaimer.line1", locale=locale), id='final-disclaimer-line1', style={'margin': '0'}),
+                html.P(t("ui.results_disclaimer.line2", locale=locale), id='final-disclaimer-line2', style={'margin': '0'}),
+                html.P(t("ui.results_disclaimer.line3", locale=locale), id='final-disclaimer-line3', style={'margin': '0'}),
+            ],
+            id='final-disclaimer',
+            className='ui warning message final-disclaimer-compact',
+            disable_n_clicks=True,
+            style={
+                'display': 'block',
+                'maxWidth': '900px',
+                'margin': '0 auto 14px auto',
+                'fontSize': '13px',
+                'lineHeight': '1.45',
+                'padding': '10px 16px',
+                'textAlign': 'center',
+            },
+        ),
         html.Div(
             t("ui.final.rounds_played", locale=locale, played=len(rounds), total=max_rounds),
             id='final-rounds-played',
@@ -5758,8 +6230,120 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
                 'color': '#2c5282'
             }
         ),
+        *([hero_line] if hero_line is not None else []),
+        leaderboard,
+        *([share_section] if share_section is not None else []),
+        *([synthesis_card] if synthesis_card is not None else []),
         html.Div(
-            t("ui.final.journey_title", locale=locale),
+            overall_metrics_display,
+            id='final-overall-metrics-container',
+            disable_n_clicks=True,
+            style={
+                'padding': 'clamp(10px, 2vw, 20px)',
+                'backgroundColor': 'white',
+                'borderRadius': '10px',
+                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+                'marginBottom': '20px',
+                'width': '100%',
+                'boxSizing': 'border-box'
+            }
+        ),
+        html.Div(
+            [
+                html.H3(
+                    t("ui.final.per_round_metrics", locale=locale),
+                    id='final-per-round-title',
+                    style={
+                        'textAlign': 'center',
+                        'marginBottom': '12px',
+                        'fontSize': 'clamp(18px, 3vw, 24px)',
+                    },
+                ),
+                html.Details(
+                    [
+                        html.Summary(
+                            [
+                                html.Span(
+                                    t("ui.ending.click_here_for_details", locale=locale),
+                                    className='fold-label-show',
+                                ),
+                                html.Span(
+                                    t("ui.ending.hide_details", locale=locale),
+                                    className='fold-label-hide',
+                                ),
+                            ],
+                            id='final-per-round-details-toggle',
+                            className='ending-fold-button',
+                        ),
+                        *([
+                            html.Div(
+                                t(
+                                    "ui.final.stats_note",
+                                    locale=locale,
+                                    mse=f"{stats_mse:.2f}",
+                                    rmse=f"{stats_rmse:.2f}",
+                                    unit=unit,
+                                ),
+                                id='final-stats-note',
+                                style={
+                                    'textAlign': 'center',
+                                    'margin': '12px 0 0 0',
+                                    'color': '#64748b',
+                                    'fontSize': '13px',
+                                },
+                            )
+                        ] if stats_mse is not None and stats_rmse is not None else []),
+                        html.Div(
+                            t("ui.ending.units_line", locale=locale, unit=unit),
+                            id='final-units-line',
+                            style={
+                                'textAlign': 'center',
+                                'margin': '12px 0 10px 0',
+                                'color': '#4a5568',
+                                'fontSize': '14px',
+                            },
+                        ),
+                        build_readonly_ag_grid(
+                            table_id='final-rounds-table',
+                            row_data=round_rows,
+                            column_defs=build_readonly_column_defs(
+                                [
+                                    {'name': t("ui.final.col_round", locale=locale), 'id': 'Round', 'type': 'numeric'},
+                                    {'name': t("ui.final.col_points", locale=locale), 'id': 'Pairs', 'type': 'numeric'},
+                                    {'name': 'MAE', 'id': 'MAE', 'type': 'numeric'},
+                                    {'name': 'MSE', 'id': 'MSE', 'type': 'numeric'},
+                                    {'name': 'RMSE', 'id': 'RMSE', 'type': 'numeric'},
+                                    {'name': 'MAPE', 'id': 'MAPE', 'type': 'numeric'},
+                                ],
+                                fixed_decimal_fields={'MAE', 'MSE', 'RMSE', 'MAPE'},
+                            ),
+                            style={
+                                'width': '100%',
+                                'overflowX': 'auto',
+                                'marginTop': '8px',
+                            },
+                        ),
+                    ],
+                    className='ending-fold',
+                ),
+            ],
+            id='final-per-round-section',
+            disable_n_clicks=True,
+            style={
+                'marginBottom': '20px',
+                'padding': 'clamp(10px, 2vw, 20px)',
+                'backgroundColor': 'white',
+                'borderRadius': '10px',
+                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+                'width': '100%',
+                'boxSizing': 'border-box',
+            },
+        ),
+        # Actions LAST: you leave after seeing everything, not before. The
+        # destructive Exit (wipes the session) is a labelled button, never a
+        # bare icon, and never the first interactive element on the page.
+        html.Div(
+            t(journey_key, locale=locale),
             id='final-journey-title',
             disable_n_clicks=True,
         ),
@@ -5772,29 +6356,6 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
         ),
         html.Div(
             [
-                html.Button(
-                    _exit_label,
-                    id='restart-button',
-                    className='ui primary button finish-study-exit',
-                    title=_exit_label,
-                    style={
-                        'backgroundColor': '#007bff',
-                        'color': 'white',
-                        'padding': '0',
-                        'border': 'none',
-                        'borderRadius': '8px',
-                        'cursor': 'pointer',
-                        'width': '48px',
-                        'minWidth': '48px',
-                        'height': '48px',
-                        'display': 'inline-flex',
-                        'alignItems': 'center',
-                        'justifyContent': 'center',
-                        'lineHeight': '1',
-                        'margin': '0',
-                        'flexShrink': '0',
-                    },
-                ),
                 _switch_format_button(
                     "A", locale=locale, short=True, visible="A" in switch_targets,
                 ),
@@ -5805,29 +6366,26 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
                     "C", locale=locale, short=True, visible="C" in switch_targets,
                 ),
                 html.Button(
-                    t("ui.share.button_share", locale=locale),
-                    id='share-results-button',
-                    n_clicks=0,
-                    className="ui green button",
+                    _exit_label,
+                    id='restart-button',
+                    className='ui button final-exit-button',
+                    title=_exit_label,
                     style={
-                        'backgroundColor': '#4CBB17',
+                        'backgroundColor': WINDOWS_CLOSE_RED,
                         'color': 'white',
-                        'padding': '0 16px',
+                        'height': '48px',
+                        'padding': '0 28px',
                         'border': 'none',
                         'borderRadius': '8px',
-                        'fontSize': '16px',
+                        'fontSize': '17px',
                         'fontWeight': '700',
                         'cursor': 'pointer',
-                        'height': '48px',
-                        'minHeight': '48px',
                         'display': 'inline-flex',
                         'alignItems': 'center',
                         'justifyContent': 'center',
                         'lineHeight': '1.2',
                         'margin': '0',
-                        'whiteSpace': 'nowrap',
-                        'flex': '1 1 auto',
-                        'maxWidth': '280px',
+                        'flexShrink': '0',
                     },
                 ),
             ],
@@ -5858,101 +6416,6 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
             id='final-played-formats',
             disable_n_clicks=True,
             style={'display': 'none'},
-        ),
-        leaderboard,
-        html.Div(
-            overall_metrics_display,
-            id='final-overall-metrics-container',
-            disable_n_clicks=True,
-            style={
-                'padding': 'clamp(10px, 2vw, 20px)',
-                'backgroundColor': 'white',
-                'borderRadius': '10px',
-                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
-                'marginBottom': '20px',
-                'width': '100%',
-                'boxSizing': 'border-box'
-            }
-        ),
-        html.Div(
-            [
-                html.H3(
-                    t("ui.final.per_round_metrics", locale=locale),
-                    id='final-per-round-title',
-                    style={
-                        'textAlign': 'center',
-                        'marginBottom': '12px',
-                        'fontSize': 'clamp(18px, 3vw, 24px)',
-                    },
-                ),
-                html.Details(
-                    [
-                        html.Summary(
-                            t("ui.ending.click_here_for_details", locale=locale),
-                            id='final-per-round-details-toggle',
-                            className='ending-fold-button',
-                        ),
-                        html.Div(
-                            t("ui.ending.units_line", locale=locale, unit=unit),
-                            id='final-units-line',
-                            style={
-                                'textAlign': 'center',
-                                'margin': '12px 0 10px 0',
-                                'color': '#4a5568',
-                                'fontSize': '14px',
-                            },
-                        ),
-                        build_readonly_ag_grid(
-                            table_id='final-rounds-table',
-                            row_data=round_rows,
-                            column_defs=build_readonly_column_defs(
-                                [
-                                    {'name': 'Round', 'id': 'Round', 'type': 'numeric'},
-                                    {'name': 'Pairs', 'id': 'Pairs', 'type': 'numeric'},
-                                    {'name': 'MAE', 'id': 'MAE', 'type': 'numeric'},
-                                    {'name': 'MSE', 'id': 'MSE', 'type': 'numeric'},
-                                    {'name': 'RMSE', 'id': 'RMSE', 'type': 'numeric'},
-                                    {'name': 'MAPE', 'id': 'MAPE', 'type': 'numeric'},
-                                ],
-                                fixed_decimal_fields={'MAE', 'MSE', 'RMSE', 'MAPE'},
-                            ),
-                            style={
-                                'width': '100%',
-                                'overflowX': 'auto',
-                                'marginTop': '8px',
-                            },
-                        ),
-                    ],
-                    className='ending-fold',
-                ),
-            ],
-            disable_n_clicks=True,
-            style={
-                'marginBottom': '20px',
-                'padding': 'clamp(10px, 2vw, 20px)',
-                'backgroundColor': 'white',
-                'borderRadius': '10px',
-                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
-                'width': '100%',
-                'boxSizing': 'border-box',
-            },
-        ),
-        # Disclaimer after results (same idea as /ending: chart/results first).
-        html.Div(
-            [
-                html.I(className="close icon"),
-                html.P(t("ui.results_disclaimer.line1", locale=locale), id='final-disclaimer-line1', style={'margin': '0'}),
-                html.P(t("ui.results_disclaimer.line2", locale=locale), id='final-disclaimer-line2', style={'margin': '0'}),
-                html.P(t("ui.results_disclaimer.line3", locale=locale), id='final-disclaimer-line3', style={'margin': '0'}),
-            ],
-            className='ui warning message',
-            disable_n_clicks=True,
-            style={
-                'maxWidth': '900px',
-                'margin': '0 auto 20px auto',
-                'fontSize': '14px',
-                'lineHeight': '1.4',
-            },
         ),
     ], disable_n_clicks=True, style={
         'maxWidth': '100%',
@@ -6032,7 +6495,8 @@ def reconstruct_events_dataframe_from_dict(events_data: Dict[str, List[Any]]) ->
      State('diabetic-type-dropdown', 'value'),
      State('diabetes-duration-input', 'value'),
      State('challenge-unknown-check', 'value'),
-     State('challenge-unknown-slider', 'value'),
+     State('paper-mention-check', 'value'),
+     State('paper-full-name-input', 'value'),
      State('location-input', 'value'),
      State('user-info-store', 'data')],
     prevent_initial_call=True
@@ -6044,7 +6508,9 @@ def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
                        format_value: Optional[str], data_usage_consent: Optional[list[str]],
                        diabetic: Optional[bool], diabetic_type: Optional[str],
                        diabetes_duration: Optional[float],
-                       challenge_unknown: Optional[list[str] | bool], challenge_unknown_pct: Optional[float],
+                       challenge_unknown: Optional[list[str] | bool],
+                       paper_mention_check: Optional[list[str] | bool],
+                       paper_full_name: Optional[str],
                        location: Optional[str],
                        existing_user_info: Optional[Dict[str, Any]] = None) -> tuple[Any, ...]:
     """Handle start button on startup page.
@@ -6070,10 +6536,11 @@ def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
     )
     from sugar_sugar.cgm_duration import cgm_duration_to_years, normalize_cgm_duration_unit
     from sugar_sugar.challenge_unknown import (
+        CHALLENGE_UNKNOWN_PCT,
         challenge_unknown_checked,
         challenge_unknown_eligible,
-        snap_challenge_pct,
     )
+    from sugar_sugar.paper_mention import resolve_paper_mention
 
     wants_contact = _wants_contact_from_user_info(existing_user_info)
     already_upload_consent = prior_upload_data_consent(existing_user_info)
@@ -6111,6 +6578,16 @@ def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
         study_id = info.get('study_id') or str(uuid.uuid4())
         run_id = str(uuid.uuid4())
         uses_cgm_bool = bool(uses_cgm) if uses_cgm is not None else False
+        challenge_on = (
+            challenge_unknown_checked(challenge_unknown)
+            and challenge_unknown_eligible(
+                {'diabetic': diabetic, 'diabetic_type': diabetic_type, 'format': format_value},
+                format_value,
+            )
+        )
+        wants_paper_mention, paper_name = resolve_paper_mention(
+            paper_mention_check, paper_full_name
+        )
 
         info.update({
             'study_id': study_id,
@@ -6143,23 +6620,18 @@ def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
             'diabetic': diabetic,
             'diabetic_type': diabetic_type,
             'diabetes_duration': diabetes_duration,
-            'challenge_unknown': (
-                challenge_unknown_checked(challenge_unknown)
-                and challenge_unknown_eligible(
-                    {'diabetic': diabetic, 'diabetic_type': diabetic_type, 'format': format_value},
-                    format_value,
-                )
-            ),
-            'challenge_unknown_pct': snap_challenge_pct(challenge_unknown_pct),
+            'challenge_unknown': challenge_on,
+            'challenge_unknown_pct': CHALLENGE_UNKNOWN_PCT if challenge_on else '',
             'generic_intervention': generic_intervention_for_user(
                 {
                     'diabetic': diabetic,
                     'diabetic_type': diabetic_type,
                     'format': format_value,
-                    'challenge_unknown': challenge_unknown_checked(challenge_unknown),
-                    'challenge_unknown_pct': snap_challenge_pct(challenge_unknown_pct),
+                    'challenge_unknown': challenge_on,
                 }
             ),
+            'paper_mention': wants_paper_mention,
+            'paper_full_name': paper_name,
             'location': location,
             'rounds': info.get('rounds') or [],
             'max_rounds': int(info.get('max_rounds') or MAX_ROUNDS),
@@ -6218,6 +6690,8 @@ def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
             "keep_up_to_date": bool(info.get("consent_keep_up_to_date", False)),
             "no_selection": bool(info.get("consent_no_selection", True)),
             "consent_use_uploaded_data": bool(info.get("consent_use_uploaded_data", False)),
+            "paper_mention": bool(info.get("paper_mention", False)),
+            "paper_full_name": str(info.get("paper_full_name") or ""),
         }
         ensure_consent_agreement_row(consent_row)
         # Stamp resolved flags so the consent CSV matches what we will persist
@@ -6231,6 +6705,8 @@ def handle_start_button(n_clicks: Optional[int], nickname: Optional[str],
                 "receive_results_later": bool(info.get("consent_receive_results_later", False)),
                 "keep_up_to_date": bool(info.get("consent_keep_up_to_date", False)),
                 "upload_own_data": bool(info.get("consent_upload_own_data", False)),
+                "paper_mention": bool(info.get("paper_mention", False)),
+                "paper_full_name": str(info.get("paper_full_name") or ""),
             },
         )
         # Capture the starter immediately -- people who open /prediction and
@@ -6582,12 +7058,179 @@ def handle_next_round_button(
         )
 
 
+def _finish_rounds_if_exiting(
+    user_info: Optional[Dict[str, Any]],
+    current_df_data: Optional[Dict[str, Any]],
+    *,
+    count_current_drawing: bool,
+) -> int:
+    rounds_played = len((user_info or {}).get("rounds") or [])
+    if (
+        count_current_drawing
+        and current_df_data
+        and hidden_area_is_complete(reconstruct_dataframe_from_dict(current_df_data))
+    ):
+        rounds_played += 1
+    return rounds_played
+
+
+def _finish_confirmation_context(
+    user_info: Optional[Dict[str, Any]],
+    current_df_data: Optional[Dict[str, Any]],
+    *,
+    count_current_drawing: bool,
+) -> Dict[str, int]:
+    return {
+        "rounds_played": _finish_rounds_if_exiting(
+            user_info,
+            current_df_data,
+            count_current_drawing=count_current_drawing,
+        ),
+        "max_rounds": int((user_info or {}).get("max_rounds") or MAX_ROUNDS),
+        "min_useful": int((user_info or {}).get("min_useful_rounds") or MIN_USEFUL_ROUNDS),
+    }
+
+
+def _open_finish_confirmation(
+    *,
+    count_current_drawing: bool,
+    user_info: Optional[Dict[str, Any]],
+    current_df_data: Optional[Dict[str, Any]],
+) -> Tuple[Dict[str, str], str, Dict[str, int]]:
+    return (
+        {"display": "flex"},
+        "finish-confirm-overlay is-open",
+        _finish_confirmation_context(
+            user_info,
+            current_df_data,
+            count_current_drawing=count_current_drawing,
+        ),
+    )
+
+
+def _finish_confirmation_text(
+    context: Optional[Dict[str, int]],
+    interface_language: Optional[str],
+) -> tuple[str, str, str, str]:
+    """Translate confirmation copy without changing overlay or navigation state."""
+    locale = normalize_locale(interface_language)
+    message = ""
+    if context:
+        message = finish_confirm_message(
+            rounds_played=int(context.get("rounds_played") or 0),
+            max_rounds=int(context.get("max_rounds") or MAX_ROUNDS),
+            min_useful=int(context.get("min_useful") or MIN_USEFUL_ROUNDS),
+            locale=locale,
+        )
+    return (
+        t("ui.submit.finish_confirm_title", locale=locale),
+        message,
+        t("ui.submit.finish_anyway", locale=locale),
+        t("ui.submit.keep_playing", locale=locale),
+    )
+
+
+@app.callback(
+    [Output('finish-confirm-title-prediction', 'children'),
+     Output('finish-confirm-message-prediction', 'children'),
+     Output('finish-confirm-button-prediction', 'children'),
+     Output('finish-keep-playing-button-prediction', 'children')],
+    [Input('interface-language', 'data'),
+     Input('finish-confirm-context-prediction', 'data')],
+)
+def update_prediction_finish_confirm_text(
+    interface_language: Optional[str],
+    context: Optional[Dict[str, int]],
+) -> tuple[str, str, str, str]:
+    return _finish_confirmation_text(context, interface_language)
+
+
+@app.callback(
+    [Output('finish-confirm-title-ending', 'children'),
+     Output('finish-confirm-message-ending', 'children'),
+     Output('finish-confirm-button-ending', 'children'),
+     Output('finish-keep-playing-button-ending', 'children')],
+    [Input('interface-language', 'data'),
+     Input('finish-confirm-context-ending', 'data')],
+)
+def update_ending_finish_confirm_text(
+    interface_language: Optional[str],
+    context: Optional[Dict[str, int]],
+) -> tuple[str, str, str, str]:
+    return _finish_confirmation_text(context, interface_language)
+
+
+@app.callback(
+    [Output('finish-confirm-overlay-prediction', 'style'),
+     Output('finish-confirm-overlay-prediction', 'className'),
+     Output('finish-confirm-context-prediction', 'data')],
+    [Input('finish-study-button', 'n_clicks'),
+     Input('finish-keep-playing-button-prediction', 'n_clicks')],
+    [State('user-info-store', 'data'),
+     State('current-window-df', 'data')],
+    prevent_initial_call=True,
+)
+def toggle_finish_confirmation_from_prediction(
+    finish_clicks: Optional[int],
+    keep_playing_clicks: Optional[int],
+    user_info: Optional[Dict[str, Any]],
+    current_df_data: Optional[Dict[str, Any]],
+) -> Tuple[Dict[str, str], str, Optional[Dict[str, int]]]:
+    if ctx.triggered_id == 'finish-keep-playing-button-prediction':
+        if not keep_playing_clicks:
+            raise PreventUpdate
+        return {"display": "none"}, "finish-confirm-overlay", None
+    if not finish_clicks:
+        raise PreventUpdate
+    return _open_finish_confirmation(
+        count_current_drawing=True,
+        user_info=user_info,
+        current_df_data=current_df_data,
+    )
+
+
+@app.callback(
+    [Output('finish-confirm-overlay-ending', 'style'),
+     Output('finish-confirm-overlay-ending', 'className'),
+     Output('finish-confirm-context-ending', 'data')],
+    [Input('finish-study-button-ending', 'n_clicks'),
+     Input('finish-keep-playing-button-ending', 'n_clicks')],
+    [State('user-info-store', 'data'),
+     State('current-window-df', 'data')],
+    prevent_initial_call=True,
+)
+def toggle_finish_confirmation_from_ending(
+    ending_clicks: Optional[int],
+    keep_playing_clicks: Optional[int],
+    user_info: Optional[Dict[str, Any]],
+    current_df_data: Optional[Dict[str, Any]],
+) -> Tuple[Dict[str, str], str, Optional[Dict[str, int]]]:
+    if ctx.triggered_id == 'finish-keep-playing-button-ending':
+        if not keep_playing_clicks:
+            raise PreventUpdate
+        return {"display": "none"}, "finish-confirm-overlay", None
+    if not ending_clicks:
+        raise PreventUpdate
+    max_rounds = int((user_info or {}).get("max_rounds") or MAX_ROUNDS)
+    current_round = int(
+        (user_info or {}).get("current_round_number")
+        or len((user_info or {}).get("rounds") or [])
+    )
+    if current_round >= max_rounds:
+        raise PreventUpdate
+    return _open_finish_confirmation(
+        count_current_drawing=False,
+        user_info=user_info,
+        current_df_data=current_df_data,
+    )
+
+
 @app.callback(
     [Output('url', 'pathname', allow_duplicate=True),
      Output('user-info-store', 'data', allow_duplicate=True),
      Output('glucose-chart-mode', 'data', allow_duplicate=True),
      Output('last-visited-page', 'data', allow_duplicate=True)],
-    [Input('finish-study-button', 'n_clicks')],
+    [Input('finish-confirm-button-prediction', 'n_clicks')],
     [State('user-info-store', 'data'),
      State('current-window-df', 'data'),
      State('time-slider', 'value')],
@@ -6605,7 +7248,6 @@ def handle_finish_study_from_prediction(
     Prior rounds with an incomplete current drawing go to ``/final`` (overall).
     Only a session with nothing to show returns to landing.
     """
-    print(f"DEBUG handle_finish_study_from_prediction FIRED: n_clicks={n_clicks}")
     if not n_clicks:
         return no_update, no_update, no_update, no_update
 
@@ -6643,17 +7285,31 @@ def handle_finish_study_from_prediction(
     [Output('url', 'pathname', allow_duplicate=True),
      Output('user-info-store', 'data', allow_duplicate=True),
      Output('glucose-chart-mode', 'data', allow_duplicate=True)],
-    [Input('finish-study-button-ending', 'n_clicks')],
+    [Input('finish-study-button-ending', 'n_clicks'),
+     Input('finish-confirm-button-ending', 'n_clicks')],
     [State('user-info-store', 'data')],
     prevent_initial_call=True
 )
 def handle_finish_study_from_ending(
-    n_clicks: Optional[int],
+    finish_clicks: Optional[int],
+    confirm_clicks: Optional[int],
     user_info: Optional[Dict[str, Any]],
 ) -> Tuple[str, Optional[Dict[str, Any]], Dict[str, bool]]:
-    print(f"DEBUG handle_finish_study_from_ending FIRED: n_clicks={n_clicks}")
+    n_clicks = (
+        confirm_clicks
+        if ctx.triggered_id == "finish-confirm-button-ending"
+        else finish_clicks
+    )
     if not n_clicks:
         return no_update, no_update, no_update
+    if ctx.triggered_id == "finish-study-button-ending" and user_info:
+        max_rounds = int(user_info.get("max_rounds") or MAX_ROUNDS)
+        current_round = int(
+            user_info.get("current_round_number")
+            or len(user_info.get("rounds") or [])
+        )
+        if current_round < max_rounds:
+            return no_update, no_update, no_update
 
     with start_action(action_type=u"handle_finish_study_from_ending", n_clicks=int(n_clicks)):
         pass
@@ -6665,12 +7321,153 @@ def handle_finish_study_from_ending(
     if not rounds:
         return '/final', user_info, {'hide_last_hour': True}
 
-    if should_persist_study_data(user_info):
+    # Last Submit already wrote this run. Do not rewrite on Results — that
+    # blocks the click for a second and is why the button feels dead.
+    if should_persist_study_data(user_info) and not user_info.get("statistics_saved"):
         with start_action(action_type=u"handle_finish_study_from_ending"):
             submit_component.save_statistics(user_info)
             user_info['statistics_saved'] = True
 
     return '/final', user_info, {'hide_last_hour': False}
+
+
+def _final_fill_locale_unit(
+    interface_language: Optional[str],
+    glucose_unit: Optional[str],
+) -> tuple[str, str]:
+    locale = normalize_locale(interface_language)
+    unit = glucose_unit if glucose_unit in ("mg/dL", "mmol/L") else "mg/dL"
+    return locale, unit
+
+
+@app.callback(
+    [
+        Output("final-ranking-list", "children", allow_duplicate=True),
+        Output("final-fill-step", "data", allow_duplicate=True),
+    ],
+    Input("final-fill-step", "data"),
+    [
+        State("url", "pathname"),
+        State("user-info-store", "data"),
+        State("glucose-unit", "data"),
+        State("interface-language", "data"),
+    ],
+    prevent_initial_call=True,
+)
+def fill_final_leaderboard(
+    kick: Optional[Any],
+    pathname: Optional[str],
+    user_info: Optional[Dict[str, Any]],
+    glucose_unit: Optional[str],
+    interface_language: Optional[str],
+) -> tuple[Any, Any]:
+    """Phase 1: ranking CSVs. Advances the store so the share callback can run.
+
+    A single callback that Output its own Input did not re-enter for phase 2
+    (seen 10:18:40 — leaderboard landed, graph never did).
+    """
+    if pathname != "/final" or not user_info or not isinstance(kick, dict):
+        raise PreventUpdate
+    if kick.get("phase") != 1:
+        raise PreventUpdate
+    locale, unit = _final_fill_locale_unit(interface_language, glucose_unit)
+    with start_action(action_type=u"fill_final_leaderboard"):
+        overall, per_format = _final_ranking_snapshots(user_info)
+        ranking = _final_leaderboard_children(
+            overall=overall,
+            per_format=per_format,
+            locale=locale,
+            unit=unit,
+            user_info=user_info,
+        )
+    return ranking, {**kick, "phase": 2}
+
+
+@app.callback(
+    [
+        Output("final-share-panel", "children", allow_duplicate=True),
+        Output("final-synthesis-card", "children", allow_duplicate=True),
+    ],
+    Input("final-fill-step", "data"),
+    [
+        State("url", "pathname"),
+        State("user-info-store", "data"),
+        State("glucose-unit", "data"),
+        State("interface-language", "data"),
+    ],
+    prevent_initial_call=True,
+)
+def fill_final_share(
+    kick: Optional[Any],
+    pathname: Optional[str],
+    user_info: Optional[Dict[str, Any]],
+    glucose_unit: Optional[str],
+    interface_language: Optional[str],
+) -> tuple[Any, Any]:
+    """Phase 2: share record + synthesis graph, after the leaderboard store write."""
+    if pathname != "/final" or not user_info or not isinstance(kick, dict):
+        raise PreventUpdate
+    if kick.get("phase") != 2:
+        raise PreventUpdate
+    locale, _unit = _final_fill_locale_unit(interface_language, glucose_unit)
+    with start_action(action_type=u"fill_final_share"):
+        share = _final_share_section_children(user_info, locale=locale)
+        synthesis = _final_synthesis_inner(user_info, locale=locale)
+    return share, synthesis
+
+
+app.clientside_callback(
+    """
+    function(resultsClicks, confirmClicks, userInfo) {
+        var ctx = window.dash_clientside.callback_context;
+        if (!ctx || !ctx.triggered || !ctx.triggered.length) {
+            return window.dash_clientside.no_update;
+        }
+        var prop = ctx.triggered[0].prop_id || '';
+        var isConfirm = prop.indexOf('finish-confirm-button-ending') === 0;
+        var isResults = prop.indexOf('finish-study-button-ending') === 0;
+        if (isConfirm && confirmClicks) {
+            return 'results-loading-overlay is-open';
+        }
+        if (!isResults || !resultsClicks) {
+            return window.dash_clientside.no_update;
+        }
+        var info = userInfo || {};
+        var maxRounds = Number(info.max_rounds || 12);
+        var current = Number(info.current_round_number || 0);
+        var nRounds = (info.rounds && info.rounds.length) ? info.rounds.length : 0;
+        if (Math.max(current, nRounds) < maxRounds) {
+            return window.dash_clientside.no_update;
+        }
+        var btn = document.getElementById('finish-study-button-ending');
+        if (btn) {
+            btn.disabled = true;
+            btn.style.pointerEvents = 'none';
+        }
+        return 'results-loading-overlay is-open';
+    }
+    """,
+    Output("results-loading-overlay", "className"),
+    Input("finish-study-button-ending", "n_clicks"),
+    Input("finish-confirm-button-ending", "n_clicks"),
+    State("user-info-store", "data"),
+    prevent_initial_call=True,
+)
+
+
+app.clientside_callback(
+    """
+    function(pathname) {
+        if (pathname === '/ending') {
+            return window.dash_clientside.no_update;
+        }
+        return 'results-loading-overlay';
+    }
+    """,
+    Output("results-loading-overlay", "className", allow_duplicate=True),
+    Input("url", "pathname"),
+    prevent_initial_call=True,
+)
 
 
 @app.callback(
@@ -6853,101 +7650,14 @@ def handle_share_play_again(n_clicks: Optional[int]) -> tuple:
     return _full_session_reset()
 
 
-@app.callback(
-    Output('url', 'pathname', allow_duplicate=True),
-    [Input('share-results-button', 'n_clicks')],
-    [State('user-info-store', 'data'),
-     State('interface-language', 'data')],
-    prevent_initial_call=True,
-)
-def handle_share_results_button(
-    n_clicks: Optional[int],
-    user_info: Optional[Dict[str, Any]],
-    interface_language: Optional[str],
-) -> str:
-    """Persist a share record and navigate the user to the public share page.
+# NOTE: there is deliberately no share callback anymore.  The share flow is
+# part of /final itself: `create_final_layout` builds the record via
+# `build_final_share_record`, persists it with `share_store.ensure_share`
+# (content-addressed, so re-renders reuse the file), and renders
+# `build_share_panel` eagerly.  /share/<id> remains the recipient-facing page.
 
-    The share record MUST capture every round the user has played across
-    every format they've tried, not just the currently-active run.  The
-    final page shows both; the share page must do the same or it'd hide
-    prior achievements.
-    """
-    if not n_clicks or not user_info:
-        raise PreventUpdate
-    with start_action(action_type=u"handle_share_results_button") as action:
-        current_rounds: list[dict[str, Any]] = list(user_info.get("rounds") or [])
-        current_format: str = str(user_info.get("format") or "")
-
-        # Tag currently-playing rounds with their format if missing, so the
-        # share page can split them by format even after we merge archives.
-        tagged_current: list[dict[str, Any]] = []
-        for rnd in current_rounds:
-            r = dict(rnd)
-            if not r.get("format"):
-                r["format"] = current_format
-            tagged_current.append(r)
-
-        # Merge archived runs (one key per previously-completed format run).
-        # Each archived run is already a list of round dicts with its own format.
-        archived_rounds: list[dict[str, Any]] = []
-        runs_by_format: dict[str, list[dict[str, Any]]] = dict(user_info.get("runs_by_format") or {})
-        for fmt_key, runs in runs_by_format.items():
-            for run in (runs or []):
-                for rnd in (run.get("rounds") or []):
-                    r = dict(rnd)
-                    if not r.get("format"):
-                        r["format"] = fmt_key
-                    archived_rounds.append(r)
-
-        all_rounds: list[dict[str, Any]] = archived_rounds + tagged_current
-        if not all_rounds:
-            action.log(message_type=u"no_rounds_to_share")
-            raise PreventUpdate
-
-        # Figure out which formats the user has actually played (for the
-        # ranking block).  Include the current format if it has rounds.
-        played_formats: set[str] = {str(r.get("format") or "") for r in all_rounds}
-        played_formats.discard("")
-
-        study_id: str = str(user_info.get("study_id") or "")
-        rankings: dict[str, Any] = compute_share_rankings(
-            study_id, sorted(played_formats), key=email_key(user_info.get("email"))
-        )
-
-        # Strip the share record to JSON-safe primitives so it survives a
-        # round-trip through JSON on disk.  `prediction_table_data` is already
-        # a list of {str: str}; round_info is shallow dicts of primitives.
-        share_record: dict[str, Any] = {
-            "schema_version": 2,
-            "created_at": datetime.now().astimezone().isoformat(timespec="seconds"),
-            "locale": normalize_locale(interface_language),
-            "rounds": all_rounds,
-            "played_formats": sorted(played_formats, key=lambda x: FORMAT_ORDER.get(str(x), 999)),
-            "rankings": rankings,
-            "user_info": {
-                "name": str(user_info.get("name") or ""),
-                "nickname": normalize_nickname(user_info.get("nickname")),
-                "study_id": study_id,
-                "format": current_format,
-                "uses_cgm": bool(user_info.get("uses_cgm", False)),
-                "max_rounds": int(user_info.get("max_rounds") or MAX_ROUNDS),
-                "challenge_unknown": bool(user_info.get("challenge_unknown", False)),
-                "challenge_unknown_pct": user_info.get("challenge_unknown_pct", ""),
-            },
-        }
-        share_id: str = share_store.save_share(share_record)
-        action.log(
-            message_type=u"share_saved",
-            share_id=share_id,
-            total_rounds=len(all_rounds),
-            archived_rounds=len(archived_rounds),
-            current_rounds=len(tagged_current),
-            played_formats=sorted(played_formats),
-        )
-    return f"/share/{share_id}"
-
-
-# Clientside: clipboard copy for the "Copy link" button on the share page.
+# Clientside: clipboard copy for the "Copy link" button on the share panel
+# (present on both /final and /share/<id>).
 app.clientside_callback(
     """
     function(n_clicks, url) {
@@ -7909,7 +8619,8 @@ def redeem_resume_from_input(
     [Input('url', 'pathname')],
     [State('current-window-df', 'data'),
      State('user-info-store', 'data'),
-     State('data-source-name', 'data')],
+     State('data-source-name', 'data'),
+     State('events-df', 'data')],
     prevent_initial_call=True
 )
 def initialize_data_on_url_change(
@@ -7917,6 +8628,7 @@ def initialize_data_on_url_change(
     current_df_data: Optional[Dict],
     user_info: Optional[Dict[str, Any]],
     source_name_store: Optional[str] = None,
+    events_data: Optional[Dict[str, List[Any]]] = None,
 ) -> Tuple[
     Optional[Dict[str, List[Any]]],
     Optional[Dict[str, List[Any]]],
@@ -7931,8 +8643,17 @@ def initialize_data_on_url_change(
     window exists yet.  All other pages are left alone so that persisted
     localStorage stores are never overwritten (critical for the resume flow).
     The full dataset is sliced server-side; only the window is shipped.
+
+    Compacting an oversized `events-df` (`compacted_events_store`) is folded into
+    this callback rather than living in its own: Dash derives the `allow_duplicate`
+    suffix from the INPUTS alone (`create_callback_id._hash_inputs`), so a second
+    callback writing `events-df` off the same `Input('url', 'pathname')` hashes to
+    the same output id and the renderer aborts the page with "Duplicate callback
+    outputs". Two writers of one store on one trigger were also a last-writer-wins
+    race. Any future `events-df` writer keyed on the pathname belongs here too.
     """
-    _no_change = (no_update, no_update, no_update, no_update, no_update, no_update)
+    compacted = compacted_events_store(events_data, current_df_data)
+    _no_change = (no_update, compacted, no_update, no_update, no_update, no_update)
 
     if pathname != '/prediction':
         return _no_change
@@ -8339,7 +9060,7 @@ def handle_example_data_button(
         return (current_time,
                convert_df_to_dict(new_df),
                events_store_for_window(new_events_df, new_df),
-               True,  # is_example_data = True for generic data
+               True,  # is_example_data = True for public data
                source_name,
                False,  # reset randomization flag for new data
                random_start,  # Set slider to the random start position
@@ -8400,42 +9121,6 @@ def handle_time_slider(
 
         return current_time, new_dict, events_store_for_window(events_df, new_df)
 
-
-@app.callback(
-    Output('events-df', 'data', allow_duplicate=True),
-    [Input('url', 'pathname')],
-    [State('events-df', 'data'),
-     State('current-window-df', 'data')],
-    prevent_initial_call=True,
-)
-def compact_events_store(
-    pathname: Optional[str],
-    events_data: Optional[Dict[str, List[Any]]],
-    window_data: Optional[Dict[str, List[Any]]],
-) -> Any:
-    """Trim a whole-subject events store left in localStorage by an older build.
-
-    New rounds already store only the window's events, but a session that was
-    mid-game across the deploy keeps the multi-megabyte store in localStorage and
-    re-uploads it with every callback that reads `events-df` -- the slowness this
-    fixes would persist for the rest of that round. Navigation is a cheap, always
-    reached moment to shrink it; sessions that are already trimmed no-op.
-    """
-    if not events_data or not window_data:
-        raise PreventUpdate
-    event_times: list[Any] = events_data.get('time') or []
-    window_times: list[Any] = window_data.get('time') or []
-    if not event_times or not window_times:
-        raise PreventUpdate
-    columns = list(events_data.values())
-    if any(len(column) != len(event_times) for column in columns):
-        raise PreventUpdate
-    # Store timestamps are fixed-width ISO strings, so string order is chronological.
-    start, end = window_times[0], window_times[-1]
-    keep = [i for i, stamp in enumerate(event_times) if start <= stamp <= end]
-    if len(keep) == len(event_times):
-        raise PreventUpdate
-    return {key: [values[i] for i in keep] for key, values in events_data.items()}
 
 # Separate callback for glucose graph interactions (only active on prediction page)
 @app.callback(
@@ -8912,7 +9597,7 @@ def find_nearest_time(x: Union[str, float, datetime], df: pl.DataFrame) -> datet
 
 
 def register_faq_callbacks(app_instance: dash.Dash) -> None:
-    from sugar_sugar.faq_board import add_faq_question, add_faq_reply
+    from sugar_sugar.faq_board import add_faq_question, add_faq_reply, faq_board_enabled
 
     @app_instance.callback(
         [Output("faq-board", "children"),
@@ -8934,7 +9619,7 @@ def register_faq_callbacks(app_instance: dash.Dash) -> None:
         section: Optional[str],
         interface_language: Optional[str],
     ) -> tuple[Any, str, str]:
-        if not n_clicks:
+        if not n_clicks or not faq_board_enabled():
             raise PreventUpdate
         locale = normalize_locale(interface_language)
         posted = add_faq_question(text=text or "", section=section or "participant", tags=tags, name=name or "")
@@ -8958,7 +9643,7 @@ def register_faq_callbacks(app_instance: dash.Dash) -> None:
         ids: list[dict[str, str]],
         interface_language: Optional[str],
     ) -> Any:
-        if not n_clicks or not any(n_clicks):
+        if not n_clicks or not any(n_clicks) or not faq_board_enabled():
             raise PreventUpdate
         triggered = ctx.triggered_id
         if not isinstance(triggered, dict):

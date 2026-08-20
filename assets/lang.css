@@ -977,7 +977,8 @@ html:not(.mobile-device) #prediction-round-summary #round-indicator {
   font-size: 16px !important;
   text-align: left !important;
 }
-html:not(.mobile-device) #prediction-source-plaque {
+html:not(.mobile-device) #prediction-source-plaque,
+html:not(.mobile-device) #ending-source-info {
   display: flex;
   flex-direction: column;
   flex-wrap: nowrap;
@@ -988,14 +989,16 @@ html:not(.mobile-device) #prediction-source-plaque {
   background: #f7fafc;
   border-radius: 6px;
 }
-html:not(.mobile-device) #prediction-source-plaque .prediction-source-line {
+html:not(.mobile-device) #prediction-source-plaque .prediction-source-line,
+html:not(.mobile-device) #ending-source-info .prediction-source-line {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 8px;
 }
-html:not(.mobile-device) #prediction-source-plaque .prediction-source-metadata {
+html:not(.mobile-device) #prediction-source-plaque .prediction-source-metadata,
+html:not(.mobile-device) #ending-source-info .prediction-source-metadata {
   margin: 0;
   color: #2c5282;
   font-size: 16px !important;
@@ -1003,12 +1006,16 @@ html:not(.mobile-device) #prediction-source-plaque .prediction-source-metadata {
   font-style: normal;
   line-height: 1.2;
 }
-html:not(.mobile-device) #prediction-source-plaque .prediction-source-metadata:empty {
+html:not(.mobile-device) #prediction-source-plaque .prediction-source-metadata:empty,
+html:not(.mobile-device) #ending-source-info .prediction-source-metadata:empty {
   display: none;
 }
 html:not(.mobile-device) #prediction-source-plaque .prediction-source-label,
 html:not(.mobile-device) #prediction-source-plaque .prediction-source-name,
-html:not(.mobile-device) #prediction-source-plaque .prediction-source-time {
+html:not(.mobile-device) #prediction-source-plaque .prediction-source-time,
+html:not(.mobile-device) #ending-source-info .prediction-source-label,
+html:not(.mobile-device) #ending-source-info .prediction-source-name,
+html:not(.mobile-device) #ending-source-info .prediction-source-time {
   margin: 0;
   color: #718096;
   font-size: 12px !important;
@@ -1045,9 +1052,7 @@ html:not(.mobile-device) #submit-button {
   text-align: center !important;
   line-height: 1.2 !important;
 }
-#finish-study-button,
-#finish-study-button-ending,
-#restart-button {
+.finish-study-exit:not(.finish-study-results) {
   width: 48px !important;
   min-width: 48px !important;
   max-width: 48px !important;
@@ -1057,6 +1062,7 @@ html:not(.mobile-device) #submit-button {
   font-size: 0 !important;
   line-height: 0 !important;
   overflow: hidden;
+  border: none !important;
   border-radius: 8px;
   flex: 0 0 48px !important;
   display: inline-flex !important;
@@ -1065,10 +1071,14 @@ html:not(.mobile-device) #submit-button {
   position: relative !important;
   color: transparent !important;
   text-indent: 0 !important;
+  background-color: #E81123 !important;
+  box-shadow: none !important;
 }
-#finish-study-button::after,
-#finish-study-button-ending::after,
-#restart-button::after {
+.finish-study-exit:not(.finish-study-results):hover,
+.finish-study-exit:not(.finish-study-results):focus {
+  background-color: #C42B1C !important;
+}
+.finish-study-exit:not(.finish-study-results)::after {
   content: "×";
   position: absolute;
   inset: 0;
@@ -1076,22 +1086,67 @@ html:not(.mobile-device) #submit-button {
   align-items: center;
   justify-content: center;
   font-size: 28px !important;
-  font-weight: 700;
+  font-weight: 400;
   line-height: 1;
   color: #fff;
   text-indent: 0;
 }
+.finish-confirm-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.55);
+}
+.finish-confirm-overlay.is-open {
+  display: flex !important;
+}
+.finish-confirm-card {
+  width: min(460px, 90vw);
+  padding: 30px 34px;
+  box-sizing: border-box;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  text-align: center;
+}
+.finish-confirm-title {
+  margin-bottom: 14px;
+  color: #1e3a5f;
+  font-size: 24px;
+  font-weight: 800;
+}
+.finish-confirm-message {
+  margin-bottom: 24px;
+  color: #4a5568;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.finish-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+}
+.finish-confirm-actions .ui.button {
+  min-width: 150px;
+  margin: 0;
+}
 #finish-study-button-ending.finish-study-results {
   width: auto !important;
-  min-width: 160px !important;
+  min-width: 320px !important;
   max-width: none !important;
-  height: 48px !important;
-  padding: 0 22px !important;
-  font-size: 20px !important;
-  font-weight: 700 !important;
+  height: 80px !important;
+  padding: 0 48px !important;
+  font-size: 32px !important;
+  font-weight: 800 !important;
   line-height: 1.2 !important;
   color: #fff !important;
   background-color: #4CBB17 !important;
+  border-radius: 14px !important;
   flex: 0 0 auto !important;
   overflow: visible;
 }
@@ -1106,6 +1161,38 @@ html:not(.mobile-device) #submit-button {
   color: #1e3a5f;
   margin: 0 10px 6px 10px;
   line-height: 1.3;
+}
+/* Plain-language headline on /final: the one number a player wants, in
+   glucose units, shown before any metric acronym. */
+#final-hero-summary {
+  text-align: center;
+  font-size: clamp(17px, 2.4vw, 22px);
+  font-weight: 700;
+  color: #1e3a5f;
+  background: #eef4fb;
+  border: 1px solid #c8dcf0;
+  border-radius: 10px;
+  padding: 12px 18px;
+  margin: 0 auto 16px auto;
+  max-width: 900px;
+  line-height: 1.4;
+}
+/* Labelled Exit on /final — a destructive action must say what it does,
+   unlike the icon-only close chips on /prediction and /ending. */
+.final-exit-button.ui.button:hover,
+.final-exit-button.ui.button:focus {
+  background-color: #C42B1C !important;
+  color: #fff !important;
+}
+/* Per-round fold toggle swaps its label when open. */
+.ending-fold .fold-label-hide {
+  display: none;
+}
+.ending-fold[open] .fold-label-hide {
+  display: inline;
+}
+.ending-fold[open] .fold-label-show {
+  display: none;
 }
 #final-switch-format-title.final-switch-format-title-visible {
   display: block !important;
@@ -1128,24 +1215,29 @@ html:not(.mobile-device) #submit-button {
   flex: 1 1 0;
   min-width: 0;
 }
-#challenge-unknown-wrap {
+#challenge-unknown-wrap,
+#paper-mention-wrap {
   padding: 12px 14px;
   background: #f8fafc;
   border: 1px solid #dbe4f0;
   border-radius: 10px;
 }
 #challenge-unknown-wrap .challenge-unknown-check,
-#challenge-unknown-wrap .dash-checklist {
+#challenge-unknown-wrap .dash-checklist,
+#paper-mention-wrap .paper-mention-check,
+#paper-mention-wrap .dash-checklist {
   font-size: 18px;
   font-weight: 700;
   color: #0f172a;
 }
-#challenge-unknown-wrap .dash-checklist label {
+#challenge-unknown-wrap .dash-checklist label,
+#paper-mention-wrap .dash-checklist label {
   display: flex;
   align-items: flex-start;
   gap: 8px;
 }
-#challenge-unknown-wrap input[type="checkbox"] {
+#challenge-unknown-wrap input[type="checkbox"],
+#paper-mention-wrap input[type="checkbox"] {
   width: 18px;
   height: 18px;
   margin-top: 3px;
@@ -1179,12 +1271,49 @@ html:not(.mobile-device) #ending-primary {
   overflow: hidden;
 }
 html:not(.mobile-device) #ending-gamification {
+  order: 0;
+}
+html:not(.mobile-device) #ending-source-info {
+  order: 1;
+}
+html:not(.mobile-device) #ending-graph-card {
+  order: 2;
+}
+html:not(.mobile-device) #ending-submit-row {
+  order: 3;
+}
+html:not(.mobile-device) #ending-primary > #switch-format-error,
+html:not(.mobile-device) #ending-primary > #switch-data-usage-consent,
+html:not(.mobile-device) #ending-primary > #ending-switch-format-title {
+  order: 4;
+}
+html:not(.mobile-device) #ending-gamification {
   padding: 8px 14px 6px 14px !important;
   margin: 0 auto !important;
   background: #f0f7ff !important;
   border: 1px solid #c5d9f0 !important;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06) !important;
   flex-shrink: 0;
+}
+html:not(.mobile-device) #ending-gamification.ending-gamification-complete {
+  padding: 12px 16px 10px 16px !important;
+  background: #fff8e1 !important;
+  border: 1px solid #f0d060 !important;
+}
+#ending-reaction-line.ending-celebrate,
+#ending-reaction-line.ending-celebrate #ending-reaction-text {
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  line-height: 1.35 !important;
+}
+#ending-milestone.ending-celebrate {
+  font-size: 22px !important;
+  font-weight: 800 !important;
+  margin-top: 6px !important;
+}
+#ending-personal-best.ending-celebrate {
+  font-size: 18px !important;
+  padding: 4px 12px !important;
 }
 html:not(.mobile-device) #ending-graph-card {
   flex: 1 1 auto !important;
@@ -1193,6 +1322,9 @@ html:not(.mobile-device) #ending-graph-card {
   margin: 0 !important;
   display: flex;
   flex-direction: column;
+}
+html:not(.mobile-device) #ending-source-info {
+  flex-shrink: 0;
 }
 html:not(.mobile-device) #ending-glucose-chart-container {
   flex: 1 1 auto;
@@ -1221,12 +1353,26 @@ html:not(.mobile-device) #ending-submit-row {
 }
 html:not(.mobile-device) #ending-submit-row.ending-submit-row-last {
   flex-wrap: wrap !important;
+  margin-top: 10px !important;
+  margin-bottom: 4px !important;
 }
 html:not(.mobile-device) #ending-submit-row.ending-submit-row-last #next-round-button {
   display: none !important;
 }
 html:not(.mobile-device) #ending-copy-link-row {
   margin-top: 8px !important;
+}
+#ending-copy-link-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  box-sizing: border-box !important;
+  width: auto !important;
+  max-width: 100% !important;
+  padding: 10px 22px !important;
+  line-height: 1.3 !important;
+  white-space: nowrap;
 }
 html:not(.mobile-device) #next-round-button {
   margin: 0 !important;
@@ -1265,28 +1411,9 @@ html:not(.mobile-device) #next-round-button {
   box-sizing: border-box;
   flex-shrink: 0;
 }
-#final-action-row #share-results-button {
-  height: 48px !important;
-  min-height: 48px !important;
-  padding: 0 16px !important;
-  margin: 0 !important;
-  border: none !important;
-  border-radius: 8px !important;
-  background-color: #4CBB17 !important;
-  color: #fff !important;
-  font-size: 16px !important;
-  font-weight: 700 !important;
-  line-height: 1.2 !important;
-  white-space: nowrap;
-  flex: 1 1 auto;
-  max-width: 280px;
-  width: auto !important;
-  min-width: 0;
-}
-
 .glucose-chart-shell {
-  --plotly-top-margin: 72px;
-  --food-bubble-strip-height: 32px;
+  --plotly-top-margin: 8px;
+  --food-bubble-strip-height: 22px;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -1294,10 +1421,21 @@ html:not(.mobile-device) #next-round-button {
   height: 100%;
 }
 
+.glucose-chart-shell .js-plotly-plot,
+.glucose-chart-shell .plot-container,
+.glucose-chart-shell .svg-container,
+#ending-static-graph .js-plotly-plot,
+#ending-static-graph .plot-container,
+#ending-static-graph .svg-container {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0;
+}
+
 .meal-food-bubble-strip {
-  /* Overlay Plotly's top margin so the apple sits on the plot edge. */
+  /* Sit on the cartesian top edge (legend/icons are inside the plot now). */
   position: absolute;
-  top: calc(var(--plotly-top-margin) - var(--food-bubble-strip-height));
+  top: var(--plotly-top-margin);
   left: 56px;
   right: 20px;
   height: var(--food-bubble-strip-height);
@@ -1311,17 +1449,30 @@ html:not(.mobile-device) #next-round-button {
   top: auto;
   bottom: 1px;
   transform: translateX(-50%);
-  width: 32px;
-  height: 28px;
-  padding: 0;
-  border: 1px solid #2e7d32;
-  border-radius: 14px 14px 14px 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: max-content;
+  height: 22px;
+  padding: 0 6px 0 4px;
+  white-space: nowrap;
+  border: 2px solid #2e7d32;
+  border-radius: 16px 16px 16px 5px;
   background: #ffffff;
-  box-shadow: 0 1px 3px rgba(46, 125, 50, 0.25);
+  color: #1b5e20;
+  box-shadow: 0 2px 5px rgba(46, 125, 50, 0.32);
   pointer-events: auto;
   touch-action: manipulation;
   cursor: pointer;
   z-index: 5;
+}
+
+.meal-food-speech-bubble:hover,
+.meal-food-speech-bubble:focus-visible {
+  background: #e8f5e9;
+  box-shadow: 0 3px 8px rgba(46, 125, 50, 0.42);
+  transform: translateX(-50%) translateY(-1px);
 }
 
 .meal-food-speech-bubble[data-count]::before {
@@ -1356,10 +1507,26 @@ html:not(.mobile-device) #next-round-button {
 }
 
 .meal-food-bubble-apple {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
   display: block;
-  margin: 3px auto 0 auto;
+  pointer-events: none;
+}
+
+.meal-food-bubble-label {
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.meal-food-bubble-open {
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 800;
   pointer-events: none;
 }
 
@@ -1461,6 +1628,37 @@ html:not(.mobile-device) #next-round-button {
 
 .meal-food-lightbox.is-composite .meal-food-lightbox-gallery {
   display: grid;
+}
+
+/* Results → /final: cover the still-mounted ending page while display_page
+   builds the share/leaderboard layout (several seconds). One click, no
+   second press on the leftover Results button. */
+.results-loading-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.78);
+  pointer-events: all;
+}
+/* Only while /ending is still mounted. :has(#final-title) used to hide it on
+   /final, so Exit → landing (no #final-title, class still is-open) painted a
+   full-screen white veil over the consent page. */
+#page-content:has(#ending-title) + #results-loading-overlay.is-open {
+  display: flex;
+}
+.results-loading-card {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a365d;
+}
+
+/* Deferred /final slots stay collapsed until the follow-up ticks fill them. */
+#final-share-panel:empty,
+#final-synthesis-card:empty {
+  display: none;
 }
 
 

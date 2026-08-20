@@ -11,12 +11,12 @@ from sugar_sugar.i18n import t
 from sugar_sugar.config import STORAGE_TYPE
 from sugar_sugar.nickname import MAX_NICKNAME_LENGTH
 from sugar_sugar.challenge_unknown import (
-    CHALLENGE_PCT_MAX,
-    CHALLENGE_PCT_MIN,
-    CHALLENGE_PCT_STEP,
-    DEFAULT_CHALLENGE_PCT,
+    challenge_unknown_checked,
     challenge_unknown_visible,
-    is_type_1,
+)
+from sugar_sugar.paper_mention import (
+    MAX_PAPER_NAME_LENGTH,
+    PAPER_MENTION_MIN_ROUNDS,
 )
 from sugar_sugar.cgm_duration import (
     DEFAULT_CGM_DURATION_UNIT,
@@ -259,7 +259,6 @@ def cgm_duration_unit_options(locale: str) -> list[dict[str, str]]:
 
 
 def challenge_unknown_children(locale: str) -> html.Div:
-    marks = {pct: f"{pct}%" for pct in range(CHALLENGE_PCT_MIN, CHALLENGE_PCT_MAX + 1, CHALLENGE_PCT_STEP)}
     return html.Div(
         [
             dcc.Checklist(
@@ -279,32 +278,63 @@ def challenge_unknown_children(locale: str) -> html.Div:
                 style={"color": "#475569", "fontSize": "14px", "lineHeight": "1.4", "margin": "8px 0"},
                 disable_n_clicks=True,
             ),
-            html.Div(
-                [
-                    html.Div(
-                        t("ui.startup.challenge_unknown_slider_label", locale=locale),
-                        id="challenge-unknown-slider-label",
-                        style={"fontWeight": "700", "marginBottom": "6px"},
-                        disable_n_clicks=True,
-                    ),
-                    dcc.Slider(
-                        id="challenge-unknown-slider",
-                        min=CHALLENGE_PCT_MIN,
-                        max=CHALLENGE_PCT_MAX,
-                        step=CHALLENGE_PCT_STEP,
-                        value=DEFAULT_CHALLENGE_PCT,
-                        marks=marks,
-                        included=True,
-                        persistence=True,
-                        persistence_type=STORAGE_TYPE,
-                    ),
-                ],
-                id="challenge-unknown-slider-wrap",
-                style={"display": "none", "marginTop": "8px"},
-            ),
         ],
         id="challenge-unknown-wrap",
+        # Hidden until `update_challenge_unknown_visibility` confirms eligibility.
+        # A `block` default flashes the checkbox at type 2 / prediabetes / LADA
+        # players on first paint, which is exactly who must never be offered it.
         style={"display": "none", "margin": "12px 0 20px 0"},
+        disable_n_clicks=True,
+    )
+
+
+def paper_mention_children(locale: str) -> html.Div:
+    return html.Div(
+        [
+            dcc.Checklist(
+                id="paper-mention-check",
+                options=[{
+                    "label": t("ui.startup.paper_mention_label", locale=locale),
+                    "value": "on",
+                }],
+                value=[],
+                persistence=True,
+                persistence_type=STORAGE_TYPE,
+                className="paper-mention-check",
+            ),
+            html.Div(
+                t(
+                    "ui.startup.paper_mention_hint",
+                    locale=locale,
+                    min_rounds=PAPER_MENTION_MIN_ROUNDS,
+                ),
+                id="paper-mention-hint",
+                style={"color": "#475569", "fontSize": "14px", "lineHeight": "1.4", "margin": "8px 0"},
+                disable_n_clicks=True,
+            ),
+            html.Div(
+                [
+                    html.Label(
+                        t("ui.startup.paper_full_name_label", locale=locale),
+                        style={"fontWeight": "700", "marginBottom": "6px", "display": "block"},
+                    ),
+                    dcc.Input(
+                        id="paper-full-name-input",
+                        type="text",
+                        maxLength=MAX_PAPER_NAME_LENGTH,
+                        placeholder=t("ui.startup.paper_full_name_placeholder", locale=locale),
+                        persistence=True,
+                        persistence_type=STORAGE_TYPE,
+                        style={"width": "100%", "padding": "10px", "fontSize": "18px"},
+                    ),
+                ],
+                id="paper-full-name-wrap",
+                style={"display": "none", "marginTop": "8px"},
+                disable_n_clicks=True,
+            ),
+        ],
+        id="paper-mention-wrap",
+        style={"margin": "12px 0 20px 0"},
         disable_n_clicks=True,
     )
 
@@ -545,7 +575,7 @@ eligibility and previous selection.
     An already-selected format is never overridden except when it became
     ineligible (B/C without a CGM). C is only ever *suggested*, on the first
     computation that has a CGM answer and no format yet -- a CGM owner who picks
-    A on purpose (play the generic data, don't upload mine) must keep it. The
+    A on purpose (play the public data, don't upload mine) must keep it. The
     old "eligible and currently A -> force C" rule made that impossible: any
     later re-fire of the callback (language switch, persistence hydration on
     reload) silently yanked them back to C and into the upload gate.
@@ -615,6 +645,7 @@ class StartupPage(html.Div):
                         t("ui.startup.nickname_hint", locale=locale),
                         style={'color': '#666', 'fontSize': '15px', 'display': 'block', 'marginBottom': '20px'}
                     ),
+                    paper_mention_children(locale),
 
                     html.Div([
                         html.Label(t("ui.startup.email_label", locale=locale), style={'fontSize': '22px', 'fontWeight': '800', 'marginBottom': '10px', 'color': '#0f172a', 'display': 'inline-block'}),
@@ -1138,10 +1169,8 @@ class StartupPage(html.Div):
 
         @app.callback(
             [Output('challenge-unknown-wrap', 'style'),
-             Output('challenge-unknown-slider-wrap', 'style'),
              Output('challenge-unknown-check', 'options'),
-             Output('challenge-unknown-help', 'children'),
-             Output('challenge-unknown-slider-label', 'children')],
+             Output('challenge-unknown-help', 'children')],
             [Input('format-dropdown', 'value'),
              Input('diabetic-dropdown', 'value'),
              Input('diabetic-type-dropdown', 'value'),
@@ -1152,25 +1181,52 @@ class StartupPage(html.Div):
             is_diabetic: Optional[bool],
             diabetic_type: Optional[str],
             interface_language: Optional[str],
-        ) -> tuple[dict[str, str], dict[str, str], list[dict[str, str]], str, str]:
+        ) -> tuple[dict[str, str], list[dict[str, str]], str]:
             locale = interface_language
             visible = challenge_unknown_visible(
                 {"diabetic": is_diabetic, "diabetic_type": diabetic_type, "format": format_value},
                 format_value,
             )
             wrap_style = {"display": "block", "margin": "12px 0 20px 0"} if visible else {"display": "none"}
-            slider_style = {"display": "block", "marginTop": "8px"} if visible else {"display": "none"}
             checkbox_options = [{
                 "label": t("ui.startup.challenge_unknown_button", locale=locale),
                 "value": "on",
             }]
-            if is_type_1({"diabetic": is_diabetic, "diabetic_type": diabetic_type}):
+            if is_diabetic is True:
                 help_text = t("ui.startup.challenge_unknown_help_t1", locale=locale)
-                slider_label = t("ui.startup.challenge_unknown_slider_t1", locale=locale)
             else:
                 help_text = t("ui.startup.challenge_unknown_help_nd", locale=locale)
-                slider_label = t("ui.startup.challenge_unknown_slider_nd", locale=locale)
-            return wrap_style, slider_style, checkbox_options, help_text, slider_label
+            return wrap_style, checkbox_options, help_text
+
+        @app.callback(
+            Output('paper-full-name-wrap', 'style'),
+            Input('paper-mention-check', 'value'),
+        )
+        def update_paper_name_visibility(checked: Optional[list[str] | bool]) -> dict[str, str]:
+            if challenge_unknown_checked(checked):
+                return {"display": "block", "marginTop": "8px"}
+            return {"display": "none"}
+
+        @app.callback(
+            [Output('paper-mention-check', 'options'),
+             Output('paper-mention-hint', 'children')],
+            Input('interface-language', 'data'),
+        )
+        def update_paper_mention_text(
+            interface_language: Optional[str],
+        ) -> tuple[list[dict[str, str]], str]:
+            locale = interface_language
+            return (
+                [{
+                    "label": t("ui.startup.paper_mention_label", locale=locale),
+                    "value": "on",
+                }],
+                t(
+                    "ui.startup.paper_mention_hint",
+                    locale=locale,
+                    min_rounds=PAPER_MENTION_MIN_ROUNDS,
+                ),
+            )
 
         @app.callback(
             [Output('cgm-details', 'style'),
@@ -1689,6 +1745,7 @@ class StartupPageMobile(html.Div):
                 t("ui.startup.nickname_hint", locale=locale),
                 style={'color': '#64748b', 'fontSize': '13px', 'display': 'block', 'marginBottom': '10px'},
             ),
+            paper_mention_children(locale),
             _m_label(t("ui.startup.email_label", locale=locale), 'email-required'),
             dcc.Input(
                 id='email-input', type='email',

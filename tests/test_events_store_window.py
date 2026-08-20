@@ -14,7 +14,10 @@ from pathlib import Path
 import polars as pl
 import pytest
 
+from dash import no_update
+
 from sugar_sugar.app import (
+    compacted_events_store,
     events_dataframe_to_store_dict,
     events_store_for_window,
     events_within_window,
@@ -63,6 +66,41 @@ def test_empty_inputs_do_not_blow_up() -> None:
     assert events_within_window(events, make_window(0).clear()).height == 0
     assert events_within_window(events.clear(), make_window(0)).height == 0
     assert events_store_for_window(events.clear(), make_window(0))["time"] == []
+
+
+def test_compacting_shrinks_a_whole_subject_store_to_the_window() -> None:
+    """The localStorage-side twin of events_within_window, run on navigation."""
+    events = events_dataframe_to_store_dict(make_events(500))
+    window = {"time": make_window(offset_steps=100, points=36)
+              .get_column("time").dt.strftime("%Y-%m-%dT%H:%M:%S").to_list()}
+
+    compacted = compacted_events_store(events, window)
+
+    assert compacted is not no_update
+    assert len(compacted["time"]) == 36
+    assert compacted["time"][0] == window["time"][0]
+    assert compacted["time"][-1] == window["time"][-1]
+    # Every column is trimmed in step, not just `time`.
+    assert {len(values) for values in compacted.values()} == {36}
+
+
+def test_compacting_no_ops_when_there_is_nothing_to_trim() -> None:
+    """`no_update` keeps an already-small store from being rewritten every navigation."""
+    window_df = make_window(offset_steps=0, points=36)
+    window = {"time": window_df.get_column("time").dt.strftime("%Y-%m-%dT%H:%M:%S").to_list()}
+    already_trimmed = events_store_for_window(make_events(500), window_df)
+
+    assert compacted_events_store(already_trimmed, window) is no_update
+    assert compacted_events_store(None, window) is no_update
+    assert compacted_events_store({}, window) is no_update
+    assert compacted_events_store(already_trimmed, None) is no_update
+    assert compacted_events_store(already_trimmed, {"time": []}) is no_update
+
+
+def test_compacting_refuses_a_ragged_store() -> None:
+    """Mismatched column lengths would index out of range -- leave the store alone."""
+    ragged = {"time": ["2026-01-01T00:00:00", "2026-01-01T00:05:00"], "event_type": ["Carbohydrates"]}
+    assert compacted_events_store(ragged, {"time": ["2026-01-01T00:00:00"]}) is no_update
 
 
 @pytest.mark.skipif(not BIG_SUBJECT.exists(), reason="generic subject data not present")

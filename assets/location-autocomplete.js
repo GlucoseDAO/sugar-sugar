@@ -304,7 +304,20 @@
       if (!current || document.activeElement !== current) {
         return;
       }
-      renderDropdown(current, filterPlaces(current.value || ''));
+      var query = current.value || '';
+      var matches = filterPlaces(query);
+      var trimmed = query.trim();
+      // Exact match (e.g. "Erdenet, Mongolia"): close the list. On Android
+      // Chrome the open panel plus min-height:100vh read as a blank white
+      // slab between the field and the keyboard.
+      if (
+        matches.length === 1
+        && displayLabel(matches[0]).toLowerCase() === trimmed.toLowerCase()
+      ) {
+        hideDropdown();
+        return;
+      }
+      renderDropdown(current, matches);
     });
   }
 

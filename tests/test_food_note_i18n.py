@@ -89,7 +89,7 @@ def test_how_it_works_keeps_teaser_and_drops_heading() -> None:
     children = how_it_works_children("en")
     texts = [getattr(node, "children", "") for node in children]
     assert "How it works" not in texts
-    assert "Three steps. One hour. Your gut vs the sensor." in texts
+    assert "Three steps. One hour ahead. Your gut feeling vs the sensor." in texts
     assert children[0].className == "how-it-works-teaser"
     assert children[1].className == "how-it-works-steps"
     assert len(children) == 2
@@ -112,8 +112,15 @@ def test_how_it_works_teaser_and_step_three_exist(locale: str) -> None:
     assert t("ui.startup.challenge_unknown_button", locale=locale)
     help_nd = t("ui.startup.challenge_unknown_help_nd", locale=locale)
     help_t1 = t("ui.startup.challenge_unknown_help_t1", locale=locale)
-    assert "10" in help_nd and "%" in help_nd
-    assert "10" in help_t1 and "%" in help_t1
+    assert help_nd and not help_nd.startswith("ui.startup.")
+    assert help_t1 and not help_t1.startswith("ui.startup.")
+    assert "10%" not in help_nd and "10 %" not in help_nd
+    assert "10%" not in help_t1 and "10 %" not in help_t1
+    paper_label = t("ui.startup.paper_mention_label", locale=locale)
+    paper_hint = t("ui.startup.paper_mention_hint", locale=locale, min_rounds=12)
+    assert paper_label and not paper_label.startswith("ui.startup.")
+    assert paper_hint and not paper_hint.startswith("ui.startup.")
+    assert "12" in paper_hint
     assert t("ui.faq.ask_title", locale=locale)
     assert t("ui.faq.section_participant", locale=locale)
     assert t("ui.faq.section_developer", locale=locale)

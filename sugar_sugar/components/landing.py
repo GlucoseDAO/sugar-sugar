@@ -42,6 +42,7 @@ def how_it_works_children(locale: str) -> list[Any]:
         html.Div(steps, className="how-it-works-steps", disable_n_clicks=True),
     ]
 
+
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _PREDICTION_STATS_CSV = _PROJECT_ROOT / "data" / "input" / "prediction_statistics.csv"
 _PREDICTION_RANKING_CSV = _PROJECT_ROOT / "data" / "input" / "prediction_ranking.csv"
@@ -417,7 +418,7 @@ class LandingPage(html.Div):
                     ),
                     html.Div(
                         t("ui.landing.about_study_text", locale=locale),
-                        style={"color": "#334155", "lineHeight": "1.6"},
+                        style={"color": "#334155", "lineHeight": "1.6", "whiteSpace": "pre-line"},
                     ),
                 ]
             ),
@@ -682,7 +683,12 @@ class LandingPageMobile(html.Div):
                 ),
                 html.Div(
                     t("ui.landing.about_study_text", locale=locale),
-                    style={"color": "#334155", "lineHeight": "1.6", "fontSize": "15px"},
+                    style={
+                        "color": "#334155",
+                        "lineHeight": "1.6",
+                        "fontSize": "15px",
+                        "whiteSpace": "pre-line",
+                    },
                 ),
             ],
             style={

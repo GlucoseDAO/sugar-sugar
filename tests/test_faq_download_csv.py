@@ -37,10 +37,10 @@ def test_faq_has_download_csv_section(locale: str) -> None:
     assert _by_id(layout, "download-csv") is not None
 
 
-def test_faq_ask_form_ids_exist() -> None:
+def test_faq_ask_form_is_hidden_by_default() -> None:
     layout = create_faq_page(locale="en")
-    assert _by_id(layout, "faq-ask-form") is not None
-    assert _by_id(layout, "faq-board") is not None
+    assert _by_id(layout, "faq-ask-form") is None
+    assert _by_id(layout, "faq-board") is None
 
 
 def test_format_help_links_to_faq_download_section() -> None:

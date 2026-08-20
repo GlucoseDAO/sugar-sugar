@@ -85,7 +85,8 @@
 }
 
 /* Synthesis: title lives in HTML (not Plotly layout.title). Graph fills the card width. */
-.share-page .share-synthesis-headline {
+.share-page .share-synthesis-headline,
+.results-synthesis-card .share-synthesis-headline {
   text-align: center;
   color: #0f172a;
   font-size: clamp(1.15rem, 2.5vw, 1.4rem);
@@ -94,7 +95,8 @@
   margin: 0;
   padding: 2px 8px 2px 8px;
 }
-.share-page .share-synthesis-legend {
+.share-page .share-synthesis-legend,
+.results-synthesis-card .share-synthesis-legend {
   /* Legend row: lives between headline and dcc.Graph; not part of the canvas */
   line-height: 1;
 }
@@ -211,7 +213,11 @@
 .share-page .share-synthesis-graph,
 .share-page .share-synthesis-graph .js-plotly-plot,
 .share-page .share-synthesis-graph .plotly,
-.share-page .share-synthesis-graph .plotly-container {
+.share-page .share-synthesis-graph .plotly-container,
+.results-synthesis-card .share-synthesis-graph,
+.results-synthesis-card .share-synthesis-graph .js-plotly-plot,
+.results-synthesis-card .share-synthesis-graph .plotly,
+.results-synthesis-card .share-synthesis-graph .plotly-container {
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0;
@@ -240,10 +246,17 @@
   filter: brightness(0.95);
 }
 
-.share-page .share-action-button.ui.button {
+/* `.share-panel` wraps the download/copy/social actions on BOTH the public
+   /share/<id> page (where it sits inside `.share-page`) and the inline share
+   panel on /final, so scoping on it styles the two identically. */
+.share-panel .share-action-button.ui.button {
   min-height: 44px;
   height: 44px;
-  width: 220px;
+  /* min-width, not width: a fixed 220px clips longer translations
+     (uk "Завантажити зображення" needs ~234px). */
+  min-width: 220px;
+  width: auto;
+  white-space: nowrap;
   padding: 0 22px !important;
   display: inline-flex !important;
   align-items: center;
@@ -255,7 +268,7 @@
   vertical-align: middle;
 }
 
-.share-page #share-copy-link-feedback {
+.share-panel #share-copy-link-feedback {
   position: absolute;
   left: 50%;
   top: calc(100% + 6px);
@@ -265,9 +278,19 @@
   pointer-events: none;
 }
 
-.share-page .share-action-button.ui.button i,
-.share-page .share-btn i {
+.share-panel .share-action-button.ui.button i,
+.share-panel .share-btn i {
   line-height: 1;
+}
+
+/* On /final the panel sits between the action row and the leaderboard --
+   give it the same white-card treatment as the other /final sections. */
+#final-share-panel .share-panel {
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 4px clamp(10px, 2vw, 20px) 16px clamp(10px, 2vw, 20px);
+  margin-bottom: 20px;
 }
 
 /* Copy-link feedback fades in via JS toggling opacity. */
@@ -276,7 +299,8 @@
 }
 
 /* Download button uses the Fomantic `green` theme -- tighten for share page. */
-.share-page .ui.button.green i {
+.share-page .ui.button.green i,
+.share-panel .ui.button.green i {
   margin-right: 8px;
 }
 
@@ -308,11 +332,12 @@ html.mobile-device .share-page .share-unknown-stamp {
   flex: 0 0 auto;
   overflow: visible;
 }
-html.mobile-device .share-page .share-btn {
+html.mobile-device .share-panel .share-btn {
   flex: 1 1 45%;
   justify-content: center;
 }
-html.mobile-device .share-page .ui.button {
+html.mobile-device .share-page .ui.button,
+html.mobile-device .share-panel .ui.button {
   margin-bottom: 8px;
 }
 html.mobile-device .share-page .share-ranking-qr-row {

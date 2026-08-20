@@ -5,13 +5,14 @@ from pathlib import Path
 import pytest
 
 from sugar_sugar.app import create_faq_page
-from sugar_sugar.faq_board import add_faq_question, add_faq_reply, load_faq_questions
+from sugar_sugar.faq_board import add_faq_question, add_faq_reply, faq_board_enabled, load_faq_questions
 from sugar_sugar.i18n import setup_i18n
 
 
 @pytest.fixture(autouse=True)
 def _faq_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("SUGAR_FAQ_DIR", str(tmp_path))
+    monkeypatch.setenv("FAQ_BOARD_ENABLED", "1")
     return tmp_path
 
 
@@ -39,6 +40,23 @@ def test_add_question_and_reply(tmp_path: Path) -> None:
 
 def test_empty_question_is_rejected() -> None:
     assert add_faq_question(text="   ", section="participant") is None
+
+
+def test_writes_are_rejected_when_board_is_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FAQ_BOARD_ENABLED", "0")
+    assert faq_board_enabled() is False
+    assert add_faq_question(text="Where do I export Libre CSV?", section="participant") is None
+    assert add_faq_reply("any-id", text="Nope", section="developer") is None
+
+
+def test_faq_page_hides_ask_form_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FAQ_BOARD_ENABLED", "0")
+    layout = create_faq_page(locale="en")
+    ids = _collect_ids(layout)
+    assert "faq-ask-text" not in ids
+    assert "faq-ask-submit" not in ids
+    assert "faq-ask-form" not in ids
+    assert "faq-board" not in ids
 
 
 def test_faq_page_has_ask_form() -> None:

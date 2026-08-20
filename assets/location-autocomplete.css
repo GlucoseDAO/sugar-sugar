@@ -18,8 +18,15 @@ html.mobile-device #startup-page .location-autocomplete-host {
   border: 1px solid #cbd5e1;
   border-radius: 6px;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
-  max-height: 240px;
+  max-height: 180px;
   overflow-y: auto;
+}
+
+html.mobile-device .location-autocomplete-dropdown {
+  position: absolute !important;
+  top: calc(100% + 2px) !important;
+  max-height: min(140px, 28dvh) !important;
+  overflow-y: auto !important;
 }
 
 .location-autocomplete-item {

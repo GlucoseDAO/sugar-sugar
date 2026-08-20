@@ -9,6 +9,7 @@ import polars as pl
 
 from sugar_sugar.app import (
     EXAMPLE_DATASET_PATH,
+    _open_finish_confirmation,
     append_round_from_window,
     capture_complete_round_on_exit,
     create_prediction_layout,
@@ -17,7 +18,14 @@ from sugar_sugar.app import (
     load_dataset,
 )
 from sugar_sugar.subject_sources import generic_window_slice_key
-from sugar_sugar.components.submit import SubmitComponent, hidden_area_is_complete
+from sugar_sugar.components.submit import (
+    FINISH_EXIT_BUTTON_CLASS,
+    WINDOWS_CLOSE_RED,
+    SubmitComponent,
+    finish_confirm_message,
+    finish_confirm_overlay,
+    hidden_area_is_complete,
+)
 from sugar_sugar.config import DEFAULT_POINTS, PREDICTION_HOUR_OFFSET
 
 
@@ -33,6 +41,20 @@ def _ids(node: Any) -> set[str]:
     elif kids is not None and not isinstance(kids, str):
         found |= _ids(kids)
     return found
+
+
+def _by_id(node: Any, target: str) -> Any:
+    if getattr(node, "id", None) == target:
+        return node
+    kids = getattr(node, "children", None)
+    if isinstance(kids, (list, tuple)):
+        for kid in kids:
+            found = _by_id(kid, target)
+            if found is not None:
+                return found
+    elif kids is not None and not isinstance(kids, str):
+        return _by_id(kids, target)
+    return None
 
 
 def _complete_window() -> pl.DataFrame:
@@ -208,7 +230,51 @@ def test_prediction_layout_keeps_finish_and_meta_ids() -> None:
     assert "prediction-round-summary" in ids
     assert "prediction-source-plaque" in ids
     assert "finish-study-button" in ids
+    finish = _by_id(layout, "finish-study-button")
+    assert finish is not None
+    assert finish.className == FINISH_EXIT_BUTTON_CLASS
+    assert finish.style["backgroundColor"] == WINDOWS_CLOSE_RED
+    assert finish.style["width"] == "48px"
+    assert "finish-confirm-overlay-prediction" in ids
+    assert "finish-confirm-button-prediction" in ids
+    assert "finish-confirm-overlay-ending" not in ids
     assert "submit-button" in ids
     assert "prediction-submit-row" in ids
     assert "prediction-upload-slot" in ids
     assert layout.id == "prediction-page"
+
+
+def test_finish_confirm_overlay_lives_outside_the_action_bar() -> None:
+    overlay = finish_confirm_overlay("en", source="prediction")
+    ids = _ids(overlay)
+    assert overlay.id == "finish-confirm-overlay-prediction"
+    assert "finish-confirm-message-prediction" in ids
+    assert "finish-confirm-button-prediction" in ids
+    assert "finish-keep-playing-button-prediction" in ids
+
+
+def test_finish_confirm_message_warns_when_below_study_floor() -> None:
+    early = finish_confirm_message(
+        rounds_played=1, max_rounds=12, min_useful=6, locale="en",
+    )
+    assert "1 of 12" in early
+    assert "too little for the study" in early
+    assert "Fewer than 6" in early
+
+    ready = finish_confirm_message(
+        rounds_played=6, max_rounds=12, min_useful=6, locale="en",
+    )
+    assert "6 of 12" in ready
+    assert "too little" not in ready
+    assert "sure you want to exit" in ready
+
+
+def test_open_finish_confirmation_shows_the_card() -> None:
+    style, class_name, context = _open_finish_confirmation(
+        count_current_drawing=False,
+        user_info={"rounds": [], "max_rounds": 12, "min_useful_rounds": 6},
+        current_df_data=None,
+    )
+    assert style == {"display": "flex"}
+    assert class_name == "finish-confirm-overlay is-open"
+    assert context == {"rounds_played": 0, "max_rounds": 12, "min_useful": 6}

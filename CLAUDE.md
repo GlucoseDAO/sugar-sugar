@@ -10,12 +10,14 @@ When the user draws the line it interpolates the position to detect closes gluco
 uv is used as the package manager for the project.
 uv run start is used to run the dash app.
 uv run chart is the fast dev shortcut: it starts Dash with data pre-loaded and routes straight to the prediction chart (bypasses landing, startup, and consent). Use this whenever the user asks to debug or test the chart in the browser. Only fall back to uv run start when the user explicitly needs the startup/landing/consent screens. uv run chart accepts --file, --points, --start, --unit, --locale, --host, --port options. Use --prefill to pre-fill the prediction region with noisy ground-truth values so the submit/ending/metrics flow can be tested without drawing (--noise controls the noise level, default 5%). Always prefer uv run chart --prefill over attempting browser automation for testing submit or ending pages.
-uv run share is the share page dev shortcut: it generates fake rounds with synthetic prediction data, saves a share record to disk, and opens the browser at `/share/<id>`. Use this whenever debugging the share page, share card PNG, OG tags, social buttons, or share-related styling. Accepts --port, --locale, --host, --formats, --rounds options. Use `--formats "A,B,C"` to simulate multi-format play (Generic + My Data + Mixed); rounds cycle through formats evenly. Default is 12 rounds with format A only. Example: `uv run share --formats "A,B,C"` generates 12 rounds (4 per format) with distinct colour palettes per panel.
+uv run share is the share page dev shortcut: it generates fake rounds with synthetic prediction data, saves a share record to disk, and opens the browser at `/share/<id>`. Use this whenever debugging the share page, share card PNG, OG tags, social buttons, or share-related styling. Accepts --port, --locale, --host, --formats, --rounds options. Use `--formats "A,B,C"` to simulate multi-format play (Public + My Data + Mixed); rounds cycle through formats evenly. Default is 12 rounds with format A only. Example: `uv run share --formats "A,B,C"` generates 12 rounds (4 per format) with distinct colour palettes per panel.
+uv run download fetches the Format A corpora (BIG IDEAs + D1NAMO). Already-present copies are skipped; `--force` re-downloads; `--all` also pulls CGMacros (unused in Format A). `uv run start` works without them — Format A falls back to `data/example.csv`. Per-dataset commands remain.
 uv run download-bigideas fetches PhysioNet BIG IDEAs Dexcom + food logs into `data/bigideas/` (gitignored). Empatica files are skipped. CGMacros is unused in Format A.
 uv run download-d1namo fetches the public D1NAMO (Dubosson) T1D subset into `data/d1namo/` (gitignored). Default extract keeps meal photos; `--no-photos` skips JPEGs.
 
 Format A source policy (`generic_intervention`): no diabetes / gestational → BIG IDEAs; type 1 → D1NAMO; type 2 → 50/50 mix each round; prediabetes → 75% BIG IDEAs / 25% D1NAMO; LADA → 75% D1NAMO / 25% BIG IDEAs. BIG IDEAs meals have no photos — the apple icon opens a text notepad (backdrop click closes, same as the D1NAMO photo lightbox).
 uv run serve runs gunicorn (production). uv run serve-staging (= uv run serve --staging) is the same but sets `_STAGING_MODE=1`, exposing prod+ test routes under `/staging/*` (`/staging/ending`, `/staging/final`, `/staging/share`, `/staging/prediction`, and a `/staging` index) that jump straight to prefilled states for remote/visual testing **without altering any production logic** — when the flag is off the app is byte-identical. The staging deployment `https://vanilla-sugar.glucosedao.org/` hosts the dev branch. See `docs/share-ops.md` → "Staging Mode".
+The public FAQ ask/reply board at the bottom of `/faq` is **off by default** (`FAQ_BOARD_ENABLED=0` in `.env.template`) until it has bot protection; the flag hides the post form *and* the list of existing questions, and `add_faq_question` / `add_faq_reply` refuse writes while it is off. The curated FAQ entries always render.
 
 ## Data ingest: everything parseable goes through `cgm-format`
 
@@ -145,6 +147,38 @@ frame must stay exactly `["time", "gl", "prediction", "age", "user_id"]`, or fra
 and frames reconstructed from a `dcc.Store` would have different shapes.
 
 ## Known Dash pitfalls
+
+### `allow_duplicate` hashes the INPUTS, so same-trigger writers collide
+
+Dash derives the duplicate-output suffix from the callback's inputs alone
+(`create_callback_id` → `_hash_inputs`, `dash/_utils.py`). Two callbacks writing the same
+property off the *same* `Input` therefore hash to the **identical** output id and the
+renderer aborts the whole page with "Duplicate callback outputs" — `uv run chart` served a
+blank `/prediction`. Without `debug` the page rendered but one writer was silently moot, and
+which one won was never defined.
+
+`compact_events_store` and `initialize_data_on_url_change` both wrote `events-df` off
+`Input('url', 'pathname')`, which is how this shipped. Two writers of one store on one trigger
+were also a last-writer-wins race.
+
+**Rule:** `allow_duplicate=True` is not a licence to add another writer. When the trigger is the
+same, fold the work into the existing callback (`compacted_events_store` is now a plain helper
+called from `initialize_data_on_url_change`). Any future pathname-keyed `events-df` writer belongs
+there too. `tests/test_callback_output_ids.py` fails the build if two callbacks ever share an
+output id again.
+
+### A callback fires only when EVERY Input and State is mounted
+
+`suppress_callback_exceptions=True` lets you *register* callbacks for ids that are not always in
+the tree; at fire time Dash still needs all of them present. A confirm handler that listed both
+`finish-study-button` (`/prediction` only) and `finish-study-button-ending` (`/ending` only) could
+never fire on either page — the exit button did nothing. Same rule as the `/startup` vs `consent-*`
+trap below.
+
+**Rule:** a callback may only span ids that render together. Page-scoped flows get page-scoped ids:
+`finish-confirm-*-prediction` (may read `time-slider`) and `finish-confirm-*-ending` (must not).
+Keep each overlay and its context store in the same layout builder so a callback can never see half
+of them. Locked down by `tests/test_callback_output_ids.py`; full postmortem in `docs/known-issues.md`.
 
 ### n_clicks corruption on static pages (issue #29)
 
@@ -386,7 +420,7 @@ A public, read-only page that lets a user broadcast their Sugar Sugar performanc
  - `GET /share/<id>/og` — crawler-only minimal HTML with Open Graph + Twitter Card meta tags and no meta-refresh. Humans hitting `/og` are redirected server-side (`302`) to the real Dash page. Needed because FB/X/WhatsApp/LinkedIn crawlers don't execute JS and would otherwise see the Dash shell with no OG tags. Social share buttons always link to the regular `/share/<id>` URL — crawler user agents get the OG response at that URL via `before_request`.
 - **Twitter/X OG footguns (full detail in `docs/share-ops.md` → "Twitter/X OG Footguns"):** X is the strictest, most opaque OG consumer; every item here bit production. (1) **Twitterbot obeys `robots.txt`** — FB/WhatsApp/LinkedIn/Telegram ignore it for OG fetches — so `Disallow: /share/*/image.png` makes the card image vanish **on X only**, reproducibly. Never disallow the card image; keep per-share PNGs out of search via `X-Robots-Tag: noindex` on the image route instead. (2) **`Content-Disposition: attachment` kills the card** — the image route serves `as_attachment=False` (inline); the Download button forces download client-side via the HTML `download` attr. (3) **X share URL must be `twitter.com/intent/tweet?text=…&url=…`, never `/intent/post`** — `/intent/post` isn't a real intent path, so the mobile X app opens then bounces ("share opens app then closes"). (4) **X retired the Card Validator (2022)** — no official re-scrape; third-party validators bypass robots.txt AND X's cache, so a green preview does NOT prove the live card works. (5) **X caches a card per-URL ~7 days** — force a fresh scrape by posting `/share/<id>?r=1` (X keys cache on full URL; crawler hook matches on path so OG is identical). (6) **New shares are inherently fresh URLs** (unique ids) → scrape clean on first post; `SHARE_CARD_IMAGE_VERSION` (`?v=` on the image) only refreshes *already-posted* URLs after a card redesign. Diagnosis: "works everywhere except X, reproducibly" → robots.txt or attachment; "validator green but tweet blank" → stale per-URL cache, re-share with `?r=1`.
 - **`kaleido`** is a hard dependency (see `pyproject.toml`). First render takes ~1 s (spawns Chromium); subsequent are served from the cache. Do NOT hot-reload the server while kaleido is rendering — it can leave orphaned Chromium processes on Windows.
-- **Share button wiring**: `share-results-button` on `/final` fires `handle_share_results_button`, which builds a lean JSON-safe record (rounds, limited `user_info` keys, locale, timestamp), persists it, and returns the new `/share/<id>` URL as the `url.pathname`. The record intentionally drops heavyweight stores (`full-df`, `events-df`) — everything the share page needs already lives in `prediction_table_data`.
+- **Share flow is part of `/final` — no button, no callback, no navigation.** `create_final_layout` builds a lean JSON-safe record via `build_final_share_record` (rounds across all formats, frozen rankings, limited `user_info` keys, locale, timestamp), persists it with `share_store.ensure_share`, and renders the share panel (`build_share_panel` in `components/share.py`: download PNG, copy link, social buttons) as a regular section right after the leaderboard (the share impulse peaks at the ranking; graph and metric detail follow). The share id is **content-addressed** — a salted HMAC (`nickname.deployment_salt()`, domain-prefixed `share-id:`) of rounds + trimmed user_info, excluding `created_at`/`locale`/`rankings` — so re-renders (language change, revisits) reuse the same file/URL instead of minting one per render, while a new round (or nickname change) yields a fresh id; `created_at` and rankings freeze at the first render of that game state. `/share/<id>` remains the recipient-facing public page the social links point at; its "Play again" button is excluded from the `/final` panel (`include_play_again=False`). The record intentionally drops heavyweight stores (`full-df`, `events-df`) — everything the share page needs already lives in `prediction_table_data`. Tests: `tests/conftest.py` autouse-redirects `SUGAR_SHARE_DIR` to tmp because any test rendering `/final` now writes a record.
 - **Encouragement text** (`sugar_sugar/encouragement.py`) is template-based today, keyed by a score bracket derived from overall MAE. A module-level `LLM_BACKEND: Optional[Callable]` is the swap point if you want to plug in a real LLM later; do not sprinkle LLM calls elsewhere.
 - **`data/shares/` is gitignored** — share records are session data, not source code.
 - **Synthesis graph on the share page** is one **stacked Plotly row per data-source format the user played (A / B / C)**. The **x-axis** is **time in the next hour** with a tick for **every 5-min step** (count = `PREDICTION_HOUR_OFFSET`, default 12). **Y = percent off actual** — `(pred − actual) / actual × 100` (skip if actual is 0). If the **first** value in the next-hour window has **no prediction**, **actual** at that step is imputed for display so the series starts. Each format row has a **tinted panel**; **colours are data-scaled per row**: `ref = max |% error|` over all rounds in that format, and each point blends its line colour toward **neutral grey (128,128,128)** by `(|y|/ref)^γ` (γ≈0.38), so the **worst |error| in that subplot** reads as **literal grey**. **Stacked fill bands** keep more intensity near the 0% axis. A **continuous solid black, thick 0%** line sits **above fills, below lines/markers**. The old gradient bar and the "accuracy %" stat tile are gone; MAE/RMSE stay on the card.

@@ -283,7 +283,8 @@ including 1-round and Start-only stubs.
 
 ### `consent_agreement.csv`
 
-Consent flags only. No predictions, no nickname, no email.
+Consent flags only. No predictions, no nickname, no email. `paper_full_name` is
+the publication-opt-in exception (acknowledgments), not a leaderboard label.
 
 | Column | Meaning |
 |--------|---------|
@@ -299,6 +300,8 @@ Consent flags only. No predictions, no nickname, no email.
 | `no_selection` | True when neither optional email box was ticked. |
 | `consent_use_uploaded_data` | Late consent that the uploaded file may be used. |
 | `consent_use_uploaded_data_timestamp` | When that late consent was given. |
+| `paper_mention` | True when the player asked to be named in a later paper and entered a full name. |
+| `paper_full_name` | Name for the acknowledgments list. Use only with `paper_mention` and ≥12 rounds. |
 
 ### `prediction_statistics.csv`
 
@@ -311,13 +314,15 @@ The research record. Metrics are always **mg/dL**, regardless of the UI unit.
 | `number` | Sequential study number. |
 | `timestamp` | Last save of this run. |
 | `email` | Address as entered (separate from ranking; see consent notice). |
-| `format` | `A` generic, `B` own data, `C` mixed (odd generic / even own). |
+| `format` | `A` public (anonymized traces from other people), `B` own data, `C` mixed (odd public / even own). |
 | `is_example_data` | Run-level flag: last round only. **Do not use this to classify Format C rounds.** |
 | `data_source_name` | Run-level source: last round only. Format A may be `BIGIDEAS-001.csv` / `D1NAMO-002.csv`; B is the upload filename; C is whichever side played last. Use `per_round_metrics` for the real list. |
 | `age`, `user_id`, `gender`, `uses_cgm`, `cgm_duration_years`, `diabetic`, `diabetic_type`, `diabetes_duration`, `location` | Demographics from `/startup`. `user_id` is the adapter default (`1`), not a public id. |
-| `generic_intervention` | Format A source policy for this player (`bigideas`, `d1namo`, `mix_t2`, or `mix:bigideas=0.90,d1namo=0.10`). Empty on older rows. |
-| `challenge_unknown` | True when the player opted into Challenge the unknown (formats A/C, no diabetes or type 1). |
-| `challenge_unknown_pct` | Share of the opposite pool in 10% steps (10–100). Empty when the challenge is off. |
+| `generic_intervention` | Format A source policy for this player (`bigideas`, `d1namo`, `mix_t2`, or `mix:bigideas=0.50,d1namo=0.50`). Empty on older rows. |
+| `challenge_unknown` | True when the player opted into Challenge the unknown (formats A/C, non-diabetic or type 1 only). |
+| `challenge_unknown_pct` | Opposite-pool share. Always `50` when the challenge is on; empty when it is off. Older rows may still hold a slider value (10–100). |
+| `paper_mention` | True when the player asked to be named in a later paper and entered a full name. |
+| `paper_full_name` | Full name for the acknowledgments list. Only use it when `paper_mention` is true and the player completed at least 12 rounds. |
 | `rounds_played` | Count of completed rounds in this run (`0` = Start stub). |
 | `predicted_values` | Python-literal list of `{version, round, value}` (prediction, mg/dL). |
 | `real_values` | Same shape: ground truth, mg/dL. |
@@ -401,6 +406,7 @@ sugar_sugar/app.py                  # append_round_from_window (per-round fields
 | Mobile screenshots | `uv run python scripts/mobile_shots.py` |
 | Share card PNG previews | `uv run python scripts/render_share_card_previews.py` |
 | Install Chrome for kaleido | `uv run setup-chrome` |
+| Format A public datasets | `uv run download` (`--all` adds CGMacros) |
 | Full test suite | `uv run pytest` |
 
 ---
