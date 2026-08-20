@@ -1,11 +1,12 @@
-"""Meals inside the predicted hour must be visible while the player draws.
+"""Event markers inside the predicted hour must be visible while drawing.
 
 Reported from prod: a BIG IDEAs window put a meal a few minutes past the
 known/predicted divider. The marker was clipped at the boundary, so the player
 saw a flat hour, drew a flat-then-falling line, and only met the post-meal rise
-on the results screen. Nobody predicts their own glucose without knowing they
-are about to eat, so the marker belongs on the chart during the round -- while
-the glucose values themselves stay hidden.
+on the results screen. The same argument covers insulin and exercise -- nobody
+predicts their own glucose without knowing when they ate, dosed or exercised --
+so every marker belongs on the chart during the round, while the glucose values
+themselves stay hidden.
 """
 
 from __future__ import annotations
@@ -47,19 +48,30 @@ def _window() -> pl.DataFrame:
     )
 
 
-def _events(*, note: str = "", photo: str = "") -> pl.DataFrame:
-    """One carb event and one insulin event, both inside the hidden hour."""
+def _events(*, note: str = "", photo: str = "", with_exercise: bool = False) -> pl.DataFrame:
+    """Carb + insulin (and optionally exercise) events inside the hidden hour."""
     meal_time = START + timedelta(minutes=5 * (BOUNDARY + 2))
+    types = ["Carbohydrates", "Insulin"]
+    insulin = [None, 4.0]
+    photos = [photo, ""]
+    carbs = [45.0, None]
+    notes = [note, ""]
+    if with_exercise:
+        types.append("Exercise")
+        insulin.append(None)
+        photos.append("")
+        carbs.append(None)
+        notes.append("")
     return pl.DataFrame(
         {
-            "time": [meal_time, meal_time],
-            "event_type": ["Carbohydrates", "Insulin"],
-            "event_subtype": ["", ""],
-            "insulin_value": [None, 4.0],
-            "photo_path": [photo, ""],
-            "meal_type": ["", ""],
-            "carbs_g": [45.0, None],
-            "food_note": [note, ""],
+            "time": [meal_time] * len(types),
+            "event_type": types,
+            "event_subtype": [""] * len(types),
+            "insulin_value": insulin,
+            "photo_path": photos,
+            "meal_type": [""] * len(types),
+            "carbs_g": carbs,
+            "food_note": notes,
         },
         schema=FOOD_NOTE_EVENTS_SCHEMA,
     )
@@ -97,24 +109,45 @@ def test_hidden_hour_marker_does_not_leak_the_glucose_value() -> None:
     assert HIDDEN_GLUCOSE not in list(blue.y)
 
 
-def test_insulin_in_hidden_hour_stays_hidden() -> None:
-    """Only meals were reported; insulin keeps its existing gating."""
+def test_insulin_in_hidden_hour_is_drawn_too() -> None:
+    """A dose is as knowable in advance as a meal, and moves glucose as hard."""
     figure = _chart(_window(), _events())
-    syringes = [
-        image for image in figure.layout.images
-        if "syringe" in str(image.source).lower() or "insulin" in str(image.source).lower()
+    past = [image for image in figure.layout.images if image.x > BOUNDARY]
+    # Both the meal and the dose sit past the divider in this fixture.
+    assert len(past) >= 2, "insulin marker inside the predicted hour was dropped"
+    for image in past:
+        assert abs(float(image.y) - HIDDEN_GLUCOSE) > 1.0
+
+
+def test_exercise_in_hidden_hour_is_pinned_not_plotted_at_the_answer() -> None:
+    """Exercise was never boundary-gated, so its star read off the y-axis."""
+    events = _events(with_exercise=True)
+    figure = _chart(_window(), events)
+    stars = [tr for tr in figure.data if getattr(tr.marker, "symbol", None) == "star"]
+    assert stars, "exercise marker missing"
+    past = [
+        (x, y) for tr in stars for x, y in zip(tr.x, tr.y) if x > BOUNDARY
     ]
-    assert all(image.x <= BOUNDARY for image in syringes)
+    assert past, "exercise marker inside the predicted hour was dropped"
+    for _, y in past:
+        assert abs(float(y) - HIDDEN_GLUCOSE) > 1.0
 
 
-def test_hidden_hour_meal_gets_a_guide_line() -> None:
-    """Without the trace behind it an icon floats; the dotted line anchors it."""
+def test_hidden_hour_markers_get_guide_lines_in_their_own_colour() -> None:
+    """Without the trace behind it an icon floats; the dotted line anchors it.
+
+    A syringe must not be announced by a green meal line, so each guide takes
+    its event's colour.
+    """
     figure = _chart(_window(), _events())
     guides = [
         shape for shape in figure.layout.shapes
         if shape.type == "line" and shape.x0 == shape.x1 and float(shape.x0) > BOUNDARY
     ]
-    assert guides, "no dotted guide line for the meal in the predicted hour"
+    assert guides, "no dotted guide line for markers in the predicted hour"
+    colours = {str(shape.line.color) for shape in guides}
+    assert GlucoseChart.EVENT_STYLES["Carbohydrates"]["color"] in colours
+    assert GlucoseChart.EVENT_STYLES["Insulin"]["color"] in colours
 
 
 def test_photo_meal_in_hidden_hour_still_gets_its_bubble() -> None:

@@ -131,28 +131,31 @@ Hard-won rules:
   it skips what the file has, so no data row is lost); `002` covers the headerless 11-column food log and
   the blank-`time_begin` → `date` + `time` fallback.
 
-### Meals are visible in the predicted hour; glucose is not
+### Event markers are visible in the predicted hour; glucose is not
 
 `hide_last_hour` withholds the **glucose trace** of the hour being predicted. It
-must not withhold the **meal markers** in it. A BIG IDEAs window put a meal a few
-minutes past the divider, the marker was clipped, and the player drew a flat line
-into a post-meal rise they had no way to see coming — the clipping did not
-withhold a hint, it made the displayed history misleading, and it biased the very
-error the study measures.
+must not withhold the **event markers** in it — meals, insulin or exercise. A
+BIG IDEAs window put a meal a few minutes past the divider, the marker was
+clipped, and the player drew a flat line into a post-meal rise they had no way to
+see coming. The clipping did not withhold a hint, it made the displayed history
+misleading, and it biased the very error the study measures. Nobody predicts
+their own glucose without knowing when they ate, dosed or exercised.
 
 `visible_food_photo_events` (`cgmacros.py`) therefore spans the whole window, and
 `cluster_visible_food_events` / `meal_food_bubble_children` no longer take a
 `hide_last_hour` argument at all — an ignored parameter is how the clipping would
-come back. Both meal representations show during the round: the FOOD speech
-bubble plus dotted guide line (photo/note meals) and the apple icon (plain carb
-events).
+come back. All three marker kinds show during the round: the FOOD speech bubble
+plus guide line (photo/note meals), the apple icon (plain carb events), the
+syringe, and the exercise star.
 
-**What must stay hidden is the y-value.** Icons are normally placed at the event's
-glucose height; past the boundary that *is* the answer. `_add_event_markers` pins
-them to `_HIDDEN_MARKER_Y_FRAC` of the y-span instead and draws the dotted guide
-line so the timing still reads off the axis. Insulin keeps its old gating —
-only meals were reported, and widening what a player can see mid-study is a
-research decision, not a rendering one. Locked down by
+**What must stay hidden is the y-value.** Markers are normally placed at the
+event's glucose height; past the boundary that *is* the answer.
+`_add_event_markers` pins them to `_HIDDEN_MARKER_Y_FRAC` of the y-span instead —
+a single "topside" rail they stack along — and `_draw_hidden_marker_guides` draws
+a dotted vertical **in each event's own colour** (a syringe must not be announced
+by a green meal line) so the timing still reads off the axis. Note exercise was
+never boundary-gated at all, so before this its star sat at the true hidden
+glucose value and could be read straight off the y-axis. Locked down by
 `tests/test_food_marker_prediction_area.py`.
 
 ### Windows must not straddle a sensor gap

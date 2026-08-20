@@ -754,15 +754,18 @@ class GlucoseChart(html.Div):
         Insulin/carbs use SVG ``layout_image`` markers (plotly.js does not render
         custom ``path://`` symbols from Python).
 
-        On the prediction page (``hide_last_hour``) **meals stay visible in the
-        predicted hour** — a player always knows when they ate, and hiding it
-        made them draw a flat line into a post-meal rise they had no way to see
-        coming. Insulin keeps its old behaviour and is dropped past the boundary.
+        On the prediction page (``hide_last_hour``) **every event marker stays
+        visible in the predicted hour** — meals, insulin and exercise alike. A
+        player always knows when they ate, dosed or exercised; hiding it made
+        them draw a flat line into an excursion they had no way to see coming,
+        which does not withhold a hint so much as make the displayed history
+        misleading.
 
-        A meal past the boundary is pinned to a neutral rail near the top of the
-        plot instead of sitting at its true glucose height, which would hand over
-        the very value being predicted, and gets a dotted guide line so its
-        timing is unambiguous without the glucose trace behind it.
+        A marker past the boundary is pinned to a neutral rail near the top of
+        the plot instead of sitting at its true glucose height, which would hand
+        over the very value being predicted, and gets a dotted guide line in its
+        own event colour so its timing is unambiguous without the glucose trace
+        behind it.
         """
         if self._current_events.height == 0:
             return
@@ -790,7 +793,7 @@ class GlucoseChart(html.Div):
 
         # Collect insulin/carb icons first so near-identical x positions can stack.
         icon_markers: list[dict[str, Any]] = []
-        hidden_marker_x: list[float] = []
+        hidden_marker_guides: list[tuple[float, str]] = []
         for event_type in ("Insulin", "Carbohydrates"):
             style = self.EVENT_STYLES[event_type]
             events = window_events.filter(pl.col("event_type") == event_type)
@@ -803,8 +806,6 @@ class GlucoseChart(html.Div):
             for event_time in events.get_column("time"):
                 x_pos, glucose_value = self._event_xy_for_time(event_time)
                 past_boundary = self.hide_last_hour and x_pos > float(known_end_idx)
-                if past_boundary and event_type != "Carbohydrates":
-                    continue
                 if past_boundary:
                     # Never place it at the hidden glucose value -- that is the answer.
                     glucose_value = hidden_marker_y
@@ -835,7 +836,7 @@ class GlucoseChart(html.Div):
                         f"<br>{event_time.strftime('%H:%M')}"
                     )
                 if past_boundary:
-                    hidden_marker_x.append(x_pos)
+                    hidden_marker_guides.append((x_pos, str(style["color"])))
                 icon_markers.append(
                     {
                         "event_type": event_type,
@@ -846,22 +847,7 @@ class GlucoseChart(html.Div):
                     }
                 )
 
-        # Without the glucose trace behind it, an icon alone reads as floating;
-        # the guide line ties it to a time on the axis (same treatment the
-        # photo/note meals already get from _add_food_photo_guides).
-        for x_pos in hidden_marker_x:
-            figure.add_shape(
-                type="line",
-                x0=x_pos,
-                x1=x_pos,
-                y0=0,
-                y1=1,
-                xref="x",
-                yref="paper",
-                line=dict(color=_FOOD_LINE_COLOR, width=1.5, dash="dot"),
-                layer="below",
-            )
-
+        self._draw_hidden_marker_guides(figure, hidden_marker_guides)
         self._stack_icon_markers(icon_markers, y_span=y_span, y_max=y_max)
         icon_legend_entries = self._draw_icon_markers(
             figure, icon_markers, legend_name_by_type=legend_name_by_type
@@ -870,12 +856,21 @@ class GlucoseChart(html.Div):
         # Exercise keeps a normal Plotly marker (no SVG stacking).
         exercise_style = self.EVENT_STYLES["Exercise"]
         exercise_events = window_events.filter(pl.col("event_type") == "Exercise")
+        hidden_exercise_guides: list[tuple[float, str]] = []
         if exercise_events.height > 0:
             x_positions = []
             y_positions = []
             hover_texts = []
             for event_time in exercise_events.get_column("time"):
                 x_pos, glucose_value = self._event_xy_for_time(event_time)
+                # Exercise was never gated by the boundary at all, so a star in
+                # the predicted hour used to sit at the hidden glucose value and
+                # read straight off the y-axis. Same rail as the other markers.
+                if self.hide_last_hour and x_pos > float(known_end_idx):
+                    glucose_value = hidden_marker_y
+                    hidden_exercise_guides.append(
+                        (x_pos, str(exercise_style["color"]))
+                    )
                 x_positions.append(x_pos)
                 y_positions.append(glucose_value)
                 hover_texts.append(
@@ -900,7 +895,32 @@ class GlucoseChart(html.Div):
                 )
             )
 
+        self._draw_hidden_marker_guides(figure, hidden_exercise_guides)
         self._add_icon_legend(figure, icon_legend_entries)
+
+    @staticmethod
+    def _draw_hidden_marker_guides(
+        figure: go.Figure,
+        guides: list[tuple[float, str]],
+    ) -> None:
+        """Dotted verticals for markers sitting in the hidden hour.
+
+        Without the glucose trace behind it an icon on the neutral rail reads as
+        floating; the line ties it to a time on the axis. Each is drawn in its
+        own event colour so a syringe is not announced by a green meal line.
+        """
+        for x_pos, color in guides:
+            figure.add_shape(
+                type="line",
+                x0=x_pos,
+                x1=x_pos,
+                y0=0,
+                y1=1,
+                xref="x",
+                yref="paper",
+                line=dict(color=color, width=1.5, dash="dot"),
+                layer="below",
+            )
 
     def _add_food_photo_guides(self, figure: go.Figure) -> None:
         """Thin green dotted meal line. The FOOD label lives in the HTML bubble."""
