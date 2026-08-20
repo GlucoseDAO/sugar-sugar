@@ -89,5 +89,6 @@ DASH_DEBUG: bool = _env_bool("DASH_DEBUG", DEBUG_MODE)
 # 24: clustered meal bubbles open a composite gallery (extra gallery children Output).
 # 25: composite gallery uses fixed img slots (clientside cannot create Img children).
 # 26: challenge-unknown slider removed; paper-mention fields added to handle_start_button.
-DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "27"))
+# 27: Results loading overlay (clientside) so /final's slow display_page is not a second click.
+DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "31"))
 

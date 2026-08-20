@@ -12,8 +12,18 @@ import os
 from pathlib import Path
 from typing import Any
 
+from dash import html
+from dash.exceptions import PreventUpdate
+import pytest
+
 from sugar_sugar import share_store
-from sugar_sugar.app import build_final_share_record, create_final_layout
+
+from sugar_sugar.app import (
+    build_final_share_record,
+    create_final_layout,
+    fill_final_leaderboard,
+    fill_final_share,
+)
 from sugar_sugar.components.share import create_share_layout
 from sugar_sugar.i18n import setup_i18n
 from tests.share_fixtures import make_test_share_record
@@ -136,6 +146,51 @@ def test_final_page_without_rounds_has_no_share_section() -> None:
     assert _by_id(layout, "final-share-panel") is None
     assert _by_id(layout, "share-copy-link-button") is None
     assert not _share_files(), "no rounds, no record"
+
+
+def test_deferred_final_paints_shell_then_leaderboard_then_share() -> None:
+    """Live /final is eager=False: first paint is the shell, ticks fill the rest.
+
+    Tick 1 reads ranking CSVs. Tick 2 writes the share record and the synthesis
+    card. Tests call the two fill callbacks directly so we do not need a browser.
+    """
+    setup_i18n()
+    user = _user()
+    layout = create_final_layout(user, "mg/dL", locale="en", eager=False)
+
+    assert _by_id(layout, "final-title") is not None
+    ranking = _by_id(layout, "final-ranking-list")
+    assert ranking is not None
+    assert _by_id(ranking, "final-ranking-title") is not None
+    assert _by_id(ranking, "final-nickname-input") is None
+    share = _by_id(layout, "final-share-panel")
+    synthesis = _by_id(layout, "final-synthesis-card")
+    assert share is not None and share.children == []
+    assert synthesis is not None and synthesis.children == []
+    assert _by_id(layout, "final-deferred-tick") is None
+    assert not _share_files(), "first paint must not write a share record"
+
+    with pytest.raises(PreventUpdate):
+        fill_final_leaderboard(None, "/final", user, "mg/dL", "en")
+    with pytest.raises(PreventUpdate):
+        fill_final_share({"phase": 1, "nonce": 1}, "/final", user, "mg/dL", "en")
+
+    ranking_kids, kick2 = fill_final_leaderboard(
+        {"phase": 1, "nonce": 1}, "/final", user, "mg/dL", "en"
+    )
+    assert ranking_kids
+    assert any(getattr(node, "id", None) == "final-ranking-title" for node in ranking_kids)
+    assert kick2 == {"phase": 2, "nonce": 1}
+    assert not _share_files(), "leaderboard phase must not persist the share card"
+
+    share_kids, synthesis_kids = fill_final_share(
+        kick2, "/final", user, "mg/dL", "en"
+    )
+    filled_share = html.Div(share_kids, id="final-share-panel")
+    assert _by_id(filled_share, "share-copy-link-button") is not None
+    assert synthesis_kids
+    files = _share_files()
+    assert len(files) == 1, "share phase persists exactly one record"
 
 
 def test_share_page_panel_keeps_play_again_for_recipients() -> None:

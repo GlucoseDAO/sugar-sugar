@@ -34,7 +34,8 @@ MOBILE_UA: str = (
 )
 
 _DISPLAY_OUTPUT: str = (
-    "..page-content.children...mobile-warning.children...navbar-container.children.."
+    "..page-content.children...mobile-warning.children..."
+    "navbar-container.children...final-fill-step.data.."
 )
 
 _WINDOW_POINTS: int = 24
@@ -100,6 +101,7 @@ def _render(
             {"id": "page-content", "property": "children"},
             {"id": "mobile-warning", "property": "children"},
             {"id": "navbar-container", "property": "children"},
+            {"id": "final-fill-step", "property": "data"},
         ],
         "inputs": [
             {"id": "url", "property": "pathname", "value": pathname},
@@ -252,7 +254,7 @@ def test_language_change_rebuilds_landing_on_prediction_consent_bounce() -> None
     """A hydrated session without consent is really showing landing -- retranslate it."""
     no_consent = {k: v for k, v in _saved_session().items() if k != "consent_completed"}
     with app.server.test_request_context(headers={"User-Agent": "Mozilla/5.0"}):
-        page, _warning, _navbar = update_on_language_change(
+        page, _warning, _navbar, _kick = update_on_language_change(
             "de", "/prediction", no_consent, None, "mg/dL"
         )
     assert page is not no_update
@@ -272,7 +274,7 @@ def test_language_change_leaves_the_restoring_placeholder_alone() -> None:
     English (no language change, so no firing) correctly gave up to `/`.
     """
     with app.server.test_request_context(headers={"User-Agent": "Mozilla/5.0"}):
-        page, warning, navbar = update_on_language_change(
+        page, warning, navbar, _kick = update_on_language_change(
             "de", "/prediction", None, None, "mg/dL"
         )
     assert page is no_update
@@ -283,7 +285,7 @@ def test_language_change_leaves_the_restoring_placeholder_alone() -> None:
 
 def test_language_change_keeps_live_prediction_chart() -> None:
     with app.server.test_request_context(headers={"User-Agent": "Mozilla/5.0"}):
-        page, warning, _navbar = update_on_language_change(
+        page, warning, _navbar, _kick = update_on_language_change(
             "de", "/prediction", _saved_session(), None, "mg/dL"
         )
     assert page is no_update

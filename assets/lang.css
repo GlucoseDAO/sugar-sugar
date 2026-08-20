@@ -1602,4 +1602,35 @@ html:not(.mobile-device) #next-round-button {
   display: grid;
 }
 
+/* Results → /final: cover the still-mounted ending page while display_page
+   builds the share/leaderboard layout (several seconds). One click, no
+   second press on the leftover Results button. */
+.results-loading-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.78);
+  pointer-events: all;
+}
+/* Only while /ending is still mounted. :has(#final-title) used to hide it on
+   /final, so Exit → landing (no #final-title, class still is-open) painted a
+   full-screen white veil over the consent page. */
+#page-content:has(#ending-title) + #results-loading-overlay.is-open {
+  display: flex;
+}
+.results-loading-card {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a365d;
+}
+
+/* Deferred /final slots stay collapsed until the follow-up ticks fill them. */
+#final-share-panel:empty,
+#final-synthesis-card:empty {
+  display: none;
+}
+
 

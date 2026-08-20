@@ -2207,6 +2207,11 @@ app.layout = html.Div([
     # cold load lands before hydration -- see _restoring_layout). Memory: a fresh
     # page load must start over at False.
     dcc.Store(id='game-stores-hydrated', data=False, storage_type='memory'),
+    # Two-step /final fill: display_page writes phase 1 with the shell, then
+    # fill_final_leaderboard advances to 2 and fill_final_share paints the card.
+    # Memory so a reload starts over. Never put an Interval in page-content —
+    # a dcc.Interval created as a callback output does not tick (01:53 /final).
+    dcc.Store(id='final-fill-step', data=None, storage_type='memory'),
     # Server-side truth about whether the drawing chart is actually on screen.
     # The `route-prediction` <html> class (and every prediction-only CSS rule,
     # incl. the `:not(.route-prediction)` mobile overflow/tap-reliability
@@ -2235,6 +2240,16 @@ app.layout = html.Div([
     html.Div(id='navbar-container', children=[], disable_n_clicks=True),
 
     html.Div(id='page-content', children=[], disable_n_clicks=True),
+    # Must sit immediately after #page-content: CSS :has(#final-title) hides it
+    # once display_page replaces ending with /final. Shown clientside on the
+    # first Results click so the still-visible ending button is not clicked again
+    # while create_final_layout runs (~3s).
+    html.Div(
+        html.Div("…", className="results-loading-card", disable_n_clicks=True),
+        id="results-loading-overlay",
+        className="results-loading-overlay",
+        disable_n_clicks=True,
+    ),
 
     html.Div(
         [
@@ -2942,7 +2957,8 @@ def _navbar(*, locale: str, pathname: Optional[str]) -> html.Div:
 @app.callback(
     [Output('page-content', 'children', allow_duplicate=True),
      Output('mobile-warning', 'children', allow_duplicate=True),
-     Output('navbar-container', 'children', allow_duplicate=True)],
+     Output('navbar-container', 'children', allow_duplicate=True),
+     Output('final-fill-step', 'data', allow_duplicate=True)],
     [Input('interface-language', 'data')],
     [State('url', 'pathname'),
      State('user-info-store', 'data'),
@@ -2951,6 +2967,24 @@ def _navbar(*, locale: str, pathname: Optional[str]) -> html.Div:
     prevent_initial_call=True,
 )
 def update_on_language_change(
+    interface_language: Optional[str],
+    pathname: Optional[str],
+    user_info: Optional[Dict[str, Any]],
+    user_agent: Optional[str],
+    glucose_unit: Optional[str],
+) -> tuple:
+    page, warning, navbar = _update_language_page(
+        interface_language, pathname, user_info, user_agent, glucose_unit
+    )
+    kick: Any = (
+        {"phase": 1, "nonce": time.time_ns()}
+        if pathname == "/final" and user_info and page is not no_update
+        else no_update
+    )
+    return page, warning, navbar, kick
+
+
+def _update_language_page(
     interface_language: Optional[str],
     pathname: Optional[str],
     user_info: Optional[Dict[str, Any]],
@@ -2998,7 +3032,7 @@ def update_on_language_change(
             return staging_layout, warning_content, navbar
     if pathname == '/final':
         if user_info:
-            return create_final_layout(user_info, glucose_unit, locale=locale), warning_content, navbar
+            return create_final_layout(user_info, glucose_unit, locale=locale, eager=False), warning_content, navbar
         return no_update, no_update, navbar
     if pathname and pathname.startswith('/share/'):
         share_id = pathname.split('/share/', 1)[1].strip('/').split('/', 1)[0]
@@ -3252,7 +3286,8 @@ def update_ending_text_on_language_change(
 @app.callback(
     [Output('page-content', 'children'),
      Output('mobile-warning', 'children'),
-     Output('navbar-container', 'children')],
+     Output('navbar-container', 'children'),
+     Output('final-fill-step', 'data')],
     [Input('url', 'pathname'),
      Input('game-stores-hydrated', 'data')],
     [State('interface-language', 'data'),
@@ -3264,6 +3299,37 @@ def update_ending_text_on_language_change(
     prevent_initial_call=False
 )
 def display_page(
+    pathname: Optional[str],
+    stores_hydrated: Optional[bool],
+    interface_language: Optional[str],
+    user_info: Optional[Dict[str, Any]],
+    current_df_data: Optional[Dict],
+    events_df_data: Optional[Dict],
+    glucose_unit: Optional[str],
+    user_agent: Optional[str],
+) -> tuple[html.Div, Optional[html.Div], html.Div, Any]:
+    page, warning, navbar = _render_page(
+        pathname,
+        stores_hydrated,
+        interface_language,
+        user_info,
+        current_df_data,
+        events_df_data,
+        glucose_unit,
+        user_agent,
+    )
+    ready = _game_stores_ready(pathname, user_info, current_df_data)
+    # ``no_update`` on every other route: writing None here would re-fire the
+    # /final fill callbacks after Exit has already unmounted their outputs.
+    kick: Any = (
+        {"phase": 1, "nonce": time.time_ns()}
+        if pathname == "/final" and user_info and ready
+        else no_update
+    )
+    return page, warning, navbar, kick
+
+
+def _render_page(
     pathname: Optional[str],
     stores_hydrated: Optional[bool],
     interface_language: Optional[str],
@@ -3360,7 +3426,7 @@ def display_page(
                         )
                     ], style={'textAlign': 'center'})
                 ]), warning_content, navbar
-            return create_final_layout(user_info, glucose_unit, locale=locale), warning_content, navbar
+            return create_final_layout(user_info, glucose_unit, locale=locale, eager=False), warning_content, navbar
         if pathname and pathname.startswith('/share/'):
             share_id = pathname.split('/share/', 1)[1].strip('/').split('/', 1)[0]
             record = share_store.load_share(share_id) if share_id else None
@@ -5574,6 +5640,90 @@ def _build_final_leaderboard(
     )
 
 
+def _final_ranking_snapshots(
+    user_info: Dict[str, Any],
+) -> tuple[Optional[dict[str, Any]], list[tuple[str, dict[str, Any]]]]:
+    """Read ranking CSVs for the formats this player actually ran."""
+    rounds: list[dict[str, Any]] = user_info.get("rounds") or []
+    current_format = str(user_info.get("format") or "A")
+    runs_by_format: dict[str, list[dict[str, Any]]] = dict(user_info.get("runs_by_format") or {})
+    already_played: set[str] = {str(fmt) for fmt, runs in runs_by_format.items() if runs}
+    if rounds:
+        already_played.add(current_format)
+    played_formats: list[str] = sorted(already_played, key=lambda x: FORMAT_ORDER.get(str(x), 999))
+    study_id = str(user_info.get("study_id") or "")
+    leaderboard_key = email_key(user_info.get("email"))
+    per_format_boards: list[tuple[str, dict[str, Any]]] = []
+    for fmt in played_formats:
+        if fmt not in ("A", "B", "C"):
+            continue
+        board = _leaderboard_snapshot(
+            project_root / "data" / "input" / f"prediction_ranking_{fmt}.csv",
+            study_id=study_id,
+            key=leaderboard_key,
+            format_filter=fmt,
+        )
+        if board is not None:
+            per_format_boards.append((fmt, board))
+    overall_board = _leaderboard_snapshot(
+        project_root / "data" / "input" / "prediction_ranking.csv",
+        study_id=study_id,
+        key=leaderboard_key,
+        format_filter="ALL",
+    )
+    return overall_board, per_format_boards
+
+
+def _final_share_section_children(
+    user_info: Dict[str, Any],
+    *,
+    locale: str,
+) -> list[Any]:
+    """Persist the share record and return the /final share panel children."""
+    share_record: Optional[dict[str, Any]] = build_final_share_record(user_info, locale=locale)
+    if share_record is None:
+        return []
+    final_share_id: str = share_store.ensure_share(share_record)
+    return [
+        html.H3(
+            t("ui.share.button_share", locale=locale),
+            style={
+                "textAlign": "center",
+                "marginBottom": "4px",
+                "fontSize": "clamp(18px, 3vw, 24px)",
+            },
+        ),
+        build_share_panel(
+            share_record,
+            share_id=final_share_id,
+            share_url=_build_share_url(final_share_id),
+            locale=locale,
+        ),
+    ]
+
+
+def _final_synthesis_inner(
+    user_info: Dict[str, Any],
+    *,
+    locale: str,
+) -> list[Any]:
+    """Inner nodes of the synthesis card (the wrapper already has the id)."""
+    synthesis_rounds: list[dict[str, Any]] = collect_playable_rounds(user_info)
+    if not synthesis_rounds:
+        return []
+    card = build_synthesis_card(
+        {"rounds": synthesis_rounds},
+        locale=locale,
+        graph_id="final-synthesis-graph",
+    )
+    kids = card.children
+    if isinstance(kids, (list, tuple)):
+        return list(kids)
+    if kids is None:
+        return []
+    return [kids]
+
+
 HIGHSCORE_TOP_N: int = 20
 HIGHSCORE_FORMAT_TOP_N: int = 10
 
@@ -5858,7 +6008,13 @@ def build_final_share_record(user_info: Dict[str, Any], *, locale: str) -> Optio
     }
 
 
-def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], *, locale: str) -> html.Div:
+def create_final_layout(
+    user_info: Dict[str, Any],
+    glucose_unit: Optional[str],
+    *,
+    locale: str,
+    eager: bool = True,
+) -> html.Div:
     rounds: list[dict[str, Any]] = user_info.get('rounds') or []
     # If current rounds are empty (e.g. user just switched format), fall back to the
     # most recently archived run so results are still visible.
@@ -5870,7 +6026,6 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
             rounds = list(latest_run.get('rounds') or [])
     max_rounds = int(user_info.get('max_rounds') or MAX_ROUNDS)
     unit = glucose_unit if glucose_unit in ('mg/dL', 'mmol/L') else 'mg/dL'
-    study_id = str(user_info.get('study_id') or '')
     current_format = str(user_info.get("format") or "A")
     uses_cgm = bool(user_info.get("uses_cgm", False))
     allowed_formats: list[str] = (["C", "B", "A"] if uses_cgm else ["A"])
@@ -5882,37 +6037,30 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
     # Consent is handled on the prediction page (B/C upload flow).
     show_switch_data_consent = False
     switch_data_consent_value: list[str] = []
-    played_formats: list[str] = sorted(already_played, key=lambda x: FORMAT_ORDER.get(str(x), 999))
 
-    leaderboard_key = email_key(user_info.get('email'))
-    per_format_boards: list[tuple[str, dict[str, Any]]] = []
-    for fmt in played_formats:
-        if fmt not in ("A", "B", "C"):
-            continue
-        board = _leaderboard_snapshot(
-            project_root / 'data' / 'input' / f'prediction_ranking_{fmt}.csv',
-            study_id=study_id,
-            key=leaderboard_key,
-            format_filter=fmt,
+    if eager:
+        overall_board, per_format_boards = _final_ranking_snapshots(user_info)
+        leaderboard = _build_final_leaderboard(
+            overall=overall_board,
+            per_format=per_format_boards,
+            locale=locale,
+            unit=unit,
+            user_info=user_info,
         )
-        if board is not None:
-            per_format_boards.append((fmt, board))
-
-    # Always show cumulative overall ranking ("ALL"), updated after each finished run.
-    overall_board = _leaderboard_snapshot(
-        project_root / 'data' / 'input' / 'prediction_ranking.csv',
-        study_id=study_id,
-        key=leaderboard_key,
-        format_filter="ALL",
-    )
-
-    leaderboard = _build_final_leaderboard(
-        overall=overall_board,
-        per_format=per_format_boards,
-        locale=locale,
-        unit=unit,
-        user_info=user_info,
-    )
+    else:
+        leaderboard = html.Div(
+            [
+                html.H3(
+                    t("ui.final.ranking_title", locale=locale),
+                    id="final-ranking-title",
+                    className="final-leaderboard-title",
+                ),
+            ],
+            id="final-ranking-list",
+            className="final-leaderboard",
+            disable_n_clicks=True,
+            style={"display": "block"},
+        )
 
     metrics_component_final = MetricsComponent()
     aggregate_table_data = _convert_table_data_units(_build_aggregate_table_data(rounds), unit)
@@ -5988,45 +6136,42 @@ def create_final_layout(user_info: Dict[str, Any], glucose_unit: Optional[str], 
         })
 
     synthesis_rounds: list[dict[str, Any]] = collect_playable_rounds(user_info)
-    synthesis_card: Optional[html.Div] = (
-        build_synthesis_card(
-            {"rounds": synthesis_rounds},
-            locale=locale,
-            card_id="final-synthesis-card",
-            graph_id="final-synthesis-graph",
+    if eager:
+        synthesis_card = (
+            build_synthesis_card(
+                {"rounds": synthesis_rounds},
+                locale=locale,
+                card_id="final-synthesis-card",
+                graph_id="final-synthesis-graph",
+            )
+            if synthesis_rounds
+            else None
         )
-        if synthesis_rounds
-        else None
-    )
-
-    # Inline share section: the share flow is part of /final itself -- no
-    # separate button, no navigation.  The record is content-addressed
-    # (`ensure_share`), so re-renders (language change, revisits) reuse the
-    # same file and URL; a new round yields a fresh id.
-    share_record: Optional[dict[str, Any]] = build_final_share_record(user_info, locale=locale)
-    share_section: Optional[html.Div] = None
-    if share_record is not None:
-        final_share_id: str = share_store.ensure_share(share_record)
+        share_kids = _final_share_section_children(user_info, locale=locale)
+        share_section: Optional[html.Div] = (
+            html.Div(
+                share_kids,
+                id="final-share-panel",
+                disable_n_clicks=True,
+                style={"width": "100%", "boxSizing": "border-box"},
+            )
+            if share_kids
+            else None
+        )
+    else:
+        # Stable ids so the deferred callback can fill them after first paint.
+        # Empty nodes stay hidden via :empty CSS until the tick writes children.
         share_section = html.Div(
-            [
-                html.H3(
-                    t("ui.share.button_share", locale=locale),
-                    style={
-                        'textAlign': 'center',
-                        'marginBottom': '4px',
-                        'fontSize': 'clamp(18px, 3vw, 24px)',
-                    },
-                ),
-                build_share_panel(
-                    share_record,
-                    share_id=final_share_id,
-                    share_url=_build_share_url(final_share_id),
-                    locale=locale,
-                ),
-            ],
-            id='final-share-panel',
+            [],
+            id="final-share-panel",
             disable_n_clicks=True,
-            style={'width': '100%', 'boxSizing': 'border-box'},
+            style={"width": "100%", "boxSizing": "border-box"},
+        )
+        synthesis_card = html.Div(
+            [],
+            id="final-synthesis-card",
+            className="results-synthesis-card",
+            disable_n_clicks=True,
         )
 
     _exit_label = t("ui.final.start_over", locale=locale)
@@ -7166,12 +7311,153 @@ def handle_finish_study_from_ending(
     if not rounds:
         return '/final', user_info, {'hide_last_hour': True}
 
-    if should_persist_study_data(user_info):
+    # Last Submit already wrote this run. Do not rewrite on Results — that
+    # blocks the click for a second and is why the button feels dead.
+    if should_persist_study_data(user_info) and not user_info.get("statistics_saved"):
         with start_action(action_type=u"handle_finish_study_from_ending"):
             submit_component.save_statistics(user_info)
             user_info['statistics_saved'] = True
 
     return '/final', user_info, {'hide_last_hour': False}
+
+
+def _final_fill_locale_unit(
+    interface_language: Optional[str],
+    glucose_unit: Optional[str],
+) -> tuple[str, str]:
+    locale = normalize_locale(interface_language)
+    unit = glucose_unit if glucose_unit in ("mg/dL", "mmol/L") else "mg/dL"
+    return locale, unit
+
+
+@app.callback(
+    [
+        Output("final-ranking-list", "children", allow_duplicate=True),
+        Output("final-fill-step", "data", allow_duplicate=True),
+    ],
+    Input("final-fill-step", "data"),
+    [
+        State("url", "pathname"),
+        State("user-info-store", "data"),
+        State("glucose-unit", "data"),
+        State("interface-language", "data"),
+    ],
+    prevent_initial_call=True,
+)
+def fill_final_leaderboard(
+    kick: Optional[Any],
+    pathname: Optional[str],
+    user_info: Optional[Dict[str, Any]],
+    glucose_unit: Optional[str],
+    interface_language: Optional[str],
+) -> tuple[Any, Any]:
+    """Phase 1: ranking CSVs. Advances the store so the share callback can run.
+
+    A single callback that Output its own Input did not re-enter for phase 2
+    (seen 10:18:40 — leaderboard landed, graph never did).
+    """
+    if pathname != "/final" or not user_info or not isinstance(kick, dict):
+        raise PreventUpdate
+    if kick.get("phase") != 1:
+        raise PreventUpdate
+    locale, unit = _final_fill_locale_unit(interface_language, glucose_unit)
+    with start_action(action_type=u"fill_final_leaderboard"):
+        overall, per_format = _final_ranking_snapshots(user_info)
+        ranking = _final_leaderboard_children(
+            overall=overall,
+            per_format=per_format,
+            locale=locale,
+            unit=unit,
+            user_info=user_info,
+        )
+    return ranking, {**kick, "phase": 2}
+
+
+@app.callback(
+    [
+        Output("final-share-panel", "children", allow_duplicate=True),
+        Output("final-synthesis-card", "children", allow_duplicate=True),
+    ],
+    Input("final-fill-step", "data"),
+    [
+        State("url", "pathname"),
+        State("user-info-store", "data"),
+        State("glucose-unit", "data"),
+        State("interface-language", "data"),
+    ],
+    prevent_initial_call=True,
+)
+def fill_final_share(
+    kick: Optional[Any],
+    pathname: Optional[str],
+    user_info: Optional[Dict[str, Any]],
+    glucose_unit: Optional[str],
+    interface_language: Optional[str],
+) -> tuple[Any, Any]:
+    """Phase 2: share record + synthesis graph, after the leaderboard store write."""
+    if pathname != "/final" or not user_info or not isinstance(kick, dict):
+        raise PreventUpdate
+    if kick.get("phase") != 2:
+        raise PreventUpdate
+    locale, _unit = _final_fill_locale_unit(interface_language, glucose_unit)
+    with start_action(action_type=u"fill_final_share"):
+        share = _final_share_section_children(user_info, locale=locale)
+        synthesis = _final_synthesis_inner(user_info, locale=locale)
+    return share, synthesis
+
+
+app.clientside_callback(
+    """
+    function(resultsClicks, confirmClicks, userInfo) {
+        var ctx = window.dash_clientside.callback_context;
+        if (!ctx || !ctx.triggered || !ctx.triggered.length) {
+            return window.dash_clientside.no_update;
+        }
+        var prop = ctx.triggered[0].prop_id || '';
+        var isConfirm = prop.indexOf('finish-confirm-button-ending') === 0;
+        var isResults = prop.indexOf('finish-study-button-ending') === 0;
+        if (isConfirm && confirmClicks) {
+            return 'results-loading-overlay is-open';
+        }
+        if (!isResults || !resultsClicks) {
+            return window.dash_clientside.no_update;
+        }
+        var info = userInfo || {};
+        var maxRounds = Number(info.max_rounds || 12);
+        var current = Number(info.current_round_number || 0);
+        var nRounds = (info.rounds && info.rounds.length) ? info.rounds.length : 0;
+        if (Math.max(current, nRounds) < maxRounds) {
+            return window.dash_clientside.no_update;
+        }
+        var btn = document.getElementById('finish-study-button-ending');
+        if (btn) {
+            btn.disabled = true;
+            btn.style.pointerEvents = 'none';
+        }
+        return 'results-loading-overlay is-open';
+    }
+    """,
+    Output("results-loading-overlay", "className"),
+    Input("finish-study-button-ending", "n_clicks"),
+    Input("finish-confirm-button-ending", "n_clicks"),
+    State("user-info-store", "data"),
+    prevent_initial_call=True,
+)
+
+
+app.clientside_callback(
+    """
+    function(pathname) {
+        if (pathname === '/ending') {
+            return window.dash_clientside.no_update;
+        }
+        return 'results-loading-overlay';
+    }
+    """,
+    Output("results-loading-overlay", "className", allow_duplicate=True),
+    Input("url", "pathname"),
+    prevent_initial_call=True,
+)
 
 
 @app.callback(

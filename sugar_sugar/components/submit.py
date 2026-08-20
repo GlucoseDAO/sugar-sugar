@@ -3,6 +3,7 @@ from dash import html, dcc, Dash, Output, Input, State
 import dash_bootstrap_components as dbc
 import polars as pl
 from datetime import datetime
+import time
 import uuid
 import csv
 import shutil
@@ -21,6 +22,23 @@ _EXAMPLE_DATASET_PATH: Path = Path("data/example.csv")
 _MOBILE_UA_KEYWORDS: tuple[str, ...] = (
     'iphone', 'android', 'ipad', 'mobile', 'mobi', 'opera mini',
 )
+
+_REPLACE_DELAYS_S: tuple[float, ...] = (0.05, 0.1, 0.2, 0.4)
+
+
+def _replace_atomically(tmp_path: Path, dest: Path) -> None:
+    """``os.replace`` on Windows can hit WinError 5 if dest is briefly locked."""
+    last_error: Optional[PermissionError] = None
+    for delay_s in (0.0, *_REPLACE_DELAYS_S):
+        if delay_s:
+            time.sleep(delay_s)
+        try:
+            tmp_path.replace(dest)
+            return
+        except PermissionError as exc:
+            last_error = exc
+    if last_error is not None:
+        raise last_error
 
 
 def _is_mobile_ua(ua: Optional[str]) -> bool:
@@ -401,7 +419,7 @@ class SubmitComponent(html.Div):
             writer.writeheader()
             for row in repaired:
                 writer.writerow({k: row.get(k, '') for k in header})
-        tmp_path.replace(path)
+        _replace_atomically(tmp_path, path)
 
     def _email_keys_by_study(self) -> dict[str, str]:
         """``study_id`` -> derived ``email_key``, read from the statistics CSV.
@@ -516,7 +534,7 @@ class SubmitComponent(html.Div):
             writer.writeheader()
             for row in rows:
                 writer.writerow({column: row.get(column, '') for column in upgraded_header})
-        tmp_path.replace(path)
+        _replace_atomically(tmp_path, path)
         return stamped, schema_changed, backup
 
     def set_study_nickname(self, *, study_id: str, key: str, nickname: str) -> int:
@@ -567,7 +585,7 @@ class SubmitComponent(html.Div):
                 writer.writeheader()
                 for row in rows:
                     writer.writerow({column: row.get(column, '') for column in upgraded_header})
-            tmp_path.replace(path)
+            _replace_atomically(tmp_path, path)
             changed_total += changed
 
         return changed_total
@@ -937,7 +955,7 @@ class SubmitComponent(html.Div):
                 writer.writeheader()
                 for out_row in out_rows:
                     writer.writerow(out_row)
-            tmp_path.replace(path)
+            _replace_atomically(tmp_path, path)
 
         def _match_keys_for(row: dict[str, Any]) -> tuple[str, ...]:
             if str(row.get("run_id") or "").strip():
