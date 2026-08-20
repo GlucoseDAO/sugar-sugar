@@ -750,6 +750,15 @@ html.mobile-device .mobile-nav-bar {
    inert (grey + not-allowed), not a dimmed-but-still-blue Fomantic button that
    reads as "clickable but broken". The className is swapped to
    `startup-next-disabled` by gate_mobile_consent_step. */
+/* Tap feedback: a wizard tap that registers must LOOK like it registered.
+   Without this a missed tap and a slow one are indistinguishable, which is how
+   "pressed it a few times, zero reaction" got read as a freeze. */
+html.mobile-device #startup-next:not(:disabled):active,
+html.mobile-device #startup-prev:not(:disabled):active {
+  transform: scale(0.98);
+  filter: brightness(0.9);
+}
+
 html.mobile-device #startup-next.startup-next-disabled,
 html.mobile-device #startup-next:disabled {
   background-color: #9aa5b1 !important;

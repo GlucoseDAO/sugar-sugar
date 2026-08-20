@@ -1560,11 +1560,17 @@ class StartupPage(html.Div):
             interface_language: Optional[str],
         ) -> tuple[bool, str, dict[str, str]]:
             step = int(current_step or 0)
-            hint_hidden = {'display': 'none'}
+            # On step 0 the hint keeps its box when it is not shown
+            # (`visibility`, not `display`).  Collapsing it moved the nav row up
+            # by its height in the same repaint that turned Next blue, so the
+            # first tap after ticking consent aimed at where the button had just
+            # been.  Steps 1-4 never show it, so there it is removed outright.
             hint_shown = {
-                'display': 'block', 'marginTop': '10px', 'fontSize': '14px',
-                'color': '#b45309', 'textAlign': 'center',
+                'display': 'block', 'visibility': 'visible', 'marginTop': '10px',
+                'fontSize': '14px', 'color': '#b45309', 'textAlign': 'center',
             }
+            hint_reserved = {**hint_shown, 'visibility': 'hidden'}
+            hint_hidden = {'display': 'none'}
             if step == 0:
                 blocked = not (
                     bool(acknowledge_value and 'ack' in acknowledge_value) and
@@ -1572,7 +1578,7 @@ class StartupPage(html.Div):
                 )
                 if blocked:
                     return True, "ui button startup-next-disabled", hint_shown
-                return False, "ui blue button", hint_hidden
+                return False, "ui blue button", hint_reserved
 
             if 1 <= step <= 4:
                 wants_contact = _wants_contact_from_user_info(user_info)
@@ -1630,7 +1636,17 @@ _M_ERROR = {'color': '#d32f2f', 'fontSize': '15px', 'marginTop': '2px', 'marginB
 
 
 def _wizard_nav_btn_style(*, visible: bool) -> dict[str, str]:
-    """Style for a wizard Back/Next button; hidden via visibility to keep layout."""
+    """Style for a wizard Back/Next button.
+
+    Hidden means ``display: none``, NOT ``visibility: hidden``.  With visibility
+    the hidden Back button kept its half of the flex row while being excluded
+    from hit testing, so on step 0 the visible Next button was only the right
+    ~50% of the bar and every tap on the left half fell through to the
+    ``disable_n_clicks=True`` container -- no callback, no :active flash, no
+    request in the server log.  That is the "pressed Next a few times, zero
+    reaction" report.  Removing the box from layout lets Next (``flex: 1``) span
+    the full width, so the whole bar is the tap target.
+    """
     return {
         'flex': '1',
         'padding': '16px',
@@ -1639,7 +1655,7 @@ def _wizard_nav_btn_style(*, visible: bool) -> dict[str, str]:
         'borderRadius': '10px',
         'border': 'none',
         'cursor': 'pointer',
-        'visibility': 'visible' if visible else 'hidden',
+        'display': 'block' if visible else 'none',
     }
 
 
@@ -1723,7 +1739,13 @@ class StartupPageMobile(html.Div):
             html.Div(
                 t("ui.startup.consent_gate_hint", locale=locale),
                 id='startup-consent-hint',
-                style={'display': 'none'},
+                # Step 0 is what renders first; gate_mobile_consent_step fills
+                # this in on its initial call. Reserve the box either way so the
+                # nav row below never shifts under the user's thumb.
+                style={
+                    'display': 'block', 'visibility': 'hidden', 'marginTop': '10px',
+                    'fontSize': '14px', 'color': '#b45309', 'textAlign': 'center',
+                },
                 disable_n_clicks=True,
             ),
             dcc.Store(id='consent-scroll-complete', data=False, storage_type=STORAGE_TYPE),
