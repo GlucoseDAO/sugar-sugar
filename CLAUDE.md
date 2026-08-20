@@ -11,6 +11,7 @@ uv is used as the package manager for the project.
 uv run start is used to run the dash app.
 uv run chart is the fast dev shortcut: it starts Dash with data pre-loaded and routes straight to the prediction chart (bypasses landing, startup, and consent). Use this whenever the user asks to debug or test the chart in the browser. Only fall back to uv run start when the user explicitly needs the startup/landing/consent screens. uv run chart accepts --file, --points, --start, --unit, --locale, --host, --port options. Use --prefill to pre-fill the prediction region with noisy ground-truth values so the submit/ending/metrics flow can be tested without drawing (--noise controls the noise level, default 5%). Always prefer uv run chart --prefill over attempting browser automation for testing submit or ending pages.
 uv run share is the share page dev shortcut: it generates fake rounds with synthetic prediction data, saves a share record to disk, and opens the browser at `/share/<id>`. Use this whenever debugging the share page, share card PNG, OG tags, social buttons, or share-related styling. Accepts --port, --locale, --host, --formats, --rounds options. Use `--formats "A,B,C"` to simulate multi-format play (Public + My Data + Mixed); rounds cycle through formats evenly. Default is 12 rounds with format A only. Example: `uv run share --formats "A,B,C"` generates 12 rounds (4 per format) with distinct colour palettes per panel.
+uv run build-locations regenerates `assets/location-suggestions.<locale>.json` from `sugar_sugar/location_catalog.py`. Run it after editing the catalog; the tests fail if the shipped files drift from it.
 uv run download fetches the Format A corpora (BIG IDEAs + D1NAMO). Already-present copies are skipped; `--force` re-downloads; `--all` also pulls CGMacros (unused in Format A). `uv run start` works without them — Format A falls back to `data/example.csv`. Per-dataset commands remain.
 uv run download-bigideas fetches PhysioNet BIG IDEAs Dexcom + food logs into `data/bigideas/` (gitignored). Empatica files are skipped. CGMacros is unused in Format A.
 uv run download-d1namo fetches the public D1NAMO (Dubosson) T1D subset into `data/d1namo/` (gitignored). Default extract keeps meal photos; `--no-photos` skips JPEGs.
@@ -130,6 +131,30 @@ Hard-won rules:
   it skips what the file has, so no data row is lost); `002` covers the headerless 11-column food log and
   the blank-`time_begin` → `date` + `time` fallback.
 
+### Meals are visible in the predicted hour; glucose is not
+
+`hide_last_hour` withholds the **glucose trace** of the hour being predicted. It
+must not withhold the **meal markers** in it. A BIG IDEAs window put a meal a few
+minutes past the divider, the marker was clipped, and the player drew a flat line
+into a post-meal rise they had no way to see coming — the clipping did not
+withhold a hint, it made the displayed history misleading, and it biased the very
+error the study measures.
+
+`visible_food_photo_events` (`cgmacros.py`) therefore spans the whole window, and
+`cluster_visible_food_events` / `meal_food_bubble_children` no longer take a
+`hide_last_hour` argument at all — an ignored parameter is how the clipping would
+come back. Both meal representations show during the round: the FOOD speech
+bubble plus dotted guide line (photo/note meals) and the apple icon (plain carb
+events).
+
+**What must stay hidden is the y-value.** Icons are normally placed at the event's
+glucose height; past the boundary that *is* the answer. `_add_event_markers` pins
+them to `_HIDDEN_MARKER_Y_FRAC` of the y-span instead and draws the dotted guide
+line so the timing still reads off the axis. Insulin keeps its old gating —
+only meals were reported, and widening what a player can see mid-study is a
+research decision, not a rendering one. Locked down by
+`tests/test_food_marker_prediction_area.py`.
+
 ### Windows must not straddle a sensor gap
 
 A CGM trace is not one continuous run — `data/example.csv` alone breaks into 11 stretches. Windows are
@@ -243,6 +268,48 @@ generic subject (`data/subjects/loop_467`, 9 MB CSV), not `example.csv` (260 KB)
 sync gunicorn workers hold a worker for the whole request body read, so one slow client's upload
 blocks other players: `serve --threads N` (or `GUNICORN_THREADS`) switches to gthread if needed.
 
+### Nothing loads eagerly on `/assets` that only one page needs
+
+Everything in `assets/` is served on every page, so a cost paid at script-eval
+time is paid by the consent step, the chart and `/faq` alike. Two shapes of waste
+both shipped to production and both read as "the app froze" on a low-spec phone:
+
+- **A big payload fetched before its page exists.** `location-suggestions.json`
+  was 824 KB of all-locale labels, fetched, parsed and re-mapped at script eval,
+  on `DOMContentLoaded` *and* on every navigation, for a field on wizard step 3.
+  It is now one compact file per locale (~88 KB, ~29 KB gzipped) fetched on the
+  first keystroke in the field. `uv run build-locations` regenerates them from
+  `sugar_sugar/location_catalog.py` (still the only source of truth — **no
+  generated corpus is kept on disk**), and `tests/test_location_suggestions.py`
+  fails if the shipped assets drift from the catalog or if the all-locales file
+  reappears in `assets/`. Rows ship as `[label, rank]` / `[label, rank, extras]`;
+  the JS derives the lowercase and ASCII-folded tokens from the label, so only
+  what it cannot derive (alternate spellings, aliases like "peking") is stored.
+- **A timer or observer that outlives its page.** `autosize-iframe.js` ran
+  `setInterval(resizeAll, 500)` forever on every page and re-added a `load`
+  listener to every frame on every DOM mutation — an unbounded listener leak on
+  an app that re-renders on each callback — to serve one iframe that only
+  `/about` renders. Sizing is event-driven now (`load` + `ResizeObserver` on the
+  inner document + window resize) with a bounded ~2 s settle poll.
+
+**Rules for new asset JS:** fetch data at the moment it is used, not at import;
+never leave an unbounded `setInterval`; a `MutationObserver` on
+`document.body`/`documentElement` with `subtree: true` must collapse a burst into
+at most one scan per animation frame (`requestAnimationFrame` guard) — Dash fires
+mutations on every callback response. Prefer delegated `focusin`/`input`
+listeners over an observer that exists only to re-attach handlers after a
+re-render (`number-inputs.js` dropped its observer that way). And bump
+`DEPLOY_BUILD` — clientside assets are not fingerprinted, so open tabs keep the
+old file until forced to reload.
+
+**Not on this list:** `consent-scroll-poll` (the 500 ms `dcc.Interval` behind
+`consent-scroll-complete`) *looks* immortal but self-disables on its first tick.
+`#consent-notice-scroll` has no `overflow` — the iframe owns the scrollbar, per
+the single-scrollbar rule — so `scrollHeight == clientHeight`, `atEnd` is
+trivially true, and the callback returns `disabled=True`. A side effect worth
+knowing: the desktop landing page's "scroll to the end" gate is therefore
+satisfied immediately, and the mobile wizard ignores the store entirely.
+
 ### localStorage hydration race condition
 
 `dcc.Store` with `storage_type='local'` hydrates **asynchronously** after the initial server render. Each store hydrates independently — there is no guaranteed order. A callback triggered by one store hydrating as `Input` may read other stores via `State` before they have hydrated, seeing the server-default value (`None` or whatever `data=` was in the layout) instead of the persisted value.
@@ -299,6 +366,7 @@ Architecture in one paragraph: the static viewport meta is **`width=device-width
 - **Don't let the generic `html.mobile-device input { display:block; width:100% }` rule hit checkboxes/radios** — it stretches consent checkboxes full-width and breaks the label onto the next line. Exclude them (`:not([type="checkbox"]):not([type="radio"])`) and lay each `.form-check` out as a `display:flex` row.
 - **Consent reader (`/consent-form`): don't use a `height:100vh` (or `min-height:100vh`) flex shell.** `100vh` ignores the navbar above `#page-content`, pushing the "Go to start" button below the fold; `min-height:100vh` adds a second page-level scrollbar (the recurring double-scrollbar bug). Let the shell be normal flow and give the embedded iframe `height: calc(100vh - 190px)` (room for navbar + button + paddings) so the iframe owns the only scrollbar — a full-bleed single box, no nested inner card.
 - **Contact links: stack the tables into one column on mobile** (`thead`/`tr`/`td` → `display:block; width:100%`, first cell bold as heading, narrow font + `overflow-wrap:anywhere; word-break:normal` on links). Wide multi-column tables truncate long emails/URLs into 1–2 char dangling overhangs that look unprofessional.
+- **A hidden flex sibling is a silent dead zone — hide with `display:none`, never `visibility:hidden`.** The wizard nav row is two `flex: 1` buttons; hiding Back with `visibility` kept its box in the row while excluding it from hit testing, so on step 0 Next was only the right ~50% of the bar and every tap on the left half fell through to the `disable_n_clicks=True` container: no callback, no `:active` flash, **nothing in the server log**. A thumb aimed at the middle of the bar misses every time. Reported August 2026 as "Next is blue, pressed it a few times, zero reaction, then it worked on the first press minutes later" — and the log proves it was tap loss, not lag: zero POSTs during the gap and exactly one `navigate_startup_wizard` response when it finally moved, so at most one click was ever dispatched. **Diagnostic rule: zero POSTs in the gap means the click never happened; server latency and callback bugs both leave traces.** Related: never let a control's own activation move it — `startup-consent-hint` collapsed from `display:block` to `none` in the same repaint that turned Next blue, shifting the row up under the user's thumb; it keeps its box via `visibility` on step 0. And give every mobile button an `:active` state, or a missed tap and a slow one look identical.
 - **Mobile buttons/links need `touch-action: manipulation` or taps get swallowed.** The viewport allows zoom (`user-scalable=yes`), so mobile browsers wait ~300ms per tap for a double-tap-zoom and drop rapid taps as zoom gestures — a button/link then only fires after several taps (seen on Vivaldi Android: Next "worked on the 4th click"). NOT a callback bug and NOT reproducible headless (synthetic clicks bypass the gesture wait). Fix in `mobile.css`: `touch-action: manipulation` on `a`/`button`/`.ui.button`/`[role=button]`/`label`/`input`/`.form-check`, scoped to `html.mobile-device:not(.route-prediction)` (the chart owns its own touch-action for drawline). Pinch-zoom preserved.
 - **Fullscreen/immersive entry must be a clientside callback fired by a real GESTURE** — `requestFullscreen` from a route-change/store callback is rejected (no user activation). Wired to two gesture buttons (wizard `start-button` + persistent "Fullscreen mode" button on `/prediction`), each `requestFullscreen(documentElement)` + best-effort `screen.orientation.lock('landscape')` (the OLD "never use orientation.lock" rule is **superseded** — it's used after fullscreen, Android works, iOS rejects-caught) + `Plotly.Plots.resize`. Reuse the demo-video fullscreen path (proven). Don't rely on it for playability — `100dvh`/device-width landscape stands alone. Localize clientside button feedback via a `data-*` attr (`t()`-rendered server-side), e.g. `data-copied-text`.
 - **Landscape `/prediction` header chips are absolute-positioned — rebalance edges together.** Round (`left+width`), Units (`right+width`), Source (`left`/`right`-pinned, so its width = `screenW − left − right`). Shrinking Round/Units does NOT widen Source unless you also move Source's `left`/`right` in. mobile.css has near-duplicate landscape blocks — append a final `@media (orientation: landscape) and (pointer: coarse)` override so it wins.
