@@ -17,7 +17,7 @@ import dash_bootstrap_components as dbc
 import os
 import sys
 import typer
-from flask import Response, send_file as flask_send_file, request as flask_request
+from flask import Response, has_request_context, send_file as flask_send_file, request as flask_request
 import uuid
 from dotenv import load_dotenv
 from eliot import start_action, start_task
@@ -2928,7 +2928,13 @@ def _is_mobile_ua(ua: Optional[str]) -> bool:
 
 
 def _is_mobile_request() -> bool:
-    """Detect a mobile client from the current Flask request's User-Agent."""
+    """Detect a mobile client from the current Flask request's User-Agent.
+
+    Tests and CLI builders have no request: treat them as desktop so layout
+    construction never depends on a live HTTP context.
+    """
+    if not has_request_context():
+        return False
     return _is_mobile_ua(flask_request.headers.get('User-Agent', ''))
 
 
@@ -4931,12 +4937,6 @@ def create_ending_layout(
         ),
         html.Div([
             html.Div(
-                source_plaque,
-                id='ending-source-info',
-                className='prediction-source-plaque',
-                disable_n_clicks=True,
-            ),
-            html.Div(
                 id='ending-glucose-chart-container',
                 className='glucose-chart-shell',
                 children=[
@@ -4954,6 +4954,8 @@ def create_ending_layout(
                     ),
                     dcc.Graph(
                         id='ending-static-graph',
+                        # Same compact figure + resize contract as /prediction
+                        # (GlucoseChart._COMPACT_MARGIN, assets/compact-chart.js).
                         figure=GlucoseChart.build_static_figure(
                             df,
                             events_df,
@@ -4961,6 +4963,7 @@ def create_ending_layout(
                             unit=unit,
                             locale=locale,
                             prediction_boundary=len(df) - PREDICTION_HOUR_OFFSET,
+                            compact=_is_mobile_request(),
                         ),
                         config={
                             'displayModeBar': False,
@@ -4971,6 +4974,7 @@ def create_ending_layout(
                             'editable': False,
                         },
                         style={'height': '100%', 'flex': '1', 'minHeight': '0'},
+                        responsive=True,
                     ),
                 ],
                 disable_n_clicks=True,
@@ -5061,6 +5065,12 @@ def create_ending_layout(
                 'padding': '0 10px',
                 'flexShrink': '0',
             },
+        ),
+        html.Div(
+            source_plaque,
+            id='ending-source-info',
+            className='prediction-source-plaque',
+            disable_n_clicks=True,
         ),
         html.Div(id="switch-format-error", disable_n_clicks=True, style={'margin': '0'}),
         dcc.Checklist(

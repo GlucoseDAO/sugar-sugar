@@ -1271,6 +1271,23 @@ html:not(.mobile-device) #ending-primary {
   overflow: hidden;
 }
 html:not(.mobile-device) #ending-gamification {
+  order: 0;
+}
+html:not(.mobile-device) #ending-source-info {
+  order: 1;
+}
+html:not(.mobile-device) #ending-graph-card {
+  order: 2;
+}
+html:not(.mobile-device) #ending-submit-row {
+  order: 3;
+}
+html:not(.mobile-device) #ending-primary > #switch-format-error,
+html:not(.mobile-device) #ending-primary > #switch-data-usage-consent,
+html:not(.mobile-device) #ending-primary > #ending-switch-format-title {
+  order: 4;
+}
+html:not(.mobile-device) #ending-gamification {
   padding: 8px 14px 6px 14px !important;
   margin: 0 auto !important;
   background: #f0f7ff !important;
@@ -1395,8 +1412,8 @@ html:not(.mobile-device) #next-round-button {
   flex-shrink: 0;
 }
 .glucose-chart-shell {
-  --plotly-top-margin: 84px;
-  --food-bubble-strip-height: 32px;
+  --plotly-top-margin: 8px;
+  --food-bubble-strip-height: 22px;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -1404,10 +1421,21 @@ html:not(.mobile-device) #next-round-button {
   height: 100%;
 }
 
+.glucose-chart-shell .js-plotly-plot,
+.glucose-chart-shell .plot-container,
+.glucose-chart-shell .svg-container,
+#ending-static-graph .js-plotly-plot,
+#ending-static-graph .plot-container,
+#ending-static-graph .svg-container {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0;
+}
+
 .meal-food-bubble-strip {
-  /* Overlay Plotly's top margin so the apple sits on the plot edge. */
+  /* Sit on the cartesian top edge (legend/icons are inside the plot now). */
   position: absolute;
-  top: calc(var(--plotly-top-margin) - var(--food-bubble-strip-height));
+  top: var(--plotly-top-margin);
   left: 56px;
   right: 20px;
   height: var(--food-bubble-strip-height);
@@ -1426,8 +1454,8 @@ html:not(.mobile-device) #next-round-button {
   justify-content: center;
   gap: 3px;
   width: max-content;
-  height: 32px;
-  padding: 0 8px 0 5px;
+  height: 22px;
+  padding: 0 6px 0 4px;
   white-space: nowrap;
   border: 2px solid #2e7d32;
   border-radius: 16px 16px 16px 5px;
@@ -1479,15 +1507,15 @@ html:not(.mobile-device) #next-round-button {
 }
 
 .meal-food-bubble-apple {
-  width: 24px;
-  height: 24px;
-  flex: 0 0 24px;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
   display: block;
   pointer-events: none;
 }
 
 .meal-food-bubble-label {
-  font-size: 10px;
+  font-size: 9px;
   line-height: 1;
   font-weight: 800;
   letter-spacing: 0.02em;

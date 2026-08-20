@@ -878,12 +878,20 @@ html.mobile-device #landing-page .how-it-works-teaser {
 }
 
 html.mobile-device #landing-page .how-it-works-steps {
-  font-size: 24px !important;
+  font-size: 16px !important;
 }
 
+/* Absolute px — do not use 0.5em here. Dash/Skeleton `h2 { letter-spacing: -.1rem }`
+   plus an em-shrunk heading makes Android collapse word spaces into
+   "1.Drawhowyouthink…". Desktop keeps the 0.5em pairing and is unchanged. */
 html.mobile-device #landing-page .how-it-works-step {
-  font-size: 0.5em !important;
-  margin-bottom: 8px !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.01em !important;
+  word-spacing: 0.18em !important;
+  line-height: 1.45 !important;
+  margin-bottom: 10px !important;
+  white-space: normal !important;
 }
 
 html.mobile-device #startup-next:disabled,
@@ -907,6 +915,16 @@ html.mobile-device .landing-continue-mobile {
    clipping its bottom border, and the 6px gap made adjacent boxes look
    bottomless.  Force the wrapper to grow with the input and give each field
    breathing room. */
+/* Keyboard open: 100vh does not shrink, so the identity/location step
+   leaves a tall empty white slab between the focused field and the keys.
+   Let the form be as tall as its fields and scroll normally. */
+html.mobile-device #startup-page,
+html.mobile-device #landing-page,
+html.mobile-device #landing-page > div {
+  min-height: 0 !important;
+  height: auto !important;
+}
+
 html.mobile-device #startup-page .dash-input-container {
   overflow: visible !important;
   height: auto !important;
@@ -1091,89 +1109,156 @@ html.mobile-device .info-page .contact-table a[href^="http"] {
   font-weight: 600 !important;
 }
 
-html.mobile-device #ending-static-graph,
-html.mobile-device #ending-static-graph .js-plotly-plot,
-html.mobile-device #ending-static-graph .plot-container {
-  height: 450px !important;
+/* Results (/ending): same 100dvh lock as /prediction.
+   Round bar is a thin header, chart flex-fills the leftover, X + Next sit in
+   the 48px footer slot. Extra blocks (source, disclaimer, metrics) stay in
+   the DOM for callbacks but do not take first-screen space. */
+html.mobile-device #page-content:has(#ending-page) {
+  height: calc(100dvh - 4rem) !important;
+  max-height: calc(100dvh - 4rem) !important;
+  overflow: hidden !important;
+}
+html.mobile-device #ending-page {
+  height: 100% !important;
+  max-height: 100% !important;
+  padding: 4px 8px 6px 8px !important;
+  gap: 0 !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  box-sizing: border-box !important;
+}
+html.mobile-device #ending-primary {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  gap: 4px !important;
+  overflow: hidden !important;
 }
 html.mobile-device #ending-gamification {
-  padding: 8px 12px 6px 12px !important;
+  flex: 0 0 auto !important;
+  padding: 4px 10px 3px 10px !important;
 }
 html.mobile-device #ending-gamification.ending-gamification-complete {
-  padding: 10px 12px 8px 12px !important;
+  padding: 5px 10px 4px 10px !important;
   background: #fff8e1 !important;
   border: 1px solid #f0d060 !important;
 }
-html.mobile-device #ending-reaction-line.ending-celebrate,
-html.mobile-device #ending-reaction-line.ending-celebrate #ending-reaction-text {
-  font-size: 20px !important;
+html.mobile-device #ending-gamification #ending-round-info {
+  font-size: 15px !important;
 }
-html.mobile-device #ending-milestone.ending-celebrate {
-  font-size: 18px !important;
-}
-html.mobile-device #ending-personal-best.ending-celebrate {
-  font-size: 16px !important;
-}
-html.mobile-device #ending-graph-card {
-  padding: 0 !important;
-}
-html.mobile-device #ending-source-info {
-  display: flex;
-  flex-direction: column;
-  flex-wrap: nowrap;
-  align-items: flex-start;
-  gap: 1px;
-  margin: 0;
-  padding: 2px 10px;
-  background: #f7fafc;
-  border-radius: 6px;
-  flex-shrink: 0;
-}
-html.mobile-device #ending-source-info .prediction-source-line {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
-}
-html.mobile-device #ending-source-info .prediction-source-metadata {
-  margin: 0;
-  color: #2c5282;
-  font-size: 16px !important;
-  font-weight: 600;
-  font-style: normal;
-  line-height: 1.2;
-}
-html.mobile-device #ending-source-info .prediction-source-metadata:empty {
-  display: none;
-}
-html.mobile-device #ending-source-info .prediction-source-label,
-html.mobile-device #ending-source-info .prediction-source-name,
-html.mobile-device #ending-source-info .prediction-source-time {
-  margin: 0;
-  color: #718096;
-  font-size: 12px !important;
-  font-weight: 400;
-  line-height: 1.2;
-}
-html.mobile-device #ending-graph-explanation,
-html.mobile-device #ending-round-motivation {
+html.mobile-device #ending-progress-bar > div:last-child {
   display: none !important;
 }
-html.mobile-device #ending-copy-link-button {
-  white-space: normal;
-  padding: 10px 20px !important;
+html.mobile-device #ending-reaction-line {
+  font-size: 12px !important;
+  line-height: 1.25 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+html.mobile-device #ending-reaction-line.ending-celebrate,
+html.mobile-device #ending-reaction-line.ending-celebrate #ending-reaction-text {
+  font-size: 13px !important;
+}
+html.mobile-device #ending-milestone,
+html.mobile-device #ending-round-motivation,
+html.mobile-device #ending-graph-explanation {
+  display: none !important;
+}
+html.mobile-device #ending-personal-best {
+  font-size: 11px !important;
+  padding: 1px 8px !important;
+}
+html.mobile-device #ending-graph-card {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+}
+html.mobile-device #ending-glucose-chart-container {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+html.mobile-device .glucose-chart-shell {
+  --plotly-top-margin: 2px;
+  --food-bubble-strip-height: 22px;
+}
+html.mobile-device #ending-static-graph,
+html.mobile-device #ending-static-graph .js-plotly-plot,
+html.mobile-device #ending-static-graph .plot-container,
+html.mobile-device #ending-static-graph .svg-container {
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+html.mobile-device #ending-source-info,
+html.mobile-device #ending-copy-link-row,
+html.mobile-device #ending-local-storage-note,
+html.mobile-device #ending-units-line,
+html.mobile-device #ending-page > .ui.warning.message,
+html.mobile-device #ending-page > div:has(.ending-fold) {
+  display: none !important;
 }
 html.mobile-device #ending-submit-row {
   display: flex !important;
   flex-direction: row !important;
-  flex-wrap: wrap !important;
+  flex-wrap: nowrap !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 8px !important;
+  gap: 10px !important;
+  flex: 0 0 48px !important;
+  height: 48px !important;
+  min-height: 48px !important;
+  max-height: 48px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+html.mobile-device #next-round-button {
+  width: 300px !important;
+  max-width: min(300px, calc(100% - 64px)) !important;
+  height: 48px !important;
+  min-height: 48px !important;
+  max-height: 48px !important;
+  font-size: 22px !important;
+  padding: 8px 12px !important;
 }
 html.mobile-device #ending-submit-row.ending-submit-row-last #next-round-button {
   display: none !important;
+}
+@media (orientation: landscape) and (pointer: coarse) {
+  html.mobile-device:has(#ending-page) #navbar-container {
+    display: none !important;
+  }
+  html.mobile-device #page-content:has(#ending-page) {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+  }
+  html.mobile-device #ending-page {
+    padding: 4px 6px !important;
+  }
+  html.mobile-device #ending-gamification {
+    padding: 0 10px !important;
+    min-height: 46px !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+  html.mobile-device #ending-reaction-line,
+  html.mobile-device #ending-milestone,
+  html.mobile-device #ending-personal-best {
+    display: none !important;
+  }
 }
 html.mobile-device #ending-submit-row .ending-switch-format-btn,
 html.mobile-device #final-action-row .ending-switch-format-btn {
@@ -1207,11 +1292,13 @@ html.mobile-device #finish-study-button-ending.finish-study-results {
   width: auto !important;
   min-width: 220px !important;
   max-width: none !important;
-  height: 64px !important;
-  padding: 0 28px !important;
-  font-size: 26px !important;
+  height: 48px !important;
+  min-height: 48px !important;
+  max-height: 48px !important;
+  padding: 0 20px !important;
+  font-size: 22px !important;
   font-weight: 800 !important;
-  border-radius: 12px !important;
+  border-radius: 8px !important;
   flex: 0 0 auto !important;
 }
 html.mobile-device #final-journey-title {
@@ -1247,7 +1334,7 @@ html.mobile-device #consent-form-page .consent-form-text {
 html.route-prediction.mobile-device .js-plotly-plot .xtick text,
 html.route-prediction.mobile-device .js-plotly-plot .ytick text,
 html.route-prediction.mobile-device .js-plotly-plot .legendtext {
-  font-size: 16px !important;
+  font-size: 8px !important;
 }
 
 html.route-prediction.mobile-device .js-plotly-plot .xtitle,
@@ -2591,19 +2678,19 @@ html.mobile-device .meal-food-lightbox-note {
 
 html.mobile-device .meal-food-speech-bubble {
   width: max-content;
-  height: 36px;
-  padding: 0 9px 0 6px;
+  height: 22px;
+  padding: 0 6px 0 3px;
   touch-action: manipulation;
 }
 
 html.mobile-device .meal-food-bubble-apple {
-  width: 26px;
-  height: 26px;
-  flex-basis: 26px;
+  width: 16px;
+  height: 16px;
+  flex-basis: 16px;
 }
 
 html.mobile-device .meal-food-bubble-label {
-  font-size: 11px;
+  font-size: 9px;
 }
 
 @media (orientation: landscape) and (pointer: coarse) {
@@ -2854,4 +2941,145 @@ html.route-prediction.mobile-device #finish-study-button::after {
   .finish-confirm-actions .ui.button {
     width: 100%;
   }
+}
+
+/* --- Compact landscape chart (prediction + results). Must stay last. ------
+   Reclaim height for the plot: thinner header, smaller hour ticks, less
+   Plotly-adjacent padding. Footer stays 48px so X/Submit/Next do not overlap
+   the x-axis. Units stay on the y-axis (not in this header). */
+@media (orientation: landscape) and (pointer: coarse) {
+  html.route-prediction.mobile-device #page-content > div {
+    padding: 2px 4px !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-round-summary,
+  html.route-prediction.mobile-device #prediction-source-plaque {
+    height: 32px !important;
+    min-height: 32px !important;
+    top: 2px !important;
+    z-index: 5 !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-round-summary {
+    font-size: 16px !important;
+    line-height: 1 !important;
+    padding: 0 8px !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-source-plaque {
+    padding: 0 8px !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-source-plaque #generic-source-metadata-display {
+    font-size: 13px !important;
+    line-height: 1.1 !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-source-plaque .prediction-source-label,
+  html.route-prediction.mobile-device #prediction-source-plaque #data-source-display,
+  html.route-prediction.mobile-device #prediction-source-plaque #prediction-chart-meta {
+    font-size: 11px !important;
+  }
+
+  html.route-prediction.mobile-device #prediction-glucose-chart-container {
+    top: 34px !important;
+    bottom: 48px !important;
+    left: 2px !important;
+    right: 2px !important;
+    min-height: 0 !important;
+  }
+
+  html.route-prediction.mobile-device .js-plotly-plot .xtitle,
+  html.route-prediction.mobile-device .js-plotly-plot .g-xtitle,
+  html.mobile-device #ending-static-graph .xtitle,
+  html.mobile-device #ending-static-graph .g-xtitle {
+    display: none !important;
+    visibility: hidden !important;
+    font-size: 0 !important;
+  }
+
+  html.route-prediction.mobile-device .js-plotly-plot .xtick text {
+    font-size: 8px !important;
+  }
+
+  html.route-prediction.mobile-device .js-plotly-plot .ytick text {
+    font-size: 9px !important;
+  }
+
+  html.route-prediction.mobile-device .js-plotly-plot .xtitle,
+  html.route-prediction.mobile-device .js-plotly-plot .ytitle {
+    font-size: 11px !important;
+  }
+
+  html.route-prediction.mobile-device .meal-food-bubble-strip {
+    left: 40px;
+    right: 6px;
+  }
+
+  html.mobile-device #ending-page {
+    padding: 2px 4px !important;
+  }
+
+  html.mobile-device #ending-gamification {
+    min-height: 32px !important;
+    height: 32px !important;
+    padding: 0 8px !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  html.mobile-device #ending-gamification > div:first-child {
+    margin-bottom: 0 !important;
+    align-items: center !important;
+  }
+
+  html.mobile-device #ending-gamification #ending-round-info {
+    font-size: 14px !important;
+    line-height: 1 !important;
+  }
+
+  html.mobile-device #ending-progress-bar {
+    max-height: 12px !important;
+  }
+
+  html.mobile-device #ending-graph-card,
+  html.mobile-device #ending-glucose-chart-container {
+    padding: 0 !important;
+  }
+
+  html.mobile-device #ending-static-graph .xtick text {
+    font-size: 8px !important;
+  }
+
+  html.mobile-device #ending-static-graph .ytick text {
+    font-size: 9px !important;
+  }
+
+  html.mobile-device #ending-static-graph .xtitle,
+  html.mobile-device #ending-static-graph .g-xtitle,
+  html.mobile-device #ending-static-graph .ytitle {
+    font-size: 11px !important;
+  }
+
+  html.mobile-device #ending-static-graph .xtitle,
+  html.mobile-device #ending-static-graph .g-xtitle {
+    display: none !important;
+    visibility: hidden !important;
+    font-size: 0 !important;
+  }
+}
+
+html.mobile-device .js-plotly-plot .xtitle,
+html.mobile-device .js-plotly-plot .g-xtitle,
+html.mobile-device .js-plotly-plot .ytitle,
+html.mobile-device .js-plotly-plot .g-ytitle,
+html.route-prediction.mobile-device .js-plotly-plot .xtitle,
+html.route-prediction.mobile-device .js-plotly-plot .g-xtitle,
+html.route-prediction.mobile-device .js-plotly-plot .ytitle,
+html.route-prediction.mobile-device .js-plotly-plot .g-ytitle {
+  display: none !important;
+  visibility: hidden !important;
+  font-size: 0 !important;
 }

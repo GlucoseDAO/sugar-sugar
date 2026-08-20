@@ -149,8 +149,8 @@ def test_mid_round_keeps_next_and_hides_switch_buttons() -> None:
     assert _by_id(row, "switch-format-c").style["display"] == "none"
 
 
-def test_ending_keeps_source_on_the_chart_card() -> None:
-    """Source stays on the results card, same plaque as /prediction."""
+def test_ending_keeps_source_plaque_after_buttons() -> None:
+    """Source sits after Next/X so the first screen can keep the chart + footer."""
     layout = _layout(last_round=False, uses_cgm=False)
     source = _by_id(layout, "ending-source-info")
     assert source is not None
@@ -159,8 +159,12 @@ def test_ending_keeps_source_on_the_chart_card() -> None:
     assert _by_id(source, "ending-source-label").className == "prediction-source-label"
     assert _by_id(source, "ending-source-metadata").className == "prediction-source-metadata"
     assert _by_id(source, "ending-source-time").children
-    graph = _by_id(layout, "ending-graph-card")
-    assert _by_id(graph, "ending-source-info") is source
+    primary = _by_id(layout, "ending-primary")
+    assert primary is not None
+    child_ids = [getattr(child, "id", None) for child in primary.children]
+    assert child_ids.index("ending-submit-row") < child_ids.index("ending-source-info")
+    assert _by_id(layout, "ending-graph-card") is not None
+    assert _by_id(_by_id(layout, "ending-graph-card"), "ending-source-info") is None
     assert _by_id(layout, "ending-food-bubbles") is not None
 
 

@@ -14,17 +14,47 @@ from eliot import start_action
 
 from urllib.parse import quote
 
+from flask import has_request_context, request as flask_request
+
 from sugar_sugar.cgmacros import cgmacros_photo_url, visible_food_photo_events
 from sugar_sugar.d1namo import d1namo_photo_url, is_d1namo_source_name
 from sugar_sugar.food_note_i18n import translate_food_note
 from sugar_sugar.config import PREDICTION_HOUR_OFFSET, STORAGE_TYPE
 from sugar_sugar.i18n import normalize_locale, t
 
+# Same tokens as app._MOBILE_UA_KEYWORDS — kept here to avoid a circular import.
+_MOBILE_UA_KEYWORDS: tuple[str, ...] = (
+    "iphone", "android", "ipad", "mobile", "mobi", "opera mini",
+)
+
+
+def _chart_request_is_mobile() -> bool:
+    """True when the current Flask request looks like a phone/tablet.
+
+    Picks the compact Plotly layout (tighter margins, smaller hour ticks).
+    Tests and CLI builds have no request and stay on the desktop layout.
+    """
+    if not has_request_context():
+        return False
+    ua = (flask_request.headers.get("User-Agent") or "").lower()
+    return any(keyword in ua for keyword in _MOBILE_UA_KEYWORDS)
+
 _FOOD_LINE_COLOR: str = "#2e7d32"
 _APPLE_ICON_SRC: str = "/assets/images/apple.svg"
 _FOOD_CLUSTER_X_GAP: float = 1.8
 FOOD_COMPOSITE_MAX: int = 6
 _FOOD_COMPOSITE_PREFIX: str = "composite:"
+
+# Paper margins with automargin OFF — these are the real reserved strips.
+# Plotly's default automargin grows t/b to fit the legend and rotated HH:MM
+# ticks, which left the cartesian (drawn) area a short band in a tall white
+# card on /prediction and /ending. Turning automargin off and keeping these
+# values tiny is what actually enlarges the line. Numbers must stay in sync
+# with assets/compact-chart.js (that file also Plotly.Plots.resize()s so the
+# SVG fills the flex card in every run mode: debug, staging, production).
+_COMPACT_MARGIN: dict[str, int] = {"l": 36, "r": 4, "t": 2, "b": 20, "pad": 0}
+_DESKTOP_MARGIN: dict[str, int] = {"l": 50, "r": 8, "t": 8, "b": 22, "pad": 0}
+_DESKTOP_PREDICTION_LEFT: int = 56
 
 
 def event_x_index(window_df: pl.DataFrame, event_time: datetime) -> float:
@@ -207,11 +237,14 @@ class GlucoseChart(html.Div):
         "Insulin": {
             "icon": "syringe.svg",
             "color": "#7b1fa2",
-            "icon_size_x": 2.7,
-            "icon_size_y_frac": 0.105,
-            "legend_sizex": 0.0525,
-            "legend_sizey": 0.105,
-            "hover_size": 42,
+            # On-plot size in x-index units / fraction of y-range. 2026-08-20:
+            # the landscape chart grew vertically, which made the old 2.7×0.105
+            # syringe look like a speck — these values are ~1.6× that.
+            "icon_size_x": 4.4,
+            "icon_size_y_frac": 0.17,
+            "legend_sizex": 0.07,
+            "legend_sizey": 0.14,
+            "hover_size": 56,
         },
         "Exercise": {
             "symbol": "star",
@@ -262,7 +295,8 @@ class GlucoseChart(html.Div):
                     # `touchAction: none` prevents the browser from intercepting
                     # touch gestures (pinch-zoom, pan) on the chart, which
                     # otherwise fights with Plotly's drawline handler on mobile.
-                    style={'height': '100%', 'touchAction': 'none', 'flex': '1', 'minHeight': '0'}
+                    style={'height': '100%', 'touchAction': 'none', 'flex': '1', 'minHeight': '0'},
+                    responsive=True,
                 )
             ],
             className="glucose-chart-shell",
@@ -279,9 +313,9 @@ class GlucoseChart(html.Div):
         fig.update_layout(
             title='Glucose Levels',
             autosize=True,
-            xaxis=dict(title='Time'),
-            yaxis=dict(title='Glucose Level (mg/dL)'),
-            margin=dict(l=50, r=20, t=80, b=50),
+            xaxis=dict(title='Time', automargin=False),
+            yaxis=dict(title='Glucose Level (mg/dL)', automargin=False),
+            margin=dict(_DESKTOP_MARGIN),
             showlegend=True,
             legend=dict(
                 orientation='h',
@@ -366,7 +400,9 @@ class GlucoseChart(html.Div):
                 source=source_name,
                 hide_last_hour=hide_last_hour_flag
             ):
-                figure = self._build_figure(df, events_df, source_name, locale=locale)
+                figure = self._build_figure(
+                    df, events_df, source_name, locale=locale, compact=True,
+                )
                 bubbles = meal_food_bubble_children(
                     df,
                     events_df,
@@ -471,15 +507,25 @@ class GlucoseChart(html.Div):
             'food_note': pl.Series(food_notes, dtype=pl.String),
         })
 
-    def _build_figure(self, df: pl.DataFrame, events_df: pl.DataFrame, source_name: Optional[str] = None, *, locale: str = "en") -> go.Figure:
+    def _build_figure(
+        self,
+        df: pl.DataFrame,
+        events_df: pl.DataFrame,
+        source_name: Optional[str] = None,
+        *,
+        locale: str = "en",
+        compact: Optional[bool] = None,
+    ) -> go.Figure:
         """Build complete figure with all components"""
         figure = go.Figure()
-        
-        # Store data for internal methods
+
+        # Store data for internal methods. Compact must be set before event
+        # markers so the insulin/carb icon legend can sit in the thinner strip.
         self._current_df = df
         self._current_events = events_df
         self._current_source = source_name
-        
+        self._compact_layout = _chart_request_is_mobile() if compact is None else compact
+
         # Build all components
         self._add_range_rectangles(figure)
         self._add_glucose_trace(figure, locale=locale)
@@ -487,7 +533,7 @@ class GlucoseChart(html.Div):
         self._add_event_markers(figure, locale=locale)
         self._add_food_photo_guides(figure)
         self._update_layout(figure, locale=locale)
-        
+
         return figure
 
     def _add_range_rectangles(self, figure: go.Figure) -> None:
@@ -963,24 +1009,29 @@ class GlucoseChart(html.Div):
 
         return legend_entries
 
-    @classmethod
     def _add_icon_legend(
-        cls,
+        self,
         figure: go.Figure,
         entries: list[tuple[str, str, str]],
     ) -> None:
         """Paper-coord SVG + label so the legend matches the chart icons."""
         if not entries:
             return
-        # Right-aligned row above the plot (alongside the horizontal Plotly legend).
+        compact = bool(getattr(self, "_compact_layout", False))
+        # Right-aligned row inside the plot so the top paper margin can stay thin.
         slot = 0.16
         right = 0.98
         start_x = right - slot * (len(entries) - 1)
+        legend_y = 0.97
+        label_size = 10 if compact else 12
         for i, (uri, label, event_type) in enumerate(entries):
             x = start_x + i * slot
-            style = cls.EVENT_STYLES.get(event_type, {})
+            style = self.EVENT_STYLES.get(event_type, {})
             sizex = float(style.get("legend_sizex", 0.035))
             sizey = float(style.get("legend_sizey", 0.07))
+            if compact:
+                sizex *= 0.72
+                sizey *= 0.72
             icon_x = x - 0.06
             # Label starts just after the icon, same gap as the original 0.035-wide slot.
             label_x = icon_x + sizex / 2.0 + 0.0045
@@ -990,7 +1041,7 @@ class GlucoseChart(html.Div):
                     xref="paper",
                     yref="paper",
                     x=icon_x,
-                    y=1.08,
+                    y=legend_y,
                     sizex=sizex,
                     sizey=sizey,
                     xanchor="center",
@@ -1003,12 +1054,12 @@ class GlucoseChart(html.Div):
                 xref="paper",
                 yref="paper",
                 x=label_x,
-                y=1.08,
+                y=legend_y,
                 text=label,
                 showarrow=False,
                 xanchor="left",
                 yanchor="middle",
-                font=dict(size=12, color="#333"),
+                font=dict(size=label_size, color="#333"),
             )
 
     @classmethod
@@ -1021,6 +1072,7 @@ class GlucoseChart(html.Div):
         unit: str = "mg/dL",
         locale: str = "en",
         prediction_boundary: Optional[int] = None,
+        compact: Optional[bool] = None,
     ) -> go.Figure:
         """Build a complete figure from given data without touching any instance state.
 
@@ -1034,6 +1086,8 @@ class GlucoseChart(html.Div):
                 supplied a vertical dashed line is drawn there and both regions
                 are labelled. Results figures keep ``hide_last_hour=False`` so
                 insulin/carb markers appear across the full window.
+            compact: Mobile-tight margins and hour ticks. ``None`` follows the
+                current request User-Agent; tests should pass explicitly.
         """
         instance = cls.__new__(cls)
         instance.hide_last_hour = False
@@ -1042,7 +1096,10 @@ class GlucoseChart(html.Div):
         instance._current_df = df
         instance._current_events = events_df
         instance._current_source = source_name
-        figure = instance._build_figure(df, events_df, source_name, locale=locale)
+        figure = instance._build_figure(
+            df, events_df, source_name, locale=locale, compact=compact,
+        )
+        compact_layout = bool(instance._compact_layout)
 
         if prediction_boundary is not None and 0 <= prediction_boundary <= len(df):
             x_pos = float(prediction_boundary)
@@ -1063,7 +1120,7 @@ class GlucoseChart(html.Div):
                 y=0.98,
                 text=f"← {t('ui.chart.known_label', locale=locale)} | {t('ui.chart.predicted_label', locale=locale)} →",
                 showarrow=False,
-                font=dict(size=11, color="orange"),
+                font=dict(size=9 if compact_layout else 11, color="orange"),
                 bgcolor="white",
                 bordercolor="orange",
                 borderwidth=1,
@@ -1076,61 +1133,97 @@ class GlucoseChart(html.Div):
         figure.update_layout(dragmode=False)
         return figure
 
+    def _hour_ticks(self) -> tuple[list[int], list[str]]:
+        """Return x tick indexes and HH:MM labels, thinned on compact layouts."""
+        times = self._current_df.get_column("time")
+        count = len(times)
+        compact = bool(getattr(self, "_compact_layout", False))
+        if compact and count > 18:
+            step = 3 if count > 40 else 2
+            indexes = list(range(0, count, step))
+            if indexes[-1] != count - 1:
+                indexes.append(count - 1)
+        else:
+            indexes = list(range(count))
+        return indexes, [times[index].strftime("%H:%M") for index in indexes]
+
+    def _layout_margin(self) -> dict[str, int]:
+        """Return Plotly paper margins. Compact and desktop both stay tight."""
+        compact = bool(getattr(self, "_compact_layout", False))
+        if compact:
+            return dict(_COMPACT_MARGIN)
+        margin = dict(_DESKTOP_MARGIN)
+        if self.hide_last_hour:
+            margin["l"] = _DESKTOP_PREDICTION_LEFT
+        return margin
+
     def _update_layout(self, figure: go.Figure, *, locale: str) -> None:
         """Updates the figure layout with axes, margins, and interaction settings."""
         y_range = self._calculate_y_axis_range()
-        
+        compact = bool(getattr(self, "_compact_layout", False))
+        tickvals, ticktext = self._hour_ticks()
+        hide_axis_title = compact or self.hide_last_hour
+
         figure.update_layout(
             title="",
             autosize=True,
             xaxis=dict(
-                title=t("ui.chart.x_axis", locale=locale),
-                tickmode='array',
-                tickvals=list(range(len(self._current_df))),
-                ticktext=[time_val.strftime('%H:%M') for time_val in self._current_df.get_column("time")],
+                title="" if hide_axis_title else t("ui.chart.x_axis", locale=locale),
+                title_standoff=0,
+                tickmode="array",
+                tickvals=tickvals,
+                ticktext=ticktext,
+                tickangle=-90 if compact else None,
+                tickfont=dict(size=8 if compact else 11),
+                ticks="outside",
+                ticklen=2 if compact else 4,
+                automargin=False,
                 fixedrange=True,
                 showspikes=True,
-                spikemode='across',
-                spikesnap='cursor',
-                gridcolor='rgba(128, 128, 128, 0.2)',
+                spikemode="across",
+                spikesnap="cursor",
+                gridcolor="rgba(128, 128, 128, 0.2)",
                 showgrid=True,
-                range=[-0.5, len(self._current_df) - 0.5]
+                range=[-0.5, len(self._current_df) - 0.5],
             ),
             yaxis=dict(
-                # On /prediction the HTML unit chip beside the axis owns the label;
-                # results/static figures keep the classic "Glucose Level (unit)" title.
-                title=(
-                    ""
-                    if self.hide_last_hour
-                    else t("ui.chart.y_axis", locale=locale, unit=self._display_unit)
+                # Compact and /prediction let ticks (and the HTML unit chip)
+                # stand alone so the cartesian area can grow vertically.
+                title=dict(
+                    text=(
+                        ""
+                        if hide_axis_title
+                        else t("ui.chart.y_axis", locale=locale, unit=self._display_unit)
+                    ),
+                    font=dict(size=11 if compact else 14),
+                    standoff=4,
                 ),
+                tickfont=dict(size=10 if compact else 12),
+                automargin=False,
                 fixedrange=True,
                 showspikes=True,
-                spikemode='across',
-                spikesnap='cursor',
-                gridcolor='rgba(128, 128, 128, 0.2)',
+                spikemode="across",
+                spikesnap="cursor",
+                gridcolor="rgba(128, 128, 128, 0.2)",
                 showgrid=True,
-                range=y_range
+                range=y_range,
             ),
-            # Extra top margin so insulin/carb SVG legend icons (paper y≈1.08) fit.
-            # Prediction leaves room on the left for the unit chip near the axis.
-            margin=dict(
-                l=56 if self.hide_last_hour else 50,
-                r=20,
-                t=84,
-                b=50,
-            ),
+            # Legend and insulin icons sit inside the plot, so the top strip
+            # only needs a few pixels. automargin is off: these values stick.
+            margin=self._layout_margin(),
             showlegend=True,
             legend=dict(
-                orientation='h',
-                yanchor='top',
-                y=1.08,
-                xanchor='left',
+                orientation="h",
+                yanchor="top",
+                y=0.99,
+                xanchor="left",
                 x=0.0,
+                font=dict(size=10 if compact else 12),
+                bgcolor="rgba(255,255,255,0.85)",
             ),
-            dragmode='drawline',
-            hovermode='closest',
-            plot_bgcolor='white',
-            paper_bgcolor='white'
+            dragmode="drawline",
+            hovermode="closest",
+            plot_bgcolor="white",
+            paper_bgcolor="white",
         )
 
