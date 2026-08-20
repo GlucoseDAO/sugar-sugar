@@ -1,19 +1,28 @@
 // Location autocomplete for #location-input on /startup.
-// Loaded from assets/; init is also triggered by a clientside callback on navigation.
+//
+// Loading policy: the suggestion corpus is fetched ONLY once the user has typed
+// into the location field. It used to be a single 824 KB all-locales file
+// fetched and parsed eagerly on every page of the app -- before consent, on the
+// chart, on /faq -- which cost real seconds of main thread on low-spec phones.
+// It is now one compact per-locale file (~50-80 KB, ~20 KB gzipped) built by
+// `uv run build-locations`, requested on first keystroke in the field and then
+// cached in memory for the page's lifetime.
 
 (function () {
   'use strict';
 
   var INPUT_ID = 'location-input';
   var LOCALE_STORE_ID = 'interface-language';
-  var DATA_URL = '/assets/location-suggestions.json';
+  var DATA_URL_PREFIX = '/assets/location-suggestions.';
   var MIN_CHARS = 2;
   var MAX_RESULTS = 8;
   var DEBOUNCE_MS = 120;
   var SUPPORTED_LOCALES = ['de', 'en', 'es', 'fr', 'ro', 'ru', 'uk', 'zh'];
 
-  var places = null;
-  var loadPromise = null;
+  // Keyed by locale: switching the UI language loads that language's file and
+  // keeps the previous one, so switching back is free.
+  var placesByLocale = {};
+  var loadPromises = {};
   var dropdown = null;
   var debounceTimer = null;
   var activeIndex = -1;
@@ -51,14 +60,41 @@
       .toLowerCase();
   }
 
-  function loadPlaces() {
-    if (places) {
-      return Promise.resolve(places);
+  // Row shape from build_locations.py: [label, rank] or [label, rank, extras].
+  // The lowercase and folded forms of the label are derived here rather than
+  // stored, which is most of why the per-locale files are small.
+  function expandRow(row) {
+    if (!row || !row.length) {
+      return null;
     }
-    if (loadPromise) {
-      return loadPromise;
+    var label = String(row[0]);
+    var lower = label.toLowerCase();
+    var folded = asciiFold(label);
+    var tokens = folded === lower ? [lower] : [lower, folded];
+    var extras = row[2];
+    if (extras && extras.length) {
+      for (var i = 0; i < extras.length; i++) {
+        var extra = String(extras[i]).toLowerCase();
+        if (tokens.indexOf(extra) === -1) {
+          tokens.push(extra);
+        }
+      }
     }
-    loadPromise = fetch(DATA_URL)
+    return {
+      label: label,
+      rank: typeof row[1] === 'number' ? row[1] : 1000,
+      tokens: tokens,
+    };
+  }
+
+  function loadPlaces(locale) {
+    if (placesByLocale[locale]) {
+      return Promise.resolve(placesByLocale[locale]);
+    }
+    if (loadPromises[locale]) {
+      return loadPromises[locale];
+    }
+    loadPromises[locale] = fetch(DATA_URL_PREFIX + locale + '.json')
       .then(function (response) {
         if (!response.ok) {
           throw new Error('Failed to load location suggestions');
@@ -66,52 +102,34 @@
         return response.json();
       })
       .then(function (data) {
-        if (!Array.isArray(data)) {
-          places = [];
-          return places;
-        }
-        // Accept both legacy string rows and the current object rows.
-        places = data.map(function (row) {
-          if (typeof row === 'string') {
-            return {
-              canonical: row,
-              labels: { en: row },
-              search: [row.toLowerCase()],
-            };
+        var rows = [];
+        if (Array.isArray(data)) {
+          for (var i = 0; i < data.length; i++) {
+            var place = expandRow(data[i]);
+            if (place) {
+              rows.push(place);
+            }
           }
-          return row;
-        });
-        return places;
+        }
+        placesByLocale[locale] = rows;
+        return rows;
       })
       .catch(function () {
-        places = [];
-        return places;
+        placesByLocale[locale] = [];
+        return placesByLocale[locale];
       });
-    return loadPromise;
-  }
-
-  function displayLabel(place) {
-    var locale = getLocale();
-    if (place.labels && place.labels[locale]) {
-      return place.labels[locale];
-    }
-    if (place.labels && place.labels.en) {
-      return place.labels.en;
-    }
-    return place.canonical || '';
+    return loadPromises[locale];
   }
 
   function placeMatches(place, q, qFold) {
-    var tokens = place.search || [];
+    var tokens = place.tokens;
     for (var i = 0; i < tokens.length; i++) {
-      var token = String(tokens[i]).toLowerCase();
-      if (token.indexOf(q) === 0 || (qFold && token.indexOf(qFold) === 0)) {
+      if (tokens[i].indexOf(q) === 0 || (qFold && tokens[i].indexOf(qFold) === 0)) {
         return 2;
       }
     }
     for (var j = 0; j < tokens.length; j++) {
-      var tokenContains = String(tokens[j]).toLowerCase();
-      if (tokenContains.indexOf(q) !== -1 || (qFold && tokenContains.indexOf(qFold) !== -1)) {
+      if (tokens[j].indexOf(q) !== -1 || (qFold && tokens[j].indexOf(qFold) !== -1)) {
         return 1;
       }
     }
@@ -119,16 +137,14 @@
   }
 
   function placeSortKey(a, b) {
-    var rankA = typeof a.rank === 'number' ? a.rank : 1000;
-    var rankB = typeof b.rank === 'number' ? b.rank : 1000;
-    if (rankA !== rankB) {
-      return rankA - rankB;
+    if (a.rank !== b.rank) {
+      return a.rank - b.rank;
     }
-    return displayLabel(a).localeCompare(displayLabel(b));
+    return a.label.localeCompare(b.label);
   }
 
-  function filterPlaces(query) {
-    if (!places || !query) {
+  function filterPlaces(places, query) {
+    if (!places || !places.length || !query) {
       return [];
     }
     var q = query.trim().toLowerCase();
@@ -147,11 +163,10 @@
       if (!rank) {
         continue;
       }
-      var label = displayLabel(place);
-      if (!label || seen[label]) {
+      if (seen[place.label]) {
         continue;
       }
-      seen[label] = true;
+      seen[place.label] = true;
       if (rank === 2) {
         prefix.push(place);
       } else {
@@ -223,15 +238,14 @@
     dropdown.setAttribute('role', 'listbox');
 
     matches.forEach(function (place, index) {
-      var label = displayLabel(place);
       var item = document.createElement('button');
       item.type = 'button';
       item.className = 'location-autocomplete-item';
-      item.textContent = label;
+      item.textContent = place.label;
       item.setAttribute('role', 'option');
       item.addEventListener('mousedown', function (event) {
         event.preventDefault();
-        selectSuggestion(input, label);
+        selectSuggestion(input, place.label);
       });
       item.addEventListener('mouseenter', function () {
         setActiveIndex(index);
@@ -299,21 +313,21 @@
       return;
     }
 
-    loadPlaces().then(function () {
+    // First fetch of the corpus happens HERE -- the user is typing a location,
+    // which is the only moment the data is worth its bytes.
+    var locale = getLocale();
+    loadPlaces(locale).then(function (places) {
       var current = getInputElement();
       if (!current || document.activeElement !== current) {
         return;
       }
       var query = current.value || '';
-      var matches = filterPlaces(query);
+      var matches = filterPlaces(places, query);
       var trimmed = query.trim();
       // Exact match (e.g. "Erdenet, Mongolia"): close the list. On Android
       // Chrome the open panel plus min-height:100vh read as a blank white
       // slab between the field and the keyboard.
-      if (
-        matches.length === 1
-        && displayLabel(matches[0]).toLowerCase() === trimmed.toLowerCase()
-      ) {
+      if (matches.length === 1 && matches[0].label.toLowerCase() === trimmed.toLowerCase()) {
         hideDropdown();
         return;
       }
@@ -362,6 +376,10 @@
     ensureHost(input);
   }
 
+  // Called by the clientside callback on navigation. Deliberately does NOT
+  // preload the corpus: arriving on /startup is not typing a location. There is
+  // no MutationObserver either -- the delegated focus/input listeners below
+  // attach on demand, so nothing runs while the user is elsewhere in the app.
   function scan() {
     var input = getInputElement();
     if (input) {
@@ -375,7 +393,6 @@
       return;
     }
     scan();
-    loadPlaces();
     var input = getInputElement();
     if (input && document.activeElement === input) {
       scheduleUpdate(input);
@@ -434,17 +451,4 @@
     refresh: refresh,
     scan: scan,
   };
-
-  document.addEventListener('DOMContentLoaded', function () {
-    scan();
-    loadPlaces();
-  });
-
-  var observer = new MutationObserver(function () {
-    scan();
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
-
-  scan();
-  loadPlaces();
 })();

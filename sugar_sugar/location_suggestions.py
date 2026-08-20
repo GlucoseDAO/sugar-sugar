@@ -156,8 +156,15 @@ def export_suggestions_asset() -> list[dict[str, Any]]:
 
 
 def write_suggestions_asset(path: Path | None = None) -> Path:
-    """Write the bundled autocomplete list to ``assets/location-suggestions.json``."""
-    target = path or Path(__file__).resolve().parents[1] / "assets" / "location-suggestions.json"
+    """Dump the whole multi-locale catalog to one JSON file.
+
+    This is a debugging/inspection dump, **not** a shipped asset.  The browser
+    is served one compact file per locale instead (``uv run build-locations``);
+    the all-locales corpus was 824 KB and was fetched eagerly on every page.
+    The default target is therefore ``data/`` -- writing it into ``assets/``
+    would put it back on the wire.
+    """
+    target = path or Path(__file__).resolve().parents[1] / "data" / "location-suggestions.json"
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(
         json.dumps(export_suggestions_asset(), ensure_ascii=False, indent=0),

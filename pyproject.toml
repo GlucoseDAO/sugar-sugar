@@ -45,6 +45,7 @@ download-cgmacros = "sugar_sugar.download_cgmacros:main"
 download-bigideas = "sugar_sugar.download_bigideas:main"
 download-d1namo = "sugar_sugar.download_d1namo:main"
 migrate-cgm-duration = "sugar_sugar.migrate_cgm_duration:cli_main"
+build-locations = "sugar_sugar.build_locations:cli_main"
 
 [dependency-groups]
 dev = [
