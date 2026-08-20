@@ -44,33 +44,48 @@ Autocomplete is **client-side only**: no Python callback runs on keystrokes.
 | Form field + host wrapper | `sugar_sugar/components/startup.py` | Renders `#location-input` inside `.location-autocomplete-host` (desktop layout and mobile wizard step with location). |
 | Route init ping | `startup.py` → clientside callback | On `url.pathname` change, calls `window.sugarSugarLocationAutocomplete.refresh(pathname)` so autocomplete attaches after navigation/resume. |
 | Memory store sink | `sugar_sugar/app.py` | `dcc.Store(id='location-autocomplete-ping')` — clientside output only. |
-| Browser logic | `assets/location-autocomplete.js` | Debounced filter, dropdown UI, keyboard navigation; loads JSON once via `fetch`. |
+| Browser logic | `assets/location-autocomplete.js` | Debounced filter, dropdown UI, keyboard navigation. **Fetches the corpus only once the user types in the field** — never at import or on navigation. |
 | Dropdown styling | `assets/location-autocomplete.css` | Host `overflow: visible`, z-index, mobile overrides. |
-| Suggestion data (browser) | `assets/location-suggestions.json` | ~2k rows: countries + up to 10 cities per country, 8 locale labels each. |
+| Suggestion data (browser) | `assets/location-suggestions.<locale>.json` | One compact file per locale (~88 KB, ~29 KB gzipped): ~2k rows of countries + up to 10 cities per country, labelled in that locale only. |
 | Catalog builder (Python) | `sugar_sugar/location_catalog.py` | Merges country i18n, city lists, and per-city locale overrides into `CITY_SPECS`. |
 | Country list | `sugar_sugar/location_countries.py` | Canonical `COUNTRY_NAMES` tuple (197 countries). |
 | City source data | `sugar_sugar/build_city_data.py` | Embedded `TOP_CITIES_BY_COUNTRY` (~10 cities per country). |
 | Generated city JSON | `sugar_sugar/data/top_cities_by_country.json` | Written by `build_city_data`; read at import (with embedded fallback). |
 | City locale overrides | `sugar_sugar/location_city_i18n.py` | Native spellings + extra search tokens (e.g. Kyiv/Kiev, München). |
-| Filter + asset export | `sugar_sugar/location_suggestions.py` | `filter_location_suggestions()`, `write_suggestions_asset()`. |
-| Tests | `tests/test_location_suggestions.py` | Filter logic, asset sync, per-country city counts. |
+| Filter + all-locale dump | `sugar_sugar/location_suggestions.py` | `filter_location_suggestions()` (server-side filter), `write_suggestions_asset()` (debug dump to `data/`, **not** a shipped asset). |
+| Per-locale asset build | `sugar_sugar/build_locations.py` | `uv run build-locations` → `assets/location-suggestions.<locale>.json`. |
+| Tests | `tests/test_location_suggestions.py` | Filter logic, per-locale asset sync, per-country city counts, and a guard that the 824 KB all-locales file never returns to `assets/`. |
 
 ### Data model
 
-Each autocomplete row in `location-suggestions.json`:
+Each row of `location-suggestions.<locale>.json` is a compact array —
+`[label, rank]`, or `[label, rank, extra_tokens]`:
 
 ```json
-{
-  "canonical": "Berlin, Germany",
-  "labels": { "en": "Berlin, Germany", "de": "Berlin, Deutschland", ... },
-  "search": ["berlin, germany", "berlin, deutschland", ...],
-  "rank": 0
-}
+[
+  ["Berlin, Deutschland", 0],
+  ["München, Deutschland", 1, ["munich, germany", "munchen", "munich"]]
+]
 ```
 
+- **`label`**: the only spelling shipped for this locale. The runtime derives the
+  lowercase and ASCII-folded search tokens from it, which is why they are not
+  stored.
+- **`extra_tokens`**: only what the label cannot yield — alternate spellings and
+  aliases ("munchen", "peking", "nyc"). Other locales' full "City, Country"
+  labels are deliberately dropped: they were the bulk of the old corpus, and the
+  label's own prefix already matches the city half. Replayed over 5636 realistic
+  queries, the top suggestion is unchanged and the 8-item tail differs in 5.8%.
 - **`rank`**: city position within its country (0 = largest/capital first). Used to
   sort prefix matches so `ber` → Berlin before Berat.
 - **Countries** use `rank: 1000` so city matches surface first when both match.
+
+**Why per-locale and lazy:** everything in `assets/` is served on every page. The
+old single 824 KB all-locale file was fetched, parsed and re-mapped at script
+eval, on `DOMContentLoaded` *and* on every navigation — on `/faq`, on the chart,
+on the consent step — for a field that lives on wizard step 3 and that most
+players never reach. On a low-spec Android that is seconds of main thread and a
+large object graph bought before the user has consented.
 
 ### Commands — edit city / country data
 
@@ -95,14 +110,19 @@ Edit `CITY_I18N` in `sugar_sugar/location_city_i18n.py` (keyed by
 Edit `COUNTRY_I18N` in `sugar_sugar/location_catalog.py`. Countries without an
 entry fall back to the English name in all locales.
 
-**4. Regenerate the browser bundle** (required after any catalog change):
+**4. Regenerate the browser bundles** (required after any catalog change):
 
 ```bash
-uv run python -m sugar_sugar.location_suggestions
+uv run build-locations
 ```
 
-Writes `assets/location-suggestions.json`. The on-disk asset must match Python
-(`tests/test_location_suggestions.py::test_asset_matches_python_source`).
+Writes `assets/location-suggestions.<locale>.json` for all eight locales. The
+on-disk assets must match Python
+(`tests/test_location_suggestions.py::test_per_locale_assets_match_python_source`).
+
+Do **not** run `uv run python -m sugar_sugar.location_suggestions` to produce a
+shipped asset — that dumps the whole all-locales catalog, and it writes to
+`data/` precisely so it cannot end up on the wire again.
 
 **5. Run tests:**
 
@@ -120,12 +140,12 @@ and hard-refresh open tabs (stale clients can POST obsolete callback ids).
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
 | No dropdown when typing | Not on `/startup`, or consent not completed (`display_page` redirects to landing) | Complete consent → `/startup`; or use `uv run chart` only for chart debugging (no startup form). |
-| No dropdown after code change | Stale browser cache / old `location-suggestions.json` | Hard refresh; bump `DEPLOY_BUILD`; confirm `/assets/location-suggestions.json` loads in Network tab. |
+| No dropdown after code change | Stale browser cache / stale per-locale asset | Hard refresh; bump `DEPLOY_BUILD`; type 2+ characters and confirm `/assets/location-suggestions.<locale>.json` appears in the Network tab (it is not requested before you type). |
 | Dropdown clipped / hidden | Parent `overflow: hidden` | Host must have `location-autocomplete-host`; CSS sets `overflow: visible`. |
-| Works in EN but not DE/RU/ZH | Missing `CITY_I18N` / `COUNTRY_I18N` entry | Add locale in `location_city_i18n.py` or `COUNTRY_I18N`; regenerate asset. |
-| `ber` shows obscure cities first | Missing or wrong `rank` in asset | Regenerate asset; cities are ranked 0–9 within each country in `build_city_data` order. |
+| Works in EN but not DE/RU/ZH | Missing `CITY_I18N` / `COUNTRY_I18N` entry, or that locale's asset was not rebuilt | Add locale in `location_city_i18n.py` or `COUNTRY_I18N`; `uv run build-locations`. |
+| `ber` shows obscure cities first | Missing or wrong `rank` in asset | `uv run build-locations`; cities are ranked 0–9 within each country in `build_city_data` order. |
 | Server 500 on navigation after JS change | Stale tab with old clientside callback id | Bump `DEPLOY_BUILD`, hard-refresh all tabs. |
-| Tests fail on asset sync | Forgot to run `location_suggestions` after catalog edit | Run step 4 above. |
+| Tests fail on asset sync | Forgot to rebuild after a catalog edit | Run step 4 above. |
 | Import error on fresh clone | Missing `top_cities_by_country.json` | Run `uv run python -m sugar_sugar.build_city_data` once (catalog falls back to embedded dict but JSON should be committed). |
 
 ### Manual smoke test
@@ -249,7 +269,7 @@ browsers cache them aggressively.
 
 | Asset | Regenerate with |
 |-------|-----------------|
-| `assets/location-suggestions.json` | `uv run python -m sugar_sugar.location_suggestions` |
+| `assets/location-suggestions.<locale>.json` (8 files) | `uv run build-locations` |
 | `sugar_sugar/data/top_cities_by_country.json` | `uv run python -m sugar_sugar.build_city_data` |
 | Clientside JS behaviour | Edit `assets/*.js`, bump `DEPLOY_BUILD` in `config.py` |
 
@@ -417,7 +437,7 @@ sugar_sugar/app.py                  # append_round_from_window (per-round fields
 assets/
   location-autocomplete.js      # browser autocomplete
   location-autocomplete.css
-  location-suggestions.json     # generated — commit after regen
+  location-suggestions.*.json   # generated per locale — commit after regen
 
 sugar_sugar/
   location_countries.py         # COUNTRY_NAMES
