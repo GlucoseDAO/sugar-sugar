@@ -89,7 +89,7 @@ def test_how_it_works_keeps_teaser_and_drops_heading() -> None:
     children = how_it_works_children("en")
     texts = [getattr(node, "children", "") for node in children]
     assert "How it works" not in texts
-    assert "Three steps. One hour ahead. Your gut feeling vs the sensor." in texts
+    assert "Three steps. Predict the next hour. Your gut feeling vs the sensor." in texts
     assert children[0].className == "how-it-works-teaser"
     assert children[1].className == "how-it-works-steps"
     assert len(children) == 2
@@ -99,12 +99,26 @@ def test_how_it_works_keeps_teaser_and_drops_heading() -> None:
     assert str(steps[0].children).startswith("1. ")
 
 
+# Teaser must name the forecast ("predict the next hour"), not a one-hour session.
+_TEASER_HORIZON_MARKERS: dict[str, str] = {
+    "en": "Predict the next hour",
+    "uk": "Передбач наступну годину",
+    "ru": "Предскажи следующий час",
+    "de": "Sag die nächste Stunde voraus",
+    "fr": "Prédis la prochaine heure",
+    "es": "Predice la próxima hora",
+    "ro": "Prezice ora următoare",
+    "zh": "预测下一小时",
+}
+
+
 @pytest.mark.parametrize("locale", list(SUPPORTED_LOCALES))
 def test_how_it_works_teaser_and_step_three_exist(locale: str) -> None:
     teaser = t("ui.landing.how_it_works_teaser", locale=locale)
     steps = t_list("ui.landing.how_it_works_steps", locale=locale)
     assert teaser
     assert not teaser.startswith("ui.landing.")
+    assert _TEASER_HORIZON_MARKERS[locale] in teaser
     assert len(steps) == 3
     assert steps[2]
     assert t("ui.header.non_diabetic", locale=locale)

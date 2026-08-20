@@ -30,7 +30,7 @@ zh:
     consent_upload_own_data: "我同意上传我自己的 CGM 数据用于可选任务。"
     tagline: "一款测试您血糖预测超能力的游戏。"
     how_it_works: "运作方式"
-    how_it_works_teaser: "三步。一小时。你的直觉对上传感器。"
+    how_it_works_teaser: "三步。预测下一小时。你的直觉对上传感器。"
     faq_button: "常见问题"
     how_it_works_steps:
       - "画出你认为下一小时血糖会如何变化"

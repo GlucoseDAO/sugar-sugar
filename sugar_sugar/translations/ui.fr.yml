@@ -32,7 +32,7 @@ fr:
     consent_upload_own_data: "J'accepte de téléverser mes propres données CGM pour les tâches facultatives."
     tagline: "Un jeu pour tester tes super-pouvoirs de prédiction de la glycémie."
     how_it_works: "Comment ça marche"
-    how_it_works_teaser: "Trois étapes. Une heure. Ton intuition contre le capteur."
+    how_it_works_teaser: "Trois étapes. Prédis la prochaine heure. Ton intuition contre le capteur."
     faq_button: "FAQ"
     how_it_works_steps:
       - "Dessine comment tu penses que la glycémie va évoluer dans l'heure suivante"

@@ -30,7 +30,7 @@ en:
     consent_upload_own_data: "I agree to upload my own CGM data for the optional tasks."
     tagline: "A game to test your glucose-predicting superpowers."
     how_it_works: "How it works"
-    how_it_works_teaser: "Three steps. One hour ahead. Your gut feeling vs the sensor."
+    how_it_works_teaser: "Three steps. Predict the next hour. Your gut feeling vs the sensor."
     faq_button: "FAQ"
     how_it_works_steps:
       - "Draw how you think glucose will move in the next hour"

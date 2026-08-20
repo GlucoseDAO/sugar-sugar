@@ -30,7 +30,7 @@ ro:
     consent_upload_own_data: "Sunt de acord să încarc propriile date CGM pentru sarcinile opționale."
     tagline: "Un joc care îți testează superputerile de a prezice glucoza."
     how_it_works: "Cum funcționează"
-    how_it_works_teaser: "Trei pași. O oră. Instinctul tău contra senzorului."
+    how_it_works_teaser: "Trei pași. Prezice ora următoare. Instinctul tău contra senzorului."
     faq_button: "Întrebări frecvente"
     how_it_works_steps:
       - "Desenează cum crezi că se va mișca glucoza în următoarea oră"

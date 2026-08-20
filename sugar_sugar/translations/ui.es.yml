@@ -32,7 +32,7 @@ es:
     consent_upload_own_data: "Acepto subir mis propios datos de CGM para las tareas opcionales."
     tagline: "Un juego para poner a prueba tus superpoderes de predicción de glucosa."
     how_it_works: "Cómo funciona"
-    how_it_works_teaser: "Tres pasos. Una hora. Tu instinto contra el sensor."
+    how_it_works_teaser: "Tres pasos. Predice la próxima hora. Tu instinto contra el sensor."
     faq_button: "FAQ"
     how_it_works_steps:
       - "Dibuja cómo crees que se moverá la glucosa en la próxima hora"

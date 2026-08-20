@@ -30,7 +30,7 @@ de:
     consent_upload_own_data: "Ich willige ein, eigene CGM-Daten für optionale Aufgaben hochzuladen."
     tagline: "Ein Spiel, um deine Fähigkeiten zur Glukose‑Vorhersage zu testen."
     how_it_works: "So funktioniert es"
-    how_it_works_teaser: "Drei Schritte. Eine Stunde. Dein Bauchgefühl gegen den Sensor."
+    how_it_works_teaser: "Drei Schritte. Sag die nächste Stunde voraus. Dein Bauchgefühl gegen den Sensor."
     faq_button: "FAQ"
     how_it_works_steps:
       - "Zeichne, wie sich die Glukose in der nächsten Stunde entwickeln wird"
