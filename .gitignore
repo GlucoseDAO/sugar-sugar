@@ -194,6 +194,18 @@ prediction_ranking_C.csv
 # Pristine pre-conversion copies taken by backfill_leaderboard_identity
 *.pre-nickname.bak
 
+# Half-written files from the atomic CSV writes (write .tmp -> os.replace).
+# A worker killed mid-write (deploy restart, OOM) leaves one behind, and an
+# untracked leftover in the work tree is enough to make a prod `git pull` fail.
+data/input/*.tmp
+*.csv.tmp
+
+# Debug dump of the whole multi-locale place catalog
+# (`python -m sugar_sugar.location_suggestions`). Derivable from
+# location_catalog.py and 824 KB; the shipped assets are the per-locale files
+# built by `uv run build-locations`. Never commit this one.
+data/location-suggestions.json
+
 logs/*
 !logs/.gitkeep
 
