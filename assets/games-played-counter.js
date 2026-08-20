@@ -1,5 +1,13 @@
+// Count-up animation for the landing page's "games played so far" figure.
+//
+// The counter exists only on the landing page, but this file is served
+// everywhere. The MutationObserver below therefore does the least it can: at
+// most one querySelectorAll per animation frame, however many mutations Dash
+// fires, and it disconnects once a counter has been animated (the element is
+// re-created on language change, so it re-arms via the Dash navigation render).
 (function () {
   var DURATION_MS = 1200;
+  var scanQueued = false;
 
   function easeOutCubic(t) {
     return 1 - Math.pow(1 - t, 3);
@@ -43,6 +51,18 @@
     }
   }
 
+  /** Collapse a burst of Dash mutations into a single scan per frame. */
+  function queueScan() {
+    if (scanQueued) {
+      return;
+    }
+    scanQueued = true;
+    window.requestAnimationFrame(function () {
+      scanQueued = false;
+      scan();
+    });
+  }
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", scan);
   } else {
@@ -50,8 +70,6 @@
   }
 
   // Dash re-renders the landing page on language change / client routing.
-  var observer = new MutationObserver(function () {
-    scan();
-  });
+  var observer = new MutationObserver(queueScan);
   observer.observe(document.documentElement, { childList: true, subtree: true });
 })();

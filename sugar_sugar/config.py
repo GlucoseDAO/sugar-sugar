@@ -92,5 +92,5 @@ DASH_DEBUG: bool = _env_bool("DASH_DEBUG", DEBUG_MODE)
 # 27: Results loading overlay (clientside) so /final's slow display_page is not a second click.
 # 28: Glucose chart cartesian area grown (tighter margins, automargin off, resize).
 # 29: Chart paper pulled to the food bubble / footer; form 100vh keyboard gap.
-DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "33"))
+DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "34"))
 
