@@ -156,7 +156,7 @@ ro:
     wizard_next: "Înainte"
     wizard_step: "Pasul %{current} din %{total}"
     format_label: "Format"
-    format_placeholder: "Alege o opțiune"
+    format_placeholder: "Selectează o opțiune"
     format_a_label: "Date publice"
     format_b_label: "Datele mele"
     format_c_label: "Date publice + datele mele"

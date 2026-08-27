@@ -568,17 +568,14 @@ def _compute_format_options(
     """Return the dropdown options list and the desired selected value.
 
     Keeping the option ordering consistent (A, B, C) is important for the
-dropdown scroller.  Formats B and C are disabled unless ``uses_cgm`` is True.
-    The returned ``value`` is used to update the component's value according to
-eligibility and previous selection.
+    dropdown scroller. Formats B and C are disabled unless ``uses_cgm`` is True.
 
-    An already-selected format is never overridden except when it became
-    ineligible (B/C without a CGM). C is only ever *suggested*, on the first
-    computation that has a CGM answer and no format yet -- a CGM owner who picks
-    A on purpose (play the public data, don't upload mine) must keep it. The
-    old "eligible and currently A -> force C" rule made that impossible: any
-    later re-fire of the callback (language switch, persistence hydration on
-    reload) silently yanked them back to C and into the upload gate.
+    Format is never inferred from CGM (or anything else). Until the player
+    picks A/B/C themselves the value stays empty so the placeholder
+    ("Select an option") shows — same contract as gender. An already-selected
+    format is kept unless it became ineligible (B/C without a CGM), in which
+    case it is cleared back to the placeholder rather than silently replaced
+    with A.
     """
     allow_all = uses_cgm is True
     options: list[dict[str, Any]] = [
@@ -599,9 +596,9 @@ eligibility and previous selection.
     ]
 
     if not current_format:
-        return options, ('C' if allow_all else 'A')
+        return options, None
     if not allow_all and current_format in ('B', 'C'):
-        return options, 'A'
+        return options, None
     return options, current_format
 
 

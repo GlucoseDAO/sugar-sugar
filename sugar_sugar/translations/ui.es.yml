@@ -157,7 +157,7 @@ es:
     wizard_next: "Siguiente"
     wizard_step: "Paso %{current} de %{total}"
     format_label: "Formato"
-    format_placeholder: "Elige una opción"
+    format_placeholder: "Selecciona una opción"
     format_a_label: "Datos públicos"
     format_b_label: "Mis datos"
     format_c_label: "Públicos + Mis datos"
