@@ -433,10 +433,14 @@ es:
 
   highscore:
     title: "Clasificación"
-    subtitle: "Cada partida terminada conserva su propio puesto: supera tu resultado y el anterior seguirá en la tabla. Solo se clasifican las partidas con al menos %{min} rondas: más rondas hacen más difícil un MAE bajo, así que los intentos cortos no entran. Un error absoluto medio (MAE) más bajo significa una mejor predicción."
-    overall_board: "General"
-    by_data_source: "Por fuente de datos"
-    lower_is_better: "Un MAE más bajo es mejor"
+    subtitle: "Dos tablas, separadas según los datos que se predicen: las curvas sin diabetes son más planas y fáciles, así que nunca se clasifican frente a datos con diabetes. Cada partida terminada conserva su propio puesto, y cada puntuación es el error absoluto medio (MAE) de las mejores %{min} rondas de ese tipo de datos — así las partidas de 6 y de 12 rondas compiten en igualdad. Un MAE más bajo es mejor."
+    board_nondiabetic: "Datos sin diabetes"
+    board_diabetic: "Datos con diabetes"
+    your_place_line: "%{board}: #%{rank} / %{total} · MAE %{mae} %{unit}"
+    badge_hard_mode: "Modo difícil: esta puntuación se logró con datos ajenos a la propia condición del jugador"
+    badge_veteran: "Veterano: más de una partida terminada. Haz clic en el nombre para ver sus estadísticas."
+    legend_hard_mode: "%{badge} modo difícil: el jugador predijo datos que no son los suyos — una persona con diabetes sobre datos sin diabetes, o al revés"
+    legend_veteran: "%{badge} veterano: más de una partida terminada — el nombre enlaza a la página de estadísticas del jugador"
     players_count: "%{total} jugadores"
     scores_count: "%{total} resultados"
     games_played: "%{count} partidas jugadas"
@@ -444,6 +448,20 @@ es:
     empty: "Aún no hay partidas clasificadas. Juega al menos %{min} rondas y serás el primero en la clasificación."
     play_now: "Jugar ahora"
     privacy_note: "Los apodos son opcionales y públicos. Si indicaste un correo electrónico, la clasificación guarda solo un hash unidireccional de él para reconocer tus resultados entre dispositivos, nunca la dirección en sí ni ningún otro dato personal. Los apodos no forman parte de los datos del estudio."
+
+  player:
+    title: "Estadísticas del jugador"
+    anonymous: "Jugador anónimo"
+    games_count: "%{count} partidas terminadas"
+    games_title: "Partidas"
+    best_nondiabetic: "Mejor puntuación con datos sin diabetes: %{mae} %{unit}"
+    best_diabetic: "Mejor puntuación con datos con diabetes: %{mae} %{unit}"
+    col_format: "Fuente de datos"
+    col_nondiabetic_mae: "MAE sin diabetes (%{unit})"
+    col_diabetic_mae: "MAE con diabetes (%{unit})"
+    col_overall_mae: "MAE global (%{unit})"
+    not_found: "No hay ninguna página de jugador en esta dirección — puede que el enlace esté caducado."
+    back_to_board: "Volver a la clasificación"
 
   final:
     title: "Análisis completo"

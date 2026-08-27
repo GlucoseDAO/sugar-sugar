@@ -93,6 +93,7 @@ DASH_DEBUG: bool = _env_bool("DASH_DEBUG", DEBUG_MODE)
 # 28: Glucose chart cartesian area grown (tighter margins, automargin off, resize).
 # 29: Chart paper pulled to the food bubble / footer; form 100vh keyboard gap.
 # 35: Desktop chart bottom paper grown so HH:MM ticks are not clipped.
+# 37: Highscore split into diabetic/non-diabetic class boards; /player/<id> page (CSS additions).
 # 36: Compact/mobile bottom paper grown so rotated HH:MM ticks are not clipped.
-DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "36"))
+DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "37"))
 

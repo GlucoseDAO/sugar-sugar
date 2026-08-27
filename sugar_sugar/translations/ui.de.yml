@@ -432,10 +432,14 @@ de:
 
   highscore:
     title: "Bestenliste"
-    subtitle: "Jedes beendete Spiel behält seinen eigenen Platz — übertriff dein Ergebnis, und das alte bleibt trotzdem in der Liste. Nur Durchläufe mit mindestens %{min} Runden werden gewertet: mehr Runden machen einen niedrigen MAE schwerer, kurze Versuche bleiben außen vor. Ein kleinerer mittlerer absoluter Fehler (MAE) bedeutet eine bessere Vorhersage."
-    overall_board: "Gesamt"
-    by_data_source: "Nach Datenquelle"
-    lower_is_better: "Kleinerer MAE ist besser"
+    subtitle: "Zwei Tabellen, getrennt nach den vorhergesagten Daten: Kurven ohne Diabetes sind flacher und leichter, deshalb werden sie nie gegen Diabetes-Daten gewertet. Jedes beendete Spiel behält seinen eigenen Platz, und jedes Ergebnis ist der mittlere absolute Fehler (MAE) über die besten %{min} Runden dieses Datentyps — so treten Spiele mit 6 und mit 12 Runden fair gegeneinander an. Kleinerer MAE ist besser."
+    board_nondiabetic: "Daten ohne Diabetes"
+    board_diabetic: "Diabetes-Daten"
+    your_place_line: "%{board}: #%{rank} / %{total} · MAE %{mae} %{unit}"
+    badge_hard_mode: "Hard Mode — dieses Ergebnis wurde auf Daten erzielt, die nicht zur eigenen Stoffwechsellage passen"
+    badge_veteran: "Veteran — mehr als ein beendetes Spiel. Klicke auf den Namen für die Spielerstatistik."
+    legend_hard_mode: "%{badge} Hard Mode: Vorhersage auf fremden Daten — Diabetiker auf Daten ohne Diabetes oder umgekehrt"
+    legend_veteran: "%{badge} Veteran: mehr als ein beendetes Spiel — der Name führt zur Statistikseite des Spielers"
     players_count: "%{total} Spieler"
     scores_count: "%{total} Ergebnisse"
     games_played: "%{count} gespielte Spiele"
@@ -443,6 +447,20 @@ de:
     empty: "Noch keine gewerteten Spiele. Spiele mindestens %{min} Runden und du bist der Erste auf der Liste."
     play_now: "Jetzt spielen"
     privacy_note: "Spitznamen sind optional und öffentlich. Wenn du eine E-Mail-Adresse angegeben hast, speichert die Bestenliste nur einen Einweg-Hash davon, damit deine Ergebnisse geräteübergreifend erkannt werden — niemals die Adresse selbst und keine weiteren personenbezogenen Daten. Spitznamen sind nicht Teil der Studiendaten."
+
+  player:
+    title: "Spielerstatistik"
+    anonymous: "Anonymer Spieler"
+    games_count: "%{count} beendete Spiele"
+    games_title: "Spiele"
+    best_nondiabetic: "Bestes Ergebnis auf Daten ohne Diabetes: %{mae} %{unit}"
+    best_diabetic: "Bestes Ergebnis auf Diabetes-Daten: %{mae} %{unit}"
+    col_format: "Datenquelle"
+    col_nondiabetic_mae: "MAE ohne Diabetes (%{unit})"
+    col_diabetic_mae: "MAE Diabetes (%{unit})"
+    col_overall_mae: "MAE gesamt (%{unit})"
+    not_found: "Unter dieser Adresse gibt es keine Spielerseite — der Link ist womöglich veraltet."
+    back_to_board: "Zurück zur Bestenliste"
 
   final:
     title: "Komplette Analyse"

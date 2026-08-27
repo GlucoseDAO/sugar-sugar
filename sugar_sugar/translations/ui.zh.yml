@@ -431,10 +431,14 @@ zh:
 
   highscore:
     title: "排行榜"
-    subtitle: "每一局完成的游戏都保留自己的名次——刷新成绩后，旧成绩仍然留在榜上。至少完成 %{min} 轮才会上榜：轮数越多，低 MAE 越难，短局不计入排名。平均绝对误差（MAE）越小，预测越准确。"
-    overall_board: "总榜"
-    by_data_source: "按数据来源"
-    lower_is_better: "MAE 越小越好"
+    subtitle: "两张榜单，按被预测的数据类型划分：无糖尿病的血糖曲线更平缓、更容易预测，因此不会与糖尿病数据同榜排名。每一局完成的游戏都保留自己的名次，每个成绩是该数据类型下最好的 %{min} 轮的平均绝对误差（MAE）——因此 6 轮和 12 轮的游戏公平竞争。MAE 越小越好。"
+    board_nondiabetic: "无糖尿病数据"
+    board_diabetic: "糖尿病数据"
+    your_place_line: "%{board}：#%{rank} / %{total} · MAE %{mae} %{unit}"
+    badge_hard_mode: "困难模式——该成绩是在与玩家自身状况不同的数据上取得的"
+    badge_veteran: "老将——完成了不止一局游戏。点击名字查看玩家统计。"
+    legend_hard_mode: "%{badge} 困难模式：玩家预测的不是自己熟悉的数据——糖尿病玩家预测无糖尿病数据，或反之"
+    legend_veteran: "%{badge} 老将：完成了不止一局游戏——名字链接到该玩家的统计页面"
     players_count: "%{total} 位玩家"
     scores_count: "%{total} 条成绩"
     games_played: "已游玩 %{count} 局"
@@ -442,6 +446,20 @@ zh:
     empty: "还没有上榜成绩。至少完成 %{min} 轮，你就是榜首。"
     play_now: "开始游戏"
     privacy_note: "昵称是可选的，且会公开显示。如果你填写了电子邮件，排行榜只保存它的单向哈希值，用于在不同设备上识别你的成绩，绝不保存邮件地址本身，也不保存其他个人数据。昵称不属于研究数据。"
+
+  player:
+    title: "玩家统计"
+    anonymous: "匿名玩家"
+    games_count: "已完成 %{count} 局"
+    games_title: "游戏记录"
+    best_nondiabetic: "无糖尿病数据最佳成绩：%{mae} %{unit}"
+    best_diabetic: "糖尿病数据最佳成绩：%{mae} %{unit}"
+    col_format: "数据来源"
+    col_nondiabetic_mae: "无糖尿病 MAE（%{unit}）"
+    col_diabetic_mae: "糖尿病 MAE（%{unit}）"
+    col_overall_mae: "总 MAE（%{unit}）"
+    not_found: "该地址没有对应的玩家页面——链接可能已失效。"
+    back_to_board: "返回排行榜"
 
   final:
     title: "完整分析"

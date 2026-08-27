@@ -456,10 +456,14 @@ en:
 
   highscore:
     title: "Highscore"
-    subtitle: "Every finished game keeps its own place — beat your score and the old one stays on the board. Only runs with at least %{min} rounds are ranked: more rounds make a low MAE harder, so short attempts stay off the board. Lower mean absolute error (MAE) means a better prediction."
-    overall_board: "Overall"
-    by_data_source: "By data source"
-    lower_is_better: "Lower MAE is better"
+    subtitle: "Two boards, split by the data being predicted: non-diabetic traces are flatter and easier, so they are never ranked against diabetic ones. Every finished game keeps its own place, and each score is the mean absolute error (MAE) over the best %{min} rounds of that data type — so 6-round and 12-round games compete on equal footing. Lower MAE is better."
+    board_nondiabetic: "Non-diabetic data"
+    board_diabetic: "Diabetic data"
+    your_place_line: "%{board}: #%{rank} / %{total} · MAE %{mae} %{unit}"
+    badge_hard_mode: "Hard mode — this score was set on data foreign to the player's own condition"
+    badge_veteran: "Veteran — more than one finished game. Click the name for player statistics."
+    legend_hard_mode: "%{badge} hard mode: the player predicted data they are not native to — a diabetic on non-diabetic data, or the other way round"
+    legend_veteran: "%{badge} veteran: more than one finished game — the name links to the player's statistics page"
     players_count: "%{total} players"
     scores_count: "%{total} scores"
     games_played: "%{count} games played"
@@ -467,6 +471,20 @@ en:
     empty: "No ranked games yet. Play at least %{min} rounds and you will be the first on the board."
     play_now: "Play now"
     privacy_note: "Nicknames are optional and public. If you gave an email address, the board stores only a one-way hash of it so your results are recognised across devices — never the address itself and no other personal data. Nicknames are not part of the study data."
+
+  player:
+    title: "Player statistics"
+    anonymous: "Anonymous player"
+    games_count: "%{count} finished games"
+    games_title: "Games"
+    best_nondiabetic: "Best score on non-diabetic data: %{mae} %{unit}"
+    best_diabetic: "Best score on diabetic data: %{mae} %{unit}"
+    col_format: "Data source"
+    col_nondiabetic_mae: "Non-diabetic MAE (%{unit})"
+    col_diabetic_mae: "Diabetic MAE (%{unit})"
+    col_overall_mae: "Overall MAE (%{unit})"
+    not_found: "There is no player page at this address — the link may be stale."
+    back_to_board: "Back to the highscore board"
 
   final:
     title: "Complete Analysis"
