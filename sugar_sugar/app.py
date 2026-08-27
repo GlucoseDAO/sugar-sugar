@@ -648,7 +648,7 @@ def _leaderboard_snapshot(
     """Build a compact leaderboard view for one player.
 
     Returns ``None`` when the CSV is missing/empty. Otherwise:
-      ``{rank, total, players, mae, top: [{rank, mae, rounds, nickname, is_you}]}``
+      ``{rank, total, players, mae, top: [{rank, mae, rounds, timestamp, nickname, is_you}]}``
 
     ``total`` is the number of board slots and ``rank`` the player's best one;
     ``players`` counts distinct people, which is only used for the stat chips.
@@ -672,6 +672,7 @@ def _leaderboard_snapshot(
                 "rank": int(row["rank_idx"]) + 1,
                 "mae": float(row["mae"]),
                 "rounds": int(rounds) if rounds is not None else None,
+                "timestamp": str(row["timestamp"] or ""),
                 "nickname": str(row["nickname"] or ""),
                 "is_you": int(row["rank_idx"]) in my_ranks,
             }
@@ -689,6 +690,7 @@ def _leaderboard_snapshot(
                     "rank": user_rank,
                     "mae": user_mae,
                     "rounds": int(best['rounds']) if best['rounds'] is not None else None,
+                    "timestamp": str(best['timestamp'] or ""),
                     "nickname": str(best['nickname'] or ""),
                     "is_you": True,
                 }
@@ -5258,6 +5260,23 @@ def _format_mae_for_unit(mae_mgdl: float, *, unit: str) -> str:
     return f"{value:.2f}"
 
 
+def _board_when_parts(raw: object) -> tuple[str, str]:
+    """Split a ranking/statistics timestamp into ``(date, HH:MM)`` for the board.
+
+    Ranking and statistics CSVs store ``YYYY-MM-DD HH:MM:SS``. Seconds are
+    dropped so the extra column stays compact. Missing/unparseable values
+    become ``("-", "")``.
+    """
+    text = str(raw or "").strip()
+    if not text:
+        return "-", ""
+    cleaned = text.replace("T", " ", 1).replace("Z", "")
+    parts = cleaned.split()
+    date = parts[0] if parts else "-"
+    clock = parts[1][:5] if len(parts) > 1 else ""
+    return date, clock
+
+
 def _leaderboard_hero_children(
     overall: Optional[dict[str, Any]],
     *,
@@ -5350,6 +5369,14 @@ def _leaderboard_board(
         else:
             player_label = nickname or t("ui.final.player_n", locale=locale, n=int(entry["rank"]))
         rounds = entry.get("rounds")
+        when_date, when_time = _board_when_parts(entry.get("timestamp"))
+        when_children: list[Any] = [
+            html.Span(when_date, className="when-date", disable_n_clicks=True),
+        ]
+        if when_time:
+            when_children.append(
+                html.Span(when_time, className="when-time", disable_n_clicks=True)
+            )
         rows.append(
             html.Div(
                 [
@@ -5367,6 +5394,11 @@ def _leaderboard_board(
                     html.Span(
                         "-" if rounds is None else str(int(rounds)),
                         className="final-leaderboard-cell rounds",
+                    ),
+                    html.Span(
+                        when_children,
+                        className="final-leaderboard-cell when",
+                        disable_n_clicks=True,
                     ),
                     html.Span(
                         _format_mae_for_unit(float(entry["mae"]), unit=unit),
@@ -5396,6 +5428,10 @@ def _leaderboard_board(
                     html.Span(
                         t("ui.final.col_rounds", locale=locale),
                         className="final-leaderboard-cell rounds",
+                    ),
+                    html.Span(
+                        t("ui.final.col_when", locale=locale),
+                        className="final-leaderboard-cell when",
                     ),
                     html.Span(
                         t("ui.final.col_mae", locale=locale, unit=unit),

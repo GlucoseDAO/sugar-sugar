@@ -13,7 +13,7 @@ from typing import Any, Optional
 
 import pytest
 
-from sugar_sugar.app import _leaderboard_snapshot, _rank_from_ranking_csv
+from sugar_sugar.app import _board_when_parts, _leaderboard_snapshot, _rank_from_ranking_csv
 
 _HEADER = (
     "study_id,run_id,number,timestamp,email_key,nickname,format,rounds_played,"
@@ -141,6 +141,28 @@ def test_rounds_are_reported_per_slot(ranking_csv: Path) -> None:
     assert [entry["rounds"] for entry in snapshot["top"]] == [24, 12]
 
 
+def test_board_when_parts_split_date_and_hhmm() -> None:
+    assert _board_when_parts("2026-08-02 18:30:00") == ("2026-08-02", "18:30")
+    assert _board_when_parts("2026-08-02T18:30:00Z") == ("2026-08-02", "18:30")
+    assert _board_when_parts("") == ("-", "")
+    assert _board_when_parts(None) == ("-", "")
+
+
+def test_timestamp_is_reported_per_slot(ranking_csv: Path) -> None:
+    ranking_csv.write_text(
+        _HEADER
+        + _row("s1", 20.0, key="k", rounds=12, ts="2026-07-01 10:15:00")
+        + _row("s1", 14.0, key="k", rounds=24, ts="2026-08-02 18:30:00"),
+        encoding="utf-8",
+    )
+    snapshot = _snapshot(ranking_csv, study_id="s1", key="k")
+    assert snapshot is not None
+    assert [entry["timestamp"] for entry in snapshot["top"]] == [
+        "2026-08-02 18:30:00",
+        "2026-07-01 10:15:00",
+    ]
+
+
 def test_missing_rounds_column_is_tolerated(tmp_path: Path) -> None:
     legacy = tmp_path / "prediction_ranking.csv"
     legacy.write_text(
@@ -193,7 +215,14 @@ def test_visitor_without_a_session_sees_the_board_and_no_you_row(ranking_csv: Pa
     assert snapshot is not None
     assert snapshot["rank"] is None and snapshot["mae"] is None
     assert snapshot["top"] == [
-        {"rank": 1, "mae": 20.0, "rounds": 12, "nickname": "Bob", "is_you": False}
+        {
+            "rank": 1,
+            "mae": 20.0,
+            "rounds": 12,
+            "timestamp": "2026-08-01 10:00:00",
+            "nickname": "Bob",
+            "is_you": False,
+        }
     ]
 
 

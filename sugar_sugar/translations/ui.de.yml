@@ -460,6 +460,7 @@ de:
     col_rank: "#"
     col_player: "Spieler"
     col_rounds: "Runden"
+    col_when: "Wann"
     col_mae: "MAE (%{unit})"
     you: "Du"
     player_n: "Spieler %{n}"

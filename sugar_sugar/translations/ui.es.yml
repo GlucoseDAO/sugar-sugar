@@ -461,6 +461,7 @@ es:
     col_rank: "#"
     col_player: "Jugador"
     col_rounds: "Rondas"
+    col_when: "Cuándo"
     col_mae: "MAE (%{unit})"
     you: "Tú"
     player_n: "Jugador %{n}"

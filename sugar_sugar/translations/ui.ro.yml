@@ -481,6 +481,7 @@ ro:
     col_rank: "#"
     col_player: "Jucător"
     col_rounds: "Runde"
+    col_when: "Când"
     col_mae: "MAE (%{unit})"
     you: "Tu"
     player_n: "Jucător %{n}"

@@ -210,6 +210,35 @@ def test_final_page_renders_the_editor_ids(ranking_root: Path) -> None:
     assert "final-ranking-list" in ids
 
 
+def test_final_board_shows_the_played_datetime(ranking_root: Path) -> None:
+    """The in-game leaderboard snippet reuses the highscore When column."""
+    key = nickname_module.email_key("ann@x.com")
+    _overall(ranking_root).write_text(
+        _HEADER + _row("s1", key=key, nickname="Ninja", ts="2026-08-02 18:30:00"),
+        encoding="utf-8",
+    )
+
+    def _texts(node: Any) -> list[str]:
+        out: list[str] = []
+        if isinstance(node, str):
+            return [node]
+        kids = getattr(node, "children", None)
+        if isinstance(kids, str):
+            out.append(kids)
+        elif isinstance(kids, (list, tuple)):
+            for kid in kids:
+                out.extend(_texts(kid))
+        elif kids is not None:
+            out.extend(_texts(kids))
+        return out
+
+    texts = _texts(create_final_layout(_finished_user(), "mg/dL", locale="en"))
+    assert "When" in texts
+    assert "2026-08-02" in texts
+    assert "18:30" in texts
+    assert "18:30:00" not in texts
+
+
 def test_highscore_page_has_no_editor(ranking_root: Path) -> None:
     """`/highscore` is public and session-free -- a rename box there is meaningless."""
     _overall(ranking_root).write_text(_HEADER + _row("s1"), encoding="utf-8")

@@ -459,6 +459,7 @@ zh:
     col_rank: "#"
     col_player: "玩家"
     col_rounds: "回合"
+    col_when: "时间"
     col_mae: "MAE (%{unit})"
     you: "你"
     player_n: "玩家 %{n}"

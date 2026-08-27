@@ -214,6 +214,20 @@ def test_highscore_keeps_every_finished_game_on_the_board(ranking_root: Path) ->
     assert "2 players" in joined
 
 
+def test_highscore_shows_the_played_datetime(ranking_root: Path) -> None:
+    """Date+time from the ranking/statistics timestamp, without the seconds."""
+    overall = ranking_root / "data" / "input" / "prediction_ranking.csv"
+    overall.write_text(
+        _HEADER + _row("s1", "ALL", 14.0, nickname="Ninja", ts="2026-08-02 18:30:00"),
+        encoding="utf-8",
+    )
+    texts = _texts(create_highscore_page(None, None, locale="en"))
+    assert "When" in texts
+    assert "2026-08-02" in texts
+    assert "18:30" in texts
+    assert "18:30:00" not in texts
+
+
 def test_highscore_shows_the_rounds_behind_each_score(ranking_root: Path) -> None:
     """The column that tells one player's several slots apart."""
     overall = ranking_root / "data" / "input" / "prediction_ranking.csv"

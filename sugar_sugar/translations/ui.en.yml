@@ -484,6 +484,7 @@ en:
     col_rank: "#"
     col_player: "Player"
     col_rounds: "Rounds"
+    col_when: "When"
     col_mae: "MAE (%{unit})"
     you: "You"
     player_n: "Player %{n}"

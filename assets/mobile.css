@@ -1036,10 +1036,25 @@ html.mobile-device .highscore-page .highscore-format-grid {
   grid-template-columns: 1fr !important;
   gap: 14px !important;
 }
-html.mobile-device .highscore-page .final-leaderboard-row {
-  grid-template-columns: 28px 1fr 42px 74px !important;
+html.mobile-device .final-leaderboard-row {
+  grid-template-columns:
+    minmax(0, 24px)
+    minmax(0, 1fr)
+    max-content
+    minmax(0, 72px)
+    minmax(0, 52px) !important;
   padding: 8px 4px !important;
-  gap: 6px !important;
+  gap: 4px !important;
+}
+html.mobile-device .highscore-page .final-leaderboard-row {
+  grid-template-columns:
+    minmax(0, 24px)
+    minmax(0, 1fr)
+    max-content
+    minmax(0, 72px)
+    minmax(0, 52px) !important;
+  padding: 8px 4px !important;
+  gap: 4px !important;
 }
 html.mobile-device .highscore-page .highscore-hero-wrap {
   max-width: 100% !important;

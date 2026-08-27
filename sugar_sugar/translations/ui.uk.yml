@@ -459,6 +459,7 @@ uk:
     col_rank: "#"
     col_player: "Гравець"
     col_rounds: "Раунди"
+    col_when: "Коли"
     col_mae: "MAE (%{unit})"
     you: "Ти"
     player_n: "Гравець %{n}"

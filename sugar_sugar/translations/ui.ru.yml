@@ -459,6 +459,7 @@ ru:
     col_rank: "#"
     col_player: "Игрок"
     col_rounds: "Раунды"
+    col_when: "Когда"
     col_mae: "MAE (%{unit})"
     you: "Ты"
     player_n: "Игрок %{n}"
