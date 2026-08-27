@@ -23,51 +23,50 @@ Prod is `https://sugar-sugar.study`; the staging box is `https://vanilla-sugar.g
 | `data/bigideas/`, `data/d1namo/`, `data/subjects/` | corpora | no — `uv run download` on the test box |
 | `data/output/`, `logs/` | generated artifacts | no |
 
-## The quick way (recommended)
+## Just run the script
+
+```bash
+scripts/copy-input-to-test.sh <source-data/input> <dest-data/input> [--dry-run]
+```
+
+Both arguments are `data/input` directories, each either a local path or an ssh remote
+(`[user@]host:/path`) — **including both at once**, since the copy always stages through a local
+temp dir. Start with `--dry-run`; nothing is written to the destination until you confirm.
+
+```bash
+# from your laptop, both ends remote
+scripts/copy-input-to-test.sh prod:/srv/sugar-sugar/data/input \
+                              staging:/srv/sugar-sugar/data/input --dry-run
+scripts/copy-input-to-test.sh prod:/srv/sugar-sugar/data/input \
+                              staging:/srv/sugar-sugar/data/input
+
+# or on the test box itself, pulling from prod
+scripts/copy-input-to-test.sh prod:/srv/sugar-sugar/data/input ./data/input
+```
+
+What it does, in order:
+
+1. **Pulls top-level `*.csv` only**, non-recursively — so no directory under `data/input` can travel.
+   That is what keeps `users/` (uploaded exports, real patient names in the filenames) and the
+   git-tracked `patient_consent_form/` / `study_design/` out, structurally rather than by a rule
+   someone can forget.
+2. **Blanks the `email` column** of `prediction_statistics.csv` in the staging dir, so raw addresses
+   never reach the destination at all. `--with-emails` opts out (real participant data — only onto a
+   box you would trust with prod).
+3. **Prints what it staged**, with row counts, and asks before writing (`--yes` to skip; required
+   when stdin is not a TTY).
+4. **Snapshots the destination** to `data/input-before-copy-<stamp>.tar.gz` (`0600`, gitignored)
+   before overwriting anything.
+5. **Pushes**, then reminds you what the missing salt implies.
+
+The source is only ever read. `--delete` additionally removes CSVs in the destination that are
+absent from the source; without it, extra files there are left alone.
+
+### Why the scrubbed copy is enough
 
 The privacy-safe copy is also the *sufficient* one for looking at the boards: `/highscore` reads
-`prediction_statistics.csv` (for rounds and per-round MAEs) plus the ranking CSVs (for nicknames,
-joined on `study_id`). Neither needs an email address, an upload, or a resume blob.
-
-**On prod** — reuse the existing backup script rather than hand-rolling a tar; it takes a lock,
-verifies the archive and writes it `0600`:
-
-```bash
-cd /path/to/sugar-sugar
-./backup/backup-input.sh              # → backup/archives/sugar-data-input-<UTC stamp>.tar.gz
-```
-
-**Transfer** (the archive contains participant data until you scrub it — keep it off shared boxes):
-
-```bash
-scp prod:/path/to/sugar-sugar/backup/archives/sugar-data-input-<stamp>.tar.gz /tmp/
-scp /tmp/sugar-data-input-<stamp>.tar.gz test:/tmp/
-```
-
-**On test** — extract at the repo root (archive paths are root-relative), dropping the uploads:
-
-```bash
-cd /path/to/sugar-sugar
-tar -xzf /tmp/sugar-data-input-<stamp>.tar.gz --exclude='data/input/users/*'
-```
-
-**Scrub the emails immediately** (on the test copy — never run this against prod):
-
-```bash
-uv run python -c "
-import polars as pl
-p = 'data/input/prediction_statistics.csv'
-df = pl.read_csv(p, infer_schema_length=0)
-df.with_columns(pl.lit('').alias('email')).write_csv(p)
-print('blanked', df.height, 'rows')
-"
-```
-
-`infer_schema_length=0` reads every column as text, so numbers are not reformatted and the
-comma-heavy quoted columns (`location`, `per_round_metrics`) survive the round-trip intact. It
-rewrites the file in place, which is why it belongs on the copy only.
-
-Then delete the archive from `/tmp` on both hops.
+`prediction_statistics.csv` (rounds and per-round MAEs) plus the ranking CSVs (nicknames, joined on
+`study_id`). Neither needs an email address, an upload, or a resume blob.
 
 ### What blanking the email costs you
 
@@ -110,9 +109,35 @@ the usual cause is the round floor: an entry needs at least `MIN_USEFUL_ROUNDS` 
 The two-board layout only renders on a checkout that has the `scoreboard-redesign` branch — staging
 tracks `development-ai`, so check out the branch there before expecting the new boards.
 
+## Doing it by hand
+
+If you would rather not use the script (or need the uploads too, on a box that may hold them),
+`backup/backup-input.sh` on the source produces a verified `0600` tarball of the whole `data/input`:
+
+```bash
+./backup/backup-input.sh                                   # → backup/archives/sugar-data-input-<stamp>.tar.gz
+scp prod:.../backup/archives/sugar-data-input-<stamp>.tar.gz /tmp/ && scp /tmp/*.tar.gz test:/tmp/
+cd /path/to/sugar-sugar                                    # archive paths are repo-root relative
+tar -xzf /tmp/sugar-data-input-<stamp>.tar.gz --exclude='data/input/users/*'
+```
+
+Then blank the emails yourself, on the copy only — it rewrites the file in place:
+
+```bash
+uv run python -c "
+import polars as pl
+p = 'data/input/prediction_statistics.csv'
+df = pl.read_csv(p, infer_schema_length=0)
+df.with_columns(pl.lit('').alias('email')).write_csv(p)"
+```
+
+`infer_schema_length=0` reads every column as text, so numbers are not reformatted and the
+comma-heavy quoted columns (`location`, `per_round_metrics`) survive the round-trip intact. Delete
+the archive from `/tmp` on both hops afterwards.
+
 ## Notes
 
-- **Consistency:** CSV writes are atomic per file (`.tmp` + `replace`), so a tar taken while the app
+- **Consistency:** CSV writes are atomic per file (`.tmp` + `replace`), so a copy taken while the app
   is live gets internally consistent files, with at most slight skew *between* files. Quiesce the
   service if that matters; for eyeballing a board it does not.
 - **Never copy test → prod.** Nothing here is reversible in that direction; `save_statistics` upserts
