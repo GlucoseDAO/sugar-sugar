@@ -85,6 +85,18 @@ body :not(h1):not(h2):not(h3):not(h4):not(h5):not(h6) {
   font-size: 16px !important;
 }
 
+/* Plotly tick text must keep the sizes glucose.py reserved paper for.
+   The blanket 16px rule otherwise inflates HH:MM labels and they clip
+   inside Plotly's overflow:hidden svg-container. Mobile /prediction
+   keeps its own 8px override (higher specificity). */
+html:not(.mobile-device) .js-plotly-plot .xtick text {
+  font-size: 11px !important;
+}
+html:not(.mobile-device) .js-plotly-plot .ytick text,
+html:not(.mobile-device) .js-plotly-plot .legendtext {
+  font-size: 12px !important;
+}
+
 /* Override the blanket 16px rule for Fomantic UI menus so size classes work */
 body .ui.massive.menu .item,
 body .ui.massive.menu {
@@ -1330,6 +1342,12 @@ html:not(.mobile-device) #ending-glucose-chart-container {
   flex: 1 1 auto;
   min-height: 0;
   height: 100%;
+}
+html:not(.mobile-device) #ending-static-graph .xtitle,
+html:not(.mobile-device) #ending-static-graph .g-xtitle {
+  display: none !important;
+  visibility: hidden !important;
+  font-size: 0 !important;
 }
 html:not(.mobile-device) #ending-static-graph,
 html:not(.mobile-device) #ending-static-graph .js-plotly-plot,

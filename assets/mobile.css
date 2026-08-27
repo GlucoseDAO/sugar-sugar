@@ -1339,7 +1339,16 @@ html.mobile-device #consent-form-page .consent-form-text {
    /prediction is now device-width, so they render at native size.)
    =========================================================================== */
 
-/* Chart tick / axis labels: bumped up from Plotly's small default. */
+/* Chart tick / axis labels: keep Plotly's reserved sizes. The blanket
+   16px body rule otherwise inflates rotated HH:MM ticks on /ending too
+   (this used to be /prediction-only). */
+html.mobile-device .js-plotly-plot .xtick text {
+  font-size: 8px !important;
+}
+html.mobile-device .js-plotly-plot .ytick text,
+html.mobile-device .js-plotly-plot .legendtext {
+  font-size: 9px !important;
+}
 html.route-prediction.mobile-device .js-plotly-plot .xtick text,
 html.route-prediction.mobile-device .js-plotly-plot .ytick text,
 html.route-prediction.mobile-device .js-plotly-plot .legendtext {

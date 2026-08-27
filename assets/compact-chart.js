@@ -5,8 +5,8 @@
    production / Chrome): this file is a static asset, not gated on a
    build flag. */
 (function () {
-  var COMPACT = { t: 2, b: 20, l: 36, r: 4, pad: 0 };
-  var DESKTOP = { t: 8, b: 22, r: 8, pad: 0 };
+  var COMPACT = { t: 2, b: 40, l: 36, r: 4, pad: 0 };
+  var DESKTOP = { t: 8, b: 36, r: 8, pad: 0 };
 
   function isGlucosePlot(gd) {
     if (!gd) {
@@ -20,9 +20,23 @@
   }
 
   function isMobileChart() {
+    // Same predicate as the `mobile-device` <html> class in app.py.
+    // A desktop touchscreen is pointer:coarse but hover:hover / wide —
+    // treating that as a phone rotated the HH:MM ticks into a 20px strip
+    // and clipped them on the desktop /prediction card.
     var root = document.documentElement;
-    return root.classList.contains("mobile-device")
-      || window.matchMedia("(pointer: coarse)").matches;
+    if (root.classList.contains("mobile-device")) {
+      return true;
+    }
+    if (!window.matchMedia) {
+      return false;
+    }
+    try {
+      return window.matchMedia("(pointer: coarse)").matches
+        && window.matchMedia("(max-device-width: 1024px)").matches;
+    } catch (err) {
+      return false;
+    }
   }
 
   function growPlot(gd) {
@@ -52,6 +66,9 @@
         payload["xaxis.tickfont.size"] = 8;
         payload["yaxis.tickfont.size"] = 9;
         payload["xaxis.ticklen"] = 2;
+      } else {
+        payload["xaxis.tickangle"] = 0;
+        payload["xaxis.tickfont.size"] = 11;
       }
       window.Plotly.relayout(gd, payload);
     }

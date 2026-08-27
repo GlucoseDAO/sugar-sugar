@@ -56,8 +56,10 @@ _FOOD_COMPOSITE_PREFIX: str = "composite:"
 # values tiny is what actually enlarges the line. Numbers must stay in sync
 # with assets/compact-chart.js (that file also Plotly.Plots.resize()s so the
 # SVG fills the flex card in every run mode: debug, staging, production).
-_COMPACT_MARGIN: dict[str, int] = {"l": 36, "r": 4, "t": 2, "b": 20, "pad": 0}
-_DESKTOP_MARGIN: dict[str, int] = {"l": 50, "r": 8, "t": 8, "b": 22, "pad": 0}
+# Desktop `b` has to clear horizontal HH:MM; compact `b` has to clear
+# the same labels rotated -90 (8px "HH:MM" is ~28px tall plus tick marks).
+_COMPACT_MARGIN: dict[str, int] = {"l": 36, "r": 4, "t": 2, "b": 40, "pad": 0}
+_DESKTOP_MARGIN: dict[str, int] = {"l": 50, "r": 8, "t": 8, "b": 36, "pad": 0}
 _DESKTOP_PREDICTION_LEFT: int = 56
 
 
@@ -403,7 +405,7 @@ class GlucoseChart(html.Div):
                 hide_last_hour=hide_last_hour_flag
             ):
                 figure = self._build_figure(
-                    df, events_df, source_name, locale=locale, compact=True,
+                    df, events_df, source_name, locale=locale,
                 )
                 bubbles = meal_food_bubble_children(
                     df,
@@ -1216,13 +1218,15 @@ class GlucoseChart(html.Div):
         y_range = self._calculate_y_axis_range()
         compact = bool(getattr(self, "_compact_layout", False))
         tickvals, ticktext = self._hour_ticks()
-        hide_axis_title = compact or self.hide_last_hour
+        # HH:MM ticks already say this is time. A "Time"/"Timp" title sits in
+        # the same bottom paper strip and overlaps the values on /ending.
+        hide_y_title = compact or self.hide_last_hour
 
         figure.update_layout(
             title="",
             autosize=True,
             xaxis=dict(
-                title="" if hide_axis_title else t("ui.chart.x_axis", locale=locale),
+                title="",
                 title_standoff=0,
                 tickmode="array",
                 tickvals=tickvals,
@@ -1246,7 +1250,7 @@ class GlucoseChart(html.Div):
                 title=dict(
                     text=(
                         ""
-                        if hide_axis_title
+                        if hide_y_title
                         else t("ui.chart.y_axis", locale=locale, unit=self._display_unit)
                     ),
                     font=dict(size=11 if compact else 14),

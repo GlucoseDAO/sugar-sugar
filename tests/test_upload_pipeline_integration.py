@@ -156,7 +156,7 @@ def _assert_static_chart(window_df: pl.DataFrame, events_df: pl.DataFrame, sourc
         prediction_boundary=len(window_df) - PREDICTION_HOUR_OFFSET,
     )
     assert len(mgdl_figure.data) > 0
-    assert mgdl_figure.layout.xaxis.title.text
+    assert (mgdl_figure.layout.xaxis.title.text or "") == ""
     assert mgdl_figure.layout.yaxis.title.text
     # The static/immersive chart intentionally has NO chart title ("Glucose
     # Levels" was removed in the mobile redesign to reclaim vertical space; the
