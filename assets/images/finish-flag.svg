@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- Checkered finish flag — marks the last point a prediction must reach -->
+  <g>
+    <rect x="9" y="6" width="4" height="38" rx="2" fill="#37474f"/>
+    <rect x="13" y="7" width="27" height="18" fill="#ffffff" stroke="#37474f" stroke-width="1.5"/>
+    <g fill="#263238">
+      <rect x="13" y="7" width="9" height="6"/>
+      <rect x="31" y="7" width="9" height="6"/>
+      <rect x="22" y="13" width="9" height="6"/>
+      <rect x="13" y="19" width="9" height="6"/>
+      <rect x="31" y="19" width="9" height="6"/>
+    </g>
+  </g>
+</svg>

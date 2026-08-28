@@ -227,6 +227,7 @@ de:
     progress_ready: "✓ Bereit zum Senden!"
     progress_hidden_area: "Mache Vorhersagen im ausgeblendeten Bereich, um zu senden"
     submit: "Senden"
+    submit_remaining: "Senden (%{done}/%{total})"
     finish_game: "Spiel beenden"
     finish_confirm_title: "Dieses Spiel verlassen?"
     finish_confirm_early: "Du hast %{current} von %{total} Runden abgeschlossen. Weniger als %{min} Runden sind zu wenig für die Studie."
@@ -341,6 +342,8 @@ de:
     event_carbohydrates: "Kohlenhydrate"
     food_label: "ESSEN"
 
+    draw_to_here: "Bis hierhin zeichnen"
+    prediction_complete: "Linie vollständig"
   metrics:
     title: "Metriken"
     prediction_accuracy: "Vorhersagegenauigkeit"

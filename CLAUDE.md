@@ -158,6 +158,35 @@ never boundary-gated at all, so before this its star sat at the true hidden
 glucose value and could be read straight off the y-axis. Locked down by
 `tests/test_food_marker_prediction_area.py`.
 
+### The playing chart says where the line has to end
+
+A player stopped drawing partway through the hidden hour, pressed Submit, got
+nothing, and reported it as a bug. Three things had to line up, and all three
+were true:
+
+- **Nothing on the chart marked the target.** The glucose trace simply stopped
+  and the rest of the plot was empty. `_add_prediction_finish_line`
+  (`glucose.py`) now puts a checkered flag on a dashed vertical at the *last* x
+  index whenever `hide_last_hour` is on, labelled "Draw to here" and turning
+  green ("Line complete") once `hidden_area_is_complete` passes. Results charts
+  never get it -- there the hour is already revealed. The flag and its label are
+  **right-anchored**: the x-axis range is `[-0.5, n-0.5]`, so anything centred on
+  the last index is clipped by the plot border.
+- **The copy that says so is hidden where it matters.** `mobile.css` has
+  `#prediction-progress-label { display: none !important }` on mobile
+  `/prediction` -- the landscape control strip has no room for it -- so on the
+  device most rounds are played, the button label is the only surface left. The
+  disabled Submit therefore reads `Submit (6/12)`
+  (`ui.submit.submit_remaining`). Do not "fix" this by unhiding the label.
+- **Fomantic colour classes beat inline styles.** `.ui.green.button` sets its
+  background `!important`, so the gate's inline `#999999` never applied: a
+  disabled Submit rendered as *green at 45% opacity* and looked pressable. The
+  gate now swaps the class (`SUBMIT_ENABLED_CLASS` / `SUBMIT_DISABLED_CLASS`),
+  same as the mobile wizard's Next button. **Any Fomantic-coloured button with a
+  disabled state has this bug until the class is swapped.**
+
+Locked down by `tests/test_prediction_finish_marker.py`.
+
 ### Windows must not straddle a sensor gap
 
 A CGM trace is not one continuous run — `data/example.csv` alone breaks into 11 stretches. Windows are

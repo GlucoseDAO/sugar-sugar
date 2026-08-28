@@ -228,6 +228,7 @@ fr:
     progress_ready: "✓ Prêt à soumettre !"
     progress_hidden_area: "Fais des prédictions dans la zone cachée pour soumettre"
     submit: "Soumettre"
+    submit_remaining: "Soumettre (%{done}/%{total})"
     finish_game: "Terminer la partie"
     finish_confirm_title: "Quitter cette partie ?"
     finish_confirm_early: "Tu as terminé %{current} manches sur %{total}. Moins de %{min} manches, c'est trop peu pour l'étude."
@@ -342,6 +343,8 @@ fr:
     event_carbohydrates: "Glucides"
     food_label: "REPAS"
 
+    draw_to_here: "Dessinez jusqu'ici"
+    prediction_complete: "Ligne terminée"
   metrics:
     title: "Métriques"
     prediction_accuracy: "Précision de la prédiction"

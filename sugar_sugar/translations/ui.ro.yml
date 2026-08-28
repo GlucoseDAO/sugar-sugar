@@ -248,6 +248,7 @@ ro:
     progress_ready: "✓ Gata de trimitere!"
     progress_hidden_area: "Fă predicții în zona ascunsă pentru a trimite"
     submit: "Trimite"
+    submit_remaining: "Trimite (%{done}/%{total})"
     finish_game: "Încheie jocul"
     finish_confirm_title: "Ieși din acest joc?"
     finish_confirm_early: "Ai finalizat %{current} din %{total} runde. Mai puțin de %{min} runde este prea puțin pentru studiu."
@@ -362,6 +363,8 @@ ro:
     event_carbohydrates: "Carbohidrați"
     food_label: "MÂNCARE"
 
+    draw_to_here: "Desenează până aici"
+    prediction_complete: "Linie completă"
   metrics:
     title: "Metrici"
     prediction_accuracy: "Acuratețea predicției"

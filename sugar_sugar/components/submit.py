@@ -16,6 +16,11 @@ from sugar_sugar.i18n import t, normalize_locale
 from sugar_sugar.nickname import email_key, normalize_nickname
 from sugar_sugar.cgm_duration import cgm_duration_csv_value
 
+# Submit's two looks. Fomantic colour classes carry `!important` backgrounds, so
+# the disabled state has to drop `green` rather than override it inline.
+SUBMIT_ENABLED_CLASS = "ui green button"
+SUBMIT_DISABLED_CLASS = "ui button submit-button-disabled"
+
 # Dataset used for the example/generic format and the format-C even rounds.
 _EXAMPLE_DATASET_PATH: Path = Path("data/example.csv")
 
@@ -280,7 +285,7 @@ class SubmitComponent(html.Div):
                     html.Button(
                         t("ui.submit.submit", locale=self._locale),
                         id="submit-button",
-                        className="ui green button",
+                        className=SUBMIT_DISABLED_CLASS,
                         disabled=True,  # Start disabled
                         style={
                             'width': '300px',
@@ -1220,6 +1225,12 @@ class SubmitComponent(html.Div):
             [Output('submit-button', 'disabled'),
              Output('submit-button', 'children'),
              Output('submit-button', 'style'),
+             # Fomantic's `.ui.green.button` sets its background `!important`,
+             # so the inline grey below never showed: a disabled Submit rendered
+             # as green-at-45%-opacity, which reads as styling rather than as
+             # "not yet". Swapping the colour class is the same fix the mobile
+             # wizard's Next button uses.
+             Output('submit-button', 'className'),
              Output('prediction-progress-label', 'children'),
              Output('prediction-progress-label', 'style')],
             [Input('current-window-df', 'data'),
@@ -1231,9 +1242,15 @@ class SubmitComponent(html.Div):
             df_data: Optional[dict[str, Any]],
             interface_language: Optional[str],
             user_agent: Optional[str],
-        ) -> tuple[bool, str, dict[str, Any], str, dict[str, Any]]:
+        ) -> tuple[bool, str, dict[str, Any], str, str, dict[str, Any]]:
             """Enable submit button only when there are predictions to the end of the hidden area"""
             locale = normalize_locale(interface_language)
+            # `prediction-progress-label` is display:none on mobile /prediction
+            # (the landscape control strip has no room for it), so on the device
+            # most rounds are played the button label is the only place the
+            # "you are not done yet" count can be read.
+            def remaining_label(done: int, total: int) -> str:
+                return t("ui.submit.submit_remaining", locale=locale, done=done, total=total)
             ready_text = (
                 f"✓ {t('ui.submit.submit', locale=locale)}"
                 if _is_mobile_ua(user_agent)
@@ -1261,7 +1278,8 @@ class SubmitComponent(html.Div):
             if not df_data:
                 disabled_style = {**base_style, 'backgroundColor': '#cccccc', 'color': '#666666', 'cursor': 'not-allowed'}
                 label_style = {**base_label_style, 'color': '#6c757d'}
-                return True, t("ui.submit.submit", locale=locale), disabled_style, t("ui.submit.progress_no_data", locale=locale), label_style
+                return (True, t("ui.submit.submit", locale=locale), disabled_style,
+                        SUBMIT_DISABLED_CLASS, t("ui.submit.progress_no_data", locale=locale), label_style)
             
             # Reconstruct DataFrame to check for predictions
             df = self._reconstruct_dataframe_from_dict(df_data)
@@ -1305,7 +1323,7 @@ class SubmitComponent(html.Div):
                 if predictions_to_end:
                     enabled_style = {**base_style, 'backgroundColor': '#4CBB17', 'color': 'white', 'cursor': 'pointer'}
                     label_style = {**base_label_style, 'display': 'none'}
-                    return False, ready_text, enabled_style, "", label_style
+                    return False, ready_text, enabled_style, SUBMIT_ENABLED_CLASS, "", label_style
                 else:
                     disabled_style = {**base_style, 'backgroundColor': '#999999', 'color': 'white', 'cursor': 'not-allowed'}
                     label_style = {**base_label_style, 'color': '#6c757d'}
@@ -1315,11 +1333,13 @@ class SubmitComponent(html.Div):
                         done=user_predictions_count,
                         total=required_user_predictions,
                     )
-                    return True, t("ui.submit.submit", locale=locale), disabled_style, status_text, label_style
+                    return (True, remaining_label(user_predictions_count, required_user_predictions),
+                            disabled_style, SUBMIT_DISABLED_CLASS, status_text, label_style)
             else:
                 disabled_style = {**base_style, 'backgroundColor': '#cccccc', 'color': '#666666', 'cursor': 'not-allowed'}
                 label_style = {**base_label_style, 'color': '#6c757d'}
-                return True, t("ui.submit.submit", locale=locale), disabled_style, t("ui.submit.progress_hidden_area", locale=locale), label_style
+                return (True, remaining_label(0, len(hidden_area_df)), disabled_style,
+                        SUBMIT_DISABLED_CLASS, t("ui.submit.progress_hidden_area", locale=locale), label_style)
 
     def _reconstruct_dataframe_from_dict(self, df_data: dict[str, list[Any]]) -> pl.DataFrame:
         """Reconstruct a Polars DataFrame from stored dictionary data"""

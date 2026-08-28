@@ -106,5 +106,5 @@ DASH_DEBUG: bool = _env_bool("DASH_DEBUG", DEBUG_MODE)
 # 38: Highscore round-floor selector (new callback) + medal badges.
 # 39: Boards read the ranking CSVs (players missing from statistics now rank).
 # 40: Best-N scoring restored on the class boards.
-DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "40"))
+DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "41"))
 

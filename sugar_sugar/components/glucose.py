@@ -19,6 +19,7 @@ from flask import has_request_context, request as flask_request
 from sugar_sugar.cgmacros import cgmacros_photo_url, visible_food_photo_events
 from sugar_sugar.d1namo import d1namo_photo_url, is_d1namo_source_name
 from sugar_sugar.food_note_i18n import translate_food_note
+from sugar_sugar.components.submit import hidden_area_is_complete
 from sugar_sugar.config import PREDICTION_HOUR_OFFSET, STORAGE_TYPE
 from sugar_sugar.i18n import normalize_locale, t
 
@@ -220,8 +221,16 @@ _ASSETS_IMAGES = Path(__file__).resolve().parents[2] / "assets" / "images"
 # Insulin / carbs: SVG layout images (plotly.js ignores custom path:// markers).
 _ICON_EVENT_TYPES: frozenset[str] = frozenset({"Insulin", "Carbohydrates"})
 
+# Finish-line marker on the playing chart: amber while the hidden hour is still
+# unfinished, green once the drawn line reaches its last point.
+_FINISH_PENDING_COLOR = "#b45309"
+_FINISH_DONE_COLOR = "#15803d"
+# Flag width in x-index units. Wide enough to read on a phone, narrow enough not
+# to cover the points immediately before the finish line.
+_FINISH_FLAG_SIZE_X = 2.2
 
-@lru_cache(maxsize=4)
+
+@lru_cache(maxsize=8)
 def _svg_data_uri(filename: str) -> str:
     path = _ASSETS_IMAGES / filename
     raw = path.read_bytes()
@@ -535,6 +544,7 @@ class GlucoseChart(html.Div):
         self._add_prediction_traces(figure, locale=locale)
         self._add_event_markers(figure, locale=locale)
         self._add_food_photo_guides(figure)
+        self._add_prediction_finish_line(figure, locale=locale)
         self._update_layout(figure, locale=locale)
 
         return figure
@@ -1202,6 +1212,83 @@ class GlucoseChart(html.Div):
         else:
             indexes = list(range(count))
         return indexes, [times[index].strftime("%H:%M") for index in indexes]
+
+    def _add_prediction_finish_line(self, figure: go.Figure, *, locale: str) -> None:
+        """Mark the last point a prediction has to reach, on the playing chart.
+
+        Reported August 2026: a player stopped drawing partway through the
+        hidden hour, found Submit did nothing and took it for a bug. Nothing on
+        the chart said where the line had to end -- the glucose trace simply
+        stopped and the rest of the plot was empty -- and the one piece of copy
+        that said so (``prediction-progress-label``) is ``display: none`` on
+        mobile, where most rounds are played.
+
+        So the target gets a marker in the same vocabulary as the meal and
+        insulin events: a flag on a dashed vertical at the final x index, with a
+        label that turns green once the line reaches it. Results charts never
+        show it -- there the hour is already revealed.
+        """
+        if not self.hide_last_hour or self._current_df.height == 0:
+            return
+
+        finish_x = float(self._current_df.height - 1)
+        complete = hidden_area_is_complete(self._current_df)
+        color = _FINISH_DONE_COLOR if complete else _FINISH_PENDING_COLOR
+        label = (
+            t("ui.chart.prediction_complete", locale=locale)
+            if complete
+            else t("ui.chart.draw_to_here", locale=locale)
+        )
+        compact = bool(getattr(self, "_compact_layout", False))
+
+        figure.add_shape(
+            type="line",
+            x0=finish_x,
+            x1=finish_x,
+            y0=0,
+            y1=1,
+            xref="x",
+            yref="paper",
+            line=dict(color=color, width=2, dash="dash"),
+            layer="below",
+        )
+        # The flag sits half a point from the plot's right edge, so both it and
+        # the label hang leftwards -- centred on the line they would be clipped.
+        size_y = 0.13 if compact else 0.11
+        figure.add_layout_image(
+            dict(
+                source=_svg_data_uri("finish-flag.svg"),
+                xref="x",
+                yref="paper",
+                x=finish_x,
+                y=0.9,
+                sizex=_FINISH_FLAG_SIZE_X,
+                sizey=size_y,
+                xanchor="right",
+                yanchor="middle",
+                sizing="contain",
+                layer="above",
+            )
+        )
+        figure.add_annotation(
+            x=finish_x,
+            y=0.9,
+            text=label,
+            showarrow=False,
+            xref="x",
+            yref="paper",
+            xanchor="right",
+            yanchor="top",
+            # A couple of pixels clear of the plot border, or the label's own
+            # frame is clipped by it.
+            xshift=-5,
+            yshift=-14,
+            font=dict(size=10 if compact else 12, color=color),
+            bgcolor="rgba(255,255,255,0.85)",
+            bordercolor=color,
+            borderwidth=1,
+            borderpad=2,
+        )
 
     def _layout_margin(self) -> dict[str, int]:
         """Return Plotly paper margins. Compact and desktop both stay tight."""

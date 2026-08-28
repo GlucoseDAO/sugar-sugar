@@ -1808,3 +1808,23 @@ html:not(.mobile-device) #next-round-button {
 }
 
 
+
+/* Submit while the hidden hour is unfinished. Fomantic's `.ui.green.button`
+   sets its background `!important`, so the callback's inline grey never
+   applied: the disabled button rendered as green at 45% opacity, which reads
+   as a styling choice, not as "not yet" — a tester's player took the dead
+   button for a bug. The gate therefore drops the `green` class instead of
+   fighting it, same as the mobile wizard's Next button. */
+#submit-button.submit-button-disabled {
+  background-color: #9aa0a6 !important;
+  color: #ffffff !important;
+  cursor: not-allowed !important;
+  opacity: 1 !important;
+  box-shadow: none !important;
+}
+#submit-button.submit-button-disabled:hover,
+#submit-button.submit-button-disabled:focus,
+#submit-button.submit-button-disabled:active {
+  background-color: #9aa0a6 !important;
+  color: #ffffff !important;
+}

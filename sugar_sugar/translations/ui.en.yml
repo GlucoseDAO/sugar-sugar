@@ -248,6 +248,7 @@ en:
     progress_ready: "✓ Ready to submit!"
     progress_hidden_area: "Make predictions in the hidden area to submit"
     submit: "Submit"
+    submit_remaining: "Submit (%{done}/%{total})"
     finish_game: "Finish game"
     finish_confirm_title: "Exit this game?"
     finish_confirm_early: "You’ve completed %{current} of %{total} rounds. Fewer than %{min} rounds is too little for the study."
@@ -365,6 +366,8 @@ en:
     event_carbohydrates: "Carbohydrates"
     food_label: "FOOD"
 
+    draw_to_here: "Draw to here"
+    prediction_complete: "Line complete"
   metrics:
     title: "Metrics"
     prediction_accuracy: "Prediction Accuracy"

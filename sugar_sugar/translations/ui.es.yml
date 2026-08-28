@@ -228,6 +228,7 @@ es:
     progress_ready: "✓ ¡Listo para enviar!"
     progress_hidden_area: "Haz predicciones en el área oculta para enviar"
     submit: "Enviar"
+    submit_remaining: "Enviar (%{done}/%{total})"
     finish_game: "Finalizar partida"
     finish_confirm_title: "¿Salir de esta partida?"
     finish_confirm_early: "Has completado %{current} de %{total} rondas. Menos de %{min} rondas es demasiado poco para el estudio."
@@ -342,6 +343,8 @@ es:
     event_carbohydrates: "Carbohidratos"
     food_label: "COMIDA"
 
+    draw_to_here: "Dibuja hasta aquí"
+    prediction_complete: "Línea completa"
   metrics:
     title: "Métricas"
     prediction_accuracy: "Precisión de la predicción"
