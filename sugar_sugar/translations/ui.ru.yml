@@ -178,8 +178,30 @@ ru:
     paper_full_name_placeholder: "Имя и фамилия"
     data_usage_consent_label: "Я согласен на использование загруженных данных CGM для данного исследования."
     data_usage_consent_required: "Пожалуйста, подтверди согласие на использование данных, чтобы продолжить."
+    consent_gate_hint: "Отметь выше оба обязательных пункта (18+ / условия прочитаны и согласие на защиту данных), чтобы продолжить."
+    import_title: "Импорт твоих данных CGM"
+    import_subtitle: "Загрузи CSV-экспорт (Dexcom / Libre / Medtronic) или свой entries.json из Nightscout — выбери вместе с ним treatments.json, чтобы получить отметки еды и инсулина. Либо забери данные прямо со своего сайта Nightscout."
+    import_or: "— или —"
+    import_upload_prompt: "Перетащи файл или нажми, чтобы выбрать CSV — либо выбери сразу entries.json и treatments.json из Nightscout"
+    import_ns_url_placeholder: "URL Nightscout (https://твой-сайт.com)"
+    import_ns_token_placeholder: "Токен доступа или API secret (необязательно)"
+    import_ns_button: "Импортировать из Nightscout"
+    import_ns_loading: "Связываемся с твоим сайтом Nightscout…"
+    import_success: "Загружено показаний: %{count} из %{source}. Можно начинать."
+    import_needs_consent: "Отметь выше согласие на использование данных перед импортом."
+    import_needs_url: "Сначала введи URL своего Nightscout."
+    import_empty: "Источник не вернул ни одного показания глюкозы. Проверь URL/токен (или диапазон дат) и попробуй снова."
+    import_bad_file: "Не удалось прочитать этот файл — загрузи стандартный CSV-экспорт CGM (Dexcom / Libre / Medtronic) или entries.json из Nightscout и попробуй снова."
+    import_needs_entries: "Добавь entries.json — именно в нём лежат показания глюкозы. treatments.json и profile.json сами по себе не подойдут."
+    import_ignored: "Файл %{files} проигнорирован — игре он не нужен."
+    import_ns_unreachable: "Не удалось связаться с этим сайтом Nightscout. Проверь URL и соединение, затем попробуй снова."
+    import_ns_timeout: "Сайт Nightscout отвечал слишком долго. Попробуй ещё раз."
+    import_ns_http_error: "Сайт Nightscout отклонил запрос (HTTP %{code}). Проверь URL и токен."
+    import_ns_unavailable: "Импорт из Nightscout недоступен на этом сервере (не хватает сетевой зависимости)."
+    import_failed: "Импорт не удался. Проверь файл или данные Nightscout и попробуй снова."
 
   header:
+    upload_button: "Загрузить"
     points_label: "Количество точек для показа:"
     time_window_label: "Позиция временного окна:"
     upload_prompt_1: "Перетащи файл или "
@@ -215,6 +237,8 @@ ru:
     how_to_play_3: "3. Дорисуй предсказание до конца скрытой области, чтобы отправить его"
 
   prediction:
+    upload_only_gate: "Ты выбрал игру только на своих данных. Чтобы начать, нажми кнопку «Загрузить» и выбери свой файл."
+    upload_mixed_gate: "Ты выбрал смешанный режим (публичные + твои данные). Чтобы продолжить, нажми кнопку «Загрузить» и выбери свой CGM-файл — раунды будут чередовать публичные анонимизированные записи и твои данные."
     units_label: "Единицы:"
     upload_required_alert: "Этот формат требует твоих собственных данных CGM. Пожалуйста, загрузи CSV-файл для начала."
     upload_consent_recorded: "Согласие записано. Теперь ты можешь загружать и использовать свои данные CGM в этой сессии."
@@ -238,6 +262,7 @@ ru:
     text: "Примечание: Sugar-Sugar в настоящее время оптимизирован для компьютеров. Поддержка мобильных устройств появится скоро!"
 
   orientation:
+    go_fullscreen: "На весь экран"
     title: "ПОВЕРНИТЕ ТЕЛЕФОН ГОРИЗОНТАЛЬНО, ЧТОБЫ РИСОВАТЬ"
     subtitle: ""
 

@@ -179,6 +179,7 @@ ro:
     paper_full_name_placeholder: "Prenume și nume"
     data_usage_consent_label: "Sunt de acord cu utilizarea datelor mele CGM încărcate pentru acest studiu."
     data_usage_consent_required: "Te rugăm să confirmi consimțământul pentru utilizarea datelor ca să continui."
+    consent_gate_hint: "Bifează mai sus ambele căsuțe obligatorii (18+ / am citit termenii și consimțământul privind protecția datelor) pentru a continua."
     import_title: "Importă-ți datele CGM"
     import_subtitle: "Încarcă un export CSV (Dexcom / Libre / Medtronic) sau fișierul entries.json de la Nightscout — selectează și treatments.json ca să primești marcaje pentru mese și insulină. Ori preia datele direct de pe site-ul tău Nightscout."
     import_or: "— sau —"
@@ -262,6 +263,7 @@ ro:
     text: "Notă: Sugar-Sugar este optimizat pentru desktop momentan. Suportul pentru mobil va veni în curând!"
 
   orientation:
+    go_fullscreen: "Ecran complet"
     title: "ROTEȘTE TELEFONUL ÎN MOD PEISAJ PENTRU A DESENA"
     subtitle: ""
 
