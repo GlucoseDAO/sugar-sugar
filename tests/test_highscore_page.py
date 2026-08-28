@@ -13,8 +13,10 @@ game yet.
 
 from __future__ import annotations
 
+import csv
+import io
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Iterator, Optional
 
 import pytest
 
@@ -84,10 +86,36 @@ def data_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]
     yield tmp_path
 
 
-def _write_stats(root: Path, rows: str) -> None:
-    (root / "data" / "input" / "prediction_statistics.csv").write_text(
-        STATS_HEADER + rows, encoding="utf-8"
-    )
+def _write_stats(root: Path, rows: str, nicknames: Optional[dict[str, str]] = None) -> None:
+    """Write the statistics CSV and the ranking rows it implies.
+
+    The boards are built from the ranking CSVs -- that is where the leaderboard
+    is actually written -- so a fixture with statistics alone would describe a
+    state the app never produces.
+    """
+    input_dir = root / "data" / "input"
+    (input_dir / "prediction_statistics.csv").write_text(STATS_HEADER + rows, encoding="utf-8")
+
+    names = nicknames or {}
+    header = STATS_HEADER.strip().split(",")
+    by_format: dict[str, list[list[str]]] = {}
+    for row in csv.reader(io.StringIO(rows)):
+        if not row:
+            continue
+        cell = dict(zip(header, row))
+        fmt = cell.get("format") or "A"
+        by_format.setdefault(fmt, []).append([
+            cell.get("study_id", ""), cell.get("run_id", ""), "1",
+            cell.get("timestamp", ""), fmt, cell.get("rounds_played", ""),
+            cell.get("is_example_data", ""), cell.get("data_source_name", ""),
+            cell.get("overall_mae_mgdl", ""), "0", "0", "0",
+            email_key(cell.get("email", "")), names.get(cell.get("study_id", ""), ""),
+        ])
+    for fmt, entries in by_format.items():
+        with (input_dir / f"prediction_ranking_{fmt}.csv").open("w", newline="", encoding="utf-8") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(RANK_HEADER.strip().split(","))
+            writer.writerows(entries)
 
 
 def _texts(component: Any) -> list[str]:
@@ -176,8 +204,8 @@ def test_highscore_hides_runs_below_the_class_round_floor(data_root: Path) -> No
     assert "Player 2" not in texts
 
 
-def test_highscore_scores_on_best_rounds_so_12_rounds_beat_no_handicap(data_root: Path) -> None:
-    """The 12-round run's best 6 rounds beat the 6-round run's only 6."""
+def test_highscore_scores_on_best_rounds_so_length_is_not_a_handicap(data_root: Path) -> None:
+    """The 12-round run's best 6 beat the 6-round run's only 6."""
     twelve = _per_round_cell([(10.0 + i, "BIGIDEAS-001.csv") for i in range(12)])
     six = _per_round_cell([(14.0 + i, "BIGIDEAS-002.csv") for i in range(6)])
     _write_stats(
@@ -187,8 +215,8 @@ def test_highscore_scores_on_best_rounds_so_12_rounds_beat_no_handicap(data_root
     )
     texts = _texts(create_highscore_page(None, None, locale="en"))
     joined = " ".join(texts)
-    assert "12.50" in joined  # long run: mean of rounds 10..15
-    assert "16.50" in joined  # short run: mean of rounds 14..19
+    assert "12.50" in joined  # long run: mean of its best 6 (10..15)
+    assert "16.50" in joined  # short run: mean of 14..19
     assert texts.index("12.50") < texts.index("16.50")
 
 
@@ -262,11 +290,7 @@ def test_highscore_shows_nicknames_instead_of_player_n(data_root: Path) -> None:
         data_root,
         _stats_row("s1", email="ann@x.com", per_round=_flat_rounds(9.0, "BIGIDEAS-001.csv"))
         + _stats_row("s2", per_round=_flat_rounds(18.0, "BIGIDEAS-002.csv")),
-    )
-    (data_root / "data" / "input" / "prediction_ranking.csv").write_text(
-        RANK_HEADER
-        + f"s1,r1,1,2026-08-01 10:00:00,ALL,12,False,src.csv,9.0,0,0,0,{email_key('ann@x.com')},SugarNinja\n",
-        encoding="utf-8",
+        nicknames={"s1": "SugarNinja"},
     )
     page = create_highscore_page(None, None, locale="en")
     texts = _texts(page)

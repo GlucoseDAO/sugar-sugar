@@ -130,6 +130,11 @@ def discover_legacy_generic_sources() -> list[GenericDatasetSource]:
                 gender="female",
                 weight="67 kg",
                 sensor="Dexcom G6",
+                # An insulin-treated trace: 73 insulin events, 42% of readings
+                # above 180 mg/dL, range 39-401. Stating it matters because this
+                # file is the Format A fallback when the corpora are absent, and
+                # an undeclared source lands on neither scoreboard.
+                diabetic=True,
             )
         )
 

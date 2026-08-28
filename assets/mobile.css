@@ -1032,6 +1032,13 @@ html.mobile-device .highscore-page .highscore-card {
   max-width: 100% !important;
   padding: 12px 10px !important;
 }
+html.mobile-device .highscore-page .highscore-floor-row {
+  flex-direction: column !important;
+  align-items: stretch !important;
+}
+html.mobile-device .highscore-page .highscore-floor-select {
+  width: 100% !important;
+}
 html.mobile-device .highscore-page .highscore-class-grid {
   grid-template-columns: 1fr !important;
   gap: 14px !important;

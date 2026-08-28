@@ -79,22 +79,39 @@ which means you are testing on production data and should do it on a box you wou
 This is pseudonymized, not anonymized: age, gender, diabetes type and location remain, and a
 `study_id` still keys back to prod's records.
 
-## The salt: don't copy it
+## The salt: don't copy it — re-key instead
 
 `data/.ranking_salt` (or `RANKING_EMAIL_SALT`) is a per-deployment secret behind three HMACs:
 `email_key`, the content-addressed share ids, and the `/player/<id>` URLs. Copying it puts a prod
 secret on a public staging box, and rotating it is not an option (it re-splits every existing
 player), so treat the copy as one-way.
 
-With a *different* salt on test:
+Leaving it behind used to mean copied rows kept prod's `email_key` digests, which the test box can
+never reproduce: the same person read as two identities there. **The script now re-derives that
+column instead.** `email_key` is an HMAC and cannot be reversed, but it does not need to be — the
+addresses it was derived from are in `prediction_statistics.csv`, in the staging dir, at that
+moment. So the copy re-hashes each address under the *destination's own* salt (read from
+`<dest>/../.ranking_salt`) and only then blanks the addresses. Prod's salt is not needed and never
+moves; the test box ends up with digests it can reproduce for itself.
 
-- **Works normally** — the `/highscore` class boards (they recompute `email_key` from the email
-  column, so they are self-consistent under any salt) and nicknames (joined on `study_id`).
-- **Breaks for a tester reusing a prod email** — `/final`'s "You" highlight and the `stored_nickname`
-  prefill, which compare a locally computed hash against the `email_key` *stored* in the ranking
-  CSVs. Copied rows will not match.
-- **Changes** — `/player/<id>` URLs differ from prod's (the pages still work), and re-rendering a
-  copied share mints a new id instead of reusing the file.
+The re-key is verified against the app's own `email_key()` in `tests/test_copy_input_rekey.py`, so
+the two cannot drift.
+
+Caveats worth knowing:
+
+- **A destination that sets `RANKING_EMAIL_SALT` in its environment** ignores the salt file, so the
+  file the script reads would be the wrong secret. Pass `--dest-salt "$RANKING_EMAIL_SALT"` there.
+- **A destination that has never run the app** has no salt file yet; the script says so and copies
+  without re-keying. Start the app once to mint one, then re-copy.
+- **Rows whose `study_id` has no address on record** cannot be re-derived and keep prod's digest.
+  They stay grouped with each other, they just cannot match a session created on test. The script
+  reports the count.
+- **The `/highscore` class boards do not depend on any of this** — they derive identity from the
+  `email` column of the statistics CSV, so with emails blanked they group per `study_id` regardless.
+  Re-keying is what fixes `/final`'s "You" highlight, the `stored_nickname` prefill, and the
+  identity/player counts behind `_ranking_entries`.
+- **`/player/<id>` URLs still differ from prod's** (they are HMACs of the identity under each box's
+  own salt) and re-rendering a copied share still mints a new id. Both are working-as-intended.
 
 ## Verify
 

@@ -3,6 +3,7 @@
     "age": "28 years old",
     "gender": "female",
     "weight": "67 kg",
-    "sensor": "Dexcom G6"
+    "sensor": "Dexcom G6",
+    "diabetic": true
   }
 }

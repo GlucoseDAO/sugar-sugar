@@ -43,6 +43,14 @@ STORAGE_TYPE: str = os.getenv("STORAGE_TYPE", "local")
 # Maximum number of prediction rounds per session
 MAX_ROUNDS: int = int(os.getenv("MAX_ROUNDS", "12"))
 MIN_USEFUL_ROUNDS: int = int(os.getenv("MIN_USEFUL_ROUNDS", str(max(1, MAX_ROUNDS // 2))))
+# Rounds of ONE data class a run needs before it appears on a /highscore class
+# board, and the number of best rounds its score averages. Defaults to
+# MIN_USEFUL_ROUNDS but is separately tunable: that constant also defines what
+# counts as useful *study* data, and a deployment where most players stop after
+# a few rounds may want a lower bar for the public board without redefining that.
+SCOREBOARD_CLASS_ROUNDS: int = max(
+    1, int(os.getenv("SCOREBOARD_CLASS_ROUNDS", str(MIN_USEFUL_ROUNDS)))
+)
 
 # Umami analytics. Defaults use the same-domain Caddy proxy so common
 # cross-domain analytics blocklists do not match the tracker URL.
@@ -95,5 +103,8 @@ DASH_DEBUG: bool = _env_bool("DASH_DEBUG", DEBUG_MODE)
 # 35: Desktop chart bottom paper grown so HH:MM ticks are not clipped.
 # 37: Highscore split into diabetic/non-diabetic class boards; /player/<id> page (CSS additions).
 # 36: Compact/mobile bottom paper grown so rotated HH:MM ticks are not clipped.
-DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "37"))
+# 38: Highscore round-floor selector (new callback) + medal badges.
+# 39: Boards read the ranking CSVs (players missing from statistics now rank).
+# 40: Best-N scoring restored on the class boards.
+DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "40"))
 

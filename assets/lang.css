@@ -464,7 +464,28 @@ body .ui.large.menu {
   max-width: none;
   padding: 12px 8px;
 }
-/* Badges after a player's name: hard mode (foreign data) and veteran (>1 game). */
+/* The round-floor selector above the boards. */
+.highscore-floor-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 16px 0;
+}
+.highscore-floor-label {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #1e3a5f;
+}
+.highscore-floor-select {
+  min-width: 190px;
+  font-size: 13px;
+}
+.highscore-unranked-note {
+  margin-top: 6px;
+  font-style: italic;
+}
+/* Badges after a player's name: hard mode (foreign data) and the medal tiers. */
 .board-badge {
   margin-left: 5px;
   font-size: 13px;

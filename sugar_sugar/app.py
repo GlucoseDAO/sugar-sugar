@@ -89,6 +89,11 @@ from sugar_sugar.nickname import (
 )
 from sugar_sugar.scoreboard import (
     DATA_CLASSES,
+    CLASS_SCORE_ROUNDS,
+    MEDAL_BRONZE_ROUNDS,
+    MEDAL_SILVER_ROUNDS,
+    MEDAL_GOLD_GAMES,
+    earned_medals,
     DATA_CLASS_DIABETIC,
     DATA_CLASS_NONDIABETIC,
     BoardEntry,
@@ -5794,13 +5799,21 @@ _DATA_CLASS_TITLE_KEYS: dict[str, str] = {
     DATA_CLASS_DIABETIC: "ui.highscore.board_diabetic",
 }
 HARD_MODE_BADGE: str = "⚔️"
-VETERAN_BADGE: str = "🏅"
+# Earned cumulatively, so a long game shows bronze+silver and a returning player
+# adds gold. VETERAN_BADGE stays as the gold glyph under its old name because
+# `_scoreboard_class_board` still keys the /player link off the same condition.
+MEDAL_BADGES: dict[str, str] = {"bronze": "🥉", "silver": "🥈", "gold": "🥇"}
+VETERAN_BADGE: str = MEDAL_BADGES["gold"]
+
+# Round floors offered by the /highscore selector. The default is the deployment's
+# own CLASS_SCORE_ROUNDS so the page agrees with `/final` and the share card.
+HIGHSCORE_FLOOR_CHOICES: tuple[int, ...] = (3, 6, 12)
 
 
 def _entry_badges(
     *,
     hard_mode: bool,
-    veteran: bool,
+    medals: list[str],
     locale: str,
 ) -> list[Any]:
     """Badge spans shown after a player's name on the class boards."""
@@ -5814,12 +5827,12 @@ def _entry_badges(
                 disable_n_clicks=True,
             )
         )
-    if veteran:
+    for medal in medals:
         badges.append(
             html.Span(
-                VETERAN_BADGE,
-                className="board-badge veteran",
-                title=t("ui.highscore.badge_veteran", locale=locale),
+                MEDAL_BADGES[medal],
+                className=f"board-badge medal {medal}",
+                title=t(f"ui.highscore.medal_{medal}", locale=locale),
                 disable_n_clicks=True,
             )
         )
@@ -5867,15 +5880,17 @@ def _scoreboard_class_board(
             )
         else:
             player_text = nickname or t("ui.final.player_n", locale=locale, n=idx + 1)
-        veteran = entry.games > 1
+        medals = earned_medals(total_rounds=entry.total_rounds, games=entry.games)
+        # A player page only exists for someone with more than one finished game,
+        # which is exactly the gold condition.
         name_node: Any = (
             dcc.Link(player_text, href=f"/player/{entry.public_id}", className="player-link")
-            if veteran and entry.public_id
+            if "gold" in medals and entry.public_id
             else player_text
         )
         player_children: list[Any] = [name_node]
         player_children.extend(
-            _entry_badges(hard_mode=entry.hard_mode, veteran=veteran, locale=locale)
+            _entry_badges(hard_mode=entry.hard_mode, medals=medals, locale=locale)
         )
         when_date, when_time = _board_when_parts(entry.timestamp)
         when_children: list[Any] = [
@@ -5994,6 +6009,106 @@ def _scoreboard_hero_children(
     ]
 
 
+def _highscore_boards_children(
+    scoreboard: Scoreboard,
+    *,
+    study_id: str,
+    key: str,
+    locale: str,
+    unit: str,
+    floor: int,
+) -> list[Any]:
+    """Hero + both class boards + medal legend, for one round floor.
+
+    Split out of :func:`create_highscore_page` so the selector callback can swap
+    the whole block without re-rendering the page around it.
+    """
+    children: list[Any] = []
+    hero_inner: list[Any] = _scoreboard_hero_children(
+        scoreboard, study_id=study_id, key=key, locale=locale, unit=unit
+    )
+    if hero_inner:
+        children.append(
+            html.Div(
+                html.Div(hero_inner, className="final-leaderboard-hero", disable_n_clicks=True),
+                className="highscore-hero-wrap",
+                disable_n_clicks=True,
+            )
+        )
+
+    class_cards: list[Any] = []
+    for data_class in DATA_CLASSES:
+        card = _scoreboard_class_board(
+            data_class,
+            scoreboard.boards.get(data_class) or [],
+            study_id=study_id,
+            key=key,
+            locale=locale,
+            unit=unit,
+        )
+        if card is not None:
+            class_cards.append(
+                html.Div(card, className="final-leaderboard highscore-card", disable_n_clicks=True)
+            )
+
+    if class_cards:
+        children.append(
+            html.Div(class_cards, className="highscore-class-grid", disable_n_clicks=True)
+        )
+        legend_lines: list[Any] = [
+            html.Div(
+                t("ui.highscore.legend_hard_mode", locale=locale, badge=HARD_MODE_BADGE),
+                className="highscore-legend-line",
+                disable_n_clicks=True,
+            )
+        ]
+        legend_lines.extend(
+            html.Div(
+                t(
+                    f"ui.highscore.legend_{medal}",
+                    locale=locale,
+                    badge=MEDAL_BADGES[medal],
+                    rounds=rounds,
+                ),
+                className="highscore-legend-line",
+                disable_n_clicks=True,
+            )
+            for medal, rounds in (
+                ("bronze", MEDAL_BRONZE_ROUNDS),
+                ("silver", MEDAL_SILVER_ROUNDS),
+                ("gold", MEDAL_GOLD_GAMES),
+            )
+        )
+        children.append(
+            html.Div(legend_lines, className="highscore-legend", disable_n_clicks=True)
+        )
+        # Say how many finished games the current floor leaves out, so a short
+        # board reads as a setting rather than as missing data.
+        if scoreboard.unranked_runs:
+            children.append(
+                html.Div(
+                    t(
+                        "ui.highscore.unranked_note",
+                        locale=locale,
+                        count=scoreboard.unranked_runs,
+                        total=scoreboard.total_runs,
+                        min=floor,
+                    ),
+                    className="highscore-legend-line highscore-unranked-note",
+                    disable_n_clicks=True,
+                )
+            )
+    else:
+        children.append(
+            html.Div(
+                t("ui.highscore.empty", locale=locale, min=floor),
+                className="final-leaderboard-empty highscore-empty",
+                disable_n_clicks=True,
+            )
+        )
+    return children
+
+
 def create_highscore_page(
     user_info: Optional[Dict[str, Any]],
     glucose_unit: Optional[str],
@@ -6077,70 +6192,47 @@ def create_highscore_page(
         ),
     ]
 
-    hero_inner: list[Any] = _scoreboard_hero_children(
-        scoreboard, study_id=study_id, key=key, locale=locale, unit=unit
+    children.append(
+        html.Div(
+            [
+                html.Label(
+                    t("ui.highscore.floor_label", locale=locale),
+                    htmlFor="highscore-floor",
+                    className="highscore-floor-label",
+                ),
+                dcc.Dropdown(
+                    id="highscore-floor",
+                    options=[
+                        {
+                            "label": t("ui.highscore.floor_option", locale=locale, min=choice),
+                            "value": choice,
+                        }
+                        for choice in HIGHSCORE_FLOOR_CHOICES
+                    ],
+                    value=CLASS_SCORE_ROUNDS,
+                    clearable=False,
+                    searchable=False,
+                    className="highscore-floor-select",
+                ),
+            ],
+            className="highscore-floor-row",
+            disable_n_clicks=True,
+        )
     )
-    if hero_inner:
-        children.append(
-            html.Div(
-                html.Div(hero_inner, className="final-leaderboard-hero", disable_n_clicks=True),
-                className="highscore-hero-wrap",
-                disable_n_clicks=True,
-            )
+    children.append(
+        html.Div(
+            _highscore_boards_children(
+                scoreboard,
+                study_id=study_id,
+                key=key,
+                locale=locale,
+                unit=unit,
+                floor=CLASS_SCORE_ROUNDS,
+            ),
+            id="highscore-boards",
+            disable_n_clicks=True,
         )
-
-    class_cards: list[Any] = []
-    for data_class in DATA_CLASSES:
-        card = _scoreboard_class_board(
-            data_class,
-            scoreboard.boards.get(data_class) or [],
-            study_id=study_id,
-            key=key,
-            locale=locale,
-            unit=unit,
-        )
-        if card is not None:
-            class_cards.append(
-                html.Div(card, className="final-leaderboard highscore-card", disable_n_clicks=True)
-            )
-    if class_cards:
-        children.append(
-            html.Div(class_cards, className="highscore-class-grid", disable_n_clicks=True)
-        )
-        children.append(
-            html.Div(
-                [
-                    html.Div(
-                        t(
-                            "ui.highscore.legend_hard_mode",
-                            locale=locale,
-                            badge=HARD_MODE_BADGE,
-                        ),
-                        className="highscore-legend-line",
-                        disable_n_clicks=True,
-                    ),
-                    html.Div(
-                        t(
-                            "ui.highscore.legend_veteran",
-                            locale=locale,
-                            badge=VETERAN_BADGE,
-                        ),
-                        className="highscore-legend-line",
-                        disable_n_clicks=True,
-                    ),
-                ],
-                className="highscore-legend",
-                disable_n_clicks=True,
-            )
-        )
-    else:
-        children.append(
-            html.Div(
-                t("ui.highscore.empty", locale=locale, min=MIN_USEFUL_ROUNDS),
-                className="final-leaderboard-empty highscore-empty",
-                disable_n_clicks=True,
-            )
-        )
+    )
 
     children.append(
         html.Div(
@@ -6216,7 +6308,12 @@ def create_player_page(
     name_children: list[Any] = [html.Span(name, disable_n_clicks=True)]
     name_children.extend(
         _entry_badges(
-            hard_mode=player.hard_mode, veteran=len(player.games) > 1, locale=locale
+            hard_mode=player.hard_mode,
+            medals=earned_medals(
+                total_rounds=max((g.total_rounds for g in player.games), default=0),
+                games=len(player.games),
+            ),
+            locale=locale,
         )
     )
 
@@ -6268,7 +6365,7 @@ def create_player_page(
         ]
         if game.hard_mode:
             format_cell_children.extend(
-                _entry_badges(hard_mode=True, veteran=False, locale=locale)
+                _entry_badges(hard_mode=True, medals=[], locale=locale)
             )
         body_rows.append(
             html.Tr(
@@ -6331,6 +6428,41 @@ def create_player_page(
         ],
         className="info-page highscore-page player-page",
         disable_n_clicks=True,
+    )
+
+
+@app.callback(
+    Output('highscore-boards', 'children'),
+    Input('highscore-floor', 'value'),
+    [State('user-info-store', 'data'),
+     State('glucose-unit', 'data'),
+     State('interface-language', 'data')],
+    prevent_initial_call=True,
+)
+def update_highscore_floor(
+    floor: Optional[int],
+    user_info: Optional[Dict[str, Any]],
+    glucose_unit: Optional[str],
+    interface_language: Optional[str],
+) -> list[Any]:
+    """Rebuild the boards for the chosen per-class round floor.
+
+    Only the boards are swapped, so the page around them (and the selector's own
+    value) survives.  Both ids live in `create_highscore_page`, so this callback
+    can only fire on `/highscore` -- the rule that a callback needs every one of
+    its components mounted.
+    """
+    chosen = int(floor or CLASS_SCORE_ROUNDS)
+    locale = normalize_locale(interface_language)
+    unit = glucose_unit if glucose_unit in ('mg/dL', 'mmol/L') else 'mg/dL'
+    info = user_info or {}
+    return _highscore_boards_children(
+        build_scoreboard(project_root / "data" / "input", class_rounds=chosen),
+        study_id=str(info.get('study_id') or ''),
+        key=email_key(info.get('email')),
+        locale=locale,
+        unit=unit,
+        floor=chosen,
     )
 
 
