@@ -87,6 +87,21 @@ from sugar_sugar.nickname import (
     identity_key,
     normalize_nickname,
 )
+from sugar_sugar.scoreboard import (
+    DATA_CLASSES,
+    CLASS_SCORE_ROUNDS,
+    MEDAL_BRONZE_ROUNDS,
+    MEDAL_SILVER_ROUNDS,
+    MEDAL_GOLD_GAMES,
+    earned_medals,
+    DATA_CLASS_DIABETIC,
+    DATA_CLASS_NONDIABETIC,
+    BoardEntry,
+    PlayerStats,
+    Scoreboard,
+    build_scoreboard,
+    entry_is_own,
+)
 from sugar_sugar.consent import (
     apply_optional_consent_choices,
     reconcile_stored_consents,
@@ -3065,6 +3080,9 @@ def _update_language_page(
         return create_faq_page(locale=locale), warning_content, navbar
     if pathname == '/highscore':
         return create_highscore_page(user_info, glucose_unit, locale=locale), warning_content, navbar
+    if pathname and pathname.startswith('/player/'):
+        player_id = pathname.split('/player/', 1)[1].strip('/').split('/', 1)[0]
+        return create_player_page(player_id, glucose_unit, locale=locale), warning_content, navbar
     # Landing page
     return _landing_builder(locale=locale), warning_content, navbar
 
@@ -3454,6 +3472,9 @@ def _render_page(
             return create_faq_page(locale=locale), warning_content, navbar
         if pathname == '/highscore':
             return create_highscore_page(user_info, glucose_unit, locale=locale), warning_content, navbar
+        if pathname and pathname.startswith('/player/'):
+            player_id = pathname.split('/player/', 1)[1].strip('/').split('/', 1)[0]
+            return create_player_page(player_id, glucose_unit, locale=locale), warning_content, navbar
         # Default route: landing page
         return (_landing_builder(locale=locale), warning_content, navbar)
 
@@ -5770,7 +5791,322 @@ def _final_synthesis_inner(
 
 
 HIGHSCORE_TOP_N: int = 20
-HIGHSCORE_FORMAT_TOP_N: int = 10
+
+# Board titles per data class; the non-diabetic table comes first because it is
+# the bigger population, not because it is the harder one (it is the easier one).
+_DATA_CLASS_TITLE_KEYS: dict[str, str] = {
+    DATA_CLASS_NONDIABETIC: "ui.highscore.board_nondiabetic",
+    DATA_CLASS_DIABETIC: "ui.highscore.board_diabetic",
+}
+HARD_MODE_BADGE: str = "⚔️"
+# Earned cumulatively, so a long game shows bronze+silver and a returning player
+# adds gold. VETERAN_BADGE stays as the gold glyph under its old name because
+# `_scoreboard_class_board` still keys the /player link off the same condition.
+MEDAL_BADGES: dict[str, str] = {"bronze": "🥉", "silver": "🥈", "gold": "🥇"}
+VETERAN_BADGE: str = MEDAL_BADGES["gold"]
+
+# Round floors offered by the /highscore selector. The default is the deployment's
+# own CLASS_SCORE_ROUNDS so the page agrees with `/final` and the share card.
+HIGHSCORE_FLOOR_CHOICES: tuple[int, ...] = (3, 6, 12)
+
+
+def _entry_badges(
+    *,
+    hard_mode: bool,
+    medals: list[str],
+    locale: str,
+) -> list[Any]:
+    """Badge spans shown after a player's name on the class boards."""
+    badges: list[Any] = []
+    if hard_mode:
+        badges.append(
+            html.Span(
+                HARD_MODE_BADGE,
+                className="board-badge hard-mode",
+                title=t("ui.highscore.badge_hard_mode", locale=locale),
+                disable_n_clicks=True,
+            )
+        )
+    for medal in medals:
+        badges.append(
+            html.Span(
+                MEDAL_BADGES[medal],
+                className=f"board-badge medal {medal}",
+                title=t(f"ui.highscore.medal_{medal}", locale=locale),
+                disable_n_clicks=True,
+            )
+        )
+    return badges
+
+
+def _scoreboard_class_board(
+    data_class: str,
+    entries: list[BoardEntry],
+    *,
+    study_id: str,
+    key: str,
+    locale: str,
+    unit: str,
+    top_n: int = HIGHSCORE_TOP_N,
+) -> Optional[html.Div]:
+    """One class board (diabetic-data or non-diabetic-data) as a card.
+
+    Same 5-cell grid as the old arcade board (the ``final-leaderboard-*`` CSS
+    contract), with badges inside the player cell so the column layout in
+    ``lang.css`` / ``mobile.css`` stays untouched.  A veteran's name links to
+    their public ``/player/<id>`` statistics page.  Rendered rows: the top N
+    plus the visitor's own best slot when it sits below the cut.
+    """
+    if not entries:
+        return None
+
+    own_indices = [
+        idx for idx, entry in enumerate(entries)
+        if entry_is_own(entry, study_id=study_id, key=key)
+    ]
+    shown: list[tuple[int, BoardEntry]] = list(enumerate(entries[: max(1, top_n)]))
+    if own_indices and own_indices[0] >= len(shown):
+        shown.append((own_indices[0], entries[own_indices[0]]))
+
+    rows: list[Any] = []
+    for idx, entry in shown:
+        is_you = idx in own_indices
+        nickname = normalize_nickname(entry.nickname)
+        if is_you:
+            player_text = (
+                t("ui.final.you_named", locale=locale, name=nickname)
+                if nickname
+                else t("ui.final.you", locale=locale)
+            )
+        else:
+            player_text = nickname or t("ui.final.player_n", locale=locale, n=idx + 1)
+        medals = earned_medals(total_rounds=entry.total_rounds, games=entry.games)
+        # A player page only exists for someone with more than one finished game,
+        # which is exactly the gold condition.
+        name_node: Any = (
+            dcc.Link(player_text, href=f"/player/{entry.public_id}", className="player-link")
+            if "gold" in medals and entry.public_id
+            else player_text
+        )
+        player_children: list[Any] = [name_node]
+        player_children.extend(
+            _entry_badges(hard_mode=entry.hard_mode, medals=medals, locale=locale)
+        )
+        when_date, when_time = _board_when_parts(entry.timestamp)
+        when_children: list[Any] = [
+            html.Span(when_date, className="when-date", disable_n_clicks=True),
+        ]
+        if when_time:
+            when_children.append(
+                html.Span(when_time, className="when-time", disable_n_clicks=True)
+            )
+        rows.append(
+            html.Div(
+                [
+                    html.Span(str(idx + 1), className="final-leaderboard-cell rank"),
+                    html.Span(
+                        player_children,
+                        className=(
+                            "final-leaderboard-cell player you-label"
+                            if is_you
+                            else "final-leaderboard-cell player"
+                        ),
+                    ),
+                    # Rounds *of this data class* in the run: the score is the mean
+                    # of the best CLASS_SCORE_ROUNDS of them, so this is the count
+                    # the entry earned its score from.
+                    html.Span(
+                        str(entry.class_rounds),
+                        className="final-leaderboard-cell rounds",
+                    ),
+                    html.Span(
+                        when_children,
+                        className="final-leaderboard-cell when",
+                        disable_n_clicks=True,
+                    ),
+                    html.Span(
+                        _format_mae_for_unit(entry.score_mae, unit=unit),
+                        className="final-leaderboard-cell mae",
+                    ),
+                ],
+                className="final-leaderboard-row you" if is_you else "final-leaderboard-row",
+                disable_n_clicks=True,
+            )
+        )
+
+    children: list[Any] = [
+        html.Div(
+            t(_DATA_CLASS_TITLE_KEYS[data_class], locale=locale),
+            className="final-leaderboard-board-title",
+            disable_n_clicks=True,
+        ),
+        html.Div(
+            t("ui.highscore.scores_count", locale=locale, total=len(entries)),
+            className="final-leaderboard-board-subtitle",
+            disable_n_clicks=True,
+        ),
+        html.Div(
+            [
+                html.Span(t("ui.final.col_rank", locale=locale), className="final-leaderboard-cell rank"),
+                html.Span(t("ui.final.col_player", locale=locale), className="final-leaderboard-cell player"),
+                html.Span(t("ui.final.col_rounds", locale=locale), className="final-leaderboard-cell rounds"),
+                html.Span(t("ui.final.col_when", locale=locale), className="final-leaderboard-cell when"),
+                html.Span(t("ui.final.col_mae", locale=locale, unit=unit), className="final-leaderboard-cell mae"),
+            ],
+            className="final-leaderboard-row head",
+            disable_n_clicks=True,
+        ),
+        html.Div(rows, className="final-leaderboard-rows", disable_n_clicks=True),
+    ]
+    return html.Div(children, className="final-leaderboard-board", disable_n_clicks=True)
+
+
+def _scoreboard_hero_children(
+    scoreboard: Scoreboard,
+    *,
+    study_id: str,
+    key: str,
+    locale: str,
+    unit: str,
+) -> list[Any]:
+    """"Your place" lines, one per class board the visitor is ranked on."""
+    if not study_id and not key:
+        return []
+    lines: list[Any] = []
+    for data_class in DATA_CLASSES:
+        entries = scoreboard.boards.get(data_class) or []
+        own = [
+            (idx, entry) for idx, entry in enumerate(entries)
+            if entry_is_own(entry, study_id=study_id, key=key)
+        ]
+        if not own:
+            continue
+        idx, entry = own[0]
+        lines.append(
+            html.Div(
+                t(
+                    "ui.highscore.your_place_line",
+                    locale=locale,
+                    board=t(_DATA_CLASS_TITLE_KEYS[data_class], locale=locale),
+                    rank=idx + 1,
+                    total=len(entries),
+                    mae=_format_mae_for_unit(entry.score_mae, unit=unit),
+                    unit=unit,
+                ),
+                className="final-leaderboard-hero-rank highscore-place-line",
+                disable_n_clicks=True,
+            )
+        )
+    if not lines:
+        return []
+    return [
+        html.Div(
+            t("ui.final.your_place", locale=locale),
+            className="final-leaderboard-hero-label",
+            disable_n_clicks=True,
+        ),
+        *lines,
+    ]
+
+
+def _highscore_boards_children(
+    scoreboard: Scoreboard,
+    *,
+    study_id: str,
+    key: str,
+    locale: str,
+    unit: str,
+    floor: int,
+) -> list[Any]:
+    """Hero + both class boards + medal legend, for one round floor.
+
+    Split out of :func:`create_highscore_page` so the selector callback can swap
+    the whole block without re-rendering the page around it.
+    """
+    children: list[Any] = []
+    hero_inner: list[Any] = _scoreboard_hero_children(
+        scoreboard, study_id=study_id, key=key, locale=locale, unit=unit
+    )
+    if hero_inner:
+        children.append(
+            html.Div(
+                html.Div(hero_inner, className="final-leaderboard-hero", disable_n_clicks=True),
+                className="highscore-hero-wrap",
+                disable_n_clicks=True,
+            )
+        )
+
+    class_cards: list[Any] = []
+    for data_class in DATA_CLASSES:
+        card = _scoreboard_class_board(
+            data_class,
+            scoreboard.boards.get(data_class) or [],
+            study_id=study_id,
+            key=key,
+            locale=locale,
+            unit=unit,
+        )
+        if card is not None:
+            class_cards.append(
+                html.Div(card, className="final-leaderboard highscore-card", disable_n_clicks=True)
+            )
+
+    if class_cards:
+        children.append(
+            html.Div(class_cards, className="highscore-class-grid", disable_n_clicks=True)
+        )
+        legend_lines: list[Any] = [
+            html.Div(
+                t("ui.highscore.legend_hard_mode", locale=locale, badge=HARD_MODE_BADGE),
+                className="highscore-legend-line",
+                disable_n_clicks=True,
+            )
+        ]
+        legend_lines.extend(
+            html.Div(
+                t(
+                    f"ui.highscore.legend_{medal}",
+                    locale=locale,
+                    badge=MEDAL_BADGES[medal],
+                    rounds=rounds,
+                ),
+                className="highscore-legend-line",
+                disable_n_clicks=True,
+            )
+            for medal, rounds in (
+                ("bronze", MEDAL_BRONZE_ROUNDS),
+                ("silver", MEDAL_SILVER_ROUNDS),
+                ("gold", MEDAL_GOLD_GAMES),
+            )
+        )
+        children.append(
+            html.Div(legend_lines, className="highscore-legend", disable_n_clicks=True)
+        )
+        # Say how many finished games the current floor leaves out, so a short
+        # board reads as a setting rather than as missing data.
+        if scoreboard.unranked_runs:
+            children.append(
+                html.Div(
+                    t(
+                        "ui.highscore.unranked_note",
+                        locale=locale,
+                        count=scoreboard.unranked_runs,
+                        total=scoreboard.total_runs,
+                        min=floor,
+                    ),
+                    className="highscore-legend-line highscore-unranked-note",
+                    disable_n_clicks=True,
+                )
+            )
+    else:
+        children.append(
+            html.Div(
+                t("ui.highscore.empty", locale=locale, min=floor),
+                className="final-leaderboard-empty highscore-empty",
+                disable_n_clicks=True,
+            )
+        )
+    return children
 
 
 def create_highscore_page(
@@ -5781,11 +6117,19 @@ def create_highscore_page(
 ) -> html.Div:
     """Public highscore page reachable from the navbar (desktop) / burger menu (mobile).
 
-    Reads the same ranking CSVs as ``/final`` (``data/input/prediction_ranking*.csv``),
-    so it renders for a first-time visitor with no session at all.  When a session
-    exists, the visitor's own row is highlighted and a "your place" hero is shown.
-    Players who picked a nickname are shown by it; the rest stay anonymous
-    (``Player N``) exactly as on ``/final``.
+    Two main tables split by the **data being predicted** -- non-diabetic
+    (BIG IDEAs, flatter and objectively easier) and diabetic (D1NAMO / LOOP /
+    a diabetic player's own data) -- because one mixed board lets easy data
+    outrank hard data.  Entries are scored on their best ``CLASS_SCORE_ROUNDS``
+    rounds of the class (see ``sugar_sugar.scoreboard``), which removes the
+    6-vs-12-round handicap.  Hard-mode entries (playing data foreign to your
+    own condition) carry a badge; players with more than one finished game get
+    a veteran badge and link to their public ``/player/<id>`` page.
+
+    Renders for a first-time visitor with no session at all.  When a session
+    exists, the visitor's own rows are highlighted and a "your place" hero is
+    shown.  Players who picked a nickname are shown by it; the rest stay
+    anonymous (``Player N``).
     """
     from sugar_sugar.components.landing import (
         count_people_who_accessed,
@@ -5808,24 +6152,7 @@ def create_highscore_page(
     study_id: str = str((user_info or {}).get('study_id') or '')
     key: str = email_key((user_info or {}).get('email'))
 
-    overall: Optional[dict[str, Any]] = _leaderboard_snapshot(
-        project_root / 'data' / 'input' / 'prediction_ranking.csv',
-        study_id=study_id,
-        key=key,
-        format_filter="ALL",
-        top_n=HIGHSCORE_TOP_N,
-    )
-    per_format: list[tuple[str, dict[str, Any]]] = []
-    for fmt in ("A", "B", "C"):
-        board = _leaderboard_snapshot(
-            project_root / 'data' / 'input' / f'prediction_ranking_{fmt}.csv',
-            study_id=study_id,
-            key=key,
-            format_filter=fmt,
-            top_n=HIGHSCORE_FORMAT_TOP_N,
-        )
-        if board is not None:
-            per_format.append((fmt, board))
+    scoreboard: Scoreboard = build_scoreboard(input_dir)
 
     children: list[Any] = [
         html.H1(t("ui.highscore.title", locale=locale), disable_n_clicks=True),
@@ -5850,10 +6177,12 @@ def create_highscore_page(
                     className="highscore-stat",
                     disable_n_clicks=True,
                 ),
-                # `total` counts board slots (one per finished game); `players` is
-                # the distinct-people count among ranked completers.
                 html.Div(
-                    t("ui.highscore.players_count", locale=locale, total=int((overall or {}).get("players") or 0)),
+                    t(
+                        "ui.highscore.players_count",
+                        locale=locale,
+                        total=scoreboard.player_count(),
+                    ),
                     className="highscore-stat",
                     disable_n_clicks=True,
                 ),
@@ -5863,70 +6192,47 @@ def create_highscore_page(
         ),
     ]
 
-    hero_inner: list[Any] = _leaderboard_hero_children(overall, locale=locale, unit=unit)
-    if hero_inner:
-        children.append(
-            html.Div(
-                html.Div(hero_inner, className="final-leaderboard-hero", disable_n_clicks=True),
-                className="highscore-hero-wrap",
-                disable_n_clicks=True,
-            )
+    children.append(
+        html.Div(
+            [
+                html.Label(
+                    t("ui.highscore.floor_label", locale=locale),
+                    htmlFor="highscore-floor",
+                    className="highscore-floor-label",
+                ),
+                dcc.Dropdown(
+                    id="highscore-floor",
+                    options=[
+                        {
+                            "label": t("ui.highscore.floor_option", locale=locale, min=choice),
+                            "value": choice,
+                        }
+                        for choice in HIGHSCORE_FLOOR_CHOICES
+                    ],
+                    value=CLASS_SCORE_ROUNDS,
+                    clearable=False,
+                    searchable=False,
+                    className="highscore-floor-select",
+                ),
+            ],
+            className="highscore-floor-row",
+            disable_n_clicks=True,
         )
-
-    overall_board = _leaderboard_board(
-        list((overall or {}).get("top") or []),
-        title=t("ui.highscore.overall_board", locale=locale),
-        subtitle=t("ui.highscore.lower_is_better", locale=locale),
-        locale=locale,
-        unit=unit,
     )
-    if overall_board is not None:
-        children.append(
-            html.Div(
-                overall_board,
-                className="final-leaderboard highscore-card",
-                disable_n_clicks=True,
-            )
+    children.append(
+        html.Div(
+            _highscore_boards_children(
+                scoreboard,
+                study_id=study_id,
+                key=key,
+                locale=locale,
+                unit=unit,
+                floor=CLASS_SCORE_ROUNDS,
+            ),
+            id="highscore-boards",
+            disable_n_clicks=True,
         )
-
-    format_cards: list[Any] = []
-    for fmt, board in per_format:
-        card = _leaderboard_board(
-            list(board.get("top") or []),
-            title=_format_label(fmt, locale=locale),
-            # One slot per finished game on this source, so count scores not players.
-            subtitle=t("ui.highscore.scores_count", locale=locale, total=int(board.get("total") or 0)),
-            locale=locale,
-            unit=unit,
-        )
-        if card is not None:
-            format_cards.append(
-                html.Div(card, className="final-leaderboard highscore-card", disable_n_clicks=True)
-            )
-    if format_cards:
-        children.append(
-            html.Div(
-                [
-                    html.H3(
-                        t("ui.highscore.by_data_source", locale=locale),
-                        className="highscore-section-title",
-                        disable_n_clicks=True,
-                    ),
-                    html.Div(format_cards, className="highscore-format-grid", disable_n_clicks=True),
-                ],
-                className="highscore-formats",
-                disable_n_clicks=True,
-            )
-        )
-
-    if overall_board is None and not format_cards:
-        children.append(
-            html.Div(
-                t("ui.highscore.empty", locale=locale, min=MIN_USEFUL_ROUNDS),
-                className="final-leaderboard-empty highscore-empty",
-                disable_n_clicks=True,
-            )
-        )
+    )
 
     children.append(
         html.Div(
@@ -5952,6 +6258,212 @@ def create_highscore_page(
     )
 
     return html.Div(children, className="info-page highscore-page", disable_n_clicks=True)
+
+
+def create_player_page(
+    public_id: str,
+    glucose_unit: Optional[str],
+    *,
+    locale: str,
+) -> html.Div:
+    """Public per-player statistics page at ``/player/<public_id>``.
+
+    Reached by clicking a veteran's name on ``/highscore``.  ``public_id`` is a
+    salted HMAC of the leaderboard identity, so the URL exposes neither
+    ``study_id`` nor ``email_key``; an unknown id renders a friendly not-found
+    state instead of a crash.  Shows the player's badges, best class scores and
+    every finished game with its timestamp -- nickname or anonymous, never
+    anything from the study record.
+    """
+    unit: str = glucose_unit if glucose_unit in ('mg/dL', 'mmol/L') else 'mg/dL'
+    scoreboard: Scoreboard = build_scoreboard(project_root / "data" / "input")
+    player: Optional[PlayerStats] = scoreboard.players.get(str(public_id or "").strip())
+
+    back_link = html.Div(
+        dcc.Link(
+            t("ui.player.back_to_board", locale=locale),
+            href="/highscore",
+            className="ui blue button highscore-play-button",
+        ),
+        className="highscore-actions",
+        disable_n_clicks=True,
+    )
+
+    if player is None:
+        return html.Div(
+            [
+                html.H1(t("ui.player.title", locale=locale), disable_n_clicks=True),
+                html.Div(
+                    t("ui.player.not_found", locale=locale),
+                    className="final-leaderboard-empty highscore-empty",
+                    disable_n_clicks=True,
+                ),
+                back_link,
+            ],
+            className="info-page highscore-page player-page",
+            disable_n_clicks=True,
+        )
+
+    name = normalize_nickname(player.nickname) or t("ui.player.anonymous", locale=locale)
+    name_children: list[Any] = [html.Span(name, disable_n_clicks=True)]
+    name_children.extend(
+        _entry_badges(
+            hard_mode=player.hard_mode,
+            medals=earned_medals(
+                total_rounds=max((g.total_rounds for g in player.games), default=0),
+                games=len(player.games),
+            ),
+            locale=locale,
+        )
+    )
+
+    chips: list[Any] = [
+        html.Div(
+            t("ui.player.games_count", locale=locale, count=len(player.games)),
+            className="highscore-stat",
+            disable_n_clicks=True,
+        )
+    ]
+    best_keys: dict[str, str] = {
+        DATA_CLASS_NONDIABETIC: "ui.player.best_nondiabetic",
+        DATA_CLASS_DIABETIC: "ui.player.best_diabetic",
+    }
+    for data_class in DATA_CLASSES:
+        best = player.best_scores.get(data_class)
+        if best is None:
+            continue
+        chips.append(
+            html.Div(
+                t(
+                    best_keys[data_class],
+                    locale=locale,
+                    mae=_format_mae_for_unit(best, unit=unit),
+                    unit=unit,
+                ),
+                className="highscore-stat",
+                disable_n_clicks=True,
+            )
+        )
+
+    def _mae_cell(value: Optional[float]) -> str:
+        return _format_mae_for_unit(value, unit=unit) if value is not None else "–"
+
+    header_cells = [
+        t("ui.final.col_when", locale=locale),
+        t("ui.player.col_format", locale=locale),
+        t("ui.final.col_rounds", locale=locale),
+        t("ui.player.col_nondiabetic_mae", locale=locale, unit=unit),
+        t("ui.player.col_diabetic_mae", locale=locale, unit=unit),
+        t("ui.player.col_overall_mae", locale=locale, unit=unit),
+    ]
+    body_rows: list[Any] = []
+    for game in reversed(player.games):
+        when_date, when_time = _board_when_parts(game.timestamp)
+        when_label = f"{when_date} {when_time}".strip()
+        format_cell_children: list[Any] = [
+            html.Span(_format_label(game.format, locale=locale), disable_n_clicks=True)
+        ]
+        if game.hard_mode:
+            format_cell_children.extend(
+                _entry_badges(hard_mode=True, medals=[], locale=locale)
+            )
+        body_rows.append(
+            html.Tr(
+                [
+                    html.Td(when_label, disable_n_clicks=True),
+                    html.Td(format_cell_children, disable_n_clicks=True),
+                    html.Td(str(game.total_rounds), disable_n_clicks=True),
+                    html.Td(
+                        _mae_cell(game.class_maes.get(DATA_CLASS_NONDIABETIC)),
+                        disable_n_clicks=True,
+                    ),
+                    html.Td(
+                        _mae_cell(game.class_maes.get(DATA_CLASS_DIABETIC)),
+                        disable_n_clicks=True,
+                    ),
+                    html.Td(_mae_cell(game.overall_mae), disable_n_clicks=True),
+                ],
+                disable_n_clicks=True,
+            )
+        )
+
+    games_table = html.Div(
+        html.Table(
+            [
+                html.Thead(
+                    html.Tr(
+                        [html.Th(cell, disable_n_clicks=True) for cell in header_cells],
+                        disable_n_clicks=True,
+                    ),
+                    disable_n_clicks=True,
+                ),
+                html.Tbody(body_rows, disable_n_clicks=True),
+            ],
+            className="player-games-table",
+            disable_n_clicks=True,
+        ),
+        # Wide table: it owns its horizontal scroll so the page body never does.
+        style={"overflowX": "auto"},
+        className="player-games-scroll",
+        disable_n_clicks=True,
+    )
+
+    return html.Div(
+        [
+            html.H1(t("ui.player.title", locale=locale), disable_n_clicks=True),
+            html.Div(name_children, className="player-page-name", disable_n_clicks=True),
+            html.Div(chips, className="highscore-stats", disable_n_clicks=True),
+            html.H3(
+                t("ui.player.games_title", locale=locale),
+                className="highscore-section-title",
+                disable_n_clicks=True,
+            ),
+            games_table,
+            html.Div(
+                t("ui.highscore.privacy_note", locale=locale),
+                className="highscore-privacy-note",
+                disable_n_clicks=True,
+            ),
+            back_link,
+        ],
+        className="info-page highscore-page player-page",
+        disable_n_clicks=True,
+    )
+
+
+@app.callback(
+    Output('highscore-boards', 'children'),
+    Input('highscore-floor', 'value'),
+    [State('user-info-store', 'data'),
+     State('glucose-unit', 'data'),
+     State('interface-language', 'data')],
+    prevent_initial_call=True,
+)
+def update_highscore_floor(
+    floor: Optional[int],
+    user_info: Optional[Dict[str, Any]],
+    glucose_unit: Optional[str],
+    interface_language: Optional[str],
+) -> list[Any]:
+    """Rebuild the boards for the chosen per-class round floor.
+
+    Only the boards are swapped, so the page around them (and the selector's own
+    value) survives.  Both ids live in `create_highscore_page`, so this callback
+    can only fire on `/highscore` -- the rule that a callback needs every one of
+    its components mounted.
+    """
+    chosen = int(floor or CLASS_SCORE_ROUNDS)
+    locale = normalize_locale(interface_language)
+    unit = glucose_unit if glucose_unit in ('mg/dL', 'mmol/L') else 'mg/dL'
+    info = user_info or {}
+    return _highscore_boards_children(
+        build_scoreboard(project_root / "data" / "input", class_rounds=chosen),
+        study_id=str(info.get('study_id') or ''),
+        key=email_key(info.get('email')),
+        locale=locale,
+        unit=unit,
+        floor=chosen,
+    )
 
 
 def _convert_table_data_units(table_data: list[dict[str, str]], glucose_unit: str) -> list[dict[str, str]]:

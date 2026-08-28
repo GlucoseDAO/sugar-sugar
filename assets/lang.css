@@ -451,18 +451,92 @@ body .ui.large.menu {
   font-size: clamp(18px, 2.6vw, 22px) !important;
   color: #1e3a5f;
 }
-.highscore-format-grid {
+/* The two main class boards (non-diabetic data / diabetic data) sit side by
+   side on the 1040px page and stack when the viewport gets narrow. */
+.highscore-class-grid {
   display: grid;
-  /* Keep the three source cards in one row on the 1040px page. The row
-     grid now shrinks instead of overflowing, so 300px is enough again. */
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
   gap: 18px;
   align-items: start;
 }
-.highscore-format-grid .highscore-card {
+.highscore-class-grid .highscore-card {
   margin: 0;
   max-width: none;
   padding: 12px 8px;
+}
+/* The round-floor selector above the boards. */
+.highscore-floor-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 16px 0;
+}
+.highscore-floor-label {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #1e3a5f;
+}
+.highscore-floor-select {
+  min-width: 190px;
+  font-size: 13px;
+}
+.highscore-unranked-note {
+  margin-top: 6px;
+  font-style: italic;
+}
+/* Badges after a player's name: hard mode (foreign data) and the medal tiers. */
+.board-badge {
+  margin-left: 5px;
+  font-size: 13px;
+  cursor: help;
+}
+.player-link {
+  color: #1d4ed8;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+.player-link:hover {
+  color: #1e40af;
+}
+.highscore-legend {
+  max-width: 720px;
+  margin: 4px auto 0 auto;
+  text-align: center;
+}
+.highscore-legend-line {
+  font-size: 12px !important;
+  color: #64748b;
+  line-height: 1.5;
+}
+/* ---- Player statistics page (/player/<id>) ---------------------------- */
+.player-page-name {
+  font-size: clamp(18px, 2.8vw, 24px) !important;
+  font-weight: 700 !important;
+  color: #1e3a5f;
+  margin: 4px 0 12px 0;
+}
+.player-games-scroll {
+  margin: 0 0 18px 0;
+}
+.player-games-table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 560px;
+}
+.player-games-table th,
+.player-games-table td {
+  border-bottom: 1px solid rgba(75, 95, 130, 0.18);
+  padding: 8px 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+.player-games-table th {
+  font-size: 12px !important;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 /* `.final-leaderboard-row.head` sets 12px, but the global
    `body :not(h1..h6) { font-size: 16px !important }` rule in this file wins on

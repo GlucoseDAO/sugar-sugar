@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -83,8 +83,15 @@ def load_generic_sources_metadata() -> dict[str, GenericSourceMetadata]:
 
     for source in discover_legacy_generic_sources() + discover_generic_dataset_sources():
         meta = _metadata_from_source(source)
-        if meta is not None:
-            out[source.source_name] = meta
+        if meta is None:
+            continue
+        # A discovered source is authoritative, except where it knows nothing:
+        # carrying its `None` over a status declared in the JSON would silently
+        # un-declare it, and an undeclared source belongs to neither scoreboard.
+        declared = out.get(source.source_name)
+        if meta.diabetic is None and declared is not None and declared.diabetic is not None:
+            meta = replace(meta, diabetic=declared.diabetic)
+        out[source.source_name] = meta
 
     return out
 

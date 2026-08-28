@@ -218,6 +218,9 @@ logs/*
 # Local backup archives (see backup/README.md)
 backup/archives/
 
+# Pre-overwrite snapshot taken by scripts/copy-input-to-test.sh
+data/input-before-copy-*.tar.gz
+
 # Public CGMacros dataset from PhysioNet (not stored in git; unused in Format A).
 # Fetch locally with: uv run download-cgmacros
 # https://physionet.org/content/cgmacros/1.0.0/
