@@ -179,10 +179,11 @@ ro:
     paper_full_name_placeholder: "Prenume și nume"
     data_usage_consent_label: "Sunt de acord cu utilizarea datelor mele CGM încărcate pentru acest studiu."
     data_usage_consent_required: "Te rugăm să confirmi consimțământul pentru utilizarea datelor ca să continui."
+    consent_gate_hint: "Bifează mai sus ambele căsuțe obligatorii (18+ / am citit termenii și consimțământul privind protecția datelor) pentru a continua."
     import_title: "Importă-ți datele CGM"
-    import_subtitle: "Încarcă un CSV (export Dexcom / Libre / Medtronic / Nightscout) sau preia-le direct de pe site-ul tău Nightscout. Poți face asta și mai târziu, pe ecranul de predicție."
+    import_subtitle: "Încarcă un export CSV (Dexcom / Libre / Medtronic) sau fișierul entries.json de la Nightscout — selectează și treatments.json ca să primești marcaje pentru mese și insulină. Ori preia datele direct de pe site-ul tău Nightscout."
     import_or: "— sau —"
-    import_upload_prompt: "Trage și plasează sau apasă pentru a selecta un fișier CSV"
+    import_upload_prompt: "Trage și plasează sau apasă pentru a selecta un CSV — ori alege împreună entries.json și treatments.json de la Nightscout"
     import_ns_url_placeholder: "URL Nightscout (https://site-ul-tau.com)"
     import_ns_token_placeholder: "Token de acces sau API secret (opțional)"
     import_ns_button: "Importă din Nightscout"
@@ -191,7 +192,9 @@ ro:
     import_needs_consent: "Te rugăm să bifezi consimțământul pentru utilizarea datelor înainte de import."
     import_needs_url: "Te rugăm să introduci mai întâi URL-ul Nightscout."
     import_empty: "Sursa nu a returnat nicio valoare de glucoză. Verifică URL-ul/token-ul (sau intervalul de date) și încearcă din nou."
-    import_bad_file: "Fișierul nu a putut fi citit — exportă un CSV CGM standard (Dexcom / Libre / Medtronic / Nightscout) și încearcă din nou."
+    import_bad_file: "Fișierul nu a putut fi citit — încarcă un export CSV CGM standard (Dexcom / Libre / Medtronic) sau un entries.json de la Nightscout și încearcă din nou."
+    import_needs_entries: "Adaugă entries.json — el conține valorile glicemiei. treatments.json și profile.json nu pot fi folosite singure."
+    import_ignored: "Am ignorat %{files}, de care jocul nu are nevoie."
     import_ns_unreachable: "Nu s-a putut accesa site-ul Nightscout. Verifică URL-ul și conexiunea, apoi încearcă din nou."
     import_ns_timeout: "Site-ul Nightscout a răspuns prea greu. Te rugăm să încerci din nou."
     import_ns_http_error: "Site-ul Nightscout a respins cererea (HTTP %{code}). Verifică URL-ul și token-ul."
@@ -208,7 +211,7 @@ ro:
     upload_required: "Este necesară încărcarea"
     upload_success: "Datele din %{filename} au fost încărcate cu succes. Aceste date vor fi folosite pentru predicții."
     example_data_now_using: "Acum se folosesc date exemplu. Încarcă un fișier CSV pentru o analiză personalizată."
-    example_data_warning: "În prezent se folosesc date exemplu. Încarcă propriul CSV Dexcom/Libre/Medtronic/Nightscout pentru o analiză personalizată."
+    example_data_warning: "În prezent se folosesc date exemplu. Încarcă propriul CSV Dexcom/Libre/Medtronic — sau entries.json de la Nightscout — pentru o analiză personalizată."
     csv_tab_label: "Fișier CSV"
     nightscout_tab_label: "Nightscout"
     nightscout_url_placeholder: "https://site-ul-tau-nightscout.com"
@@ -260,6 +263,7 @@ ro:
     text: "Notă: Sugar-Sugar este optimizat pentru desktop momentan. Suportul pentru mobil va veni în curând!"
 
   orientation:
+    go_fullscreen: "Ecran complet"
     title: "ROTEȘTE TELEFONUL ÎN MOD PEISAJ PENTRU A DESENA"
     subtitle: ""
 
@@ -616,7 +620,7 @@ ro:
           - q: "Cine poate participa?"
             a: "Oricine are 18+ ani. Utilizatorii de CGM sunt deosebit de valoroși, dar și persoanele fără CGM pot juca cu date publice anonimizate."
           - q: "Ce dispozitive și formate CGM sunt acceptate?"
-            a: "Sunt acceptate exporturile Dexcom, Libre, Medtronic și Nightscout. Un set de date publice anonimizate este de asemenea disponibil dacă nu ai un dispozitiv CGM."
+            a: "Sunt acceptate exporturile CSV Dexcom, Libre și Medtronic, precum și un fișier entries.json de la Nightscout. (Nu și exportul CSV al Nightscout — îi lipsesc majoritatea datelor.) Un set de date publice anonimizate este de asemenea disponibil dacă nu ai un dispozitiv CGM."
           - q: "Cât timp durează?"
             a: "Fiecare rundă durează aproximativ 2–3 minute. O sesiune completă (12 runde) durează aproximativ 30 de minute, dar o poți împărți în mai multe vizite."
           - q: "Pot să mă opresc la jumătate și să reiau mai târziu?"
@@ -644,7 +648,7 @@ ro:
         id: download-csv
         items:
           - q: "De ce nu pot exporta din aplicația de telefon?"
-            a: "Majoritatea aplicațiilor CGM de pe telefon oferă doar rapoarte PDF. CSV-ul brut vine de pe site-ul producătorului sau din aplicații open-source precum xDrip+ și Nightscout."
+            a: "Majoritatea aplicațiilor CGM de pe telefon oferă doar rapoarte PDF. CSV-ul brut vine de pe site-ul producătorului sau din aplicații open-source precum xDrip+."
           - q: "Dexcom (Clarity)"
             a: >-
               1. Deschide [clarity.dexcom.com](https://clarity.dexcom.com) (SUA) sau [clarity.dexcom.eu](https://clarity.dexcom.eu) (Europa) și autentifică-te cu contul Dexcom.
@@ -689,7 +693,7 @@ ro:
 
               **xDrip+:** Meniu → Import/Export → Export CSV (format SiDiary).
 
-              **Nightscout:** lipește URL-ul site-ului pe ecranul de start sau de predicție — nu ai nevoie de fișier.
+              **Nightscout:** lipește URL-ul site-ului pe ecranul de start — nu ai nevoie de fișier. Dacă preferi să încarci un fișier, deschide `https://site-ul-tau/api/v1/entries.json?count=10000`, salvează-l și încarcă-l pe acela — nu exportul CSV, căruia îi lipsesc majoritatea datelor.
       - title: "Date și confidențialitate"
         items:
           - q: "Sunt stocate datele mele?"

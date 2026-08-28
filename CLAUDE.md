@@ -25,8 +25,10 @@ The public FAQ ask/reply board at the bottom of `/faq` is **off by default** (`F
 `sugar_sugar/corpus.py` is the **single boundary** between the library's unified frames and the app's
 `(time, gl, prediction, age, user_id)` / `(time, event_type, event_subtype, insulin_value, …)` stores.
 `load_glucose_data` (`data.py`) routes to five loaders; only LOOP still parses by hand.
-The library floor is **cgm-format 0.12** (`pyproject.toml`). 0.11 was the release that added
-BIG IDEAs, the last corpus the app parsed itself; 0.12 added grid re-timing for training alignment.
+The library floor is **cgm-format 0.12.2** (`pyproject.toml`). 0.11 was the release that added
+BIG IDEAs, the last corpus the app parsed itself; 0.12 added grid re-timing for training alignment;
+0.12.2 fixed the Nightscout defects reported in `FEEDBACK.md` and is a **hard** floor, not a
+preference — on 0.12.0 the Nightscout URL import is dead for any real instance.
 
 **What 0.12 changed for this app: the frame got one column wider, and nothing else.**
 `original_glucose` (the device's own reading, before any re-timing) joins both unified schemas, and
@@ -53,13 +55,56 @@ waiting instead of being raised under pressure later. Nothing needs to change fo
 
 | Source | Parser | Why |
 |---|---|---|
-| Vendor exports (Dexcom/Libre/Medtronic/Nightscout) | `FormatParser.parse_file` | — |
+| Vendor exports (Dexcom/Libre/Medtronic) | `FormatParser.parse_file` | — |
+| **Nightscout `entries.json`** | `FormatParser.parse_nightscout` (routed in `data.py`) | JSON, which `detect_format` deliberately does not sniff |
 | **D1NAMO** | `FormatParser.parse_subject_directory` | subject = a *bundle* of glucose/insulin/food CSVs |
 | **BIG IDEAs** | `FormatParser.parse_subject_directory` | subject = a Clarity export + a food log (0.11+) |
 | **CGMacros** | `FormatParser.parse_tracks` | subject = one CSV with two sensor tracks |
 | LOOP `*_chronological.csv` | in-repo (`data.py`) | no library counterpart |
 
 Hard-won rules:
+
+- **A Nightscout upload is up to three files, and only `entries.json` is required.** Both
+  `dcc.Upload`s are `multiple=True` for this: `entries.json` carries the glucose,
+  `treatments.json` is optional and becomes the meal/insulin markers, and `profile.json` is
+  accepted and discarded — it holds settings, no rows, and cgm-format throws it away on the URL
+  path too. Users include it because it is part of the same download, so rejecting the selection
+  over it would be wrong; `NightscoutBundle.discarded` names what was skipped and the success
+  message says so rather than dropping it silently. Roles are decided by **content**
+  (`nightscout_json_kind`), never by file name or selection order.
+  **`load_nightscout_uploads` saves the *unified* frame, not the raw `entries.json`** — later
+  rounds reload from `user_info['uploaded_data_path']` through `load_glucose_data`, so pointing
+  it at the entries file would silently drop every event marker after round one. That is the
+  same thing `load_glucose_data_from_nightscout` does for the URL import, reached from an upload.
+  A `multiple=True` Upload also changes the *payload shape*: Dash sends a list, the clientside
+  compressor maps over it and returns a list, and `decode_upload_files` normalises both shapes so
+  neither callback has to branch. Locked down by `tests/test_nightscout_json_upload.py`.
+- **Nightscout uploads are `entries.json`, never a Nightscout CSV.** `/api/v1/entries.csv` is
+  headerless with five hardcoded columns and there is no treatments CSV at all, so cgm-format
+  cannot detect it and the upload hints must not offer it. `is_nightscout_entries_json` sniffs
+  *content*, not the file name, because both upload handlers rewrite the extension. It never
+  looks for a sibling `treatments.json`: every upload lands in one shared `data/input/users/`
+  under a timestamped name, so guessing at a neighbour would eventually pair one player's
+  entries with another's treatments. `load_nightscout_json_data` takes an explicit optional
+  treatments path instead, and the profile file is not a third input — cgm-format downloads it
+  and discards it.
+- **The Nightscout *URL* import needs cgm-format >= 0.12.2, which is the floor.** On 0.12.0 it
+  was dead for any real instance: `_parse_nightscout_treatments_json` built a frame with no
+  schema, so a treatment field null for the first 100 records inferred as dtype `Null` and the
+  import died with `ComputeError` — which is what a player actually hit. It was deliberately
+  never worked around in `data.py`; the fix belongs upstream and shipped there. Full history,
+  a synthetic repro and the four other 0.12.0 defects it travelled with are in `FEEDBACK.md`,
+  along with the two items still open (neither affects this app — both are on the exporter-CSV
+  path, which Nightscout data never takes here). `tests/test_nightscout_json_upload.py`
+  ::`test_treatments_with_a_long_null_run_are_loaded` was written red against 0.12.0 and is now
+  a regression guard — if it goes red again, fix it upstream, not here.
+- **`scripts/diagnose-nightscout.py` is the tool for "my Nightscout import failed".** Run it on
+  the host that failed, not a laptop: it walks DNS → TCP → TLS → the three endpoints, then runs
+  a synthetic parse repro that needs no network, so it separates a network block (the instances
+  are often .ru-hosted, and egress is filtered in both directions) from a too-old library on the
+  deployed host. Two control hosts tell "no egress" apart from ".ru blocked" apart from "this
+  instance is the problem". It scrubs the `--token` from its own output because
+  `httpx.HTTPStatusError` embeds the full query string.
 
 - **`ExtendedFormatProcessor`, not `FormatProcessor`, for corpora.** Corpora target the wide
   `CGM_SCHEMA_EXTENDED`; `FormatProcessor.schema` is the narrow `CGM_SCHEMA` and dies with
@@ -362,6 +407,23 @@ The fix is the **placeholder-scoped poll** pattern (`_game_stores_ready` / `_res
 
 **Corollary — `route-prediction` must follow the *render*, not the URL.** The `<html>` class was stamped from `pathname === '/prediction'` alone, so during the bug above (URL `/prediction`, content = landing/consent) every prediction-only rule in `mobile.css` applied to that foreign content — including the two `:not(.route-prediction)` **releases**: the `#page-content * { max-width: 100% }` overflow cap (without it a form page overflows and the browser zooms the whole page out) and `touch-action: manipulation` (without it Android waits ~300 ms per tap for a double-tap-zoom and swallows taps — the documented "Next worked on the 4th click"). Net effect: a consent form the player could tick but not submit. The class is now keyed on `prediction-chart-rendered`, written by `mark_prediction_chart_rendered` from `_renders_prediction_chart(pathname, user_info)` — the same predicate `display_page` uses for its consent bounce. Keep those two in step, and keep the clientside check as `pathname === '/prediction' && chartRendered` (the pathname half drops the class instantly on navigation away; the flag half withholds it until the chart is really up).
 
+### `i18n.set("fallback", ...)` silently discards the fallback
+
+i18nice's `config.set` ends with `if settings["locale"] == settings["fallback"]:
+settings["fallback"] = None`. `setup_i18n` set **both** to `"en"`, so the fallback was destroyed
+on the spot and `i18n.get("fallback")` read back `None`.
+
+The guard makes sense for the library's global-locale model, but this app never uses the global
+locale — every call site passes an explicit `locale=`, so the fallback is what renders *all seven
+other* locales for any key their file lacks. Without it, `t()` returns **the key itself**: six
+locales showed `ui.startup.import_ns_button` as a literal button label, because the whole
+`ui.startup.import_*` block only exists in `en` and `ro`. It read as a broken page, not as
+untranslated text.
+
+`sugar_sugar/i18n.py` now assigns `i18n.config.settings["fallback"]` directly, past the guard.
+**Rule:** a missing translation must degrade to English, never to a key string — if you see a
+`ui.`-prefixed string in the UI, the fallback is off, not the translation merely absent.
+
 ### Slider and component persistence
 
 Interactive Dash components (sliders, dropdowns, inputs) that are destroyed and recreated on page navigation lose their value unless `persistence=True` and `persistence_type=STORAGE_TYPE` are set. The `time-slider` on the prediction page is recreated every time `create_prediction_layout` runs (e.g. on resume). Without persistence it mounts with the layout-default value, which triggers `handle_time_slider` and re-slices `current-window-df` at the wrong position.
@@ -402,6 +464,19 @@ Architecture in one paragraph: the static viewport meta is **`width=device-width
 - **Mobile buttons/links need `touch-action: manipulation` or taps get swallowed.** The viewport allows zoom (`user-scalable=yes`), so mobile browsers wait ~300ms per tap for a double-tap-zoom and drop rapid taps as zoom gestures — a button/link then only fires after several taps (seen on Vivaldi Android: Next "worked on the 4th click"). NOT a callback bug and NOT reproducible headless (synthetic clicks bypass the gesture wait). Fix in `mobile.css`: `touch-action: manipulation` on `a`/`button`/`.ui.button`/`[role=button]`/`label`/`input`/`.form-check`, scoped to `html.mobile-device:not(.route-prediction)` (the chart owns its own touch-action for drawline). Pinch-zoom preserved.
 - **Fullscreen/immersive entry must be a clientside callback fired by a real GESTURE** — `requestFullscreen` from a route-change/store callback is rejected (no user activation). Wired to two gesture buttons (wizard `start-button` + persistent "Fullscreen mode" button on `/prediction`), each `requestFullscreen(documentElement)` + best-effort `screen.orientation.lock('landscape')` (the OLD "never use orientation.lock" rule is **superseded** — it's used after fullscreen, Android works, iOS rejects-caught) + `Plotly.Plots.resize`. Reuse the demo-video fullscreen path (proven). Don't rely on it for playability — `100dvh`/device-width landscape stands alone. Localize clientside button feedback via a `data-*` attr (`t()`-rendered server-side), e.g. `data-copied-text`.
 - **Landscape `/prediction` header chips are absolute-positioned — rebalance edges together.** Round (`left+width`), Units (`right+width`), Source (`left`/`right`-pinned, so its width = `screenW − left − right`). Shrinking Round/Units does NOT widen Source unless you also move Source's `left`/`right` in. mobile.css has near-duplicate landscape blocks — append a final `@media (orientation: landscape) and (pointer: coarse)` override so it wins.
+- **The upload gate is the one place on `/prediction` that has screen budget.** The rule below
+  (secondary actions belong on `/ending`) does not cover a B/C player who has not provided data
+  yet: the chart is hidden behind `prediction-upload-gate`, so that space is free, and it is the
+  screen that *demands* data. It used to offer a CSV button and nothing else, so a player whose
+  data lives on a Nightscout site and nowhere else was stuck — reported as "I chose to play with
+  my own data and there was no Nightscout button". `show_upload_section=b_gated` now reveals the
+  header's Nightscout controls exactly while gated, and they vanish once data is loaded. Two
+  constraints hold it together: the CSV tab is dropped when `render_csv_upload` is false (for B/C
+  the upload lives in the action strip, so rendering it here too would put `upload-data` on the
+  page twice), and the section is **always rendered**, `visible` only toggling `display`, because
+  the prediction language-change callback outputs to `nightscout-load-button` on every format and
+  a Dash callback whose component is missing raises. Locked down by
+  `tests/test_prediction_upload_strip.py`.
 - **Secondary/occasional actions go on the between-rounds `/ending` page, not in-round `/prediction`** — the chart page has zero spare screen budget (chart + control strip fill `100dvh`). The cross-device "copy resume link" button lives on `/ending`.
 - **Removing/renaming a clientside callback breaks open tabs until refresh** — a stale tab POSTs the old callback id and the server 500s with `KeyError: "Callback function not found for output '..<id>..'"`. NOT a server bug; bump `DEPLOY_BUILD` (forces fresh loads) + hard-refresh. If "new behaviour doesn't work" AND the console shows that 500, it's a stale client.
 - **`/prediction` is device-width now → size its elements at native px.** During the brief 1280-scaled era, fixed elements had to be ~3.3× larger to be tappable; that trap is gone. An oddly huge/tiny `/prediction` element is likely tuned for the old 1280-scaled assumption.

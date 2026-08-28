@@ -180,9 +180,9 @@ en:
     data_usage_consent_label: "I agree to the use of my uploaded CGM data for this study."
     data_usage_consent_required: "Please confirm data usage consent to continue."
     import_title: "Import your CGM data"
-    import_subtitle: "Upload a CSV (Dexcom / Libre / Medtronic / Nightscout export) or pull it directly from your Nightscout site. You can also do this later on the prediction screen."
+    import_subtitle: "Upload a CSV export (Dexcom / Libre / Medtronic), or your Nightscout entries.json — select treatments.json alongside it to get meal and insulin markers. Or pull the data straight from your Nightscout site."
     import_or: "— or —"
-    import_upload_prompt: "Drag & drop or click to select a CSV file"
+    import_upload_prompt: "Drag & drop or click to select a CSV — or pick your Nightscout entries.json and treatments.json together"
     import_ns_url_placeholder: "Nightscout URL (https://your-site.com)"
     import_ns_token_placeholder: "Access token or API secret (optional)"
     import_ns_button: "Import from Nightscout"
@@ -191,7 +191,9 @@ en:
     import_needs_consent: "Please tick the data-usage consent box above before importing."
     import_needs_url: "Please enter your Nightscout URL first."
     import_empty: "That source returned no glucose readings. Check the URL/token (or the date range) and try again."
-    import_bad_file: "Could not read that file — please export a standard CGM CSV (Dexcom / Libre / Medtronic / Nightscout) and try again."
+    import_bad_file: "Could not read that file — please upload a standard CGM CSV export (Dexcom / Libre / Medtronic) or a Nightscout entries.json, and try again."
+    import_needs_entries: "Add entries.json — that's the file holding the glucose readings. treatments.json and profile.json can't be used on their own."
+    import_ignored: "Ignored %{files}, which this game doesn't need."
     import_ns_unreachable: "Could not reach that Nightscout site. Check the URL and your connection, then try again."
     import_ns_timeout: "The Nightscout site took too long to respond. Please try again."
     import_ns_http_error: "The Nightscout site rejected the request (HTTP %{code}). Check the URL and token."
@@ -208,7 +210,7 @@ en:
     upload_required: "Upload required"
     upload_success: "Successfully loaded data from %{filename}. This data will be used for predictions."
     example_data_now_using: "Now using public anonymized data. Upload a CSV file for personalized analysis."
-    example_data_warning: "Currently using public anonymized data. Upload your own Dexcom/Libre/Medtronic/Nightscout CSV file for personalized analysis."
+    example_data_warning: "Currently using public anonymized data. Upload your own Dexcom/Libre/Medtronic CSV — or your Nightscout entries.json — for personalized analysis."
     csv_tab_label: "CSV File"
     nightscout_tab_label: "Nightscout"
     nightscout_url_placeholder: "https://your-nightscout-site.com"
@@ -618,7 +620,7 @@ en:
           - q: "Who can participate?"
             a: "Anyone 18+. CGM users are especially valuable, but non-CGM users can also play with public anonymized data."
           - q: "What CGM devices and formats are supported?"
-            a: "Dexcom, Libre, Medtronic, and Nightscout exports are supported. A public anonymized dataset is also available if you don't have a CGM device."
+            a: "Dexcom, Libre and Medtronic CSV exports are supported, as is a Nightscout entries.json file. (Nightscout's own CSV export is not — it leaves out most of the data.) A public anonymized dataset is also available if you don't have a CGM device."
           - q: "How long does it take?"
             a: "Each round takes about 2–3 minutes. A full session (12 rounds) is around 30 minutes, but you can split it across multiple visits."
           - q: "Can I stop partway through and resume later?"
@@ -646,7 +648,7 @@ en:
         id: download-csv
         items:
           - q: "Why can't I export from the phone app?"
-            a: "Most CGM phone apps only give PDF reports. The raw CSV comes from the manufacturer's website, or from open-source apps such as xDrip+ and Nightscout."
+            a: "Most CGM phone apps only give PDF reports. The raw CSV comes from the manufacturer's website, or from open-source apps such as xDrip+."
           - q: "Dexcom (Clarity)"
             a: >-
               1. Open [clarity.dexcom.com](https://clarity.dexcom.com) (US) or [clarity.dexcom.eu](https://clarity.dexcom.eu) (Europe) and sign in with your Dexcom account.
@@ -691,7 +693,7 @@ en:
 
               **xDrip+:** Menu → Import/Export → Export CSV (SiDiary format).
 
-              **Nightscout:** paste your site URL on the startup or prediction screen — no file needed.
+              **Nightscout:** paste your site URL on the startup screen — no file needed. To upload a file instead, open `https://your-site/api/v1/entries.json?count=10000`, save it and upload that — not the CSV export, which leaves out most of the data.
       - title: "Data and privacy"
         items:
           - q: "Is any of my data stored?"

@@ -55,7 +55,15 @@ _configure_eliot_logging()
 from sugar_sugar.i18n import setup_i18n, normalize_locale, t, t_list, t_raw
 setup_i18n()
 
-from sugar_sugar.data import load_glucose_data, load_glucose_data_from_nightscout, decode_upload_bytes
+from sugar_sugar.data import (
+    classify_nightscout_uploads,
+    decode_upload_bytes,
+    decode_upload_files,
+    load_glucose_data,
+    load_glucose_data_from_nightscout,
+    load_nightscout_uploads,
+    safe_upload_filename,
+)
 from sugar_sugar.config import (
     DEFAULT_POINTS,
     MIN_POINTS,
@@ -4126,9 +4134,16 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
     return html.Div([
         HeaderComponent(
             show_time_slider=False,
-            # The CSV upload now lives in the always-visible action strip (so it is
-            # reachable in landscape for B/C); the header no longer renders it.
-            show_upload_section=False,
+            # The CSV upload lives in the always-visible action strip (so it is
+            # reachable in landscape for B/C), so the header does not render it.
+            # The section itself is revealed only while a B/C player is still
+            # gated: that is the one screen that demands data the player may only
+            # have on a Nightscout site, and until now it offered a CSV button and
+            # nothing else -- "I chose to play with my own data and there was no
+            # Nightscout button". The chart is hidden behind the gate at that
+            # moment, so this costs no in-round chart space, and it disappears
+            # again as soon as data is loaded.
+            show_upload_section=b_gated,
             show_example_button=(format_value == "A"),
             show_data_source_section=False,
             render_csv_upload=(format_value == "A"),
@@ -9271,27 +9286,40 @@ def initialize_data_on_url_change(
 # shrinks to ~300-400 KB, well under whatever ceiling the mobile browser hits.
 # Any failure (no CompressionStream, exception) returns the original contents so
 # the server's data-URL path still works -- desktop behaviour is unchanged.
+# A `multiple=True` Upload hands `contents` as an array, so the compressor maps
+# over it and returns an array; a single-file Upload still gets a bare string
+# back. `decode_upload_files` normalises both, which is why neither callback has
+# to know which shape it was handed.
 _UPLOAD_COMPRESS_JS = """
 async function(contents, filename) {
     if (!contents) { return window.dash_clientside.no_update; }
-    try {
-        if (typeof CompressionStream === 'undefined') { return contents; }
-        var comma = contents.indexOf(',');
-        if (comma < 0) { return contents; }
-        var b64 = contents.slice(comma + 1);
-        var raw = Uint8Array.from(atob(b64), function(c){ return c.charCodeAt(0); });
-        var cs = new CompressionStream('gzip');
-        var buf = await new Response(new Blob([raw]).stream().pipeThrough(cs)).arrayBuffer();
-        var comp = new Uint8Array(buf);
-        var bin = '';
-        var CH = 0x8000;
-        for (var i = 0; i < comp.length; i += CH) {
-            bin += String.fromCharCode.apply(null, comp.subarray(i, i + CH));
+    var squeeze = async function(one) {
+        if (!one) { return one; }
+        try {
+            if (typeof CompressionStream === 'undefined') { return one; }
+            var comma = one.indexOf(',');
+            if (comma < 0) { return one; }
+            var b64 = one.slice(comma + 1);
+            var raw = Uint8Array.from(atob(b64), function(c){ return c.charCodeAt(0); });
+            var cs = new CompressionStream('gzip');
+            var buf = await new Response(new Blob([raw]).stream().pipeThrough(cs)).arrayBuffer();
+            var comp = new Uint8Array(buf);
+            var bin = '';
+            var CH = 0x8000;
+            for (var i = 0; i < comp.length; i += CH) {
+                bin += String.fromCharCode.apply(null, comp.subarray(i, i + CH));
+            }
+            return 'gzip:' + btoa(bin);
+        } catch (e) {
+            return one;
         }
-        return 'gzip:' + btoa(bin);
-    } catch (e) {
-        return contents;
+    };
+    if (Array.isArray(contents)) {
+        var out = [];
+        for (var i = 0; i < contents.length; i++) { out.push(await squeeze(contents[i])); }
+        return out;
     }
+    return await squeeze(contents);
 }
 """
 
@@ -9405,8 +9433,11 @@ def handle_file_upload(
                 )
 
             # Process cached upload (browser may not re-fire upload for same file).
-            upload_contents = str(pending)
-            filename = str(info_pre.get("pending_upload_filename") or filename or "")
+            # Both values keep whatever shape they had -- a multi-file upload
+            # caches a list of payloads and a list of names, and str()-ing
+            # either would turn the cache into an unparseable repr.
+            upload_contents = pending
+            filename = info_pre.get("pending_upload_filename") or filename or ""
 
         if not upload_contents:
             return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
@@ -9417,7 +9448,7 @@ def handle_file_upload(
             # Cache the attempted upload so we can process it immediately after consent is given,
             # without forcing the user to re-upload (browsers often don't fire "change" for same file).
             info_pre["pending_upload_contents"] = upload_contents
-            info_pre["pending_upload_filename"] = str(filename or "")
+            info_pre["pending_upload_filename"] = filename or ""
             return (
                 current_time,
                 no_update,
@@ -9430,9 +9461,10 @@ def handle_file_upload(
                 no_update,
             )
         
-        # Parse upload contents (gzip-compressed by the client, or a raw data URL)
-        decoded = decode_upload_bytes(upload_contents)
-        if decoded is None:
+        # Parse upload contents (gzip-compressed by the client, or a raw data URL).
+        # `decode_upload_files` normalises the single- and multi-file shapes.
+        upload_files = decode_upload_files(upload_contents, filename)
+        if not upload_files:
             print(f"ERROR: Invalid upload format for file {filename}")
             return (
                 current_time,
@@ -9449,23 +9481,37 @@ def handle_file_upload(
         # Ensure user data directory exists under data/input/users
         users_data_dir = project_root / 'data' / 'input' / 'users'
         users_data_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Generate unique filename with timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        safe_filename = filename.replace(' ', '_').replace('/', '_') if filename else 'uploaded_data'
-        if not safe_filename.endswith('.csv'):
-            safe_filename += '.csv'
-        unique_filename = f"{timestamp}_{safe_filename}"
-        
-        # Save file to the users data folder
-        save_path = users_data_dir / unique_filename
-        with open(save_path, 'wb') as f:
-            f.write(decoded)
-        
+
+        # A Nightscout export arrives as up to three sibling files; anything else
+        # is a single CGM export and only the first file is used.
+        bundle = classify_nightscout_uploads(upload_files)
+        if bundle is not None and not bundle.is_usable:
+            print("ERROR: Nightscout upload without an entries export")
+            return (
+                current_time,
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+                no_update,
+                info_pre,
+                no_update,
+            )
+
+        if bundle is not None:
+            new_full_df, new_events_df, save_path = load_nightscout_uploads(bundle, users_data_dir)
+            source_name = bundle.entries.filename
+        else:
+            upload_name, upload_data = upload_files[0]
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            save_path = users_data_dir / f"{timestamp}_{safe_upload_filename(upload_name)}"
+            save_path.write_bytes(upload_data)
+            source_name = upload_name
+            # Load glucose data - let load_glucose_data handle its own error cases
+            new_full_df, new_events_df = load_glucose_data(save_path)
+
         print(f"DEBUG: saved uploaded file to {save_path}")
-        
-        # Load glucose data - let load_glucose_data handle its own error cases
-        new_full_df, new_events_df = load_glucose_data(save_path)
         
         # Start at a random position for uploaded files too
         points = max(MIN_POINTS, min(MAX_POINTS, DEFAULT_POINTS))
@@ -9473,9 +9519,9 @@ def handle_file_upload(
         
         info: Dict[str, Any] = dict(info_pre)
         info["uploaded_data_path"] = str(save_path)
-        info["uploaded_data_filename"] = str(filename or "")
+        info["uploaded_data_filename"] = str(source_name)
         info["is_example_data"] = False
-        info["data_source_name"] = str(filename or "")
+        info["data_source_name"] = str(source_name)
         info["blocked_upload_requires_consent"] = False
         info.pop("pending_upload_contents", None)
         info.pop("pending_upload_filename", None)
@@ -9485,7 +9531,7 @@ def handle_file_upload(
             convert_df_to_dict(new_df),
             events_store_for_window(new_events_df, new_df),
             False,  # is_example_data = False for uploaded files
-            str(filename or ""),  # store the original filename
+            str(source_name),  # store the original filename
             False,  # reset randomization flag for new data
             random_start,  # Update initial slider value
             info,

@@ -1,0 +1,2417 @@
+[
+  {
+    "_id": "synthetic-cal-0",
+    "device": "synthetic",
+    "dateString": "2026-08-20T00:00:00.000Z",
+    "type": "cal",
+    "slope": 1.0,
+    "intercept": 0.0
+  },
+  {
+    "_id": "synthetic-mbg-0",
+    "device": "synthetic",
+    "dateString": "2026-08-20T00:00:00.000Z",
+    "type": "mbg",
+    "mbg": 118
+  },
+  {
+    "_id": "synthetic-e-000000",
+    "device": "synthetic",
+    "dateString": "2026-08-20T00:00:00.000Z",
+    "sgv": 120,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000001",
+    "device": "synthetic",
+    "dateString": "2026-08-20T00:05:00.000Z",
+    "sgv": 128,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000002",
+    "device": "synthetic",
+    "dateString": "2026-08-20T00:10:00.000Z",
+    "sgv": 135,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000003",
+    "device": "synthetic",
+    "dateString": "2026-08-20T00:15:00.000Z",
+    "sgv": 142,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000004",
+    "device": "synthetic",
+    "dateString": "2026-08-20T00:20:00.000Z",
+    "sgv": 147,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000005",
+    "device": "synthetic",
+    "dateString": "2026-08-20T00:25:00.000Z",
+    "sgv": 151,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000006",
+    "device": "synthetic",
+    "dateString": "2026-08-20T00:30:00.000Z",
+    "sgv": 154,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000007",
+    "device": "synthetic",
+    "dateString": "2026-08-20T00:35:00.000Z",
+    "sgv": 155,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000008",
+    "device": "synthetic",
+    "dateString": "2026-08-20T00:40:00.000Z",
+    "sgv": 155,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000009",
+    "device": "synthetic",
+    "dateString": "2026-08-20T00:45:00.000Z",
+    "sgv": 154,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000010",
+    "device": "synthetic",
+    "dateString": "2026-08-20T00:50:00.000Z",
+    "sgv": 153,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000011",
+    "device": "synthetic",
+    "dateString": "2026-08-20T00:55:00.000Z",
+    "sgv": 151,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000012",
+    "device": "synthetic",
+    "dateString": "2026-08-20T01:00:00.000Z",
+    "sgv": 150,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000013",
+    "device": "synthetic",
+    "dateString": "2026-08-20T01:05:00.000Z",
+    "sgv": 150,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000014",
+    "device": "synthetic",
+    "dateString": "2026-08-20T01:10:00.000Z",
+    "sgv": 151,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000015",
+    "device": "synthetic",
+    "dateString": "2026-08-20T01:15:00.000Z",
+    "sgv": 152,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000016",
+    "device": "synthetic",
+    "dateString": "2026-08-20T01:20:00.000Z",
+    "sgv": 154,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000017",
+    "device": "synthetic",
+    "dateString": "2026-08-20T01:25:00.000Z",
+    "sgv": 158,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000018",
+    "device": "synthetic",
+    "dateString": "2026-08-20T01:30:00.000Z",
+    "sgv": 161,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000019",
+    "device": "synthetic",
+    "dateString": "2026-08-20T01:35:00.000Z",
+    "sgv": 165,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000020",
+    "device": "synthetic",
+    "dateString": "2026-08-20T01:40:00.000Z",
+    "sgv": 168,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000021",
+    "device": "synthetic",
+    "dateString": "2026-08-20T01:45:00.000Z",
+    "sgv": 170,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000022",
+    "device": "synthetic",
+    "dateString": "2026-08-20T01:50:00.000Z",
+    "sgv": 171,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000023",
+    "device": "synthetic",
+    "dateString": "2026-08-20T01:55:00.000Z",
+    "sgv": 170,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000024",
+    "device": "synthetic",
+    "dateString": "2026-08-20T02:00:00.000Z",
+    "sgv": 168,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000025",
+    "device": "synthetic",
+    "dateString": "2026-08-20T02:05:00.000Z",
+    "sgv": 165,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000026",
+    "device": "synthetic",
+    "dateString": "2026-08-20T02:10:00.000Z",
+    "sgv": 159,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000027",
+    "device": "synthetic",
+    "dateString": "2026-08-20T02:15:00.000Z",
+    "sgv": 153,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000028",
+    "device": "synthetic",
+    "dateString": "2026-08-20T02:20:00.000Z",
+    "sgv": 146,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000029",
+    "device": "synthetic",
+    "dateString": "2026-08-20T02:25:00.000Z",
+    "sgv": 138,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000030",
+    "device": "synthetic",
+    "dateString": "2026-08-20T02:30:00.000Z",
+    "sgv": 131,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000031",
+    "device": "synthetic",
+    "dateString": "2026-08-20T02:35:00.000Z",
+    "sgv": 124,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000032",
+    "device": "synthetic",
+    "dateString": "2026-08-20T02:40:00.000Z",
+    "sgv": 119,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000033",
+    "device": "synthetic",
+    "dateString": "2026-08-20T02:45:00.000Z",
+    "sgv": 114,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000034",
+    "device": "synthetic",
+    "dateString": "2026-08-20T02:50:00.000Z",
+    "sgv": 110,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000035",
+    "device": "synthetic",
+    "dateString": "2026-08-20T02:55:00.000Z",
+    "sgv": 108,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000036",
+    "device": "synthetic",
+    "dateString": "2026-08-20T03:00:00.000Z",
+    "sgv": 107,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000037",
+    "device": "synthetic",
+    "dateString": "2026-08-20T03:05:00.000Z",
+    "sgv": 107,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000038",
+    "device": "synthetic",
+    "dateString": "2026-08-20T03:10:00.000Z",
+    "sgv": 107,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000039",
+    "device": "synthetic",
+    "dateString": "2026-08-20T03:15:00.000Z",
+    "sgv": 107,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000040",
+    "device": "synthetic",
+    "dateString": "2026-08-20T03:20:00.000Z",
+    "sgv": 106,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000041",
+    "device": "synthetic",
+    "dateString": "2026-08-20T03:25:00.000Z",
+    "sgv": 105,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000042",
+    "device": "synthetic",
+    "dateString": "2026-08-20T03:30:00.000Z",
+    "sgv": 103,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000043",
+    "device": "synthetic",
+    "dateString": "2026-08-20T03:35:00.000Z",
+    "sgv": 100,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000044",
+    "device": "synthetic",
+    "dateString": "2026-08-20T03:40:00.000Z",
+    "sgv": 96,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000045",
+    "device": "synthetic",
+    "dateString": "2026-08-20T03:45:00.000Z",
+    "sgv": 91,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000046",
+    "device": "synthetic",
+    "dateString": "2026-08-20T03:50:00.000Z",
+    "sgv": 85,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000047",
+    "device": "synthetic",
+    "dateString": "2026-08-20T03:55:00.000Z",
+    "sgv": 79,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000048",
+    "device": "synthetic",
+    "dateString": "2026-08-20T04:00:00.000Z",
+    "sgv": 74,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000049",
+    "device": "synthetic",
+    "dateString": "2026-08-20T04:05:00.000Z",
+    "sgv": 69,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000050",
+    "device": "synthetic",
+    "dateString": "2026-08-20T04:10:00.000Z",
+    "sgv": 65,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000051",
+    "device": "synthetic",
+    "dateString": "2026-08-20T04:15:00.000Z",
+    "sgv": 63,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000052",
+    "device": "synthetic",
+    "dateString": "2026-08-20T04:20:00.000Z",
+    "sgv": 63,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000053",
+    "device": "synthetic",
+    "dateString": "2026-08-20T04:25:00.000Z",
+    "sgv": 64,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000054",
+    "device": "synthetic",
+    "dateString": "2026-08-20T04:30:00.000Z",
+    "sgv": 66,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000055",
+    "device": "synthetic",
+    "dateString": "2026-08-20T04:35:00.000Z",
+    "sgv": 70,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000056",
+    "device": "synthetic",
+    "dateString": "2026-08-20T04:40:00.000Z",
+    "sgv": 76,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000057",
+    "device": "synthetic",
+    "dateString": "2026-08-20T04:45:00.000Z",
+    "sgv": 81,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000058",
+    "device": "synthetic",
+    "dateString": "2026-08-20T04:50:00.000Z",
+    "sgv": 87,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000059",
+    "device": "synthetic",
+    "dateString": "2026-08-20T04:55:00.000Z",
+    "sgv": 92,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000060",
+    "device": "synthetic",
+    "dateString": "2026-08-20T05:00:00.000Z",
+    "sgv": 97,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000061",
+    "device": "synthetic",
+    "dateString": "2026-08-20T05:05:00.000Z",
+    "sgv": 101,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000062",
+    "device": "synthetic",
+    "dateString": "2026-08-20T05:10:00.000Z",
+    "sgv": 104,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000063",
+    "device": "synthetic",
+    "dateString": "2026-08-20T05:15:00.000Z",
+    "sgv": 106,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000064",
+    "device": "synthetic",
+    "dateString": "2026-08-20T05:20:00.000Z",
+    "sgv": 107,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000065",
+    "device": "synthetic",
+    "dateString": "2026-08-20T05:25:00.000Z",
+    "sgv": 107,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000066",
+    "device": "synthetic",
+    "dateString": "2026-08-20T05:30:00.000Z",
+    "sgv": 107,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000067",
+    "device": "synthetic",
+    "dateString": "2026-08-20T05:35:00.000Z",
+    "sgv": 107,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000068",
+    "device": "synthetic",
+    "dateString": "2026-08-20T05:40:00.000Z",
+    "sgv": 107,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000069",
+    "device": "synthetic",
+    "dateString": "2026-08-20T05:45:00.000Z",
+    "sgv": 109,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000070",
+    "device": "synthetic",
+    "dateString": "2026-08-20T05:50:00.000Z",
+    "sgv": 111,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000071",
+    "device": "synthetic",
+    "dateString": "2026-08-20T05:55:00.000Z",
+    "sgv": 115,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000072",
+    "device": "synthetic",
+    "dateString": "2026-08-20T06:00:00.000Z",
+    "sgv": 120,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000073",
+    "device": "synthetic",
+    "dateString": "2026-08-20T06:05:00.000Z",
+    "sgv": 126,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000074",
+    "device": "synthetic",
+    "dateString": "2026-08-20T06:10:00.000Z",
+    "sgv": 133,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000075",
+    "device": "synthetic",
+    "dateString": "2026-08-20T06:15:00.000Z",
+    "sgv": 141,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000076",
+    "device": "synthetic",
+    "dateString": "2026-08-20T06:20:00.000Z",
+    "sgv": 148,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000077",
+    "device": "synthetic",
+    "dateString": "2026-08-20T06:25:00.000Z",
+    "sgv": 155,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000078",
+    "device": "synthetic",
+    "dateString": "2026-08-20T06:30:00.000Z",
+    "sgv": 161,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000079",
+    "device": "synthetic",
+    "dateString": "2026-08-20T06:35:00.000Z",
+    "sgv": 166,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000080",
+    "device": "synthetic",
+    "dateString": "2026-08-20T06:40:00.000Z",
+    "sgv": 169,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000081",
+    "device": "synthetic",
+    "dateString": "2026-08-20T06:45:00.000Z",
+    "sgv": 171,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000082",
+    "device": "synthetic",
+    "dateString": "2026-08-20T06:50:00.000Z",
+    "sgv": 171,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000083",
+    "device": "synthetic",
+    "dateString": "2026-08-20T06:55:00.000Z",
+    "sgv": 169,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000084",
+    "device": "synthetic",
+    "dateString": "2026-08-20T07:00:00.000Z",
+    "sgv": 167,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000085",
+    "device": "synthetic",
+    "dateString": "2026-08-20T07:05:00.000Z",
+    "sgv": 163,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000086",
+    "device": "synthetic",
+    "dateString": "2026-08-20T07:10:00.000Z",
+    "sgv": 160,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000087",
+    "device": "synthetic",
+    "dateString": "2026-08-20T07:15:00.000Z",
+    "sgv": 156,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000088",
+    "device": "synthetic",
+    "dateString": "2026-08-20T07:20:00.000Z",
+    "sgv": 154,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000089",
+    "device": "synthetic",
+    "dateString": "2026-08-20T07:25:00.000Z",
+    "sgv": 151,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000090",
+    "device": "synthetic",
+    "dateString": "2026-08-20T07:30:00.000Z",
+    "sgv": 150,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000091",
+    "device": "synthetic",
+    "dateString": "2026-08-20T07:35:00.000Z",
+    "sgv": 150,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000092",
+    "device": "synthetic",
+    "dateString": "2026-08-20T07:40:00.000Z",
+    "sgv": 151,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000093",
+    "device": "synthetic",
+    "dateString": "2026-08-20T07:45:00.000Z",
+    "sgv": 152,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000094",
+    "device": "synthetic",
+    "dateString": "2026-08-20T07:50:00.000Z",
+    "sgv": 153,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000095",
+    "device": "synthetic",
+    "dateString": "2026-08-20T07:55:00.000Z",
+    "sgv": 154,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000096",
+    "device": "synthetic",
+    "dateString": "2026-08-20T08:00:00.000Z",
+    "sgv": 155,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000097",
+    "device": "synthetic",
+    "dateString": "2026-08-20T08:05:00.000Z",
+    "sgv": 155,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000098",
+    "device": "synthetic",
+    "dateString": "2026-08-20T08:10:00.000Z",
+    "sgv": 153,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000099",
+    "device": "synthetic",
+    "dateString": "2026-08-20T08:15:00.000Z",
+    "sgv": 150,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000100",
+    "device": "synthetic",
+    "dateString": "2026-08-20T08:20:00.000Z",
+    "sgv": 146,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000101",
+    "device": "synthetic",
+    "dateString": "2026-08-20T08:25:00.000Z",
+    "sgv": 140,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000102",
+    "device": "synthetic",
+    "dateString": "2026-08-20T08:30:00.000Z",
+    "sgv": 133,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000103",
+    "device": "synthetic",
+    "dateString": "2026-08-20T08:35:00.000Z",
+    "sgv": 125,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000104",
+    "device": "synthetic",
+    "dateString": "2026-08-20T08:40:00.000Z",
+    "sgv": 117,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000105",
+    "device": "synthetic",
+    "dateString": "2026-08-20T08:45:00.000Z",
+    "sgv": 109,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000106",
+    "device": "synthetic",
+    "dateString": "2026-08-20T08:50:00.000Z",
+    "sgv": 102,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000107",
+    "device": "synthetic",
+    "dateString": "2026-08-20T08:55:00.000Z",
+    "sgv": 95,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000108",
+    "device": "synthetic",
+    "dateString": "2026-08-20T09:00:00.000Z",
+    "sgv": 90,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000109",
+    "device": "synthetic",
+    "dateString": "2026-08-20T09:05:00.000Z",
+    "sgv": 87,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000110",
+    "device": "synthetic",
+    "dateString": "2026-08-20T09:10:00.000Z",
+    "sgv": 85,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000111",
+    "device": "synthetic",
+    "dateString": "2026-08-20T09:15:00.000Z",
+    "sgv": 84,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000112",
+    "device": "synthetic",
+    "dateString": "2026-08-20T09:20:00.000Z",
+    "sgv": 84,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000113",
+    "device": "synthetic",
+    "dateString": "2026-08-20T09:25:00.000Z",
+    "sgv": 85,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000114",
+    "device": "synthetic",
+    "dateString": "2026-08-20T09:30:00.000Z",
+    "sgv": 87,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000115",
+    "device": "synthetic",
+    "dateString": "2026-08-20T09:35:00.000Z",
+    "sgv": 88,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000116",
+    "device": "synthetic",
+    "dateString": "2026-08-20T09:40:00.000Z",
+    "sgv": 89,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000117",
+    "device": "synthetic",
+    "dateString": "2026-08-20T09:45:00.000Z",
+    "sgv": 89,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000118",
+    "device": "synthetic",
+    "dateString": "2026-08-20T09:50:00.000Z",
+    "sgv": 88,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000119",
+    "device": "synthetic",
+    "dateString": "2026-08-20T09:55:00.000Z",
+    "sgv": 86,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000120",
+    "device": "synthetic",
+    "dateString": "2026-08-20T10:00:00.000Z",
+    "sgv": 84,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000121",
+    "device": "synthetic",
+    "dateString": "2026-08-20T10:05:00.000Z",
+    "sgv": 80,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000122",
+    "device": "synthetic",
+    "dateString": "2026-08-20T10:10:00.000Z",
+    "sgv": 77,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000123",
+    "device": "synthetic",
+    "dateString": "2026-08-20T10:15:00.000Z",
+    "sgv": 73,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000124",
+    "device": "synthetic",
+    "dateString": "2026-08-20T10:20:00.000Z",
+    "sgv": 71,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000125",
+    "device": "synthetic",
+    "dateString": "2026-08-20T10:25:00.000Z",
+    "sgv": 69,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000126",
+    "device": "synthetic",
+    "dateString": "2026-08-20T10:30:00.000Z",
+    "sgv": 68,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000127",
+    "device": "synthetic",
+    "dateString": "2026-08-20T10:35:00.000Z",
+    "sgv": 69,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000128",
+    "device": "synthetic",
+    "dateString": "2026-08-20T10:40:00.000Z",
+    "sgv": 72,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000129",
+    "device": "synthetic",
+    "dateString": "2026-08-20T10:45:00.000Z",
+    "sgv": 76,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000130",
+    "device": "synthetic",
+    "dateString": "2026-08-20T10:50:00.000Z",
+    "sgv": 82,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000131",
+    "device": "synthetic",
+    "dateString": "2026-08-20T10:55:00.000Z",
+    "sgv": 88,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000132",
+    "device": "synthetic",
+    "dateString": "2026-08-20T11:00:00.000Z",
+    "sgv": 96,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000133",
+    "device": "synthetic",
+    "dateString": "2026-08-20T11:05:00.000Z",
+    "sgv": 103,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000134",
+    "device": "synthetic",
+    "dateString": "2026-08-20T11:10:00.000Z",
+    "sgv": 110,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000135",
+    "device": "synthetic",
+    "dateString": "2026-08-20T11:15:00.000Z",
+    "sgv": 117,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000136",
+    "device": "synthetic",
+    "dateString": "2026-08-20T11:20:00.000Z",
+    "sgv": 122,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000137",
+    "device": "synthetic",
+    "dateString": "2026-08-20T11:25:00.000Z",
+    "sgv": 126,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000138",
+    "device": "synthetic",
+    "dateString": "2026-08-20T11:30:00.000Z",
+    "sgv": 129,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000139",
+    "device": "synthetic",
+    "dateString": "2026-08-20T11:35:00.000Z",
+    "sgv": 131,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000140",
+    "device": "synthetic",
+    "dateString": "2026-08-20T11:40:00.000Z",
+    "sgv": 132,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000141",
+    "device": "synthetic",
+    "dateString": "2026-08-20T11:45:00.000Z",
+    "sgv": 132,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000142",
+    "device": "synthetic",
+    "dateString": "2026-08-20T11:50:00.000Z",
+    "sgv": 132,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000143",
+    "device": "synthetic",
+    "dateString": "2026-08-20T11:55:00.000Z",
+    "sgv": 132,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000144",
+    "device": "synthetic",
+    "dateString": "2026-08-20T12:00:00.000Z",
+    "sgv": 133,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000145",
+    "device": "synthetic",
+    "dateString": "2026-08-20T12:05:00.000Z",
+    "sgv": 134,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000146",
+    "device": "synthetic",
+    "dateString": "2026-08-20T12:10:00.000Z",
+    "sgv": 137,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000147",
+    "device": "synthetic",
+    "dateString": "2026-08-20T12:15:00.000Z",
+    "sgv": 140,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000148",
+    "device": "synthetic",
+    "dateString": "2026-08-20T12:20:00.000Z",
+    "sgv": 145,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000149",
+    "device": "synthetic",
+    "dateString": "2026-08-20T12:25:00.000Z",
+    "sgv": 150,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000150",
+    "device": "synthetic",
+    "dateString": "2026-08-20T12:30:00.000Z",
+    "sgv": 156,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000151",
+    "device": "synthetic",
+    "dateString": "2026-08-20T12:35:00.000Z",
+    "sgv": 162,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000152",
+    "device": "synthetic",
+    "dateString": "2026-08-20T12:40:00.000Z",
+    "sgv": 167,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000153",
+    "device": "synthetic",
+    "dateString": "2026-08-20T12:45:00.000Z",
+    "sgv": 171,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000154",
+    "device": "synthetic",
+    "dateString": "2026-08-20T12:50:00.000Z",
+    "sgv": 175,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000155",
+    "device": "synthetic",
+    "dateString": "2026-08-20T12:55:00.000Z",
+    "sgv": 176,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000156",
+    "device": "synthetic",
+    "dateString": "2026-08-20T13:00:00.000Z",
+    "sgv": 176,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000157",
+    "device": "synthetic",
+    "dateString": "2026-08-20T13:05:00.000Z",
+    "sgv": 175,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000158",
+    "device": "synthetic",
+    "dateString": "2026-08-20T13:10:00.000Z",
+    "sgv": 171,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000159",
+    "device": "synthetic",
+    "dateString": "2026-08-20T13:15:00.000Z",
+    "sgv": 167,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000160",
+    "device": "synthetic",
+    "dateString": "2026-08-20T13:20:00.000Z",
+    "sgv": 162,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000161",
+    "device": "synthetic",
+    "dateString": "2026-08-20T13:25:00.000Z",
+    "sgv": 156,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000162",
+    "device": "synthetic",
+    "dateString": "2026-08-20T13:30:00.000Z",
+    "sgv": 150,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000163",
+    "device": "synthetic",
+    "dateString": "2026-08-20T13:35:00.000Z",
+    "sgv": 145,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000164",
+    "device": "synthetic",
+    "dateString": "2026-08-20T13:40:00.000Z",
+    "sgv": 140,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000165",
+    "device": "synthetic",
+    "dateString": "2026-08-20T13:45:00.000Z",
+    "sgv": 137,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000166",
+    "device": "synthetic",
+    "dateString": "2026-08-20T13:50:00.000Z",
+    "sgv": 134,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000167",
+    "device": "synthetic",
+    "dateString": "2026-08-20T13:55:00.000Z",
+    "sgv": 133,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000168",
+    "device": "synthetic",
+    "dateString": "2026-08-20T14:00:00.000Z",
+    "sgv": 132,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000169",
+    "device": "synthetic",
+    "dateString": "2026-08-20T14:05:00.000Z",
+    "sgv": 132,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000170",
+    "device": "synthetic",
+    "dateString": "2026-08-20T14:10:00.000Z",
+    "sgv": 132,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000171",
+    "device": "synthetic",
+    "dateString": "2026-08-20T14:15:00.000Z",
+    "sgv": 132,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000172",
+    "device": "synthetic",
+    "dateString": "2026-08-20T14:20:00.000Z",
+    "sgv": 131,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000173",
+    "device": "synthetic",
+    "dateString": "2026-08-20T14:25:00.000Z",
+    "sgv": 129,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000174",
+    "device": "synthetic",
+    "dateString": "2026-08-20T14:30:00.000Z",
+    "sgv": 126,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000175",
+    "device": "synthetic",
+    "dateString": "2026-08-20T14:35:00.000Z",
+    "sgv": 122,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000176",
+    "device": "synthetic",
+    "dateString": "2026-08-20T14:40:00.000Z",
+    "sgv": 117,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000177",
+    "device": "synthetic",
+    "dateString": "2026-08-20T14:45:00.000Z",
+    "sgv": 110,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000178",
+    "device": "synthetic",
+    "dateString": "2026-08-20T14:50:00.000Z",
+    "sgv": 103,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000179",
+    "device": "synthetic",
+    "dateString": "2026-08-20T14:55:00.000Z",
+    "sgv": 96,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000180",
+    "device": "synthetic",
+    "dateString": "2026-08-20T15:00:00.000Z",
+    "sgv": 88,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000181",
+    "device": "synthetic",
+    "dateString": "2026-08-20T15:05:00.000Z",
+    "sgv": 82,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000182",
+    "device": "synthetic",
+    "dateString": "2026-08-20T15:10:00.000Z",
+    "sgv": 76,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000183",
+    "device": "synthetic",
+    "dateString": "2026-08-20T15:15:00.000Z",
+    "sgv": 72,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000184",
+    "device": "synthetic",
+    "dateString": "2026-08-20T15:20:00.000Z",
+    "sgv": 69,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000185",
+    "device": "synthetic",
+    "dateString": "2026-08-20T15:25:00.000Z",
+    "sgv": 68,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000186",
+    "device": "synthetic",
+    "dateString": "2026-08-20T15:30:00.000Z",
+    "sgv": 69,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000187",
+    "device": "synthetic",
+    "dateString": "2026-08-20T15:35:00.000Z",
+    "sgv": 70,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000188",
+    "device": "synthetic",
+    "dateString": "2026-08-20T15:40:00.000Z",
+    "sgv": 73,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000189",
+    "device": "synthetic",
+    "dateString": "2026-08-20T15:45:00.000Z",
+    "sgv": 77,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000190",
+    "device": "synthetic",
+    "dateString": "2026-08-20T15:50:00.000Z",
+    "sgv": 80,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000191",
+    "device": "synthetic",
+    "dateString": "2026-08-20T15:55:00.000Z",
+    "sgv": 84,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000192",
+    "device": "synthetic",
+    "dateString": "2026-08-20T16:00:00.000Z",
+    "sgv": 86,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000193",
+    "device": "synthetic",
+    "dateString": "2026-08-20T16:05:00.000Z",
+    "sgv": 88,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000194",
+    "device": "synthetic",
+    "dateString": "2026-08-20T16:10:00.000Z",
+    "sgv": 89,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000195",
+    "device": "synthetic",
+    "dateString": "2026-08-20T16:15:00.000Z",
+    "sgv": 89,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000196",
+    "device": "synthetic",
+    "dateString": "2026-08-20T16:20:00.000Z",
+    "sgv": 88,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000197",
+    "device": "synthetic",
+    "dateString": "2026-08-20T16:25:00.000Z",
+    "sgv": 87,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000198",
+    "device": "synthetic",
+    "dateString": "2026-08-20T16:30:00.000Z",
+    "sgv": 85,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000199",
+    "device": "synthetic",
+    "dateString": "2026-08-20T16:35:00.000Z",
+    "sgv": 84,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000200",
+    "device": "synthetic",
+    "dateString": "2026-08-20T16:40:00.000Z",
+    "sgv": 84,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000201",
+    "device": "synthetic",
+    "dateString": "2026-08-20T16:45:00.000Z",
+    "sgv": 85,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000202",
+    "device": "synthetic",
+    "dateString": "2026-08-20T16:50:00.000Z",
+    "sgv": 87,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000203",
+    "device": "synthetic",
+    "dateString": "2026-08-20T16:55:00.000Z",
+    "sgv": 90,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000204",
+    "device": "synthetic",
+    "dateString": "2026-08-20T17:00:00.000Z",
+    "sgv": 95,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000205",
+    "device": "synthetic",
+    "dateString": "2026-08-20T17:05:00.000Z",
+    "sgv": 102,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000206",
+    "device": "synthetic",
+    "dateString": "2026-08-20T17:10:00.000Z",
+    "sgv": 109,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000207",
+    "device": "synthetic",
+    "dateString": "2026-08-20T17:15:00.000Z",
+    "sgv": 117,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000208",
+    "device": "synthetic",
+    "dateString": "2026-08-20T17:20:00.000Z",
+    "sgv": 125,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000209",
+    "device": "synthetic",
+    "dateString": "2026-08-20T17:25:00.000Z",
+    "sgv": 133,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000210",
+    "device": "synthetic",
+    "dateString": "2026-08-20T17:30:00.000Z",
+    "sgv": 140,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000211",
+    "device": "synthetic",
+    "dateString": "2026-08-20T17:35:00.000Z",
+    "sgv": 145,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000212",
+    "device": "synthetic",
+    "dateString": "2026-08-20T17:40:00.000Z",
+    "sgv": 150,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000213",
+    "device": "synthetic",
+    "dateString": "2026-08-20T17:45:00.000Z",
+    "sgv": 153,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000214",
+    "device": "synthetic",
+    "dateString": "2026-08-20T17:50:00.000Z",
+    "sgv": 155,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000215",
+    "device": "synthetic",
+    "dateString": "2026-08-20T17:55:00.000Z",
+    "sgv": 155,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000216",
+    "device": "synthetic",
+    "dateString": "2026-08-20T18:00:00.000Z",
+    "sgv": 154,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000217",
+    "device": "synthetic",
+    "dateString": "2026-08-20T18:05:00.000Z",
+    "sgv": 153,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000218",
+    "device": "synthetic",
+    "dateString": "2026-08-20T18:10:00.000Z",
+    "sgv": 152,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000219",
+    "device": "synthetic",
+    "dateString": "2026-08-20T18:15:00.000Z",
+    "sgv": 151,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000220",
+    "device": "synthetic",
+    "dateString": "2026-08-20T18:20:00.000Z",
+    "sgv": 150,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000221",
+    "device": "synthetic",
+    "dateString": "2026-08-20T18:25:00.000Z",
+    "sgv": 150,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000222",
+    "device": "synthetic",
+    "dateString": "2026-08-20T18:30:00.000Z",
+    "sgv": 151,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000223",
+    "device": "synthetic",
+    "dateString": "2026-08-20T18:35:00.000Z",
+    "sgv": 154,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000224",
+    "device": "synthetic",
+    "dateString": "2026-08-20T18:40:00.000Z",
+    "sgv": 156,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000225",
+    "device": "synthetic",
+    "dateString": "2026-08-20T18:45:00.000Z",
+    "sgv": 160,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000226",
+    "device": "synthetic",
+    "dateString": "2026-08-20T18:50:00.000Z",
+    "sgv": 163,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000227",
+    "device": "synthetic",
+    "dateString": "2026-08-20T18:55:00.000Z",
+    "sgv": 167,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000228",
+    "device": "synthetic",
+    "dateString": "2026-08-20T19:00:00.000Z",
+    "sgv": 169,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000229",
+    "device": "synthetic",
+    "dateString": "2026-08-20T19:05:00.000Z",
+    "sgv": 171,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000230",
+    "device": "synthetic",
+    "dateString": "2026-08-20T19:10:00.000Z",
+    "sgv": 171,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000231",
+    "device": "synthetic",
+    "dateString": "2026-08-20T19:15:00.000Z",
+    "sgv": 169,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000232",
+    "device": "synthetic",
+    "dateString": "2026-08-20T19:20:00.000Z",
+    "sgv": 166,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000233",
+    "device": "synthetic",
+    "dateString": "2026-08-20T19:25:00.000Z",
+    "sgv": 161,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000234",
+    "device": "synthetic",
+    "dateString": "2026-08-20T19:30:00.000Z",
+    "sgv": 155,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000235",
+    "device": "synthetic",
+    "dateString": "2026-08-20T19:35:00.000Z",
+    "sgv": 148,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000236",
+    "device": "synthetic",
+    "dateString": "2026-08-20T19:40:00.000Z",
+    "sgv": 141,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000237",
+    "device": "synthetic",
+    "dateString": "2026-08-20T19:45:00.000Z",
+    "sgv": 134,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000238",
+    "device": "synthetic",
+    "dateString": "2026-08-20T19:50:00.000Z",
+    "sgv": 127,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000239",
+    "device": "synthetic",
+    "dateString": "2026-08-20T19:55:00.000Z",
+    "sgv": 120,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000240",
+    "device": "synthetic",
+    "dateString": "2026-08-20T20:00:00.000Z",
+    "sgv": 115,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000241",
+    "device": "synthetic",
+    "dateString": "2026-08-20T20:05:00.000Z",
+    "sgv": 111,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000242",
+    "device": "synthetic",
+    "dateString": "2026-08-20T20:10:00.000Z",
+    "sgv": 109,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000243",
+    "device": "synthetic",
+    "dateString": "2026-08-20T20:15:00.000Z",
+    "sgv": 107,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000244",
+    "device": "synthetic",
+    "dateString": "2026-08-20T20:20:00.000Z",
+    "sgv": 107,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000245",
+    "device": "synthetic",
+    "dateString": "2026-08-20T20:25:00.000Z",
+    "sgv": 107,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000246",
+    "device": "synthetic",
+    "dateString": "2026-08-20T20:30:00.000Z",
+    "sgv": 107,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000247",
+    "device": "synthetic",
+    "dateString": "2026-08-20T20:35:00.000Z",
+    "sgv": 107,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000248",
+    "device": "synthetic",
+    "dateString": "2026-08-20T20:40:00.000Z",
+    "sgv": 106,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000249",
+    "device": "synthetic",
+    "dateString": "2026-08-20T20:45:00.000Z",
+    "sgv": 104,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000250",
+    "device": "synthetic",
+    "dateString": "2026-08-20T20:50:00.000Z",
+    "sgv": 101,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000251",
+    "device": "synthetic",
+    "dateString": "2026-08-20T20:55:00.000Z",
+    "sgv": 97,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000252",
+    "device": "synthetic",
+    "dateString": "2026-08-20T21:00:00.000Z",
+    "sgv": 93,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000253",
+    "device": "synthetic",
+    "dateString": "2026-08-20T21:05:00.000Z",
+    "sgv": 87,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000254",
+    "device": "synthetic",
+    "dateString": "2026-08-20T21:10:00.000Z",
+    "sgv": 81,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000255",
+    "device": "synthetic",
+    "dateString": "2026-08-20T21:15:00.000Z",
+    "sgv": 76,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000256",
+    "device": "synthetic",
+    "dateString": "2026-08-20T21:20:00.000Z",
+    "sgv": 71,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000257",
+    "device": "synthetic",
+    "dateString": "2026-08-20T21:25:00.000Z",
+    "sgv": 66,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000258",
+    "device": "synthetic",
+    "dateString": "2026-08-20T21:30:00.000Z",
+    "sgv": 64,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000259",
+    "device": "synthetic",
+    "dateString": "2026-08-20T21:35:00.000Z",
+    "sgv": 63,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000260",
+    "device": "synthetic",
+    "dateString": "2026-08-20T21:40:00.000Z",
+    "sgv": 63,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000261",
+    "device": "synthetic",
+    "dateString": "2026-08-20T21:45:00.000Z",
+    "sgv": 65,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000262",
+    "device": "synthetic",
+    "dateString": "2026-08-20T21:50:00.000Z",
+    "sgv": 69,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000263",
+    "device": "synthetic",
+    "dateString": "2026-08-20T21:55:00.000Z",
+    "sgv": 74,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000264",
+    "device": "synthetic",
+    "dateString": "2026-08-20T22:00:00.000Z",
+    "sgv": 79,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000265",
+    "device": "synthetic",
+    "dateString": "2026-08-20T22:05:00.000Z",
+    "sgv": 85,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000266",
+    "device": "synthetic",
+    "dateString": "2026-08-20T22:10:00.000Z",
+    "sgv": 91,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000267",
+    "device": "synthetic",
+    "dateString": "2026-08-20T22:15:00.000Z",
+    "sgv": 96,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000268",
+    "device": "synthetic",
+    "dateString": "2026-08-20T22:20:00.000Z",
+    "sgv": 100,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000269",
+    "device": "synthetic",
+    "dateString": "2026-08-20T22:25:00.000Z",
+    "sgv": 103,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000270",
+    "device": "synthetic",
+    "dateString": "2026-08-20T22:30:00.000Z",
+    "sgv": 105,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000271",
+    "device": "synthetic",
+    "dateString": "2026-08-20T22:35:00.000Z",
+    "sgv": 106,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000272",
+    "device": "synthetic",
+    "dateString": "2026-08-20T22:40:00.000Z",
+    "sgv": 107,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000273",
+    "device": "synthetic",
+    "dateString": "2026-08-20T22:45:00.000Z",
+    "sgv": 107,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000274",
+    "device": "synthetic",
+    "dateString": "2026-08-20T22:50:00.000Z",
+    "sgv": 107,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000275",
+    "device": "synthetic",
+    "dateString": "2026-08-20T22:55:00.000Z",
+    "sgv": 107,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000276",
+    "device": "synthetic",
+    "dateString": "2026-08-20T23:00:00.000Z",
+    "sgv": 108,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000277",
+    "device": "synthetic",
+    "dateString": "2026-08-20T23:05:00.000Z",
+    "sgv": 110,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000278",
+    "device": "synthetic",
+    "dateString": "2026-08-20T23:10:00.000Z",
+    "sgv": 114,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000279",
+    "device": "synthetic",
+    "dateString": "2026-08-20T23:15:00.000Z",
+    "sgv": 118,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000280",
+    "device": "synthetic",
+    "dateString": "2026-08-20T23:20:00.000Z",
+    "sgv": 124,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000281",
+    "device": "synthetic",
+    "dateString": "2026-08-20T23:25:00.000Z",
+    "sgv": 131,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000282",
+    "device": "synthetic",
+    "dateString": "2026-08-20T23:30:00.000Z",
+    "sgv": 138,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000283",
+    "device": "synthetic",
+    "dateString": "2026-08-20T23:35:00.000Z",
+    "sgv": 146,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000284",
+    "device": "synthetic",
+    "dateString": "2026-08-20T23:40:00.000Z",
+    "sgv": 153,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000285",
+    "device": "synthetic",
+    "dateString": "2026-08-20T23:45:00.000Z",
+    "sgv": 159,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000286",
+    "device": "synthetic",
+    "dateString": "2026-08-20T23:50:00.000Z",
+    "sgv": 164,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000287",
+    "device": "synthetic",
+    "dateString": "2026-08-20T23:55:00.000Z",
+    "sgv": 168,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000288",
+    "device": "synthetic",
+    "dateString": "2026-08-21T00:00:00.000Z",
+    "sgv": 170,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000289",
+    "device": "synthetic",
+    "dateString": "2026-08-21T00:05:00.000Z",
+    "sgv": 171,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000290",
+    "device": "synthetic",
+    "dateString": "2026-08-21T00:10:00.000Z",
+    "sgv": 170,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000291",
+    "device": "synthetic",
+    "dateString": "2026-08-21T00:15:00.000Z",
+    "sgv": 168,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000292",
+    "device": "synthetic",
+    "dateString": "2026-08-21T00:20:00.000Z",
+    "sgv": 165,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000293",
+    "device": "synthetic",
+    "dateString": "2026-08-21T00:25:00.000Z",
+    "sgv": 161,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000294",
+    "device": "synthetic",
+    "dateString": "2026-08-21T00:30:00.000Z",
+    "sgv": 158,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000295",
+    "device": "synthetic",
+    "dateString": "2026-08-21T00:35:00.000Z",
+    "sgv": 154,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000296",
+    "device": "synthetic",
+    "dateString": "2026-08-21T00:40:00.000Z",
+    "sgv": 152,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000297",
+    "device": "synthetic",
+    "dateString": "2026-08-21T00:45:00.000Z",
+    "sgv": 151,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000298",
+    "device": "synthetic",
+    "dateString": "2026-08-21T00:50:00.000Z",
+    "sgv": 150,
+    "direction": "Flat",
+    "type": "sgv"
+  },
+  {
+    "_id": "synthetic-e-000299",
+    "device": "synthetic",
+    "dateString": "2026-08-21T00:55:00.000Z",
+    "sgv": 150,
+    "direction": "Flat",
+    "type": "sgv"
+  }
+]

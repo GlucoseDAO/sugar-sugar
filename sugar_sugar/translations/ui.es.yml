@@ -180,8 +180,30 @@ es:
     paper_full_name_placeholder: "Nombre y apellidos"
     data_usage_consent_label: "Acepto el uso de mis datos CGM subidos para este estudio."
     data_usage_consent_required: "Por favor confirma el consentimiento de uso de datos para continuar."
+    consent_gate_hint: "Marca arriba las dos casillas obligatorias (18+ / he leído los términos, y consentimiento de protección de datos) para continuar."
+    import_title: "Importa tus datos de CGM"
+    import_subtitle: "Sube una exportación CSV (Dexcom / Libre / Medtronic) o tu entries.json de Nightscout — selecciona también treatments.json para obtener marcas de comidas e insulina. O trae los datos directamente desde tu sitio de Nightscout."
+    import_or: "— o —"
+    import_upload_prompt: "Arrastra y suelta o toca para elegir un CSV — o selecciona juntos tu entries.json y tu treatments.json de Nightscout"
+    import_ns_url_placeholder: "URL de Nightscout (https://tu-sitio.com)"
+    import_ns_token_placeholder: "Token de acceso o API secret (opcional)"
+    import_ns_button: "Importar desde Nightscout"
+    import_ns_loading: "Contactando con tu sitio de Nightscout…"
+    import_success: "Se cargaron %{count} lecturas de %{source}. Ya puedes empezar."
+    import_needs_consent: "Marca arriba la casilla de uso de datos antes de importar."
+    import_needs_url: "Introduce primero la URL de tu Nightscout."
+    import_empty: "Esa fuente no devolvió ninguna lectura de glucosa. Revisa la URL/token (o el rango de fechas) e inténtalo de nuevo."
+    import_bad_file: "No se pudo leer ese archivo — sube una exportación CSV de CGM estándar (Dexcom / Libre / Medtronic) o un entries.json de Nightscout e inténtalo de nuevo."
+    import_needs_entries: "Añade entries.json — es el archivo que contiene las lecturas de glucosa. treatments.json y profile.json no se pueden usar por sí solos."
+    import_ignored: "Se ignoró %{files}, que este juego no necesita."
+    import_ns_unreachable: "No se pudo contactar con ese sitio de Nightscout. Revisa la URL y tu conexión e inténtalo de nuevo."
+    import_ns_timeout: "El sitio de Nightscout tardó demasiado en responder. Inténtalo de nuevo."
+    import_ns_http_error: "El sitio de Nightscout rechazó la petición (HTTP %{code}). Revisa la URL y el token."
+    import_ns_unavailable: "La importación desde Nightscout no está disponible en este servidor (falta una dependencia de red)."
+    import_failed: "La importación falló. Revisa tu archivo o los datos de Nightscout e inténtalo de nuevo."
 
   header:
+    upload_button: "Subir"
     points_label: "Número de puntos a mostrar:"
     time_window_label: "Posición de la ventana de tiempo:"
     upload_prompt_1: "Arrastra y suelta o "
@@ -190,7 +212,7 @@ es:
     upload_required: "Se requiere subir archivo"
     upload_success: "Datos cargados correctamente desde %{filename}. Estos datos se usarán para las predicciones."
     example_data_now_using: "Ahora usando datos públicos anonimizados. Sube un archivo CSV para análisis personalizado."
-    example_data_warning: "Usando actualmente datos públicos anonimizados. Sube tu propio archivo CSV de Dexcom/Libre/Medtronic/Nightscout para análisis personalizado."
+    example_data_warning: "Usando actualmente datos públicos anonimizados. Sube tu propio archivo CSV de Dexcom/Libre/Medtronic — o tu entries.json de Nightscout — para análisis personalizado."
     csv_tab_label: "Archivo CSV"
     nightscout_tab_label: "Nightscout"
     nightscout_url_placeholder: "https://tu-sitio-nightscout.com"
@@ -217,6 +239,8 @@ es:
     how_to_play_3: "3. Dibuja tu predicción hasta el final del área oculta para enviar"
 
   prediction:
+    upload_only_gate: "Elegiste jugar solo con tus propios datos. Para empezar, pulsa el botón Subir y selecciona tu archivo."
+    upload_mixed_gate: "Elegiste el modo mixto (datos públicos + los tuyos). Para continuar, pulsa el botón Subir y selecciona tu archivo de CGM — las rondas alternarán entre trazas públicas anonimizadas y tus datos."
     units_label: "Unidades:"
     upload_required_alert: "Este formato requiere tus propios datos de CGM. Por favor sube un archivo CSV para comenzar."
     upload_consent_recorded: "Consentimiento registrado. Ahora puedes subir y usar tus datos de CGM en esta sesión."
@@ -240,6 +264,7 @@ es:
     text: "Nota: Sugar-Sugar está optimizado para escritorio en este momento. ¡El soporte para móviles llegará pronto!"
 
   orientation:
+    go_fullscreen: "Pantalla completa"
     title: "GIRA TU TELÉFONO EN MODO HORIZONTAL PARA DIBUJAR"
     subtitle: ""
 
@@ -596,7 +621,7 @@ es:
           - q: "¿Quién puede participar?"
             a: "Cualquier persona mayor de 18 años. Los usuarios de CGM son especialmente valiosos, pero los que no usan CGM también pueden jugar con datos públicos anonimizados."
           - q: "¿Qué dispositivos y formatos de CGM son compatibles?"
-            a: "Se admiten exportaciones de Dexcom, Libre, Medtronic y Nightscout. También hay un conjunto de datos públicos anonimizados si no tienes un dispositivo CGM."
+            a: "Se admiten las exportaciones CSV de Dexcom, Libre y Medtronic, así como un archivo entries.json de Nightscout. (La exportación CSV del propio Nightscout no: le falta la mayor parte de los datos.) También hay un conjunto de datos públicos anonimizados si no tienes un dispositivo CGM."
           - q: "¿Cuánto tiempo se tarda?"
             a: "Cada ronda dura unos 2-3 minutos. Una sesión completa (12 rondas) dura unos 30 minutos, pero puedes dividirla en varias visitas."
           - q: "¿Puedo parar a mitad de camino y reanudarlo más tarde?"
@@ -624,7 +649,7 @@ es:
         id: download-csv
         items:
           - q: "¿Por qué no puedo exportar desde la app del teléfono?"
-            a: "La mayoría de las apps de CGM en el teléfono solo dan informes PDF. El CSV en bruto sale de la web del fabricante o de apps de código abierto como xDrip+ y Nightscout."
+            a: "La mayoría de las apps de CGM en el teléfono solo dan informes PDF. El CSV en bruto sale de la web del fabricante o de apps de código abierto como xDrip+."
           - q: "Dexcom (Clarity)"
             a: >-
               1. Abre [clarity.dexcom.com](https://clarity.dexcom.com) (EE. UU.) o [clarity.dexcom.eu](https://clarity.dexcom.eu) (Europa) e inicia sesión con tu cuenta Dexcom.
@@ -669,7 +694,7 @@ es:
 
               **xDrip+:** Menú → Import/Export → Export CSV (formato SiDiary).
 
-              **Nightscout:** pega la URL de tu sitio en la pantalla de inicio o de predicción — no hace falta un archivo.
+              **Nightscout:** pega la URL de tu sitio en la pantalla de inicio — no hace falta un archivo. Si prefieres subir un archivo, abre `https://tu-sitio/api/v1/entries.json?count=10000`, guárdalo y sube ese — no la exportación CSV, a la que le falta la mayor parte de los datos.
       - title: "Datos y privacidad"
         items:
           - q: "¿Se almacena alguno de mis datos?"

@@ -28,7 +28,16 @@ def setup_i18n(*, extra_load_paths: Optional[Iterable[Path]] = None) -> None:
     We keep English as the default locale and fallback.
     """
     i18n.set("locale", DEFAULT_LOCALE)
-    i18n.set("fallback", DEFAULT_LOCALE)
+
+    # `i18n.set` drops the fallback whenever it equals the current locale
+    # (`i18n/config.py`: `if settings["locale"] == settings["fallback"]:
+    # settings["fallback"] = None`). Both are "en" here, so setting it through
+    # the public API silently disabled it -- and because every call site passes
+    # an explicit `locale=`, the global locale the guard reasons about is never
+    # the one being rendered. The visible symptom was raw key strings:
+    # `ui.startup.import_ns_button` shown as a button label in the six locales
+    # that do not carry the startup import block. Assign past the guard.
+    i18n.config.settings["fallback"] = DEFAULT_LOCALE
 
     # Default file format is YAML if PyYAML is installed (it is via i18nice[yaml]).
     base = str(translations_dir())

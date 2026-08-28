@@ -8,6 +8,9 @@
 !FreeStyle_Libre_3_synthetic_unified.csv
 !Unified_synthetic.csv
 !Unified_synthetic_unified.csv
+!Nightscout_entries_synthetic.json
+!Nightscout_treatments_synthetic.json
+!Nightscout_treatments_sparse_carbs_synthetic.json
 !cgmacros/
 !cgmacros/**
 !d1namo/
