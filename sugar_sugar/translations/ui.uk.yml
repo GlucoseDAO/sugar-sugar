@@ -622,7 +622,7 @@ uk:
         id: download-csv
         items:
           - q: "Чому не можна експортувати з додатка на телефоні?"
-            a: "Більшість CGM-додатків на телефоні дають лише PDF-звіти. Сирий CSV береться з сайту виробника або з відкритих додатків на кшталт xDrip+ і Nightscout."
+            a: "Більшість CGM-додатків на телефоні дають лише PDF-звіти. Сирий CSV береться з сайту виробника або з відкритих додатків на кшталт xDrip+."
           - q: "Dexcom (Clarity)"
             a: >-
               1. Відкрий [clarity.dexcom.com](https://clarity.dexcom.com) (США) або [clarity.dexcom.eu](https://clarity.dexcom.eu) (Європа) і увійди в акаунт Dexcom.

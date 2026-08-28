@@ -646,7 +646,7 @@ en:
         id: download-csv
         items:
           - q: "Why can't I export from the phone app?"
-            a: "Most CGM phone apps only give PDF reports. The raw CSV comes from the manufacturer's website, or from open-source apps such as xDrip+ and Nightscout."
+            a: "Most CGM phone apps only give PDF reports. The raw CSV comes from the manufacturer's website, or from open-source apps such as xDrip+."
           - q: "Dexcom (Clarity)"
             a: >-
               1. Open [clarity.dexcom.com](https://clarity.dexcom.com) (US) or [clarity.dexcom.eu](https://clarity.dexcom.eu) (Europe) and sign in with your Dexcom account.

@@ -623,7 +623,7 @@ de:
         id: download-csv
         items:
           - q: "Warum kann ich nicht aus der Handy-App exportieren?"
-            a: "Die meisten CGM-Apps auf dem Handy liefern nur PDF-Berichte. Die Roh-CSV kommt von der Hersteller-Website oder von Open-Source-Apps wie xDrip+ und Nightscout."
+            a: "Die meisten CGM-Apps auf dem Handy liefern nur PDF-Berichte. Die Roh-CSV kommt von der Hersteller-Website oder von Open-Source-Apps wie xDrip+."
           - q: "Dexcom (Clarity)"
             a: >-
               1. Öffne [clarity.dexcom.com](https://clarity.dexcom.com) (USA) oder [clarity.dexcom.eu](https://clarity.dexcom.eu) (Europa) und melde dich mit deinem Dexcom-Konto an.

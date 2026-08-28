@@ -43,14 +43,28 @@ CONTROL_RU_HOST: str = "https://ya.ru"
 
 app = typer.Typer(add_completion=False)
 
+# Set once from the CLI option. httpx.HTTPStatusError puts the full request URL
+# -- query string and all -- into its message, so any exception text printed
+# here can carry the access token. That is FEEDBACK.md's "no exception wrapping"
+# item biting the diagnostic tool itself, and this output is meant to be pasted
+# into issues.
+_TOKEN: Optional[str] = None
+
+
+def _scrub(text: str) -> str:
+    """Remove the access token from anything about to be printed."""
+    if not _TOKEN:
+        return text
+    return text.replace(_TOKEN, "<token-redacted>")
+
 
 def _say(status: str, label: str, detail: str = "", elapsed: Optional[float] = None) -> None:
     """Print one stage result. ``status`` is OK / FAIL / WARN / INFO."""
     mark = {"OK": "  ok  ", "FAIL": " FAIL ", "WARN": " warn ", "INFO": " info "}.get(status, status)
     timing = f"  [{elapsed * 1000:.0f} ms]" if elapsed is not None else ""
-    print(f"[{mark}] {label}{timing}")
+    print(f"[{mark}] {_scrub(label)}{timing}")
     if detail:
-        for line in str(detail).splitlines():
+        for line in _scrub(str(detail)).splitlines():
             print(f"         {line}")
 
 
@@ -270,6 +284,9 @@ def main(
     skip_controls: bool = typer.Option(False, "--skip-controls", help="Skip the reachability control hosts."),
 ) -> None:
     """Diagnose a failing Nightscout import from the host that failed."""
+    global _TOKEN
+    _TOKEN = token
+
     parsed = urlparse(url if "://" in url else f"https://{url}")
     host = parsed.hostname
     if host is None:

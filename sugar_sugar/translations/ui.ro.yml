@@ -644,7 +644,7 @@ ro:
         id: download-csv
         items:
           - q: "De ce nu pot exporta din aplicația de telefon?"
-            a: "Majoritatea aplicațiilor CGM de pe telefon oferă doar rapoarte PDF. CSV-ul brut vine de pe site-ul producătorului sau din aplicații open-source precum xDrip+ și Nightscout."
+            a: "Majoritatea aplicațiilor CGM de pe telefon oferă doar rapoarte PDF. CSV-ul brut vine de pe site-ul producătorului sau din aplicații open-source precum xDrip+."
           - q: "Dexcom (Clarity)"
             a: >-
               1. Deschide [clarity.dexcom.com](https://clarity.dexcom.com) (SUA) sau [clarity.dexcom.eu](https://clarity.dexcom.eu) (Europa) și autentifică-te cu contul Dexcom.

@@ -624,7 +624,7 @@ fr:
         id: download-csv
         items:
           - q: "Pourquoi je ne peux pas exporter depuis l'appli téléphone ?"
-            a: "La plupart des applis CGM sur téléphone ne donnent que des rapports PDF. Le CSV brut vient du site du fabricant, ou d'applis open source comme xDrip+ et Nightscout."
+            a: "La plupart des applis CGM sur téléphone ne donnent que des rapports PDF. Le CSV brut vient du site du fabricant, ou d'applis open source comme xDrip+."
           - q: "Dexcom (Clarity)"
             a: >-
               1. Ouvre [clarity.dexcom.com](https://clarity.dexcom.com) (États-Unis) ou [clarity.dexcom.eu](https://clarity.dexcom.eu) (Europe) et connecte-toi avec ton compte Dexcom.

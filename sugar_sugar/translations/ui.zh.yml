@@ -610,7 +610,7 @@ zh:
         id: download-csv
         items:
           - q: "为什么不能从手机 App 导出？"
-            a: "大多数手机上的 CGM App 只能导出 PDF 报告。原始 CSV 来自厂商网站，或 xDrip+、Nightscout 这类开源应用。"
+            a: "大多数手机上的 CGM App 只能导出 PDF 报告。原始 CSV 来自厂商网站，或 xDrip+ 这类开源应用。"
           - q: "Dexcom（Clarity）"
             a: >-
               1. 打开 [clarity.dexcom.com](https://clarity.dexcom.com)（美国）或 [clarity.dexcom.eu](https://clarity.dexcom.eu)（欧洲），用 Dexcom 账号登录。
