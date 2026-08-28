@@ -121,7 +121,13 @@ class HeaderComponent(Div):
         return html.Div([time_slider_div])
 
     def create_upload_section(self, *, visible: bool = True) -> html.Div:
-        """Create the file upload and Nightscout data source section."""
+        """Create the file upload and Nightscout data source section.
+
+        Always rendered, `visible` only toggling `display`: the prediction
+        language-change callback outputs to `nightscout-load-button` and
+        `example-data-warning` on every format, and a Dash callback whose
+        component is missing raises rather than no-oping.
+        """
         _input_style: dict[str, str] = {
             'width': '100%',
             'marginBottom': '8px',
@@ -169,11 +175,17 @@ class HeaderComponent(Div):
             ], style={'paddingTop': '10px'}),
         )
 
+        # The CSV tab is dropped when the upload control lives elsewhere -- for
+        # B/C it sits in the prediction action strip, so rendering it here too
+        # would duplicate the `upload-data` id, and rendering an empty tab would
+        # offer the player a dead end. Nightscout then becomes the only tab and
+        # has to be the selected one.
+        tabs = [csv_tab, nightscout_tab] if self.render_csv_upload else [nightscout_tab]
         children: list[Any] = [
             dcc.Tabs(
                 id="data-input-tabs",
-                value="csv",
-                children=[csv_tab, nightscout_tab],
+                value="csv" if self.render_csv_upload else "nightscout",
+                children=tabs,
                 style={'marginBottom': '4px'},
             ),
         ]

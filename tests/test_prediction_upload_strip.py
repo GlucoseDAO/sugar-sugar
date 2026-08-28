@@ -126,3 +126,88 @@ def test_format_a_never_shows_strip_upload() -> None:
     assert slot.className == "prediction-upload-hidden"
     assert actions.className == ""
     assert "upload-data" not in _ids(slot)
+
+
+# --------------------------------------------------------------------------
+# Nightscout in the upload gate.
+#
+# A B/C player who has not provided data yet is shown a gate telling them to
+# press Upload and pick a CGM file -- and until this, a CSV button was the only
+# thing on the page. Someone whose data lives on a Nightscout site and nowhere
+# else had no way forward, which is what "I chose to play with my own data and
+# there was no Nightscout button" describes.
+# --------------------------------------------------------------------------
+
+NIGHTSCOUT_IDS: frozenset[str] = frozenset(
+    {'nightscout-url-input', 'nightscout-token-input', 'nightscout-load-button', 'nightscout-status'}
+)
+
+
+def _upload_section_display(layout: Any) -> Any:
+    """The upload section's own display, read off the parent of its tabs."""
+
+    def walk(node: Any, parent: Any = None) -> Any:
+        if getattr(node, "id", None) == "data-input-tabs":
+            return (getattr(parent, "style", None) or {}).get("display")
+        kids = getattr(node, "children", None)
+        if isinstance(kids, (list, tuple)):
+            for kid in kids:
+                hit = walk(kid, node)
+                if hit is not None:
+                    return hit
+        elif kids is not None and not isinstance(kids, str):
+            return walk(kids, node)
+        return None
+
+    return walk(layout)
+
+
+def _count_ids(node: Any, target: str) -> int:
+    total = 1 if getattr(node, "id", None) == target else 0
+    kids = getattr(node, "children", None)
+    if isinstance(kids, (list, tuple)):
+        for kid in kids:
+            total += _count_ids(kid, target)
+    elif kids is not None and not isinstance(kids, str):
+        total += _count_ids(kids, target)
+    return total
+
+
+def _layout(format_value: str, **info: Any) -> Any:
+    user_info = {"format": format_value, "consent_completed": True, **info}
+    return create_prediction_layout(locale="en", format_value=format_value, user_info=user_info)
+
+
+def test_nightscout_controls_are_always_in_the_dom() -> None:
+    """The language-change callback outputs to them on every format.
+
+    A Dash callback whose component is missing raises, so these ids may be
+    hidden but never dropped.
+    """
+    for format_value in ("A", "B", "C"):
+        assert NIGHTSCOUT_IDS <= _ids(_layout(format_value)), format_value
+
+
+def test_gated_own_data_player_can_reach_nightscout() -> None:
+    for format_value in ("B", "C"):
+        assert _upload_section_display(_layout(format_value)) == "block", format_value
+
+
+def test_nightscout_is_hidden_once_data_is_loaded() -> None:
+    """It must not steal chart space once the player is actually playing."""
+    layout = _layout("B", uploaded_data_path="/tmp/example.csv")
+    assert _upload_section_display(layout) == "none"
+
+
+def test_public_data_format_never_shows_it() -> None:
+    assert _upload_section_display(_layout("A")) == "none"
+
+
+def test_gate_does_not_duplicate_the_csv_upload() -> None:
+    """`upload-data` lives in the action strip for B/C.
+
+    Rendering the CSV tab here too would put the id on the page twice, which
+    breaks the callback that reads it.
+    """
+    for format_value in ("A", "B", "C"):
+        assert _count_ids(_layout(format_value), "upload-data") == 1, format_value

@@ -4134,9 +4134,16 @@ def create_prediction_layout(*, locale: str, format_value: str, user_info: Dict[
     return html.Div([
         HeaderComponent(
             show_time_slider=False,
-            # The CSV upload now lives in the always-visible action strip (so it is
-            # reachable in landscape for B/C); the header no longer renders it.
-            show_upload_section=False,
+            # The CSV upload lives in the always-visible action strip (so it is
+            # reachable in landscape for B/C), so the header does not render it.
+            # The section itself is revealed only while a B/C player is still
+            # gated: that is the one screen that demands data the player may only
+            # have on a Nightscout site, and until now it offered a CSV button and
+            # nothing else -- "I chose to play with my own data and there was no
+            # Nightscout button". The chart is hidden behind the gate at that
+            # moment, so this costs no in-round chart space, and it disappears
+            # again as soon as data is loaded.
+            show_upload_section=b_gated,
             show_example_button=(format_value == "A"),
             show_data_source_section=False,
             render_csv_upload=(format_value == "A"),
