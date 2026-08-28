@@ -3176,6 +3176,12 @@ def update_prediction_text_on_language_change(
      Output('ending-metrics-details-toggle', 'children'),
      Output('ending-metrics-container', 'children'),
      Output('ending-local-storage-note', 'children'),
+     # The results chart is the biggest thing on this page and it was the only
+     # thing left in the language the round was played in: its legend, y-axis
+     # title and the "<- Known | Predicted ->" divider are all translated at
+     # build time, and nothing rebuilt the figure on a language change.
+     Output('ending-static-graph', 'figure'),
+     Output('ending-food-bubbles', 'children'),
      Output('finish-study-button-ending', 'children'),
      Output('next-round-button', 'children'),
      Output('ending-switch-format-title', 'children'),
@@ -3253,26 +3259,37 @@ def update_ending_text_on_language_change(
 
     finish_button_text = t("ui.ending.results", locale=locale) if is_last_round else t("ui.submit.finish_game", locale=locale)
 
-    empty_events = pl.DataFrame(
-        {"time": [], "event_type": [], "event_subtype": [], "insulin_value": []}
-    )
-    if current_df_data:
-        window_df = reconstruct_dataframe_from_dict(current_df_data)
-    else:
-        window_df = pl.DataFrame(
-            {"time": [], "gl": [], "prediction": [], "age": [], "user_id": []}
-        )
-    events_df = (
-        reconstruct_events_dataframe_from_dict(events_df_data)
-        if events_df_data
-        else empty_events
-    )
+    window_df = _ending_window_df(current_df_data, user_info)
+    events_df = _ending_events_df(events_df_data, user_info)
     source_plaque = _ending_source_plaque_children(
         user_info=user_info,
         window_df=window_df,
         events_df=events_df,
         locale=locale,
     )
+
+    # Rebuild the chart in the new language, from the same window and events the
+    # layout resolved. An empty window would blank the graph rather than
+    # translate it, so that case keeps whatever is already on screen.
+    source_name = str(user_info.get('data_source_name') or '') if user_info else ''
+    figure: Any = no_update
+    food_bubbles: Any = no_update
+    if window_df.height:
+        figure = GlucoseChart.build_static_figure(
+            window_df,
+            events_df,
+            source_name or None,
+            unit=unit,
+            locale=locale,
+            prediction_boundary=window_df.height - PREDICTION_HOUR_OFFSET,
+            compact=_is_mobile_request(),
+        )
+        food_bubbles = meal_food_bubble_children(
+            window_df,
+            events_df,
+            source_name=source_name,
+            locale=locale,
+        )
 
     return (
         t("ui.ending.title", locale=locale),
@@ -3299,6 +3316,8 @@ def update_ending_text_on_language_change(
         t("ui.ending.click_here_for_details", locale=locale),
         metrics_display,
         t("ui.ending.local_storage_note", locale=locale),
+        figure,
+        food_bubbles,
         finish_button_text,
         t("ui.ending.next_round", locale=locale),
         t("ui.switch_format.title", locale=locale),
@@ -4756,6 +4775,52 @@ def _switch_format_button(
     )
 
 
+def _ending_events_df(
+    events_df_data: Optional[Dict],
+    user_info: Optional[Dict[str, Any]],
+) -> pl.DataFrame:
+    """Events behind the /ending chart: the window store first, the dataset second.
+
+    Shared by ``create_ending_layout`` and the language-change callback so a
+    re-rendered chart is drawn from exactly the same events as the first render.
+    """
+    if events_df_data:
+        return reconstruct_events_dataframe_from_dict(events_df_data)
+    if user_info:
+        _, events_df = load_dataset(resolve_dataset_identity(user_info))
+        return events_df
+    return pl.DataFrame(
+        {'time': [], 'event_type': [], 'event_subtype': [], 'insulin_value': []}
+    )
+
+
+def _ending_window_df(
+    current_df_data: Optional[Dict],
+    user_info: Optional[Dict[str, Any]],
+) -> pl.DataFrame:
+    """The window the /ending chart draws, resolved the same way on every render.
+
+    The full dataset is never shipped to the client, so the stored window is the
+    preferred source; the recorded window offsets are the server-side fallback.
+    Kept out of ``create_ending_layout`` because the language-change callback has
+    to rebuild the same figure, and a second copy of this branch would be free to
+    drift (it did: the callback used to fall back to an *empty* frame).
+    """
+    if current_df_data:
+        return reconstruct_dataframe_from_dict(current_df_data)
+    if not user_info:
+        return pl.DataFrame(
+            {'time': [], 'gl': [], 'prediction': [], 'age': [], 'user_id': []}
+        )
+    full_df, _ = load_dataset(resolve_dataset_identity(user_info))
+    if 'prediction_window_start' in user_info and 'prediction_window_size' in user_info:
+        window_size = user_info['prediction_window_size']
+        max_start = len(full_df) - window_size
+        safe_start = max(0, min(user_info['prediction_window_start'], max_start))
+        return full_df.slice(safe_start, window_size)
+    return full_df.slice(0, DEFAULT_POINTS)
+
+
 def create_ending_layout(
     current_df_data: Optional[Dict],
     events_df_data: Optional[Dict],
@@ -4767,25 +4832,9 @@ def create_ending_layout(
     """Create the ending page layout"""
     print("DEBUG: Creating ending page with stored data")
 
-    # The full dataset is NOT shipped to the client. Load it server-side lazily,
-    # only as a fallback window source when current-window-df is absent.
-    _full_df_cache: list[pl.DataFrame] = []
-    def _ending_full_df() -> pl.DataFrame:
-        if not _full_df_cache:
-            glucose_df, _ = load_dataset(resolve_dataset_identity(user_info))
-            _full_df_cache.append(glucose_df)
-        return _full_df_cache[0]
-
     # Events for the markers: prefer the small events store; else load from the
     # dataset server-side (the chart filters events to the window anyway).
-    if events_df_data:
-        events_df = reconstruct_events_dataframe_from_dict(events_df_data)
-    elif user_info:
-        _, events_df = load_dataset(resolve_dataset_identity(user_info))
-    else:
-        events_df = pl.DataFrame(
-            {'time': [], 'event_type': [], 'event_subtype': [], 'insulin_value': []}
-        )
+    events_df = _ending_events_df(events_df_data, user_info)
 
     # Check if we have stored prediction data from the submit button
     if user_info and 'prediction_table_data' in user_info:
@@ -4808,23 +4857,8 @@ def create_ending_layout(
             return html.Div("No predictions to display", style={'textAlign': 'center', 'padding': '50px'})
         
         # Prefer the exact window with predictions as stored in session (fixes missing prediction traces).
-        if current_df_data:
-            df = reconstruct_dataframe_from_dict(current_df_data)
-            print(f"DEBUG: Using current-window-df for ending chart (points={len(df)})")
-        elif user_info and 'prediction_window_start' in user_info and 'prediction_window_size' in user_info:
-            full_df = _ending_full_df()
-            window_start = user_info['prediction_window_start']
-            window_size = user_info['prediction_window_size']
-            # Ensure we don't go beyond the available data
-            max_start = len(full_df) - window_size
-            safe_start = min(window_start, max_start)
-            safe_start = max(0, safe_start)
-            df = full_df.slice(safe_start, window_size)
-            print(f"DEBUG: Using prediction window starting at {safe_start} with size {window_size}")
-        else:
-            # Fallback to first DEFAULT_POINTS for display
-            df = _ending_full_df().slice(0, DEFAULT_POINTS)
-            print("DEBUG: No prediction window info found, using default first 24 points")
+        df = _ending_window_df(current_df_data, user_info)
+        print(f"DEBUG: Ending chart window resolved (points={len(df)})")
     else:
         print("DEBUG: No stored prediction data found")
         return html.Div("No predictions to display", style={'textAlign': 'center', 'padding': '50px'})
