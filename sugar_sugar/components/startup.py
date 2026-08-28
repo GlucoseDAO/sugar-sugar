@@ -130,7 +130,9 @@ def import_controls_children(locale: str) -> list[Any]:
         ),
         dcc.Upload(
             id='startup-upload-data',
-            multiple=False,
+            # A Nightscout export is up to three sibling files (entries /
+            # treatments / profile); every other CGM export is one.
+            multiple=True,
             accept='.csv,.json,text/csv,application/json',
             children=html.Div(t("ui.startup.import_upload_prompt", locale=locale), id='startup-upload-prompt'),
             style={
@@ -986,7 +988,21 @@ class StartupPage(html.Div):
             current_value: Optional[list[str]],
         ) -> tuple[Any, Any]:
             if format_value is None:
-                return no_update, no_update
+                # `no_update` here meant "leave the container as it is", but what
+                # it actually leaves is whatever the last render baked in -- and
+                # the layout bakes `display:none`. So a format cleared mid-session
+                # (answering "no CGM" on an earlier step clears a My Data / Mixed
+                # choice, `_compute_format_options`) left the consent box and the
+                # Nightscout import on screen for a format the user no longer had,
+                # and once the cleared value persisted to localStorage the block
+                # never came back on a later render. Hide it explicitly instead.
+                #
+                # The initial call is still hands-off: `data-usage-consent` is
+                # persisted, so returning [] before hydration would wipe a tick
+                # the user already gave.
+                if getattr(dash.callback_context, 'triggered_id', None) is None:
+                    return no_update, no_update
+                return {'display': 'none', 'marginBottom': '20px'}, []
             if format_value in ('B', 'C'):
                 # Landing/mobile may already have recorded upload consent — pre-tick
                 # so the user is not asked twice before Start.
@@ -1031,30 +1047,50 @@ class StartupPage(html.Div):
             from datetime import datetime
             from pathlib import Path
             from sugar_sugar.i18n import normalize_locale
-            from sugar_sugar.data import load_glucose_data, decode_upload_bytes
+            from sugar_sugar.data import (
+                classify_nightscout_uploads,
+                decode_upload_files,
+                load_glucose_data,
+                load_nightscout_uploads,
+                safe_upload_filename,
+            )
 
             if not contents:
                 raise dash.exceptions.PreventUpdate
             locale = normalize_locale(interface_language)
             if not _consent_ok(format_value, consent_value, user_info):
                 return no_update, _import_status_msg(t("ui.startup.import_needs_consent", locale=locale), ok=False)
-            decoded = decode_upload_bytes(contents)
-            if decoded is None:
+
+            files = decode_upload_files(contents, filename)
+            if not files:
                 return no_update, _import_status_msg(t("ui.startup.import_bad_file", locale=locale), ok=False)
+
+            # A Nightscout export is up to three sibling files and users hand
+            # over whichever they downloaded, so which is which is decided by
+            # content. Missing entries is its own message: "bad file" would be
+            # wrong and unhelpful when the files are fine but incomplete.
+            bundle = classify_nightscout_uploads(files)
+            if bundle is not None and not bundle.is_usable:
+                return no_update, _import_status_msg(
+                    t("ui.startup.import_needs_entries", locale=locale), ok=False
+                )
 
             # Parse/save is fully guarded: a malformed file must never 500 the app.
             try:
                 users_dir = Path('data/input/users')
                 users_dir.mkdir(parents=True, exist_ok=True)
-                safe = (filename or 'uploaded').replace(' ', '_').replace('/', '_')
-                # A Nightscout export is JSON. Forcing .csv onto everything used
-                # to save it as entries.json.csv; the loader sniffs content and
-                # not the name, but the stored file should still say what it is.
-                if not safe.lower().endswith(('.csv', '.json')):
-                    safe += '.csv'
-                save_path = users_dir / f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{safe}"
-                save_path.write_bytes(decoded)
-                glucose_df, _events = load_glucose_data(save_path)
+                if bundle is not None:
+                    glucose_df, _events, save_path = load_nightscout_uploads(bundle, users_dir)
+                    source_name = bundle.entries.filename
+                    ignored = bundle.discarded
+                else:
+                    upload_name, upload_data = files[0]
+                    stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                    save_path = users_dir / f"{stamp}_{safe_upload_filename(upload_name)}"
+                    save_path.write_bytes(upload_data)
+                    glucose_df, _events = load_glucose_data(save_path)
+                    source_name = upload_name
+                    ignored = tuple(name for name, _ in files[1:])
             except Exception:
                 return no_update, _import_status_msg(t("ui.startup.import_bad_file", locale=locale), ok=False)
 
@@ -1063,11 +1099,19 @@ class StartupPage(html.Div):
 
             info = dict(user_info or {})
             info['uploaded_data_path'] = str(save_path)
-            info['uploaded_data_filename'] = str(filename or 'uploaded.csv')
-            return info, _import_status_msg(
-                t("ui.startup.import_success", locale=locale, count=glucose_df.height, source=str(filename or 'CSV')),
-                ok=True,
+            info['uploaded_data_filename'] = str(source_name)
+            message = t(
+                "ui.startup.import_success",
+                locale=locale,
+                count=glucose_df.height,
+                source=str(source_name),
             )
+            # Name what was skipped rather than dropping it silently -- the user
+            # chose those files, and profile.json in particular is one they were
+            # right to include.
+            if ignored:
+                message += " " + t("ui.startup.import_ignored", locale=locale, files=", ".join(ignored))
+            return info, _import_status_msg(message, ok=True)
 
         @app.callback(
             [Output('user-info-store', 'data', allow_duplicate=True),

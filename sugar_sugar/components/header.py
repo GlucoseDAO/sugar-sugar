@@ -10,15 +10,21 @@ from sugar_sugar.i18n import t
 def make_csv_upload(
     locale: str, *, style: Optional[dict[str, Any]] = None, className: Optional[str] = None
 ) -> dcc.Upload:
-    """Build the single CSV ``dcc.Upload`` (id='upload-data').
+    """Build the CGM ``dcc.Upload`` (id='upload-data').
 
     Shared between the desktop/portrait header and the prediction action strip so
     the component (and its ``header-upload-prompt`` child, referenced by the
     language-change callback) exists in exactly one place per page.
+
+    ``multiple=True`` because a Nightscout export is up to three sibling files
+    (entries / treatments / profile) and the player should be able to hand over
+    what they downloaded. Every other CGM export is one file; the handler uses
+    the first and says which others it skipped.
     """
     return dcc.Upload(
         id='upload-data',
         className=className,
+        multiple=True,
         children=html.Div(
             id='header-upload-prompt',
             children=t("ui.header.upload_button", locale=locale),

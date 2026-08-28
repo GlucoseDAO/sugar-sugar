@@ -64,6 +64,21 @@ waiting instead of being raised under pressure later. Nothing needs to change fo
 
 Hard-won rules:
 
+- **A Nightscout upload is up to three files, and only `entries.json` is required.** Both
+  `dcc.Upload`s are `multiple=True` for this: `entries.json` carries the glucose,
+  `treatments.json` is optional and becomes the meal/insulin markers, and `profile.json` is
+  accepted and discarded — it holds settings, no rows, and cgm-format throws it away on the URL
+  path too. Users include it because it is part of the same download, so rejecting the selection
+  over it would be wrong; `NightscoutBundle.discarded` names what was skipped and the success
+  message says so rather than dropping it silently. Roles are decided by **content**
+  (`nightscout_json_kind`), never by file name or selection order.
+  **`load_nightscout_uploads` saves the *unified* frame, not the raw `entries.json`** — later
+  rounds reload from `user_info['uploaded_data_path']` through `load_glucose_data`, so pointing
+  it at the entries file would silently drop every event marker after round one. That is the
+  same thing `load_glucose_data_from_nightscout` does for the URL import, reached from an upload.
+  A `multiple=True` Upload also changes the *payload shape*: Dash sends a list, the clientside
+  compressor maps over it and returns a list, and `decode_upload_files` normalises both shapes so
+  neither callback has to branch. Locked down by `tests/test_nightscout_json_upload.py`.
 - **Nightscout uploads are `entries.json`, never a Nightscout CSV.** `/api/v1/entries.csv` is
   headerless with five hardcoded columns and there is no treatments CSV at all, so cgm-format
   cannot detect it and the upload hints must not offer it. `is_nightscout_entries_json` sniffs
@@ -391,6 +406,23 @@ The fix is the **placeholder-scoped poll** pattern (`_game_stores_ready` / `_res
 - **Rule for new game routes:** add them to `_GAME_ROUTES` and teach `_game_stores_ready` which stores they need, or they will render from empty state on a cold load.
 
 **Corollary — `route-prediction` must follow the *render*, not the URL.** The `<html>` class was stamped from `pathname === '/prediction'` alone, so during the bug above (URL `/prediction`, content = landing/consent) every prediction-only rule in `mobile.css` applied to that foreign content — including the two `:not(.route-prediction)` **releases**: the `#page-content * { max-width: 100% }` overflow cap (without it a form page overflows and the browser zooms the whole page out) and `touch-action: manipulation` (without it Android waits ~300 ms per tap for a double-tap-zoom and swallows taps — the documented "Next worked on the 4th click"). Net effect: a consent form the player could tick but not submit. The class is now keyed on `prediction-chart-rendered`, written by `mark_prediction_chart_rendered` from `_renders_prediction_chart(pathname, user_info)` — the same predicate `display_page` uses for its consent bounce. Keep those two in step, and keep the clientside check as `pathname === '/prediction' && chartRendered` (the pathname half drops the class instantly on navigation away; the flag half withholds it until the chart is really up).
+
+### `i18n.set("fallback", ...)` silently discards the fallback
+
+i18nice's `config.set` ends with `if settings["locale"] == settings["fallback"]:
+settings["fallback"] = None`. `setup_i18n` set **both** to `"en"`, so the fallback was destroyed
+on the spot and `i18n.get("fallback")` read back `None`.
+
+The guard makes sense for the library's global-locale model, but this app never uses the global
+locale — every call site passes an explicit `locale=`, so the fallback is what renders *all seven
+other* locales for any key their file lacks. Without it, `t()` returns **the key itself**: six
+locales showed `ui.startup.import_ns_button` as a literal button label, because the whole
+`ui.startup.import_*` block only exists in `en` and `ro`. It read as a broken page, not as
+untranslated text.
+
+`sugar_sugar/i18n.py` now assigns `i18n.config.settings["fallback"]` directly, past the guard.
+**Rule:** a missing translation must degrade to English, never to a key string — if you see a
+`ui.`-prefixed string in the UI, the fallback is off, not the translation merely absent.
 
 ### Slider and component persistence
 

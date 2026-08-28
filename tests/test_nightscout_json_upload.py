@@ -22,10 +22,15 @@ import polars as pl
 import pytest
 
 from sugar_sugar.data import (
+    classify_nightscout_uploads,
     decode_upload_bytes,
+    decode_upload_files,
     is_nightscout_entries_json,
     load_glucose_data,
     load_nightscout_json_data,
+    load_nightscout_uploads,
+    nightscout_json_kind,
+    safe_upload_filename,
 )
 
 # All three fixtures are synthetic and committed. The real Nightscout exports
@@ -130,3 +135,149 @@ def test_treatments_with_a_long_null_run_are_loaded() -> None:
     assert glucose_df.height > 0
     carb_events = events_df.filter(pl.col("event_type") == "Carbohydrates")
     assert carb_events.height == 2
+
+
+# --------------------------------------------------------------------------
+# Multi-file upload: a Nightscout export is up to three sibling files.
+# --------------------------------------------------------------------------
+
+
+def _packed(path: Path) -> str:
+    """The gzip+base64 envelope the browser's clientside compressor produces."""
+    return "gzip:" + base64.b64encode(gzip.compress(path.read_bytes())).decode("ascii")
+
+
+def test_kinds_are_told_apart_by_content() -> None:
+    assert nightscout_json_kind(ENTRIES_JSON.read_bytes()) == "entries"
+    assert nightscout_json_kind(TREATMENTS_JSON.read_bytes()) == "treatments"
+    assert nightscout_json_kind((TESTDATA_DIR / "nightscout_profile.json").read_bytes()) == "profile"
+    assert nightscout_json_kind((TESTDATA_DIR / "Clarity_Export_synthetic.csv").read_bytes()) is None
+
+
+def test_profile_is_accepted_and_discarded() -> None:
+    """profile.json is part of the same download, so users include it.
+
+    It carries settings, not readings -- cgm-format fetches and discards it on
+    the URL path, and an upload has to do the same rather than rejecting the
+    whole selection over a file that was reasonable to attach.
+    """
+    files = [
+        (name, (TESTDATA_DIR / name).read_bytes())
+        for name in (
+            "Nightscout_entries_synthetic.json",
+            "Nightscout_treatments_synthetic.json",
+            "nightscout_profile.json",
+        )
+    ]
+    bundle = classify_nightscout_uploads(files)
+
+    assert bundle is not None and bundle.is_usable
+    assert bundle.entries.filename == "Nightscout_entries_synthetic.json"
+    assert bundle.treatments.filename == "Nightscout_treatments_synthetic.json"
+    assert bundle.discarded == ("nightscout_profile.json",)
+
+
+def test_order_does_not_matter() -> None:
+    """Users select files in whatever order the file picker gives them."""
+    names = [
+        "nightscout_profile.json",
+        "Nightscout_treatments_synthetic.json",
+        "Nightscout_entries_synthetic.json",
+    ]
+    bundle = classify_nightscout_uploads([(n, (TESTDATA_DIR / n).read_bytes()) for n in names])
+
+    assert bundle is not None
+    assert bundle.entries.filename == "Nightscout_entries_synthetic.json"
+    assert bundle.treatments.filename == "Nightscout_treatments_synthetic.json"
+
+
+def test_a_bundle_without_entries_is_not_usable() -> None:
+    """treatments + profile is a real mistake to make, and needs its own message."""
+    names = ["Nightscout_treatments_synthetic.json", "nightscout_profile.json"]
+    bundle = classify_nightscout_uploads([(n, (TESTDATA_DIR / n).read_bytes()) for n in names])
+
+    assert bundle is not None
+    assert not bundle.is_usable
+    with pytest.raises(ValueError):
+        load_nightscout_uploads(bundle, TESTDATA_DIR)
+
+
+def test_ordinary_csv_uploads_are_not_claimed_as_a_bundle() -> None:
+    """Returning None is how the caller falls back to the single-file path."""
+    csv_bytes = (TESTDATA_DIR / "Clarity_Export_synthetic.csv").read_bytes()
+    assert classify_nightscout_uploads([("export.csv", csv_bytes)]) is None
+
+
+def test_two_file_upload_produces_event_markers(tmp_path: Path) -> None:
+    """The point of the whole feature: treatments become chart markers."""
+    files = [
+        (name, (TESTDATA_DIR / name).read_bytes())
+        for name in ("Nightscout_entries_synthetic.json", "Nightscout_treatments_synthetic.json")
+    ]
+    bundle = classify_nightscout_uploads(files)
+    glucose_df, events_df, save_path = load_nightscout_uploads(bundle, tmp_path)
+
+    assert glucose_df.height > 0
+    assert events_df.height > 0
+    assert save_path.parent == tmp_path
+
+
+def test_saved_bundle_keeps_its_events_when_reloaded(tmp_path: Path) -> None:
+    """Later rounds reload from `uploaded_data_path`, so the merge must persist.
+
+    Saving the entries file instead of the unified frame would drop every event
+    marker after round one -- the meals and boluses would silently vanish
+    mid-game, which is worse than never having shown them.
+    """
+    files = [
+        (name, (TESTDATA_DIR / name).read_bytes())
+        for name in ("Nightscout_entries_synthetic.json", "Nightscout_treatments_synthetic.json")
+    ]
+    bundle = classify_nightscout_uploads(files)
+    glucose_df, events_df, save_path = load_nightscout_uploads(bundle, tmp_path)
+
+    reloaded_glucose, reloaded_events = load_glucose_data(save_path)
+
+    assert reloaded_glucose.height == glucose_df.height
+    assert reloaded_events.height == events_df.height
+    assert reloaded_events.height > 0
+
+
+def test_transport_round_trips_several_files() -> None:
+    """Dash sends a list for a multiple=True Upload; the compressor keeps the shape."""
+    payloads = [_packed(ENTRIES_JSON), _packed(TREATMENTS_JSON)]
+    names = ["entries.json", "treatments.json"]
+
+    decoded = decode_upload_files(payloads, names)
+
+    assert [name for name, _ in decoded] == names
+    assert decoded[0][1] == ENTRIES_JSON.read_bytes()
+    assert decoded[1][1] == TREATMENTS_JSON.read_bytes()
+
+
+def test_transport_still_accepts_the_single_file_shape() -> None:
+    """A single-file Upload hands over a bare string, not a one-element list."""
+    decoded = decode_upload_files(_packed(ENTRIES_JSON), "entries.json")
+
+    assert len(decoded) == 1
+    assert decoded[0] == ("entries.json", ENTRIES_JSON.read_bytes())
+
+
+def test_an_undecodable_member_does_not_sink_the_others() -> None:
+    decoded = decode_upload_files([_packed(ENTRIES_JSON), "not-a-payload"], ["entries.json", "junk"])
+
+    assert [name for name, _ in decoded] == ["entries.json"]
+
+
+@pytest.mark.parametrize(
+    ("given", "expected"),
+    [
+        ("entries.json", "entries.json"),
+        ("my export.csv", "my_export.csv"),
+        ("../../etc/passwd", ".._.._etc_passwd.csv"),
+        (None, "uploaded.csv"),
+    ],
+)
+def test_saved_names_keep_json_as_json(given: object, expected: str) -> None:
+    """Forcing .csv onto everything used to store entries.json as entries.json.csv."""
+    assert safe_upload_filename(given) == expected

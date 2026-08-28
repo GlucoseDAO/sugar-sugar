@@ -3,7 +3,8 @@ import gzip
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Optional
+from dataclasses import dataclass
+from typing import Callable, Optional, Sequence
 
 import polars as pl
 from cgm_format import FormatParser
@@ -36,6 +37,46 @@ def decode_upload_bytes(payload: Optional[str]) -> Optional[bytes]:
     except Exception:
         return None
     return None
+
+def safe_upload_filename(name: Optional[str]) -> str:
+    """Make an uploaded file name safe to write, keeping what it says it is.
+
+    A Nightscout export is JSON, so ``.json`` is preserved; everything else is
+    given ``.csv``. Both upload handlers used to force ``.csv`` onto every
+    upload, which stored ``entries.json`` as ``entries.json.csv``.
+    """
+    safe = (name or "uploaded").replace(" ", "_").replace("/", "_")
+    if not safe.lower().endswith((".csv", ".json")):
+        safe += ".csv"
+    return safe
+
+
+def decode_upload_files(payload: object, filename: object) -> list[tuple[str, bytes]]:
+    """Decode a possibly-multi-file upload into ``(filename, bytes)`` pairs.
+
+    Dash hands ``contents`` and ``filename`` as a bare value when the Upload is
+    single-file and as a list when it is ``multiple=True``, and the clientside
+    compressor preserves whichever shape it was given. Both are normalised here
+    so the two upload callbacks do not each grow the same branch.
+
+    A member that will not decode is dropped rather than failing the upload:
+    one unreadable file out of three should not cost the user the other two.
+    The caller sees an empty list only when nothing at all decoded.
+    """
+    payloads = payload if isinstance(payload, list) else [payload]
+    names = filename if isinstance(filename, list) else [filename]
+
+    decoded: list[tuple[str, bytes]] = []
+    for index, item in enumerate(payloads):
+        if not isinstance(item, str):
+            continue
+        data = decode_upload_bytes(item)
+        if data is None:
+            continue
+        name = names[index] if index < len(names) else None
+        decoded.append((str(name or f"uploaded_{index}"), data))
+    return decoded
+
 
 def load_glucose_data_from_nightscout(
     base_url: str,
@@ -72,6 +113,55 @@ def load_glucose_data_from_nightscout(
 _JSON_SNIFF_BYTES: int = 8192
 
 
+ENTRIES: str = "entries"
+TREATMENTS: str = "treatments"
+PROFILE: str = "profile"
+
+
+def nightscout_json_kind(data: bytes) -> Optional[str]:
+    """Name which of Nightscout's three JSON exports *data* is, if any.
+
+    A Nightscout export is three sibling files and users hand over whichever
+    subset they happened to download, so the three have to be told apart by
+    content: they all deserialise to a bare array of objects and the file names
+    are whatever the browser saved them as.
+
+    * ``entries``    -- glucose. The only one that can carry a trace, so the only
+                       one that is required.
+    * ``treatments`` -- boluses, temp basals, carbs. Optional detail; it becomes
+                       the event markers on the chart.
+    * ``profile``    -- basal schedules, targets, display unit. Contributes no
+                       rows to a unified frame at all; cgm-format downloads it
+                       and discards it, and so do we.
+
+    Returns ``None`` for anything else, which is what keeps this from claiming a
+    file the library should handle.
+    """
+    if not data[:_JSON_SNIFF_BYTES].lstrip().startswith(b"["):
+        return None
+    try:
+        records = json.loads(data.decode("utf-8", errors="replace"))
+    except ValueError:
+        return None
+    if not isinstance(records, list):
+        return None
+
+    objects = [record for record in records if isinstance(record, dict)]
+    if not objects:
+        return None
+
+    # Scan every record rather than a prefix: an entries export may open with
+    # calibration or meter rows before the first sensor reading, and a profile
+    # export is short enough that a prefix proves nothing either way.
+    if any("sgv" in record or record.get("type") == "sgv" for record in objects):
+        return ENTRIES
+    if any("eventType" in record for record in objects):
+        return TREATMENTS
+    if any("defaultProfile" in record or "store" in record for record in objects):
+        return PROFILE
+    return None
+
+
 def is_nightscout_entries_json(file_path: Path) -> bool:
     """True if *file_path* is a Nightscout ``entries.json`` export.
 
@@ -91,18 +181,68 @@ def is_nightscout_entries_json(file_path: Path) -> bool:
     """
     if not file_path.exists():
         return False
-    if not file_path.read_bytes()[:_JSON_SNIFF_BYTES].lstrip().startswith(b"["):
-        return False
-    try:
-        records = json.loads(file_path.read_text(encoding="utf-8", errors="replace"))
-    except ValueError:
-        return False
-    # Scan the whole array rather than a prefix: an export may open with
-    # calibration or meter records before the first sensor reading.
-    return isinstance(records, list) and any(
-        isinstance(record, dict) and ("sgv" in record or record.get("type") == "sgv")
-        for record in records
-    )
+    return nightscout_json_kind(file_path.read_bytes()) == ENTRIES
+
+
+@dataclass(frozen=True)
+class NightscoutUpload:
+    """One uploaded Nightscout export, sorted into its role."""
+
+    filename: str
+    data: bytes
+
+
+@dataclass(frozen=True)
+class NightscoutBundle:
+    """What a multi-file Nightscout upload turned out to contain.
+
+    ``entries`` is the only member that matters for playability; without it
+    there is no glucose and the upload cannot be used. ``treatments`` is
+    optional detail. ``discarded`` holds the profile export, which users
+    reasonably include because it is part of the same download, plus anything
+    else that came along -- naming them lets the UI say what it ignored instead
+    of silently dropping files the user chose.
+    """
+
+    entries: Optional[NightscoutUpload]
+    treatments: Optional[NightscoutUpload]
+    discarded: tuple[str, ...]
+
+    @property
+    def is_usable(self) -> bool:
+        return self.entries is not None
+
+
+def classify_nightscout_uploads(files: Sequence[tuple[str, bytes]]) -> Optional[NightscoutBundle]:
+    """Sort uploaded files into the Nightscout bundle roles.
+
+    Returns ``None`` when nothing in *files* is a Nightscout export, which is
+    how the caller tells a Nightscout upload apart from an ordinary CGM CSV and
+    falls back to the single-file path.
+
+    Duplicates keep the first of each kind. A user who selects an export twice
+    (or picks up a re-download) should not have the second copy silently replace
+    the first, and there is no principled way to choose between them.
+    """
+    entries: Optional[NightscoutUpload] = None
+    treatments: Optional[NightscoutUpload] = None
+    discarded: list[str] = []
+    saw_nightscout = False
+
+    for filename, data in files:
+        kind = nightscout_json_kind(data)
+        if kind is not None:
+            saw_nightscout = True
+        if kind == ENTRIES and entries is None:
+            entries = NightscoutUpload(filename, data)
+        elif kind == TREATMENTS and treatments is None:
+            treatments = NightscoutUpload(filename, data)
+        else:
+            discarded.append(filename)
+
+    if not saw_nightscout:
+        return None
+    return NightscoutBundle(entries=entries, treatments=treatments, discarded=tuple(discarded))
 
 
 def load_nightscout_json_data(
@@ -129,6 +269,45 @@ def load_nightscout_json_data(
         unified_df = FormatParser.parse_nightscout(entries_data, treatments_data)
         split_glucose, split_events = unified_processor(unified_df).split_glucose_events(unified_df)
         return adapt_glucose_df(split_glucose), adapt_events_df(split_events)
+
+
+def load_nightscout_uploads(
+    bundle: NightscoutBundle,
+    save_dir: Path = Path("data/input/users"),
+) -> tuple[pl.DataFrame, pl.DataFrame, Path]:
+    """Parse an uploaded Nightscout bundle and persist it as a unified CSV.
+
+    What gets saved is the **unified frame**, not the raw ``entries.json``, and
+    that is the whole reason two-file upload works across rounds: later rounds
+    reload from ``user_info['uploaded_data_path']`` through ``load_glucose_data``,
+    so pointing it at the entries file would quietly drop the treatments after
+    round one and the event markers would vanish mid-game. Saving the merge is
+    what ``load_glucose_data_from_nightscout`` already does for the URL import;
+    this is the same shape reached from an upload instead of a download.
+
+    Raises ``ValueError`` if the bundle has no entries file -- callers check
+    ``bundle.is_usable`` first and tell the user which file is missing.
+    """
+    if bundle.entries is None:
+        raise ValueError("A Nightscout upload needs the entries export; it holds the glucose.")
+
+    with start_action(
+        action_type=u"load_nightscout_uploads",
+        entries=bundle.entries.filename,
+        treatments=bundle.treatments.filename if bundle.treatments else None,
+        discarded=list(bundle.discarded),
+    ):
+        unified_df = FormatParser.parse_nightscout(
+            bundle.entries.data,
+            bundle.treatments.data if bundle.treatments is not None else None,
+        )
+        split_glucose, split_events = unified_processor(unified_df).split_glucose_events(unified_df)
+        save_dir = Path(save_dir)
+        save_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        save_path = save_dir / f"{timestamp}_nightscout.csv"
+        FormatParser.to_csv_file(unified_df, str(save_path))
+        return adapt_glucose_df(split_glucose), adapt_events_df(split_events), save_path
 
 
 def load_glucose_data(file_path: Path = Path("data/example.csv")) -> tuple[pl.DataFrame, pl.DataFrame]:
