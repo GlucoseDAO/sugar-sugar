@@ -190,7 +190,7 @@ es:
     upload_required: "Se requiere subir archivo"
     upload_success: "Datos cargados correctamente desde %{filename}. Estos datos se usarán para las predicciones."
     example_data_now_using: "Ahora usando datos públicos anonimizados. Sube un archivo CSV para análisis personalizado."
-    example_data_warning: "Usando actualmente datos públicos anonimizados. Sube tu propio archivo CSV de Dexcom/Libre/Medtronic/Nightscout para análisis personalizado."
+    example_data_warning: "Usando actualmente datos públicos anonimizados. Sube tu propio archivo CSV de Dexcom/Libre/Medtronic — o tu entries.json de Nightscout — para análisis personalizado."
     csv_tab_label: "Archivo CSV"
     nightscout_tab_label: "Nightscout"
     nightscout_url_placeholder: "https://tu-sitio-nightscout.com"
@@ -596,7 +596,7 @@ es:
           - q: "¿Quién puede participar?"
             a: "Cualquier persona mayor de 18 años. Los usuarios de CGM son especialmente valiosos, pero los que no usan CGM también pueden jugar con datos públicos anonimizados."
           - q: "¿Qué dispositivos y formatos de CGM son compatibles?"
-            a: "Se admiten exportaciones de Dexcom, Libre, Medtronic y Nightscout. También hay un conjunto de datos públicos anonimizados si no tienes un dispositivo CGM."
+            a: "Se admiten las exportaciones CSV de Dexcom, Libre y Medtronic, así como un archivo entries.json de Nightscout. (La exportación CSV del propio Nightscout no: le falta la mayor parte de los datos.) También hay un conjunto de datos públicos anonimizados si no tienes un dispositivo CGM."
           - q: "¿Cuánto tiempo se tarda?"
             a: "Cada ronda dura unos 2-3 minutos. Una sesión completa (12 rondas) dura unos 30 minutos, pero puedes dividirla en varias visitas."
           - q: "¿Puedo parar a mitad de camino y reanudarlo más tarde?"
@@ -669,7 +669,7 @@ es:
 
               **xDrip+:** Menú → Import/Export → Export CSV (formato SiDiary).
 
-              **Nightscout:** pega la URL de tu sitio en la pantalla de inicio o de predicción — no hace falta un archivo.
+              **Nightscout:** pega la URL de tu sitio en la pantalla de inicio — no hace falta un archivo. Si prefieres subir un archivo, abre `https://tu-sitio/api/v1/entries.json?count=10000`, guárdalo y sube ese — no la exportación CSV, a la que le falta la mayor parte de los datos.
       - title: "Datos y privacidad"
         items:
           - q: "¿Se almacena alguno de mis datos?"

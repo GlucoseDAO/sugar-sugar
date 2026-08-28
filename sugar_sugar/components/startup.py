@@ -131,7 +131,7 @@ def import_controls_children(locale: str) -> list[Any]:
         dcc.Upload(
             id='startup-upload-data',
             multiple=False,
-            accept='.csv,text/csv',
+            accept='.csv,.json,text/csv,application/json',
             children=html.Div(t("ui.startup.import_upload_prompt", locale=locale), id='startup-upload-prompt'),
             style={
                 'width': '100%', 'minHeight': '56px', 'display': 'flex',
@@ -1047,7 +1047,10 @@ class StartupPage(html.Div):
                 users_dir = Path('data/input/users')
                 users_dir.mkdir(parents=True, exist_ok=True)
                 safe = (filename or 'uploaded').replace(' ', '_').replace('/', '_')
-                if not safe.lower().endswith('.csv'):
+                # A Nightscout export is JSON. Forcing .csv onto everything used
+                # to save it as entries.json.csv; the loader sniffs content and
+                # not the name, but the stored file should still say what it is.
+                if not safe.lower().endswith(('.csv', '.json')):
                     safe += '.csv'
                 save_path = users_dir / f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{safe}"
                 save_path.write_bytes(decoded)

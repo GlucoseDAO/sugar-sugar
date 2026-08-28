@@ -67,14 +67,78 @@ def load_glucose_data_from_nightscout(
         return adapt_glucose_df(glucose_df), adapt_events_df(events_df), save_path
 
 
+# How much of a file to look at before deciding it is JSON at all. No CSV export
+# we support opens with a bare array, so the first non-blank byte settles it.
+_JSON_SNIFF_BYTES: int = 8192
+
+
+def is_nightscout_entries_json(file_path: Path) -> bool:
+    """True if *file_path* is a Nightscout ``entries.json`` export.
+
+    Nightscout's built-in CSV export is not a usable alternative and the upload
+    hint deliberately does not offer it: ``/api/v1/entries.csv`` is headerless
+    with five hardcoded columns, so cgm-format cannot even detect it, and there
+    is no treatments CSV at all. The JSON served at ``/api/v1/entries.json`` is
+    the one export that survives intact.
+
+    This has to run ahead of the library for the same reason the LOOP and corpus
+    detectors do: ``FormatParser.detect_format`` pattern-matches CSV headers and
+    deliberately does not handle JSON, so a Nightscout export reaching it raises
+    ``UnknownFormatError``.
+
+    Detection is on content, never on the file name -- both upload handlers
+    rewrite the extension of whatever they are given.
+    """
+    if not file_path.exists():
+        return False
+    if not file_path.read_bytes()[:_JSON_SNIFF_BYTES].lstrip().startswith(b"["):
+        return False
+    try:
+        records = json.loads(file_path.read_text(encoding="utf-8", errors="replace"))
+    except ValueError:
+        return False
+    # Scan the whole array rather than a prefix: an export may open with
+    # calibration or meter records before the first sensor reading.
+    return isinstance(records, list) and any(
+        isinstance(record, dict) and ("sgv" in record or record.get("type") == "sgv")
+        for record in records
+    )
+
+
+def load_nightscout_json_data(
+    file_path: Path,
+    treatments_path: Optional[Path] = None,
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Load a Nightscout entries JSON export into the app store schema.
+
+    *treatments_path* is optional and is never inferred from a neighbouring
+    file. Every upload lands in one shared ``data/input/users/`` directory under
+    a timestamped name, so guessing at a sibling would eventually pair one
+    player's entries with another player's treatments. The upload path passes
+    entries alone and gets the glucose trace with no event markers; a caller
+    holding both files may pass both.
+
+    Note that passing treatments currently fails on cgm-format 0.12.0 whenever
+    a treatment field is null for the first 100 records -- see ``FEEDBACK.md``
+    issue 1. That is why the upload hint asks for the entries file only.
+    """
+    with start_action(action_type=u"load_nightscout_json_data", file_path=str(file_path)):
+        entries_data = file_path.read_bytes()
+        treatments_data = treatments_path.read_bytes() if treatments_path is not None else None
+        unified_df = FormatParser.parse_nightscout(entries_data, treatments_data)
+        split_glucose, split_events = unified_processor(unified_df).split_glucose_events(unified_df)
+        return adapt_glucose_df(split_glucose), adapt_events_df(split_events)
+
+
 def load_glucose_data(file_path: Path = Path("data/example.csv")) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Load CGM data through cgm-format and adapt it to the app store schema.
 
-    Four hand-rolled detectors run before the library: the three research corpora
+    Five hand-rolled detectors run before the library: the three research corpora
     are directory-shaped rather than file-shaped (and BIG IDEAs' glucose half is
     an ordinary Clarity export, so only its directory tells it apart from a plain
-    upload), and LOOP has no library counterpart at all. Everything else -- every
-    vendor export -- goes straight through ``FormatParser``.
+    upload), LOOP has no library counterpart at all, and a Nightscout export is
+    JSON, which ``detect_format`` deliberately does not handle. Everything else
+    -- every vendor export -- goes straight through ``FormatParser``.
 
     Every branch returns the same pair of frames:
     ``(time, gl, prediction, age, user_id)`` and
@@ -89,6 +153,8 @@ def load_glucose_data(file_path: Path = Path("data/example.csv")) -> tuple[pl.Da
             glucose_df, events_df = load_d1namo_data(file_path)
         elif is_bigideas_path(file_path):
             glucose_df, events_df = load_bigideas_data(file_path)
+        elif is_nightscout_entries_json(file_path):
+            glucose_df, events_df = load_nightscout_json_data(file_path)
         else:
             unified_df = FormatParser.parse_file(file_path)
             split_glucose, split_events = unified_processor(unified_df).split_glucose_events(

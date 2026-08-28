@@ -189,7 +189,7 @@ de:
     upload_required: "Upload erforderlich"
     upload_success: "Daten aus %{filename} wurden erfolgreich geladen. Diese Daten werden für Vorhersagen verwendet."
     example_data_now_using: "Jetzt werden Beispieldaten verwendet. Lade eine CSV‑Datei für eine personalisierte Analyse hoch."
-    example_data_warning: "Aktuell werden Beispieldaten verwendet. Lade deine eigene Dexcom/Libre/Medtronic/Nightscout‑CSV für eine personalisierte Analyse hoch."
+    example_data_warning: "Aktuell werden Beispieldaten verwendet. Lade deine eigene Dexcom/Libre/Medtronic‑CSV — oder deine Nightscout‑entries.json — für eine personalisierte Analyse hoch."
     csv_tab_label: "CSV-Datei"
     nightscout_tab_label: "Nightscout"
     nightscout_url_placeholder: "https://your-nightscout-site.com"
@@ -595,7 +595,7 @@ de:
           - q: "Wer kann teilnehmen?"
             a: "Alle ab 18 Jahren. CGM-Nutzende sind besonders wertvoll, aber auch Personen ohne CGM können mit öffentlichen anonymisierten Daten spielen."
           - q: "Welche CGM-Geräte und Formate werden unterstützt?"
-            a: "Dexcom, Libre, Medtronic und Nightscout-Exporte werden unterstützt. Ein öffentlicher anonymisierter Datensatz ist ebenfalls verfügbar, wenn du kein CGM-Gerät hast."
+            a: "Dexcom-, Libre- und Medtronic-CSV-Exporte werden unterstützt, ebenso eine Nightscout-entries.json. (Der CSV-Export von Nightscout selbst nicht — ihm fehlen die meisten Daten.) Ein öffentlicher anonymisierter Datensatz ist ebenfalls verfügbar, wenn du kein CGM-Gerät hast."
           - q: "Wie lange dauert es?"
             a: "Jede Runde dauert etwa 2–3 Minuten. Eine vollständige Sitzung (12 Runden) beträgt ca. 30 Minuten, kann aber auf mehrere Besuche aufgeteilt werden."
           - q: "Kann ich zwischendrin aufhören und später weitermachen?"
@@ -668,7 +668,7 @@ de:
 
               **xDrip+:** Menü → Import/Export → Export CSV (SiDiary-Format).
 
-              **Nightscout:** füge deine Seiten-URL auf der Start- oder Vorhersageseite ein — keine Datei nötig.
+              **Nightscout:** füge deine Seiten-URL auf der Startseite ein — keine Datei nötig. Wenn du stattdessen eine Datei hochladen willst: öffne `https://deine-seite/api/v1/entries.json?count=10000`, speichere sie und lade diese hoch — nicht den CSV-Export, dem die meisten Daten fehlen.
       - title: "Daten und Datenschutz"
         items:
           - q: "Werden meine Daten gespeichert?"

@@ -53,13 +53,32 @@ waiting instead of being raised under pressure later. Nothing needs to change fo
 
 | Source | Parser | Why |
 |---|---|---|
-| Vendor exports (Dexcom/Libre/Medtronic/Nightscout) | `FormatParser.parse_file` | — |
+| Vendor exports (Dexcom/Libre/Medtronic) | `FormatParser.parse_file` | — |
+| **Nightscout `entries.json`** | `FormatParser.parse_nightscout` (routed in `data.py`) | JSON, which `detect_format` deliberately does not sniff |
 | **D1NAMO** | `FormatParser.parse_subject_directory` | subject = a *bundle* of glucose/insulin/food CSVs |
 | **BIG IDEAs** | `FormatParser.parse_subject_directory` | subject = a Clarity export + a food log (0.11+) |
 | **CGMacros** | `FormatParser.parse_tracks` | subject = one CSV with two sensor tracks |
 | LOOP `*_chronological.csv` | in-repo (`data.py`) | no library counterpart |
 
 Hard-won rules:
+
+- **Nightscout uploads are `entries.json`, never a Nightscout CSV.** `/api/v1/entries.csv` is
+  headerless with five hardcoded columns and there is no treatments CSV at all, so cgm-format
+  cannot detect it and the upload hints must not offer it. `is_nightscout_entries_json` sniffs
+  *content*, not the file name, because both upload handlers rewrite the extension. It never
+  looks for a sibling `treatments.json`: every upload lands in one shared `data/input/users/`
+  under a timestamped name, so guessing at a neighbour would eventually pair one player's
+  entries with another's treatments. `load_nightscout_json_data` takes an explicit optional
+  treatments path instead, and the profile file is not a third input — cgm-format downloads it
+  and discards it.
+- **The Nightscout *URL* import is broken on cgm-format 0.12.0**, and deliberately not worked
+  around here: `_parse_nightscout_treatments_json` builds a frame with no schema, so a
+  treatment field that is null for the first 100 records infers as dtype `Null` and the import
+  dies with `ComputeError`. Full diagnosis, a synthetic repro and the proposed fix are in
+  `FEEDBACK.md` issue 1; `scripts/diagnose-nightscout.py` tells that failure apart from a
+  network block when run on the affected host. `tests/test_nightscout_json_upload.py`
+  ::`test_treatments_with_a_long_null_run_are_loaded` is **expected to fail** until the floor
+  moves past 0.12.0 — it is a tripwire, not an oversight, and must not be `xfail`ed.
 
 - **`ExtendedFormatProcessor`, not `FormatProcessor`, for corpora.** Corpora target the wide
   `CGM_SCHEMA_EXTENDED`; `FormatProcessor.schema` is the narrow `CGM_SCHEMA` and dies with

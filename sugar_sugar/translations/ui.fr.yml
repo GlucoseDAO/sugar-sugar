@@ -190,7 +190,7 @@ fr:
     upload_required: "Téléversement requis"
     upload_success: "Données chargées avec succès depuis %{filename}. Ces données seront utilisées pour les prédictions."
     example_data_now_using: "Données publiques anonymisées en cours d'utilisation. Téléverse un fichier CSV pour une analyse personnalisée."
-    example_data_warning: "Données publiques anonymisées actuellement utilisées. Téléverse ton propre fichier CSV Dexcom/Libre/Medtronic/Nightscout pour une analyse personnalisée."
+    example_data_warning: "Données publiques anonymisées actuellement utilisées. Téléverse ton propre fichier CSV Dexcom/Libre/Medtronic — ou ton entries.json Nightscout — pour une analyse personnalisée."
     csv_tab_label: "Fichier CSV"
     nightscout_tab_label: "Nightscout"
     nightscout_url_placeholder: "https://ton-site-nightscout.com"
@@ -596,7 +596,7 @@ fr:
           - q: "Qui peut participer ?"
             a: "Toute personne de 18 ans et plus. Les utilisateurs de CGM sont particulièrement précieux, mais les non-utilisateurs de CGM peuvent également jouer avec des données publiques anonymisées."
           - q: "Quels appareils et formats CGM sont pris en charge ?"
-            a: "Les exports Dexcom, Libre, Medtronic et Nightscout sont pris en charge. Un jeu de données publiques anonymisées est également disponible si tu n'as pas d'appareil CGM."
+            a: "Les exports CSV Dexcom, Libre et Medtronic sont pris en charge, ainsi qu'un fichier entries.json Nightscout. (Pas l'export CSV de Nightscout lui-même : il perd la majeure partie des données.) Un jeu de données publiques anonymisées est également disponible si tu n'as pas d'appareil CGM."
           - q: "Combien de temps cela prend-il ?"
             a: "Chaque manche prend environ 2 à 3 minutes. Une session complète (12 manches) dure environ 30 minutes, mais tu peux la répartir sur plusieurs visites."
           - q: "Puis-je m'arrêter en cours de route et reprendre plus tard ?"
@@ -669,7 +669,7 @@ fr:
 
               **xDrip+ :** Menu → Import/Export → Export CSV (format SiDiary).
 
-              **Nightscout :** colle l'URL de ton site sur l'écran de démarrage ou de prédiction — pas besoin de fichier.
+              **Nightscout :** colle l'URL de ton site sur l'écran de démarrage — pas besoin de fichier. Pour téléverser un fichier à la place, ouvre `https://ton-site/api/v1/entries.json?count=10000`, enregistre-le et téléverse celui-ci — pas l'export CSV, qui perd la majeure partie des données.
       - title: "Données et confidentialité"
         items:
           - q: "Mes données sont-elles stockées ?"

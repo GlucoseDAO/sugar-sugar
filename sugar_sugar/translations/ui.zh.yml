@@ -188,7 +188,7 @@ zh:
     upload_required: "需要上传"
     upload_success: "已成功从 %{filename} 加载数据。此数据将用于预测。"
     example_data_now_using: "现在使用公开匿名数据。上传 CSV 文件进行个性化分析。"
-    example_data_warning: "目前正在使用公开匿名数据。上传您自己的 Dexcom/Libre/Medtronic/Nightscout CSV 文件进行个性化分析。"
+    example_data_warning: "目前正在使用公开匿名数据。上传您自己的 Dexcom/Libre/Medtronic CSV 文件，或 Nightscout 的 entries.json，进行个性化分析。"
     csv_tab_label: "CSV 文件"
     nightscout_tab_label: "Nightscout"
     nightscout_url_placeholder: "https://your-nightscout-site.com"
@@ -582,7 +582,7 @@ zh:
           - q: "谁可以参与？"
             a: "任何 18 岁以上的人。CGM 用户特别有价值，但非 CGM 用户也可以使用公开匿名数据进行游戏。"
           - q: "支持哪些 CGM 设备和格式？"
-            a: "支持 Dexcom、Libre、Medtronic 和 Nightscout 导出格式。如果您没有 CGM 设备，也可以使用公开匿名数据集。"
+            a: "支持 Dexcom、Libre、Medtronic 的 CSV 导出，以及 Nightscout 的 entries.json 文件。（不支持 Nightscout 自带的 CSV 导出——它会丢失大部分数据。）如果您没有 CGM 设备，也可以使用公开匿名数据集。"
           - q: "需要多长时间？"
             a: "每轮大约需要 2-3 分钟。完整的一节（12 轮）大约需要 30 分钟，但您可以分多次完成。"
           - q: "我可以中途停止并稍后继续吗？"
@@ -655,7 +655,7 @@ zh:
 
               **xDrip+：** 菜单 → Import/Export → Export CSV（SiDiary 格式）。
 
-              **Nightscout：** 在开始页或预测页粘贴你的站点 URL — 不需要文件。
+              **Nightscout：** 在开始页粘贴你的站点 URL — 不需要文件。若想改为上传文件，请打开 `https://你的站点/api/v1/entries.json?count=10000`，保存后上传该文件 — 不要用 CSV 导出，它会丢失大部分数据。
       - title: "数据与隐私"
         items:
           - q: "我的数据会被存储吗？"

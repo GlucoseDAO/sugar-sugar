@@ -9453,7 +9453,8 @@ def handle_file_upload(
         # Generate unique filename with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         safe_filename = filename.replace(' ', '_').replace('/', '_') if filename else 'uploaded_data'
-        if not safe_filename.endswith('.csv'):
+        # Keep a Nightscout entries.json named as JSON rather than entries.json.csv.
+        if not safe_filename.lower().endswith(('.csv', '.json')):
             safe_filename += '.csv'
         unique_filename = f"{timestamp}_{safe_filename}"
         
