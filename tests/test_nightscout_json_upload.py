@@ -5,10 +5,10 @@ headerless with five hardcoded columns and there is no treatments CSV at all --
 so the JSON the site serves at ``/api/v1/entries.json`` is what the upload hint
 asks for and what these tests pin down.
 
-One test in here is expected to FAIL until cgm-format ships the fix reported in
-``FEEDBACK.md`` issue 1. It is deliberately not marked ``xfail``: it is a live
-tripwire that turns green on its own the day the library is bumped, and an
-``xfail`` would then quietly flip to ``XPASS`` instead of telling anyone.
+``test_treatments_with_a_long_null_run_are_loaded`` was written red, against
+cgm-format 0.12.0, and went green on its own when the floor moved to 0.12.2 --
+which is exactly why it was never marked ``xfail``. It stays as a regression
+guard: the shape it covers is what broke a real player's import.
 """
 
 from __future__ import annotations
@@ -102,9 +102,9 @@ def test_entries_json_survives_the_upload_transport() -> None:
 def test_treatments_are_loaded_when_supplied() -> None:
     """Passing treatments alongside entries produces event markers.
 
-    Green today: this fixture's `carbs` column has a value inside polars'
-    100-row inference window, so it dodges the library bug. It exists to prove
-    the wiring itself is right, which is what makes the next test's failure
+    This fixture's `carbs` column has a value inside polars' 100-row inference
+    window, so it passed even on 0.12.0. That is the point: it isolated the
+    wiring from the library bug, so the sparse-carbs test failing next door was
     attributable to cgm-format rather than to this repo.
     """
     glucose_df, events_df = load_nightscout_json_data(ENTRIES_JSON, TREATMENTS_JSON)
@@ -115,16 +115,15 @@ def test_treatments_are_loaded_when_supplied() -> None:
 
 
 def test_treatments_with_a_long_null_run_are_loaded() -> None:
-    """EXPECTED RED until cgm-format > 0.12.0 -- see FEEDBACK.md issue 1.
+    """Regression guard for the bug that broke a real import -- FEEDBACK.md issue 1.
 
     A closed-loop user whose pump writes a Temp Basal every few minutes but who
     logs carbs rarely has `carbs` null for far more than the 100 rows polars
-    samples to infer dtypes. The column infers as `Null` and appending the first
-    real value raises ComputeError, so the whole import dies.
+    samples to infer dtypes. On cgm-format 0.12.0 the column inferred as `Null`,
+    appending the first real value raised ComputeError, and the whole import
+    died. Fixed in 0.12.2, which is the floor in ``pyproject.toml``.
 
-    Do not xfail this and do not work around it in ``data.py``: the fix belongs
-    upstream, and this test should start passing on its own once the floor in
-    ``pyproject.toml`` moves.
+    If this ever goes red again, the fix belongs upstream -- not in ``data.py``.
     """
     glucose_df, events_df = load_nightscout_json_data(ENTRIES_JSON, SPARSE_TREATMENTS_JSON)
 

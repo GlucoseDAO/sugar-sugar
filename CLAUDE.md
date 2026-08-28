@@ -25,8 +25,10 @@ The public FAQ ask/reply board at the bottom of `/faq` is **off by default** (`F
 `sugar_sugar/corpus.py` is the **single boundary** between the library's unified frames and the app's
 `(time, gl, prediction, age, user_id)` / `(time, event_type, event_subtype, insulin_value, …)` stores.
 `load_glucose_data` (`data.py`) routes to five loaders; only LOOP still parses by hand.
-The library floor is **cgm-format 0.12** (`pyproject.toml`). 0.11 was the release that added
-BIG IDEAs, the last corpus the app parsed itself; 0.12 added grid re-timing for training alignment.
+The library floor is **cgm-format 0.12.2** (`pyproject.toml`). 0.11 was the release that added
+BIG IDEAs, the last corpus the app parsed itself; 0.12 added grid re-timing for training alignment;
+0.12.2 fixed the Nightscout defects reported in `FEEDBACK.md` and is a **hard** floor, not a
+preference — on 0.12.0 the Nightscout URL import is dead for any real instance.
 
 **What 0.12 changed for this app: the frame got one column wider, and nothing else.**
 `original_glucose` (the device's own reading, before any re-timing) joins both unified schemas, and
@@ -71,14 +73,23 @@ Hard-won rules:
   entries with another's treatments. `load_nightscout_json_data` takes an explicit optional
   treatments path instead, and the profile file is not a third input — cgm-format downloads it
   and discards it.
-- **The Nightscout *URL* import is broken on cgm-format 0.12.0**, and deliberately not worked
-  around here: `_parse_nightscout_treatments_json` builds a frame with no schema, so a
-  treatment field that is null for the first 100 records infers as dtype `Null` and the import
-  dies with `ComputeError`. Full diagnosis, a synthetic repro and the proposed fix are in
-  `FEEDBACK.md` issue 1; `scripts/diagnose-nightscout.py` tells that failure apart from a
-  network block when run on the affected host. `tests/test_nightscout_json_upload.py`
-  ::`test_treatments_with_a_long_null_run_are_loaded` is **expected to fail** until the floor
-  moves past 0.12.0 — it is a tripwire, not an oversight, and must not be `xfail`ed.
+- **The Nightscout *URL* import needs cgm-format >= 0.12.2, which is the floor.** On 0.12.0 it
+  was dead for any real instance: `_parse_nightscout_treatments_json` built a frame with no
+  schema, so a treatment field null for the first 100 records inferred as dtype `Null` and the
+  import died with `ComputeError` — which is what a player actually hit. It was deliberately
+  never worked around in `data.py`; the fix belongs upstream and shipped there. Full history,
+  a synthetic repro and the four other 0.12.0 defects it travelled with are in `FEEDBACK.md`,
+  along with the two items still open (neither affects this app — both are on the exporter-CSV
+  path, which Nightscout data never takes here). `tests/test_nightscout_json_upload.py`
+  ::`test_treatments_with_a_long_null_run_are_loaded` was written red against 0.12.0 and is now
+  a regression guard — if it goes red again, fix it upstream, not here.
+- **`scripts/diagnose-nightscout.py` is the tool for "my Nightscout import failed".** Run it on
+  the host that failed, not a laptop: it walks DNS → TCP → TLS → the three endpoints, then runs
+  a synthetic parse repro that needs no network, so it separates a network block (the instances
+  are often .ru-hosted, and egress is filtered in both directions) from a too-old library on the
+  deployed host. Two control hosts tell "no egress" apart from ".ru blocked" apart from "this
+  instance is the problem". It scrubs the `--token` from its own output because
+  `httpx.HTTPStatusError` embeds the full query string.
 
 - **`ExtendedFormatProcessor`, not `FormatProcessor`, for corpora.** Corpora target the wide
   `CGM_SCHEMA_EXTENDED`; `FormatProcessor.schema` is the narrow `CGM_SCHEMA` and dies with

@@ -5,67 +5,51 @@ Sugar Sugar. Filed here rather than fixed in this repo: `sugar_sugar/corpus.py` 
 `sugar_sugar/data.py` are the single boundary to the library, and working around a parser
 defect on this side of it is exactly the drift that boundary exists to prevent.
 
-Version under test: **cgm-format 0.12.0** (the latest release on PyPI as of 2026-08-28;
-there is nothing newer to bump to). Library paths below are relative to the installed
-package. Every claim here was reproduced by running the code, not by reading it.
+**Status: everything below was reported against 0.12.0 and all of it but §5 shipped in
+0.12.2**, which is now the floor in `pyproject.toml`. Re-verified by running the code, not
+by reading the changelog. The fixed sections are kept rather than deleted — they record why
+the floor is where it is, and what to re-test if any of it regresses.
 
 ---
 
-## 1. Nightscout URL import fails outright on any real instance — `ComputeError` on treatments
+## 1. Nightscout URL import failed outright on any real instance — FIXED in 0.12.2
 
-**Severity: blocking.** This is the bug a player actually hit; it takes down the whole
-"paste your Nightscout URL" feature. Reported against a live Nightscout 15.0.3 instance
-(URL withheld — it serves a real patient's data).
+**Was: blocking.** This is the bug a player actually hit; it took down the whole "paste your
+Nightscout URL" feature. Reported against a live Nightscout 15.0.3 instance (URL withheld —
+it serves a real patient's data).
 
 ### Symptom
 
-`FormatParser.from_nightscout_url(base_url)` raises, before any app code sees a frame:
+`FormatParser.from_nightscout_url(base_url)` raised, before any app code saw a frame:
 
 ```
 polars.exceptions.ComputeError: could not append value: 47 of type: i64 to the builder;
 make sure that all rows have the same schema or consider increasing `infer_schema_length`
 ```
 
-Traceback bottoms out at `format_parser.py:1480`, in `_parse_nightscout_treatments_json`:
-
-```python
-return pl.DataFrame(rows)
-```
+Traceback bottomed out at `format_parser.py:1480`, in `_parse_nightscout_treatments_json`:
+`return pl.DataFrame(rows)`.
 
 ### Root cause
 
-`_parse_nightscout_treatments_json` (`format_parser.py:1452-1480`) builds `rows` as a list of
-dicts and hands it to `pl.DataFrame` with **no schema**, so polars infers dtypes from the
-first `infer_schema_length=100` rows only.
+`_parse_nightscout_treatments_json` built `rows` as a list of dicts and handed it to
+`pl.DataFrame` with **no schema**, so polars inferred dtypes from the first
+`infer_schema_length=100` rows only.
 
 Nightscout treatments are heterogeneous by design — a `Temp Basal` carries `rate`/`duration`
 and no `carbs`, a `Meal Bolus` carries `carbs`/`insulin` and no `rate`. On the reporting
-instance, the 353 treatments had this shape:
+instance, `carbs` was `null` for the first **167** rows — past the 100-row inference window
+— so the column inferred as dtype **`Null`**, and appending the `i64` at row 167 failed.
 
-| field | None | int | float | first non-null at row |
-|---|---|---|---|---|
-| `insulin` | 293 | 7 | 53 | 20 |
-| `carbs` | **351** | 2 | 0 | **167** |
-| `rate` | 77 | 139 | 137 | 0 |
-| `duration` | 17 | 336 | 0 | 0 |
+Two things worth stressing, because they ruled out the obvious near-miss diagnoses:
 
-`carbs` is `null` for the first **167** rows — past the 100-row inference window — so the
-column is inferred as dtype **`Null`**, and appending the `i64` at row 167 fails.
-
-Two things worth stressing, because they rule out the obvious near-miss diagnoses:
-
-- **This is not the int/float mix.** `insulin` mixes int and float (int first appears at row
-  122, float at row 20) and appends fine — polars takes the supertype. The failure is
-  specifically *any* value into a `Null`-dtype builder. Coercing the JSON's numbers to float
-  before parsing does **not** help; it merely changes the message to
+- **It was not the int/float mix.** `insulin` mixed int and float and appended fine — polars
+  takes the supertype. The failure was specifically *any* value into a `Null`-dtype builder.
+  Coercing the JSON's numbers to float did **not** help; it only changed the message to
   `could not append value: 47.0 of type: f64`.
-- **It is not exotic data.** Any Nightscout user who runs a closed loop and logs carbs
-  rarely — i.e. a large fraction of them — has a null run longer than 100 rows in at least
-  one of these four columns. Bolus-only users hit it via `rate`, pump-only users via `carbs`.
-
-The library already knows to do this correctly on its *other* Nightscout path:
-`_parse_nightscout_entries_csv` (`format_parser.py:1613`) passes `infer_schema_length=None`.
-The JSON path just lacks the equivalent.
+- **It was not exotic data.** Any Nightscout user who runs a closed loop and logs carbs
+  rarely — a large fraction of them — has a null run longer than 100 rows in at least one of
+  these four columns. Bolus-only users hit it via `rate`, pump-only users via `carbs`.
 
 ### Minimal repro (no network, no patient data)
 
@@ -82,144 +66,118 @@ treatments.append({"eventType": "Meal Bolus", "created_at": "2026-08-28T05:00:00
                    "carbs": 47, "insulin": 2.5})
 
 FormatParser.parse_nightscout(json.dumps(entries), json.dumps(treatments))
-# polars.exceptions.ComputeError: could not append value: 2.5 of type: f64 to the builder
 ```
 
-106 records is enough. Drop the null run below 100 and it passes, which is the whole bug.
+106 records was enough. Dropping the null run below 100 made it pass, which was the whole bug.
 
-### Suggested fix
+### Resolution
 
-Declare the schema instead of inferring it. Every one of these columns is cast to `Float64`
-downstream anyway (`_treatments_json_to_unified`, `format_parser.py:1517`, `1534`, `1553`),
-so an explicit schema changes no semantics — it only stops inference from guessing:
+Fixed in 0.12.2. Verified against the reporting instance: the import now returns **1378
+unified rows**, and numeric-string treatment values (`"carbs": "47"`, which some uploaders
+emit) are coerced rather than silently dropped — that detail was worth 3 events on the
+reporting instance and is covered by the repro above.
 
-```python
-_TREATMENTS_SCHEMA = {
-    "created_at": pl.String, "eventType": pl.String,
-    "insulin": pl.Float64, "carbs": pl.Float64,
-    "rate": pl.Float64, "duration": pl.Float64,
-}
-
-def _num(value: object) -> float | None:
-    """Nightscout uploaders are inconsistent: ints, floats and numeric strings all occur."""
-    if value is None or isinstance(value, bool):
-        return None
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
-# ... in the row loop, wrap the four numeric fields in _num(), then:
-return pl.DataFrame(rows, schema=_TREATMENTS_SCHEMA)
-```
-
-`infer_schema_length=None` alone would also clear the reported error, but it stays fragile:
-it still guesses, it forces a full scan of every row, and it does not handle the numeric
-**strings** some uploaders emit (`"carbs": "47"`), which infer as `String` and are then
-silently dropped by the `.cast(pl.Float64, strict=False)` downstream. The explicit schema
-plus `_num()` handles both.
-
-### Verified
-
-Applied as a monkeypatch against the reporting instance's real payload: parses cleanly,
-1367 unified rows — 1152 `EGV_READ`, 61 `INS_FAST`, 152 `INS_SLOW`, 2 `CARBS_IN` over ~4
-days. The numeric-string coercion accounts for 3 events (1 bolus, 2 basals) that are lost
-without it.
+Pinned here by `tests/test_nightscout_json_upload.py`
+::`test_treatments_with_a_long_null_run_are_loaded`, which was written to fail on 0.12.0 and
+now passes. It stays as a regression guard.
 
 ---
 
-## 2. Redirects are not followed, so `http://` and apex→www instances fail
+## 2. Redirects were not followed — FIXED in 0.12.2
 
-**Severity: high, one-line fix.**
+`nightscout_downloader.py:115` constructed the client as
+`httpx.Client(timeout=timeout, headers=headers)`.
 
-`nightscout_downloader.py:115` constructs the client as:
-
-```python
-with httpx.Client(timeout=timeout, headers=headers) as client:
-```
-
-httpx differs from `requests` here — verified on the pinned httpx 0.28.1,
-`httpx/_client.py:197`, `follow_redirects: bool = False`. `download_nightscout` never passes
-the argument.
-
-So any instance that redirects — `http://` → `https://`, apex → `www`, a Heroku/Fly/Netlify
-hostname 301ing to its canonical domain, a trailing-slash normalisation — fails at the
+httpx differs from `requests` here — on the pinned httpx 0.28.1, `httpx/_client.py:197` is
+`follow_redirects: bool = False`, and `download_nightscout` never passed the argument. So any
+instance that redirected — `http://` → `https://`, apex → `www`, a Heroku/Fly/Netlify
+hostname 301ing to its canonical domain, a trailing-slash normalisation — failed at the
 `raise_for_status()` on the next line with `httpx.HTTPStatusError: Redirect response '301
-Moved Permanently'`, rather than working. Users type bare hostnames constantly.
+Moved Permanently'`. Users type bare hostnames constantly.
 
-Fix: `httpx.Client(timeout=timeout, headers=headers, follow_redirects=True)`.
-
----
-
-## 3. An empty or non-JSON API response is misrouted into the CSV parser
-
-**Severity: medium (bad diagnostics, unreachable guard).**
-
-`parse_nightscout` picks its branch with `_is_nightscout_entries_json`
-(`format_parser.py:1413-1417`):
-
-```python
-stripped = data.strip()
-return stripped.startswith("[") and '"sgv"' in stripped[:2000]
-```
-
-A Nightscout account with no data returns `200` with body `[]`. That starts with `[` but
-contains no `"sgv"`, so the sniff returns `False` and the JSON falls through to
-`_parse_nightscout_entries_csv`. Verified:
-
-```
-"[]"                                    -> MalformedDataError: Missing required column:
-                                           'Glucose (mg/dL)'. Got columns: ['[]']
-'{"status":401,"message":"Unauthorized"}' -> MalformedDataError: Missing required column:
-                                           'Glucose (mg/dL)'. Got columns:
-                                           ['{"status":401', 'message":"Unauthorized"']
-```
-
-Two consequences:
-
-- The purpose-built `ZeroValidInputError("Nightscout entries JSON is empty")` guard at
-  `format_parser.py:1436` is **unreachable** from a real API response.
-- A server's own error text survives only as a mangled polars column name, so an operator
-  debugging a 401 is shown a missing-CSV-column error naming a column nobody asked for.
-
-There is a latent variant too: the sniff reads only `stripped[:2000]`, and the downloader
-writes the file with `indent=2` (~300-400 chars per entry). An entries array whose first
-~5 records are `cal`/`mbg` rather than `sgv` is misrouted the same way.
-
-Fix: decide the branch on whether the payload *parses as JSON*, not on a substring sniff,
-and let the empty case reach the existing `ZeroValidInputError`.
+`download_nightscout` now passes `follow_redirects`.
 
 ---
 
-## 4. Smaller things noticed in the same code
+## 3. Empty or non-JSON API responses were misrouted into the CSV parser — FIXED in 0.12.2
 
-- **`entry.get("sgv") or entry.get("glucose")`** (`format_parser.py:1443`) — an `sgv` of `0`
-  is falsy, so the row falls through to `glucose`/`None` and is dropped. `0` is not a
-  physiological reading, but it is a real sensor-error value, and silently dropping differs
-  from what the code reads as intending. `if "sgv" in entry` is the intended test.
-- **`if entry.get("type") != "sgv": continue`** (`format_parser.py:1440`) — uploaders that
-  omit `type` (some xDrip+/Loop configurations) have every row skipped, producing
-  `ZeroValidInputError("No SGV entries found")` on a payload that carries `sgv` and
-  `dateString` on every record.
-- **The temp directory is never cleaned up.** `from_nightscout_url` with the default
-  `output_dir=None` does `tempfile.mkdtemp(prefix="nightscout_")` (`format_parser.py:1938-1940`)
-  and never removes it. Every call leaves raw entries + treatments + profile JSON — a
-  patient's full CGM record — in `/tmp` indefinitely. A `TemporaryDirectory` context manager
-  when the caller did not ask for persistence would fix it.
-- **`profile.json` is fetched, `raise_for_status`-ed, then discarded.** `from_nightscout_url`
-  unpacks it as `_` (`format_parser.py:1944`) and `from_nightscout_exports` documents
-  `profile_path` as accepted-and-ignored. An instance whose permissions allow `entries` but
-  deny `profile` therefore fails the entire import on an endpoint whose result is thrown away.
-- **No library exception type wraps network failures.** Connect errors, timeouts, HTTP status
-  errors and `json.JSONDecodeError` all escape raw, so a caller must import `httpx` itself to
-  catch them. `sugar_sugar/components/startup.py:1107-1129` does exactly that, and has to
-  match on `type(exc).__name__` substrings to classify. Relatedly, `HTTPStatusError` messages
-  embed the full request URL — including the `?token=` query parameter — so any caller that
-  logs the exception leaks the Nightscout read token.
-- **`parse_nightscout` and `_process_nightscout` have different error contracts.**
-  `_process_nightscout` (`format_parser.py:1787-1791`) wraps its body in
-  `except Exception -> MalformedDataError`; `parse_nightscout` (`1813-1845`), which is what
-  `from_nightscout_url` actually reaches, has no such wrapper. That asymmetry is why issue 1
-  surfaces as a raw polars `ComputeError`.
-- **The package ships no `Project-URL` or `Home-page` metadata**, so `pip show cgm-format`
-  gives no repository link. The only pointer is a CI badge in the README body.
+`parse_nightscout` picked its branch with `_is_nightscout_entries_json`, which tested
+`stripped.startswith("[") and '"sgv"' in stripped[:2000]`. A Nightscout account with no data
+returns `200` with body `[]` — starts with `[`, contains no `"sgv"` — so the JSON fell
+through to `_parse_nightscout_entries_csv`. The results were:
+
+```
+"[]"                                      -> MalformedDataError: Missing required column:
+                                             'Glucose (mg/dL)'. Got columns: ['[]']
+'{"status":401,"message":"Unauthorized"}'  -> MalformedDataError: Missing required column:
+                                             'Glucose (mg/dL)'. Got columns:
+                                             ['{"status":401', 'message":"Unauthorized"']
+```
+
+So the purpose-built `ZeroValidInputError("Nightscout entries JSON is empty")` guard was
+**unreachable** from a real API response, and a server's own error text survived only as a
+mangled polars column name.
+
+Both now report themselves properly:
+
+```
+"[]"        -> ZeroValidInputError: Nightscout entries JSON is empty
+auth object -> MalformedDataError: Nightscout returned an error object instead of
+               entries: Unauthorized
+```
+
+---
+
+## 4. Entries were dropped on falsy and missing fields — FIXED in 0.12.2
+
+- `entry.get("sgv") or entry.get("glucose")` — an `sgv` of `0` is falsy, so the row fell
+  through to `glucose`/`None` and was dropped. `0` is not physiological, but it is a real
+  sensor-error value and dropping it silently differed from what the code read as intending.
+- `if entry.get("type") != "sgv": continue` — uploaders that omit `type` (some xDrip+/Loop
+  configurations) had every row skipped, producing `ZeroValidInputError("No SGV entries
+  found")` on a payload carrying `sgv` and `dateString` on every record.
+
+Both now keep their rows: a two-entry payload with `sgv: 0` yields 2 rows, and a two-entry
+payload with no `type` field yields 2 rows.
+
+---
+
+## 5. Still open: UK/EU exporter CSV dates, and one error-contract asymmetry
+
+**Neither is blocking, and neither affects this app** — Sugar Sugar takes Nightscout data as
+JSON, by URL or as an uploaded `entries.json`, and never through the exporter CSV path.
+
+- **UK/EU-locale nightscout-exporter CSVs still do not parse.** `_EXPORTER_DATETIME_FORMATS`
+  tries `%m/%d/%Y` before `%d/%m/%Y` with `strict=False`, and the probe returns on the first
+  format that does not *throw* rather than the first that *parses*, so an unambiguous UK date
+  never reaches the UK format. 0.12.2 improved this from **silent** data loss to a loud
+  failure — an all-UK file now raises `ZeroValidInputError: No valid data rows found after
+  processing` instead of returning a frame with the rows quietly missing — which is the more
+  important half. But a UK exporter CSV is still unreadable, and a *mixed* file would still
+  lose only the ambiguous rows. Probing which format parses the most rows, rather than which
+  one throws last, would settle it.
+- **`parse_nightscout` still lacks the `try/except -> MalformedDataError` wrapper that
+  `_process_nightscout` has.** The two public paths into the same parsing code therefore have
+  different error contracts. This is what made issue 1 surface as a raw polars `ComputeError`
+  rather than a library error; with issue 1 fixed it is cosmetic, but the asymmetry remains.
+
+---
+
+## 6. Resolved housekeeping
+
+- **The temp directory is now cleaned up.** `from_nightscout_url` with the default
+  `output_dir=None` used to `tempfile.mkdtemp(prefix="nightscout_")` and never remove it,
+  leaving raw entries + treatments + profile JSON — a patient's full CGM record — in `/tmp`
+  indefinitely on every call. It now uses a `TemporaryDirectory`.
+- **The package now ships repository metadata.** `Project-URL` gives Homepage, Repository,
+  Changelog and Issues; `pip show cgm-format` previously gave no link at all and the only
+  pointer was a CI badge in the README body.
+
+Still worth considering upstream, though it costs this app nothing today: **no library
+exception type wraps network failures**, so connect errors, timeouts, HTTP status errors and
+`json.JSONDecodeError` all escape raw and a caller must import `httpx` itself to catch them.
+`sugar_sugar/components/startup.py` does exactly that, matching on `type(exc).__name__`
+substrings to classify. Relatedly, `HTTPStatusError` messages embed the full request URL
+including the `?token=` query parameter, so any caller that logs the exception leaks the
+Nightscout read token — `scripts/diagnose-nightscout.py` has to scrub its own output for
+precisely this reason.

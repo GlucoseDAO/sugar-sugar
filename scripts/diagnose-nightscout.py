@@ -14,12 +14,13 @@ There are two independent known failure modes and this tells them apart:
   controls run for exactly this reason: a non-.ru host proves the server has
   egress at all, and a second .ru host proves whether the block is regional or
   specific to this instance.
-* **Parser.** cgm-format 0.12.0 cannot parse Nightscout treatments whose
+* **Parser.** cgm-format 0.12.0 could not parse Nightscout treatments whose
   ``carbs``/``rate``/``insulin``/``duration`` are null for the first 100 records
-  -- polars infers dtype ``Null`` and then cannot append a number. See
-  ``FEEDBACK.md`` issue 1. The OFFLINE PARSE stage reproduces this with
-  synthetic data and **needs no network**, so it still answers even on a server
-  with no route to the instance at all.
+  -- polars inferred dtype ``Null`` and then could not append a number. Fixed in
+  0.12.2 (``FEEDBACK.md`` issue 1), but the check stays: it is how you tell a
+  too-old library on a deployed host apart from a network fault. The OFFLINE
+  PARSE stage reproduces it with synthetic data and **needs no network**, so it
+  answers even on a server with no route to the instance at all.
 
 Prints no glucose values, timestamps or tokens -- only counts, dtypes and status
 codes -- so the output is safe to paste into an issue.
@@ -193,23 +194,31 @@ def _report_treatment_dtypes(payload: Any) -> None:
 
     if triggers:
         _say(
-            "FAIL",
-            "parser bug precondition MET",
-            "These fields are null past polars' 100-row inference window:\n"
+            "INFO",
+            "this payload has the shape that broke cgm-format 0.12.0",
+            "Null past polars' 100-row inference window:\n"
             + "\n".join(f"  - {item}" for item in triggers)
-            + "\ncgm-format 0.12.0 will raise ComputeError on this instance. See FEEDBACK.md issue 1.",
+            + "\nHarmless from 0.12.2 on (FEEDBACK.md issue 1). Whether THIS build handles it\n"
+            "is decided by the offline check below, not by this line.",
         )
     else:
-        _say("OK", "parser bug precondition not met on this payload")
+        _say("INFO", "this payload does not have the 0.12.0 null-run shape")
 
 
 def _offline_parse_repro() -> None:
     """Reproduce the parser bug with synthetic data. Needs no network."""
     try:
+        import importlib.metadata
+
         from cgm_format import FormatParser
     except ImportError as exc:
         _say("WARN", "offline parse repro", f"cgm-format not importable: {exc}")
         return
+
+    try:
+        _say("INFO", f"cgm-format {importlib.metadata.version('cgm-format')} installed here")
+    except importlib.metadata.PackageNotFoundError:
+        pass
 
     entries = [
         {"type": "sgv", "dateString": f"2026-08-28T{hour:02d}:00:00.000Z", "sgv": 120}
@@ -335,7 +344,7 @@ def main(
                 except ValueError as exc:
                     _say("FAIL", "treatments JSON decode", f"{type(exc).__name__}: {exc}")
 
-    _stage("4. Does this instance's data trigger the parser bug?")
+    _stage("4. What shape is this instance's treatment data?")
     if treatments_payload is None:
         _say("INFO", "no treatments payload to inspect (see above)")
     else:

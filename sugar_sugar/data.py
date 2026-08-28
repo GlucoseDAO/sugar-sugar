@@ -118,9 +118,10 @@ def load_nightscout_json_data(
     entries alone and gets the glucose trace with no event markers; a caller
     holding both files may pass both.
 
-    Note that passing treatments currently fails on cgm-format 0.12.0 whenever
-    a treatment field is null for the first 100 records -- see ``FEEDBACK.md``
-    issue 1. That is why the upload hint asks for the entries file only.
+    Passing treatments used to fail on cgm-format 0.12.0 whenever a treatment
+    field was null for the first 100 records (``FEEDBACK.md`` issue 1); 0.12.2
+    fixed it and is the floor. The upload hint still asks for the entries file
+    only, because the upload is single-file -- not because treatments are broken.
     """
     with start_action(action_type=u"load_nightscout_json_data", file_path=str(file_path)):
         entries_data = file_path.read_bytes()
