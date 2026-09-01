@@ -17,7 +17,7 @@
   var MIN_CHARS = 2;
   var MAX_RESULTS = 8;
   var DEBOUNCE_MS = 120;
-  var SUPPORTED_LOCALES = ['de', 'en', 'es', 'fr', 'ro', 'ru', 'uk', 'zh'];
+  var SUPPORTED_LOCALES = ['bg', 'de', 'en', 'es', 'fr', 'ja', 'ko', 'ro', 'ru', 'uk', 'zh'];
 
   // Keyed by locale: switching the UI language loads that language's file and
   // keeps the previous one, so switching back is free.

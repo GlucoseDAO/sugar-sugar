@@ -52,7 +52,7 @@ def _configure_eliot_logging() -> None:
 
 _configure_eliot_logging()
 
-from sugar_sugar.i18n import setup_i18n, normalize_locale, t, t_list, t_raw
+from sugar_sugar.i18n import SUPPORTED_LOCALES, setup_i18n, normalize_locale, t, t_list, t_raw
 setup_i18n()
 
 from sugar_sugar.data import (
@@ -139,7 +139,7 @@ from sugar_sugar.components.submit import (
 from sugar_sugar.encouragement import pick_bracket
 from sugar_sugar.components.header import HeaderComponent, make_csv_upload
 from sugar_sugar.components.ending import EndingPage
-from sugar_sugar.components.navbar import NavBar, MobileNavBar
+from sugar_sugar.components.navbar import LANGUAGES, NavBar, MobileNavBar
 from sugar_sugar.components.share import (
     build_share_card_figure,
     build_share_panel,
@@ -2708,44 +2708,23 @@ def reset_glucose_unit_on_start_page(pathname: Optional[str]) -> str:
 
 @app.callback(
     Output('interface-language', 'data'),
-    [Input('lang-en', 'n_clicks'),
-     Input('lang-de', 'n_clicks'),
-     Input('lang-uk', 'n_clicks'),
-     Input('lang-ro', 'n_clicks'),
-     Input('lang-ru', 'n_clicks'),
-     Input('lang-zh', 'n_clicks'),
-     Input('lang-fr', 'n_clicks'),
-     Input('lang-es', 'n_clicks')],
+    [Input(f'lang-{code}', 'n_clicks') for code, _, _ in LANGUAGES],
     [State('interface-language', 'data')],
     prevent_initial_call=True
 )
-def set_interface_language(
-    n_en: Optional[int],
-    n_de: Optional[int],
-    n_uk: Optional[int],
-    n_ro: Optional[int],
-    n_ru: Optional[int],
-    n_zh: Optional[int],
-    n_fr: Optional[int],
-    n_es: Optional[int],
-    current_language: Optional[str],
-) -> str:
+def set_interface_language(*args: object) -> str:
     """Set the interface language from navbar flag buttons."""
     triggered = ctx.triggered_id
     if not triggered:
         raise PreventUpdate
-    _clicks = {
-        'lang-en': n_en, 'lang-de': n_de, 'lang-uk': n_uk, 'lang-ro': n_ro,
-        'lang-ru': n_ru, 'lang-zh': n_zh, 'lang-fr': n_fr, 'lang-es': n_es,
-    }
-    if not _clicks.get(triggered):
+    clicks = args[:-1]
+    current_language = args[-1]
+    lang_codes = [code for code, _, _ in LANGUAGES]
+    click_map = {f'lang-{code}': n for code, n in zip(lang_codes, clicks)}
+    if not click_map.get(triggered):
         raise PreventUpdate
-    _lang_map = {
-        'lang-en': 'en', 'lang-de': 'de', 'lang-uk': 'uk', 'lang-ro': 'ro',
-        'lang-ru': 'ru', 'lang-zh': 'zh', 'lang-fr': 'fr', 'lang-es': 'es',
-    }
-    new_lang = _lang_map.get(triggered)
-    if not new_lang or new_lang == current_language:
+    new_lang = triggered.removeprefix('lang-') if isinstance(triggered, str) else None
+    if not new_lang or new_lang not in lang_codes or new_lang == current_language:
         raise PreventUpdate
     return new_lang
 
@@ -10489,7 +10468,7 @@ def chart(
     points: int = typer.Option(DEFAULT_POINTS, "--points", "-p", help="Number of data points in the window"),
     start: Optional[int] = typer.Option(None, "--start", "-s", help="Start index for the data window (default: random)"),
     unit: str = typer.Option("mg/dL", "--unit", "-u", help="Glucose unit: mg/dL or mmol/L"),
-    locale: str = typer.Option("en", "--locale", "-l", help="UI locale (en, de, uk, ro)"),
+    locale: str = typer.Option("en", "--locale", "-l", help=f"UI locale ({', '.join(sorted(SUPPORTED_LOCALES))})"),
     format: str = typer.Option("A", "--format", help="Data-source format: A=generic, B=my data only (upload gate), C=mixed"),
     prefill: bool = typer.Option(False, "--prefill", help="Pre-fill predictions with noisy ground truth so submit/ending can be tested immediately"),
     noise: float = typer.Option(0.05, "--noise", help="Noise level for --prefill (fraction of gl value, e.g. 0.05 = +/-5%%)"),
@@ -10561,7 +10540,7 @@ def share(
     formats: str = typer.Option(SHARE_FORMATS, "--formats", help="Comma-separated format letters to cycle through (e.g. 'A,B,C')"),
     noise: float = typer.Option(SHARE_NOISE, "--noise", help="Max noise at last prediction step (fraction, e.g. 0.30 = +/-30%%)"),
     points: int = typer.Option(DEFAULT_POINTS, "--points", "-p", help="Number of data points per window"),
-    locale: str = typer.Option("en", "--locale", "-l", help="UI locale (en, de, uk, ro)"),
+    locale: str = typer.Option("en", "--locale", "-l", help=f"UI locale ({', '.join(sorted(SUPPORTED_LOCALES))})"),
     name: str = typer.Option(SHARE_NAME, "--name", "-n", help="Player name shown on the share card"),
     host: Optional[str] = typer.Option(None, "--host", help="Host to run the server on"),
     port: Optional[int] = typer.Option(None, "--port", help="Port to run the server on"),

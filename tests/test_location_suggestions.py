@@ -24,6 +24,24 @@ def test_filter_prefers_prefix_matches_in_english() -> None:
     assert len(matches) <= MAX_SUGGESTIONS
 
 
+def test_cjk_and_bg_city_labels_are_one_language() -> None:
+    """An English city must not sit next to a translated country name."""
+    from sugar_sugar.location_suggestions import place_entries, place_label
+
+    mixed: list[str] = []
+    for loc in ("bg", "ja", "ko", "zh"):
+        for entry in place_entries():
+            label = place_label(entry, loc)
+            english = entry.labels["en"]
+            if ", " not in label or ", " not in english:
+                continue
+            city, country = label.split(", ", 1)
+            en_city, _, en_country = english.partition(", ")
+            if (city == en_city) != (country == en_country):
+                mixed.append(f"{loc}: {label}")
+    assert not mixed, mixed[:8]
+
+
 def test_filter_matches_localized_spelling() -> None:
     matches_de = filter_location_suggestions("münc", locale="de")
     assert "München, Deutschland" in matches_de
@@ -36,6 +54,21 @@ def test_filter_matches_localized_spelling() -> None:
 
     matches_zh = filter_location_suggestions("北京", locale="zh")
     assert "北京, 中国" in matches_zh
+
+    matches_ja = filter_location_suggestions("東京", locale="ja")
+    assert "東京, 日本" in matches_ja
+
+    matches_ko = filter_location_suggestions("서울", locale="ko")
+    assert "서울, 대한민국" in matches_ko
+
+    matches_bg = filter_location_suggestions("софи", locale="bg")
+    assert "София, България" in matches_bg
+
+    matches_ja_berlin = filter_location_suggestions("ベルリ", locale="ja")
+    assert "ベルリン, ドイツ" in matches_ja_berlin
+
+    matches_ko_seoul = filter_location_suggestions("서울", locale="ko")
+    assert "서울, 대한민국" in matches_ko_seoul
 
 
 def test_filter_ascii_fallback_for_umlauts() -> None:

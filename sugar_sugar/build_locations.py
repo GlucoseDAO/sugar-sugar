@@ -1,7 +1,7 @@
 """Split the location-suggestion catalog into small per-locale asset files.
 
 The autocomplete used to ship one 824 KB `assets/location-suggestions.json`
-carrying every label in all eight UI languages plus every folded search token.
+carrying every label in all supported UI languages plus every folded search token.
 The browser fetched and parsed it eagerly on **every** page, long before the
 location field on wizard step 3 existed -- a pure tax on low-spec phones.
 

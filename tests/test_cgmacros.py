@@ -289,6 +289,9 @@ def test_meal_bubbles_and_food_line_use_photo() -> None:
     assert t("ui.chart.food_label", locale="ru") == "ЕДА"
     assert t("ui.chart.food_label", locale="uk") == "ЇЖА"
     assert t("ui.chart.food_label", locale="zh") == "食物"
+    assert t("ui.chart.food_label", locale="bg") == "ХРАНА"
+    assert t("ui.chart.food_label", locale="ja") == "食事"
+    assert t("ui.chart.food_label", locale="ko") == "식사"
 
 
 def test_photo_url_and_served_path() -> None:

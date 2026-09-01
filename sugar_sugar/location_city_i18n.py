@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Final, TypedDict
 
+from sugar_sugar.location_city_capitals import CAPITAL_I18N, MAJOR_CITY_I18N
+
 
 class CityI18nOverride(TypedDict, total=False):
     locales: dict[str, str]
@@ -43,7 +45,10 @@ CITY_I18N: Final[dict[tuple[str, str], CityI18nOverride]] = {
     ("Munich", "Germany"): {"locales": {"de": "München"}, "extra_search": ("Muenchen",)},
     ("Naples", "Italy"): {"locales": {"de": "Neapel", "es": "Nápoles", "fr": "Naples"}, "extra_search": ("Napoli",)},
     ("New York", "United States"): {"locales": {"es": "Nueva York"}},
-    ("Osaka", "Japan"): {"locales": {"zh": "大阪"}, "extra_search": ("大阪",)},
+    ("Osaka", "Japan"): {
+        "locales": {"zh": "大阪", "ja": "大阪", "ko": "오사카", "bg": "Осака"},
+        "extra_search": ("大阪",),
+    },
     ("Prague", "Czech Republic"): {"locales": {"de": "Prag", "es": "Praga", "fr": "Prague"}, "extra_search": ("Praha",)},
     ("Prague", "Czechia"): {"locales": {"de": "Prag", "es": "Praga", "fr": "Prague"}, "extra_search": ("Praha",)},
     ("Reykjavik", "Iceland"): {"extra_search": ("Reykjavík",)},
@@ -51,12 +56,22 @@ CITY_I18N: Final[dict[tuple[str, str], CityI18nOverride]] = {
     ("Rome", "Italy"): {"locales": {"de": "Rom", "es": "Roma", "fr": "Rome"}, "extra_search": ("Roma",)},
     ("Saint Petersburg", "Russia"): {"locales": {"ru": "Санкт-Петербург"}},
     ("Sao Paulo", "Brazil"): {"extra_search": ("São Paulo",)},
-    ("Seoul", "South Korea"): {"locales": {"zh": "首尔"}, "extra_search": ("서울",)},
+    ("Seoul", "South Korea"): {
+        "locales": {"zh": "首尔", "ja": "ソウル", "ko": "서울", "bg": "Сеул"},
+        "extra_search": ("서울",),
+    },
+    ("Sofia", "Bulgaria"): {
+        "locales": {"bg": "София", "ja": "ソフィア", "ko": "소피아"},
+        "extra_search": ("София",),
+    },
     ("Shanghai", "China"): {"locales": {"zh": "上海"}},
     ("Shenzhen", "China"): {"locales": {"zh": "深圳"}},
     ("Taipei", "Taiwan"): {"locales": {"zh": "台北"}},
     ("The Hague", "Netherlands"): {"locales": {"de": "Den Haag", "fr": "La Haye", "nl": "Den Haag"}},
-    ("Tokyo", "Japan"): {"locales": {"zh": "东京"}, "extra_search": ("東京",)},
+    ("Tokyo", "Japan"): {
+        "locales": {"zh": "东京", "ja": "東京", "ko": "도쿄", "bg": "Токио"},
+        "extra_search": ("東京",),
+    },
     ("Vienna", "Austria"): {"locales": {"de": "Wien", "es": "Viena", "fr": "Vienne"}},
     ("Warsaw", "Poland"): {"locales": {"de": "Warschau", "es": "Varsovia", "fr": "Varsovie"}, "extra_search": ("Warszawa",)},
     ("Zurich", "Switzerland"): {"locales": {"de": "Zürich", "fr": "Zurich"}},
@@ -65,3 +80,17 @@ CITY_I18N: Final[dict[tuple[str, str], CityI18nOverride]] = {
     ("Chennai", "India"): {"extra_search": ("Madras",)},
     ("Kolkata", "India"): {"extra_search": ("Calcutta",)},
 }
+
+
+def _merge_locale_names(extra: dict[tuple[str, str], dict[str, str]]) -> None:
+    """Add bg/ja/ko names without clobbering an existing locale spelling."""
+    for key, locales in extra.items():
+        slot = CITY_I18N.setdefault(key, {})
+        current = dict(slot.get("locales", {}))
+        for loc, name in locales.items():
+            current.setdefault(loc, name)
+        slot["locales"] = current
+
+
+_merge_locale_names(CAPITAL_I18N)
+_merge_locale_names(MAJOR_CITY_I18N)

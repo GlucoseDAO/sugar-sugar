@@ -810,9 +810,22 @@ html.mobile-device .mobile-nav-lang .lang-flag {
   height: 18px !important;
 }
 /* Open the hover menu to the LEFT so it doesn't overflow the right edge. */
-html.mobile-device .mobile-nav-lang .lang-dropdown > .menu {
+html.mobile-device .mobile-nav-lang .lang-dropdown > .menu,
+html.mobile-device .mobile-nav-lang .lang-dropdown:hover > .menu {
   left: auto !important;
   right: 0 !important;
+  max-height: none !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+
+@media (max-height: 520px) {
+  html.mobile-device .mobile-nav-lang .lang-dropdown > .menu,
+  html.mobile-device .mobile-nav-lang .lang-dropdown:hover > .menu {
+    max-height: 70vh !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
 }
 
 /* Drawer: full-width stacked links, toggled by the burger. */

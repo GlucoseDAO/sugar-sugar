@@ -1,0 +1,721 @@
+ja:
+  common:
+    app_title: "Sugar-Sugar"
+    units: "単位"
+    round_of: "%{current} / %{total} ラウンド"
+    go_to_start: "スタートページへ"
+    loading: "読み込み中..."
+    continue: "続ける"
+    game: "ゲーム"
+    finish_exit: "終了 / 退出"
+    the_study: "研究について"
+    contact_us: "お問い合わせ"
+    video_instructions: "動画で見る"
+    faq: "よくある質問"
+    highscore: "ハイスコア"
+
+  language:
+    choose: "言語"
+    en: "English"
+    de: "Deutsch"
+    uk: "Українська"
+    ro: "Română"
+    ru: "Русский"
+    zh: "中文"
+    fr: "Français"
+    es: "Español"
+    bg: "Български"
+    ja: "日本語"
+    ko: "한국어"
+
+  landing:
+    patient_consent_form_title: "研究同意書"
+    required_consents_title: "必須の同意"
+    optional_consents_title: "任意の同意"
+    consent_upload_own_data: "任意課題のために、自分のCGMデータをアップロードすることに同意します。"
+    tagline: "血糖予測の力を試すゲームです。"
+    how_it_works: "遊び方"
+    how_it_works_teaser: "3ステップ。次の1時間を予測。勘とセンサーの勝負。"
+    faq_button: "よくある質問"
+    how_it_works_steps:
+      - "次の1時間、血糖がどう動くと思うか線を描く"
+      - "自分の線と実際の動きを比べる"
+      - "どれだけ近かったかを知る"
+    preview: "プレビュー"
+    about_study_title: "この研究について"
+    about_study_text: "人は血糖の先を読めるのか。Sugar-Sugarはその問いをゲームにします。糖尿病のある人にとって、次の1時間は食事、インスリン、安全に直結します。糖尿病がなくても遊べます。誰もが、研究に必要な人間のスコアを残します。\n\nこれはロストック大学医療センター（ドイツ）倫理委員会の承認を受けた本物の研究です。同意書を読み、必須項目にチェックしてください。"
+    your_choices_title: "あなたの選択"
+    your_choices_text: "続けることで、研究への参加に同意します。プレイ内容は研究のために保存されることがあります。"
+    consent_receive_results: "後で結果を受け取りたい"
+    consent_keep_updated: "プロジェクトの最新情報を受け取りたい"
+    consent_acknowledge_label: "18歳以上であり、利用条件を読みました。"
+    consent_gdpr_label: "同意案内に記載された目的のため、一般データ保護規則（EU）2016/679に従って個人データを処理することに同意します。データは安全に扱われ、権限のない第三者には共有されず、いつでも同意を撤回できることを理解しています。"
+    open_consent_form: "同意案内を開く"
+    consent_required_error: "続けるには、18歳以上であることと同意書を読んだことを確認してください。"
+    next_hint: "次に短いフォームを記入し、CGMデータをアップロードします（またはサンプルデータを使います）。"
+    take_me_in: "はじめる"
+    games_played_so_far: "これまでにプレイされたゲーム"
+    games_played_so_far_count: "これまでに %{count} ゲーム"
+    gamers_played_so_far_count: "これまでに %{count} 人のプレイヤー"
+    games_played_completed: "そのうち %{count} 人が課題を完了"
+    completed_the_task_label: "が課題を完了"
+    victors_punchline: "勝者の側へ — 群れから抜け出そう"
+    games_slots_line: "%{total} ゲーム開始、%{completed} 完了 — 1人が何度でもプレイできます"
+
+  consent_form:
+    title: "同意案内"
+    subtitle: "続ける前にこの情報をお読みください。基本的な同意案内であり、今後更新されます。"
+    adults_only: "この研究に参加するには18歳以上である必要があります。"
+    summary_title: "概要"
+    summary_bullets:
+      - "最大12ラウンドの血糖予測ゲームをプレイします。"
+      - "プレイ内容（予測、精度指標）を研究のために保存することがあります。"
+      - "自分のCGMデータをアップロードした場合、ゲームと研究に使うことがあります。"
+      - "参加は任意で、いつでもやめられます。"
+    data_title: "データの利用"
+    data_bullets:
+      - "他の人の公開匿名データは、個人のセンサーデータをアップロードしなくても使えます。"
+      - "ファイルをアップロードすると、機微な健康情報が含まれることがあります。"
+      - "スタートページでの選択に従ってのみデータを使います。"
+    withdraw_title: "撤回"
+    withdraw_text: "ブラウザのタブやウィンドウを閉じれば、いつでも参加をやめられます。データの削除を希望する場合は、研究主催者にご連絡ください。"
+
+  about:
+    title: "Sugar-Sugarについて"
+    body: "Sugar-Sugarは、人が将来の血糖の動きをどれだけ正確に予測できるかを測るための研究ツールです。"
+    study_design_title: "研究デザイン"
+    download_pdf_label: "研究デザインをダウンロード（PDF）"
+    pdf_original_english_note: "（英語原文）"
+    translation_note: "以下のテキストは翻訳です。英語の原文研究デザインは上のPDFで入手できます。"
+    github_link_label: "GitHubのプロジェクト"
+
+  contact:
+    title: "お問い合わせ"
+    body: "質問、フィードバック、データの削除をご希望の場合は、下記の連絡先までご連絡ください。"
+    study_contacts_title: "研究の連絡先"
+    general_email_title: "チーム共通メール"
+    social_title: "ソーシャルメディア"
+    platforms_title: "ウェブサイトとプラットフォーム"
+    linkedin_title: "LinkedIn"
+    col_name: "名前"
+    col_email: "メール"
+    col_platform: "プラットフォーム"
+    col_link: "リンク"
+    col_role: "役割"
+    open_linkedin: "プロフィールを開く"
+
+  demo:
+    title: "デモ"
+    body: "Sugar-Sugarの血糖予測ゲームを短く体験できます。"
+    fullscreen_video: "全画面で見る"
+
+  startup:
+    fork_me: "GitHubでフォーク"
+    required_fields_note: "* 必須項目"
+    nickname_label: "ニックネーム"
+    nickname_placeholder: "任意 — 例: SugarNinja"
+    nickname_hint: "公開ハイスコア板に出す任意の表示名です。空欄なら匿名（プレイヤー1、プレイヤー2、…）のままです。研究データには含まれません。"
+    email_label: "メール"
+    email_placeholder: "メールを入力（結果や更新を希望する場合以外は任意）"
+    age_label: "年齢"
+    age_placeholder: "年齢を入力"
+    age_must_be_18_error: "研究に参加するには18歳以上である必要があります。"
+    age_max_error: "年齢は %{max_age} を超えられません。"
+    diabetes_duration_exceeds_age_error: "糖尿病の年数は年齢より大きくできません。"
+    cgm_duration_exceeds_age_error: "CGMの使用期間は年齢より長くできません。"
+    values_check_warning: "入力した値を確認してください。"
+    missing_fields: "入力してください: %{fields}"
+    gender_label: "性別"
+    gender_placeholder: "性別を選択"
+    gender_male: "男性"
+    gender_female: "女性"
+    gender_na: "該当なし"
+    cgm_label: "CGMを使ったことがありますか？"
+    cgm_placeholder: "CGMの使用経験を選択"
+    yes: "はい"
+    no: "いいえ"
+    cgm_duration_label: "どのくらい使いましたか？"
+    cgm_duration_placeholder: "数字を入力"
+    cgm_duration_unit_weeks: "週"
+    cgm_duration_unit_months: "月"
+    cgm_duration_unit_years: "年"
+    diabetic_label: "糖尿病がありますか？"
+    diabetic_placeholder: "糖尿病の状態を選択"
+    diabetes_type_label: "糖尿病のタイプ"
+    diabetes_type_placeholder: "タイプを選択"
+    diabetes_type_1: "1型"
+    diabetes_type_2: "2型"
+    diabetes_type_prediabetes: "前糖尿病"
+    diabetes_type_gestational: "妊娠糖尿病"
+    diabetes_type_lada: "LADA（成人潜在性自己免疫性糖尿病）"
+    diabetes_duration_label: "糖尿病の期間（年）"
+    diabetes_duration_placeholder: "年数を入力"
+    location_label: "所在地"
+    location_placeholder: "所在地を入力"
+    contact_prefs_title: "連絡の希望"
+    contact_prefs_text: "メールが必要なのは、後で結果を受け取るか、最新情報を希望した場合だけです。"
+    just_test_me: "とりあえず試す"
+    start_prediction: "予測を始める"
+    wizard_back: "戻る"
+    wizard_next: "次へ"
+    wizard_step: "ステップ %{current} / %{total}"
+    consent_gate_hint: "上の必須2項目（18歳以上／条件を読んだこと、およびデータ保護の同意）にチェックしてから進んでください。"
+    format_label: "形式"
+    format_placeholder: "オプションを選択"
+    format_a_label: "公開データ"
+    format_b_label: "自分のデータ"
+    format_c_label: "公開 + 自分のデータ"
+    format_a_label_short: "公開"
+    format_b_label_short: "自分"
+    format_c_label_short: "組み合わせ"
+    format_help_a: "公開データ — 他の人の匿名化されたCGMトレースです。アップロードは不要です。"
+    format_help_b: "自分のデータ — 自分のCSVをアップロードし、自分の血糖で遊びます。"
+    format_help_c: "公開 + 自分のデータ — 組み合わせです。一部のラウンドは匿名の公開トレース、一部はあなたのデータです。"
+    format_find_data_before: "データの場所がわからない場合は、"
+    format_find_data_link: "こちらで探せます。"
+    challenge_unknown_button: "未知に挑む"
+    challenge_unknown_button_on: "未知に挑む — オン"
+    challenge_unknown_help: "これを選ぶと、トレースの半分は反対のグループから来ます — 糖尿病がなければ糖尿病のデータ、あれば非糖尿病のデータです。公開、または公開 + 自分のデータのみ。"
+    challenge_unknown_help_nd: "これを選ぶと、トレースの半分は糖尿病のある人のデータになります。"
+    challenge_unknown_help_t1: "これを選ぶと、トレースの半分は糖尿病のない人のデータになります。"
+    paper_mention_label: "研究後に発表される科学論文で名前を載せたい"
+    paper_mention_hint: "これにチェックして氏名を入れると謝辞に加えます — %{min_rounds} ラウンド以上プレイした場合のみです。"
+    paper_full_name_label: "氏名"
+    paper_full_name_placeholder: "姓と名"
+    data_usage_consent_label: "アップロードしたCGMデータをこの研究に使うことに同意します。"
+    data_usage_consent_required: "続けるには、データの利用同意を確認してください。"
+    import_title: "CGMデータを取り込む"
+    import_subtitle: "CSVエクスポート（Dexcom / Libre / Medtronic）、またはNightscoutのentries.jsonをアップロードしてください — 食事とインスリンのマーカーにはtreatments.jsonも一緒に選んでください。Nightscoutサイトから直接取り込むこともできます。"
+    import_or: "— または —"
+    import_upload_prompt: "ドラッグ＆ドロップするかクリックしてCSVを選ぶ — またはNightscoutのentries.jsonとtreatments.jsonを一緒に選ぶ"
+    import_ns_url_placeholder: "Nightscout URL（https://your-site.com）"
+    import_ns_token_placeholder: "アクセストークンまたはAPIシークレット（任意）"
+    import_ns_button: "Nightscoutから取り込む"
+    import_ns_loading: "Nightscoutサイトに接続しています…"
+    import_success: "%{source} から %{count} 件の測定を読み込みました。開始できます。"
+    import_needs_consent: "取り込む前に、上のデータ利用同意にチェックしてください。"
+    import_needs_url: "先にNightscout URLを入力してください。"
+    import_empty: "そのソースから血糖測定が返りませんでした。URL／トークン（または期間）を確認して再試行してください。"
+    import_bad_file: "そのファイルを読めませんでした — 標準のCGM CSVエクスポート（Dexcom / Libre / Medtronic）またはNightscout entries.jsonをアップロードして再試行してください。"
+    import_needs_entries: "entries.jsonを追加してください — 血糖測定が入っているファイルです。treatments.jsonとprofile.jsonだけでは使えません。"
+    import_ignored: "このゲームに不要な %{files} は無視しました。"
+    import_ns_unreachable: "そのNightscoutサイトに届きませんでした。URLと接続を確認して再試行してください。"
+    import_ns_timeout: "Nightscoutサイトの応答が遅すぎました。もう一度お試しください。"
+    import_ns_http_error: "Nightscoutサイトがリクエストを拒否しました（HTTP %{code}）。URLとトークンを確認してください。"
+    import_ns_unavailable: "このサーバーではNightscout取り込みは使えません（ネットワーク依存関係がありません）。"
+    import_failed: "取り込みに失敗しました。ファイルまたはNightscoutの情報を確認して再試行してください。"
+
+  header:
+    points_label: "表示する点数:"
+    time_window_label: "時間窓の位置:"
+    upload_prompt_1: "ドラッグ＆ドロップするか "
+    upload_prompt_2: "ここにデータをアップロード"
+    upload_button: "アップロード"
+    use_example_data: "公開データを使う"
+    upload_required: "アップロードが必要です"
+    upload_success: "%{filename} からデータを読み込みました。このデータで予測します。"
+    example_data_now_using: "公開の匿名データを使用中です。個別分析にはCSVをアップロードしてください。"
+    example_data_warning: "現在は公開の匿名データを使っています。個別分析には自分のDexcom/Libre/Medtronic CSV、またはNightscout entries.jsonをアップロードしてください。"
+    csv_tab_label: "CSVファイル"
+    nightscout_tab_label: "Nightscout"
+    nightscout_url_placeholder: "https://your-nightscout-site.com"
+    nightscout_token_placeholder: "アクセストークン（任意）"
+    nightscout_load_button: "Nightscoutから読み込む"
+    nightscout_loading: "Nightscoutからデータを読み込んでいます…"
+    nightscout_success: "Nightscoutから %{count} 件の血糖測定を読み込みました。"
+    nightscout_error: "Nightscoutからの読み込みに失敗しました: %{error}"
+    nightscout_url_required: "Nightscout URLを入力してください。"
+    nightscout_consent_required: "Nightscoutデータを読み込む前に、データ利用の同意をください。"
+    current_data_source: "現在のデータソース:"
+    source_short: "ソース:"
+    diabetic: "糖尿病あり"
+    non_diabetic: "糖尿病なし"
+    weight_label: "体重"
+    no_carbs_note: "この食事時間の窓には記録された炭水化物データがありません。"
+    carbs_info_note: "炭水化物マーカーは、データセットに含まれているときだけ表示されます。時刻を確認してください — すべてのCGMエクスポートが炭水化物を記録するわけではありません。"
+    description_1: "血糖予測スキルを試そう！"
+    description_2: "グラフをクリックするか線を描いて、将来の血糖値を予測します。"
+    description_3: "予測が実測と比べてどれだけ正確かをゲームが表示します。"
+    how_to_play: "遊び方:"
+    how_to_play_1: "1. グラフをドラッグして予測を追加する"
+    how_to_play_2: "2. 線を続けて描き、予測カーブを作る"
+    how_to_play_3: "3. 隠れた領域の端まで予測を描いて送信する"
+
+  prediction:
+    units_label: "単位:"
+    upload_required_alert: "この形式では自分のCGMデータが必要です。開始するにはCSVをアップロードしてください。"
+    upload_only_gate: "自分のデータだけで遊ぶ選択をしました。始めるにはアップロードボタンを押してファイルを選んでください。"
+    upload_mixed_gate: "混合モード（公開 + 自分のデータ）を選びました。続けるにはアップロードボタンを押してCGMファイルを選んでください — その後、公開の匿名トレースとあなたのデータが交互になります。"
+    upload_consent_recorded: "同意を記録しました。このセッションでCGMデータをアップロードして使えます。"
+    no_upload_back_to_final: "アップロードするCGMデータがない？これまでのラウンドの結果を見る"
+
+  submit:
+    progress_no_data: "隠れた領域の端まで予測してから送信してください"
+    progress_some: "端まで予測を続けてください（%{done}/%{total} 点）"
+    progress_ready: "✓ 送信できます！"
+    progress_hidden_area: "隠れた領域に予測を描いてから送信してください"
+    submit: "送信"
+    submit_remaining: "送信（%{done}/%{total}）"
+    finish_game: "ゲームを終える"
+    finish_confirm_title: "このゲームを終了しますか？"
+    finish_confirm_early: "%{total} ラウンド中 %{current} を完了しました。%{min} ラウンド未満では研究には少なすぎます。"
+    finish_confirm: "%{total} ラウンド中 %{current} を完了しました。終了してよろしいですか？"
+    keep_playing: "遊び続ける"
+    finish_anyway: "それでも終了"
+
+  mobile_warning:
+    text: "注: Sugar-Sugarは現在デスクトップ向けに最適化されています。モバイル対応は近日公開です！"
+
+  orientation:
+    title: "描くにはスマホを横向きにしてください"
+    subtitle: ""
+    go_fullscreen: "全画面"
+
+  share:
+    button_share: "結果をシェア"
+    title: "私のSugar-Sugar結果"
+    title_named: "%{name} のSugar-Sugar結果"
+    subtitle: "私より血糖を読める？やってみて！"
+    download_png: "画像をダウンロード"
+    download_png_hint: "カードをPNGで保存。Instagramストーリーにぴったりです。"
+    generated_at: "生成"
+    play_again: "もう一度遊ぶ"
+    unknown_stamp: "未知に踏み出した"
+    copy_link: "リンクをコピー"
+    copy_link_success: "リンクをコピーしました！"
+    share_native: "シェア"
+    share_as_link: "リンクでシェア"
+    share_on_x: "Xでシェア"
+    share_on_facebook: "Facebookでシェア"
+    share_on_whatsapp: "WhatsAppでシェア"
+    share_on_linkedin: "LinkedInでシェア"
+    share_on_telegram: "Telegramでシェア"
+    share_on_discord: "Discordでシェア"
+    invite_text: "次の1時間の血糖を %{rounds} ラウンドで精度 %{accuracy} で予測しました。もっと上手くできる？"
+    invite_text_ranked: "血糖予測者の上位 %{percentile} — %{rounds} ラウンドで精度 %{accuracy}。勝てる？"
+    card_footer: "%{url} でプレイ"
+    qr_scan_to_play: "スキャンしてプレイ"
+    stats_heading: "あなたのスコアカード"
+    stat_mard: "MARD"
+    stat_mard_hint: "平均絶対相対差"
+    stat_mae: "MAE"
+    stat_mae_hint: "平均絶対誤差"
+    stat_rmse: "RMSE"
+    stat_rmse_hint: "二乗平均平方根誤差"
+    stat_rounds: "ラウンド"
+    stat_rounds_hint: "プレイした予測ラウンド"
+    stat_accuracy: "精度"
+    stat_accuracy_hint: "実測血糖への近さ"
+    stat_ranking: "最高順位"
+    stat_percentile: "上位 %{percentile}"
+    stat_no_ranking: "未ランク"
+    best_rank_scope_overall: "総合"
+    og_title_ranked: "血糖予測 上位 %{percentile} — 精度 %{accuracy}"
+    og_title_unranked: "血糖予測の精度 %{accuracy} — 勝てる？"
+    expired_title: "このシェアリンクは期限切れです"
+    expired_body: "このURLのスコアカードが見つかりませんでした。ラウンドをプレイして、自分の結果をシェアできます。"
+    expired_cta: "Sugar-Sugarをプレイ"
+    encouragement:
+      excellent:
+        lines:
+          - "次の1時間の血糖を決めた — %{rounds} ラウンド、センサー並み。次は君だ。"
+          - "%{rounds} ラウンドでカーブを全部捉えた。ついてこられる？プレイを押して。"
+          - "ほぼ完璧な予測を %{rounds} ラウンド。初見で同じは無理だろう。"
+          - "%{rounds} ラウンドのきれいな予測がこれ。君のも見せて。"
+      good:
+        lines:
+          - "堅い走り — %{rounds} ラウンド、予測は近くに着地した。もっと近くに落とせる？"
+          - "%{rounds} ラウンド線を保てた。番だ — 覆してみて。"
+          - "%{rounds} ラウンド、安定した予測。血糖の勘は上？見せて。"
+          - "%{rounds} ラウンド、まだカーブを追っている。誰が先に超える？"
+      average:
+        lines:
+          - "%{rounds} ラウンド、カーブは動き続ける。初見で僕のスコアを超えるのは無理だろう。"
+          - "血糖予測は見た目より難しい。%{rounds} ラウンド済 — もっと上手くできる？"
+          - "もう %{rounds} ラウンド。数字はずるい — 出し抜けるか見てみて。"
+          - "%{rounds} ラウンドでランキングを登り始めた。頂点で会おうか？"
+      keep_practicing:
+        lines:
+          - "血糖は謙虚にさせる。%{rounds} ラウンド済 — 僕より上手く読めるか見てみて。"
+          - "%{rounds} ラウンド、まだカーブを勉強中。番だ。"
+          - "見た目より難しいだろ？%{rounds} ラウンドの正直な挑戦。勝て。挑発する。"
+          - "%{rounds} ラウンド、線のほうが勝っている。もっと読める？見せて。"
+    synthesis:
+      title: "次の1時間の予測誤差"
+      x_axis: "時間（隠れた次の1時間の開始からの分。5分ごと）"
+      x_axis_time: "先の分数"
+      y_axis: "実測に対するパーセント誤差（5分ごと）"
+      y_axis_short: "誤差"
+      legend_zero: "完璧な予測（0%%）"
+      legend_variability: "あなたの誤差 — ラウンドごとに1本"
+      dir_high: "↑ 高く見積もりすぎ"
+      dir_low: "↓ 低く見積もりすぎ"
+      legend_error: "実測との誤差、ラウンドごとに1本"
+      round_hover: "ラウンド"
+      caption: "色つきの線はそれぞれ1ラウンド。プレイしたデータソースごとに1パネルです。黒い0%%線は完璧な予測です — 上の点は実測より高く、下の点は低く見積もっています。"
+      empty: "グラフデータがありません。"
+
+  chart:
+    title: "血糖値（%{start} から %{end}）"
+    source_suffix: " - ソース: %{source}"
+    x_axis: "時間"
+    y_axis_label: "血糖値"
+    y_axis: "血糖値（%{unit}）"
+    trace_glucose: "血糖値"
+    trace_predictions: "予測点"
+    known_label: "既知"
+    predicted_label: "予測"
+    hover_insulin: "インスリン: %{value}u<br>%{time}"
+    event_insulin: "インスリン"
+    event_exercise: "運動"
+    event_carbohydrates: "炭水化物"
+    food_label: "食事"
+
+    draw_to_here: "ここまで描く"
+    prediction_complete: "線が完成"
+  metrics:
+    title: "指標"
+    prediction_accuracy: "予測精度"
+    placeholder_need_5: "精度指標を見るには、グラフに予測を描いてください"
+    title_accuracy_metrics: "精度指標"
+    no_metrics_available: "指標がありません"
+    desc:
+      mae: "平均絶対誤差 — 平均して何血糖単位はずれたか"
+      mse: "大きな予測誤差を強調します"
+      rmse: "MAEに似ていますが、大きな誤差をより強く罰します"
+      mape: "実測値からの平均パーセント差"
+
+  table:
+    metric_header: "指標"
+    actual_glucose: "実測血糖"
+    predicted: "予測"
+    absolute_error: "絶対誤差"
+    relative_error_pct: "相対誤差（%{pct}）"
+
+  resume_dialog:
+    title: "おかえりなさい！"
+    message: "前回のセッションが保存されています（%{total} ラウンド中 %{round}）。続きから始めますか、それとも最初からですか？"
+    message_no_round: "前回のセッションが保存されています。続きから始めますか、それとも最初からですか？"
+    warning: "予測に不満だからといって最初からやり直さないでください — やり直しは研究データを歪め、研究結果を損ないます。"
+    continue_btn: "続ける"
+    start_over_btn: "最初から"
+    your_code: "再開コード（別の端末で続ける場合）: %{code}"
+
+  resume_code:
+    landing_prompt: "新しい端末で続けますか？再開コードを入力:"
+    placeholder: "再開コード"
+    redeem_btn: "再開"
+    not_found: "そのコードのセッションが見つかりませんでした。確認してもう一度どうぞ。"
+    copy_link: "🔗 再開リンクをコピー"
+    copied: "✓ リンクをコピーしました！"
+
+  restoring:
+    title: "ゲームを復元しています…"
+    text: "保存したセッションを読み込んでいます。何も起きなければ下のボタンを使ってください。"
+
+  session_expired:
+    title: "セッション期限切れ"
+    text: "最初からやり直してください。"
+
+  ending:
+    title: "予測のまとめ"
+    prediction_results: "予測結果"
+    click_here_for_details: "詳細はこちら"
+    hide_details: "詳細を隠す"
+    units_line: "単位: %{unit}"
+    next_round: "次のラウンド"
+    view_complete_analysis: "完全な分析を見る"
+    results: "結果"
+    graph_explanation: "グラフは予測した血糖の窓です。オレンジの破線は既知の履歴（左）と予測した1時間（右）を分けます。あなたの予測は赤です。"
+    data_source_label: "データソース: %{source}"
+    sensor_label: "センサー"
+    round_motivation: "いつでもやめられますが、全 %{total} ラウンドを終えると最も良いデータになります。有用な結果には少なくとも %{min_useful} ラウンドが必要です — 追加ラウンドはどれも役立ちます！"
+    local_storage_note: "進捗はこのブラウザにローカル保存されます。同じブラウザなら休憩して後から再開できます。"
+    reaction:
+      excellent:
+        - "センサー級の精度 — こうしたデータが研究を本当に前へ進めます！"
+        - "プロのようにそのカーブを読みました。珍しい精度、貴重な貢献です。"
+        - "ほぼ完璧！このラウンドは研究の強いデータ点です。"
+        - "まさに的中 — 研究が必要としているものです。"
+      good:
+        - "良い予測 — 研究にもう一つの堅いデータ点です！"
+        - "傾向をよく捉えました。データセットが強くなります。"
+        - "堅い予測！勘が本物の信号を出しています。"
+        - "いい仕事です。こうした安定したラウンドが分析をより信頼できるものにします。"
+      average:
+        - "悪くない — 難しいカーブ。試みは研究に信号を足します。"
+        - "妥当な試みです！不完全な予測でも、人間の直感を地図にする助けになります。"
+        - "まずまずの見積もり。難しいケースも研究の役に立ちます。"
+        - "まずまずの努力 — 研究が測るのは直感であり、完璧さではありません。"
+      keep_practicing:
+        - "難しい窓。難しいケースこそ研究に特に情報が多いです。"
+        - "読みにくい — ばらつきの大きい区間が最も教えてくれます。"
+        - "専門家でも外します！それがまさにこの研究が測っていることです。"
+        - "気にしないで — 人がつまずく場所で科学は学びます。"
+    milestone:
+      first_round: "最初のラウンド — もう研究に貢献しています！"
+      minimum_reached: "最低ライン到達！データは科学的に有用です。追加ラウンドでさらに強くなります。"
+      all_complete: "全ラウンド完了 — 完全なデータセットをありがとうございます！"
+    personal_best: "これまでのベストラウンド！"
+    progress:
+      minimum_goal: "最低: %{min_useful}"
+      stretch_goal: "目標: %{total}"
+      bonus_rounds: "ボーナスラウンド"
+
+  highscore:
+    title: "ハイスコア"
+    subtitle: "予測対象のデータで分かれた2つのボードです。非糖尿病のトレースは平坦で易しいので、糖尿病データとは並べません。終えたゲームはそれぞれ自分の席を保ち、スコアはそのゲームのそのデータ種の最良 %{min} ラウンドの平均絶対誤差（MAE）です — 6ラウンドと12ラウンドは同じラウンド数で判定されます。セレクタがその数を決めます。MAEは低いほど良いです。"
+    board_nondiabetic: "非糖尿病データ"
+    board_diabetic: "糖尿病データ"
+    your_place_line: "%{board}: #%{rank} / %{total} · MAE %{mae} %{unit}"
+    badge_hard_mode: "ハードモード — このスコアは、プレイヤー自身の状態とは異なるデータで出したものです"
+    badge_veteran: "ベテラン — 終えたゲームが複数。名前をクリックすると選手統計へ。"
+    legend_hard_mode: "%{badge} ハードモード: 慣れないデータを予測した — 糖尿病のある人が非糖尿病データ、またはその逆"
+    legend_veteran: "%{badge} ベテラン: 終えたゲームが複数 — 名前は選手の統計ページへリンクします"
+    floor_label: "少なくとも次のラウンド数のゲームを表示"
+    floor_option: "%{min} ラウンド"
+    medal_bronze: "銅 — 1ゲームで6ラウンド到達"
+    medal_silver: "銀 — 1ゲームで12ラウンド到達"
+    medal_gold: "金 — 複数ゲームを終えた"
+    legend_bronze: "%{badge} 銅: 1ゲームで %{rounds} ラウンド到達"
+    legend_silver: "%{badge} 銀: 1ゲームで %{rounds} ラウンド到達"
+    legend_gold: "%{badge} 金: %{rounds} ゲーム以上を終えた — 名前は選手統計へリンクします"
+    unranked_note: "終えた %{total} ゲームのうち %{count} は非表示です: 単一データ種のラウンドが %{min} 未満です。"
+    players_count: "%{total} 人のプレイヤー"
+    scores_count: "%{total} スコア"
+    games_played: "%{count} ゲームプレイ"
+    completed_the_task: "%{count} 人が課題を完了"
+    empty: "まだランク入りゲームはありません。%{min} ラウンド以上プレイすれば、ボードの最初になります。"
+    play_now: "今すぐプレイ"
+    privacy_note: "ニックネームは任意で公開です。メールを渡した場合、ボードは端末をまたいで結果を認識するための一方向ハッシュだけを保存します — アドレスそのものも他の個人データも保存しません。ニックネームは研究データではありません。"
+
+  player:
+    title: "プレイヤー統計"
+    anonymous: "匿名プレイヤー"
+    games_count: "終えたゲーム %{count}"
+    games_title: "ゲーム"
+    best_nondiabetic: "非糖尿病データのベスト: %{mae} %{unit}"
+    best_diabetic: "糖尿病データのベスト: %{mae} %{unit}"
+    col_format: "データソース"
+    col_nondiabetic_mae: "非糖尿病 MAE（%{unit}）"
+    col_diabetic_mae: "糖尿病 MAE（%{unit}）"
+    col_overall_mae: "総合 MAE（%{unit}）"
+    not_found: "このアドレスにプレイヤーページはありません — リンクが古い可能性があります。"
+    back_to_board: "ハイスコア板に戻る"
+
+  final:
+    title: "完全な分析"
+    rounds_played: "プレイしたラウンド: %{played} / %{total}"
+    played_formats: "これまでにプレイした形式: %{formats}"
+    ranking_title: "リーダーボード"
+    ranking_format_line: "ランキング（%{format}）: %{rank} / %{total}"
+    ranking_overall_line: "総合ランキング: %{rank} / %{total}"
+    your_place: "あなたの順位"
+    your_place_value: "#%{rank} / %{total}"
+    top_percentile: "上位 %{pct}%%"
+    your_mae: "あなたのMAE · %{mae} %{unit}"
+    format_ranks: "データソース別"
+    top_predictors: "トップ予測者"
+    col_rank: "#"
+    col_player: "プレイヤー"
+    col_rounds: "ラウンド"
+    col_when: "日時"
+    col_mae: "MAE（%{unit}）"
+    you: "あなた"
+    player_n: "プレイヤー %{n}"
+    you_named: "%{name}（あなた）"
+    nickname_title: "リーダーボード上の名前"
+    nickname_save: "保存"
+    nickname_saved: "保存しました — ボードに名前が表示されます。"
+    nickname_hint: "任意で公開です。空欄なら匿名のままです。"
+    no_ranking_yet: "リーダーボードに載るには少なくとも %{min} ラウンドプレイしてください。"
+    per_round_metrics: "ラウンドごとの指標"
+    start_over: "退出"
+    journey_title: "この壮大な旅は終わりました — 次を始めますか？"
+    journey_title_done: "この壮大な旅は終わりました — 研究への貢献に感謝します！"
+    hero_summary: "予測は平均して %{mae} %{unit} ずれていました — 実測から約 %{mape}%%"
+    col_round: "ラウンド"
+    col_points: "比較した点数"
+    stats_note: "統計向け: MSE %{mse} · RMSE %{rmse} %{unit}"
+
+  switch_format:
+    title: "こちらも試せます..."
+    try_a: "公開データを試す = 他の人の匿名トレースで遊ぶ"
+    try_b: "自分のデータを試す = 自分のデータを使う"
+    try_c: "公開 + 自分のデータを試す = 両方を使う"
+    try_a_short: "公開データを試す"
+    try_b_short: "自分のデータを試す"
+    try_c_short: "公開 + 自分のデータを試す"
+    not_eligible_no_cgm: "B/Cは、CGMデータがあると答えた場合のみ使えます。"
+
+  results_disclaimer:
+    line1: "これらのスコアは研究目的のみです"
+    line2: "結果にかかわらず、このアプリに基づいて医療上の判断を変えないでください"
+    line3: "医療上の判断の前に、必ず主治医に相談してください"
+
+  faq:
+    title: "よくある質問"
+    ask_title: "自分の質問を書く"
+    ask_intro: "まだ答えていないことや、もっと知りたいことはありますか。ここに書いてください。"
+    ask_placeholder: "質問を入力"
+    name_placeholder: "名前（任意）"
+    tags_label: "タグ"
+    ask_button: "質問を投稿"
+    ask_thanks: "ありがとう — 質問をボードに載せました。"
+    ask_empty: "先に質問を書いてください。"
+    tag_gameplay: "プレイ"
+    tag_data: "データ"
+    tag_privacy: "プライバシー"
+    tag_download: "ダウンロード"
+    tag_other: "その他"
+    section_participant: "参加者"
+    section_developer: "開発者"
+    reply_placeholder: "返信を書く"
+    reply_button: "返信"
+    board_empty: "まだ質問はありません。最初の人になりましょう。"
+    board_participant_title: "参加者の質問"
+    board_developer_title: "開発者の質問"
+    sections:
+      - title: "この研究が大切な理由"
+        items:
+          - q: "Sugar-Sugarとは何ですか？"
+            a: "Sugar-SugarはDashで作ったウェブ研究アプリです。血糖予測をインタラクティブなゲームにします。CGMトレースの一部を見て、続きを描き、予測を実測と比べます。目的は、人が短期の血糖動態をどれだけ正確に先読みできるかを測ることです。"
+          - q: "本物の研究ですか？"
+            a: "はい。Sugar-Sugarは本物の研究の一部です。ドイツのロストック大学医学部（Universitätsmedizin Rostock）倫理委員会の承認を受けています。責任ある研究であることを知っていただくために、背景として記しています。"
+          - q: "糖尿病のある人にとって、血糖予測が大切なのはなぜですか？"
+            a: "糖尿病のある人にとって、正確な短期予測はインスリン、炭水化物、運動、タイミングについての、より安全な日常判断を支えられます。予測が良くなれば、危険な高値と低値を減らし、血糖管理のストレスを下げられます。"
+          - q: "糖尿病のない人にとって、血糖予測が大切なのはなぜですか？"
+            a: "血糖はエネルギー、認知、気分、運動反応、長期の健康につながる中核の代謝信号です。糖尿病がなくても、食事、睡眠、ストレス、活動が代謝をリアルタイムでどう形作るかを予測は示せます — 予防的な健康と生活の最適化に役立ちます。"
+          - q: "機械学習にとって、人間の精度がそれほど大切なのはなぜですか？"
+            a: "現在、CGM血糖予測の公開された人間ベースラインはありません。情報のある人がどれだけ読めるかを知らなければ、MLモデルが本当に役立つか判断できません — 知識のある糖尿病患者より悪いことも、特定の場面だけで良いこともあります。この研究がそのベースラインを作り、将来のMLを意味のある形で比較できるようにします。"
+          - q: "人はグラフに出ないことまで知っています — 食事、睡眠、ストレス、消化、周期。それなしでは、グラフ占いでは？"
+            a: >-
+              CGMグラフを見るとき、すでに血糖の行き先の感覚があります。
+              すべての要因を意識して列挙してはいません。カーブを見て、すでに起きていることを読みます。
+
+
+              記録していないことも、血糖に現れます。
+              食後のスパイクは、炭水化物を入力したかどうかに関係なく食後のスパイクに見えます。
+              残存インスリンは、見分けのつく形でカーブを下げます。
+              血糖の線は、追跡していないことも含め、起きているすべての結果です。
+
+
+              自分のCGMデータをアップロードすれば、記録した炭水化物、インスリン、運動がマーカーとして出ます。むき出しの血糖線ではありません。
+
+
+              株式の「テクニカル分析」のようなものですか？違います。
+              株価は群衆心理で動き、予測そのものが市場を動かします。
+              血糖は生化学です。インスリンには既知の作用曲線があります。炭水化物は既知の速度で吸収されます。
+              次の1時間は、今すでに動き出していることからほとんど決まります。
+
+
+              研究もこれを裏付けます。食事とインスリン入力の有無を比べた血糖予測モデルの研究では、
+              それらの共変量を加えても短期精度は上がりませんでした
+              （[Daniels et al., 2022](https://pmc.ncbi.nlm.nih.gov/articles/PMC8782424/);
+              [The Maastricht Study, 2021](https://pmc.ncbi.nlm.nih.gov/articles/PMC8224858/)）。
+              次の1時間には、CGM信号だけで十分な情報があります。
+
+
+              一日の全部をモデルに説明するようには頼んでいません。
+              問いはこれです。画面を見て、血糖の行き先をどれだけ読めるか。
+      - title: "研究の進め方"
+        items:
+          - q: "誰が参加できますか？"
+            a: "18歳以上ならどなたでも。CGMユーザーは特に貴重ですが、CGMがなくても公開の匿名データで遊べます。"
+          - q: "対応しているCGM機器と形式は？"
+            a: "Dexcom、Libre、MedtronicのCSVエクスポートと、Nightscoutのentries.jsonに対応しています。（Nightscout独自のCSVエクスポートは不可です — ほとんどのデータが抜けます。）CGM機器がなくても使える公開匿名データセットもあります。"
+          - q: "どのくらい時間がかかりますか？"
+            a: "1ラウンドは約2〜3分です。全セッション（12ラウンド）は約30分ですが、複数回に分けられます。"
+          - q: "途中で止めて、あとから再開できますか？"
+            a: "できます。ゲームは進捗をブラウザにローカル保存します。12ラウンドが一度に多すぎるなら、タブを閉じて戻ってください — 中断したところから続ける案内が出ます。数ラウンドでも役立ちますが、追加ラウンドはどれもデータ品質を上げます。"
+          - q: "同じ人が何度も遊べますか？"
+            a: "はい — 各プレイスルーが別セッションである限り。予測スキルは練習で伸びることがあるので、結果は固定ではありません。精度は回を重ねて徐々に上がることがあります。同じセッションを続けるのではなく新しいセッションを始めると、試みが分かれ、時間を通じた上達を捉えられます。"
+          - q: "結果が気に入らないときは、やり直すべきですか？"
+            a: "精度に不満だからといってやり直さないでください。人は良いスコアを残し悪いものを捨てがちですが、それでは研究が歪み、科学的妥当性が落ちます。がっかりしても、進捗をリセットするより次のラウンドを続けるほうがよいです。"
+          - q: "精度指標とは何ですか？"
+            a: "予測カーブが実測にどれだけ近かったかを数量化する、標準の予測指標 — MAE、RMSE、MAPE — を使います。MAEは平均絶対誤差で、平均してどれだけ外れたかを示します。RMSEは大きな誤りをより強く罰するので、予測が大きく外れたケースを強調します。MAPEは誤差をパーセントで表し、異なる血糖範囲での成績比較に役立ちます。これらを合わせると、単一スコアより完全な絵になります。"
+          - q: "この研究の限界は何ですか？"
+            a: >-
+              率直に言います。
+
+              - **短い地平だけ。** 次の1時間の予測をお願いしています。より長い予測は、測っていない要因が支配する、はるかに難しい問題です。
+
+              - **記録された出来事は不完全かもしれません。** グラフはCGMアプリが記録したものを出します — 食事や投与を記録していなければ出ず、あなたもモデルも同じ不完全な絵で働きます。
+
+              - **個人的な文脈はありません。** 実生活ではデータにないことを知っています — 風邪の兆し、これから走る、三杯目のコーヒー。この研究は、個人知識から切り離してグラフを読む力を測ります。
+
+              - **リアルタイムの圧力はありません。** 落ち着いて予測線を描くことと、午前2時に半分眠い状態で投与判断をすることは違います。
+
+              - **公開データと自分のデータ。** 公開の匿名トレースで遊ぶと、自分の血糖を読む精度とは違うことがあります。自分のCGMエクスポート（Dexcom、Libre、Medtronic、Nightscout）のアップロードを勧めます — 自分のパターンへの個人的な直感こそ、MLとの比較を面白くする一部です。
+      - title: "CGM CSVのダウンロード方法"
+        id: download-csv
+        items:
+          - q: "スマホアプリから書き出せないのはなぜですか？"
+            a: "ほとんどのCGMスマホアプリはPDFレポートしか出しません。生のCSVはメーカーのウェブサイト、またはxDrip+などのオープンソースアプリから来ます。"
+          - q: "Dexcom（Clarity）"
+            a: >-
+              1. [clarity.dexcom.com](https://clarity.dexcom.com)（米国）または [clarity.dexcom.eu](https://clarity.dexcom.eu)（欧州）を開き、Dexcomアカウントでサインインします。
+
+              2. 任意のレポートを開き、上のバーで **Export** をクリックします。
+
+              3. 期間（14、30、90日、またはカスタム）を選び、CSVをダウンロードします。
+
+
+              ClarityのスマホアプリではCSVを書き出せません。ウェブサイトを使ってください。
+
+
+              動画: [Clarity upload](https://www.youtube.com/watch?v=GTULvbiAkfc), [Navigating Clarity](https://www.youtube.com/watch?v=hNSeKZXV1sM), [G6 / Clarity export](https://www.youtube.com/watch?v=7v-d_FKs6Oo).
+          - q: "Abbott FreeStyle Libre（LibreView）"
+            a: >-
+              1. [libreview.com](https://www.libreview.com) を開き、Libreアプリと同じアカウントでサインインします。
+
+              2. 左上の **Glucose History** アイコン（トレンドの波）をクリックします。
+
+              3. 右上の **Download Glucose Data** をクリックし、キャプチャを完了してダウンロードします。
+
+
+              Excelで開いて再保存しないでください — 日付が壊れることがあります。ダウンロードしたままアップロードしてください。
+
+
+              動画: [LibreView setup](https://www.youtube.com/watch?v=xBa6JJEdqcI), [TypeOneTalks export](https://www.youtube.com/watch?v=l09GPGQXOLE).
+          - q: "Medtronic（CareLink）"
+            a: >-
+              1. [carelink.minimed.com](https://carelink.minimed.com) を開いてサインインします。
+
+              2. 新しいポンプ（770G / 780G）はMiniMed Mobileアプリで同期します。古いポンプはCareLink USBまたはContour Next Linkアップローダーが必要です。
+
+              3. **Reports → Data Export (CSV)** に進みます。
+
+
+              動画: [CareLink overview](https://www.youtube.com/watch?v=WGO1YnVJ0eo), [Uploader setup](https://www.youtube.com/watch?v=u_oC2EubVT4).
+          - q: "Glooko、Tidepool、xDrip+、Nightscout"
+            a: >-
+              **Glooko:** [my.glooko.com](https://my.glooko.com) → Summary → Export as CSV。
+
+              **Tidepool:** Settings（歯車）→ Export My Data → 日付を選んでダウンロード。
+
+              **xDrip+:** Menu → Import/Export → Export CSV（SiDiary形式）。
+
+              **Nightscout:** スタート画面にサイトURLを貼り付けてください — ファイルは不要です。ファイルで上げる場合は `https://your-site/api/v1/entries.json?count=10000` を開き、保存してそれをアップロードしてください。データの大半が抜けるCSVエクスポートは使わないでください。
+      - title: "データとプライバシー"
+        items:
+          - q: "自分のデータは保存されますか？"
+            a: "送信を選ぶまで、すべては自分のブラウザ内に留まります。積極的に同意して結果を送信しない限り、サーバーには何も送られません。"
+          - q: "同意した場合、どのデータが集まりますか？"
+            a: "プレイデータ（描いた予測、精度指標）、任意でアップロードしたCGMファイル、短い質問票（年齢、CGM経験、糖尿病の状態など）です。"
+          - q: "CGMデータは第三者に共有されますか？"
+            a: "いいえ。データはこの研究だけに使い、販売や権限のない第三者への共有はしません。"
+          - q: "撤回できますか？"
+            a: "はい。ブラウザを閉じればいつでもできます。すでに送信したデータの削除は、研究チームにご連絡ください。"
+          - q: "結果の改ざんを止めるものはありますか？"
+            a: "正直に言うと、技術的には何もありません。データはすべて自分のブラウザのローカルストレージにあるので、参加者の誠実さと善意に全面的に頼っています — そして本当に信頼しています。友人を感心させるために疑わしいほど完璧な予測スコアが欲しいなら、スクリーンショットを撮って画像エディタで直すか、ブラウザのDevToolsで画面上の数字を編集してください。偽データを研究に送らないでください — 皆が恩恵を受ける研究の科学的妥当性を直接損ないます。"
+      - title: "助け方と貢献"
+        items:
+          - q: "バグを見つけたら？"
+            a: "プロジェクトのGitHub [github.com/GlucoseDAO/sugar-sugar](https://github.com/GlucoseDAO/sugar-sugar) でissueを開いてください。バグ報告はアプリの改善と、研究体験やデータ品質に影響しうる問題の特定に非常に役立ちます。"
+          - q: "ソフトウェア開発者です。機能を貢献できますか？"
+            a: "はい。貢献はプロジェクトのGitHub [github.com/GlucoseDAO/sugar-sugar](https://github.com/GlucoseDAO/sugar-sugar) で歓迎します。修正、UI改善、より多くのセンサーやファイル形式の対応、科学プロトコルを変えずに使いやすさを上げる変更を特に歓迎します。進行中の研究なので、新しい質問項目や中核課題の変更など、途中で研究デザインに触れる変更は、先にチームと相談してください。"
+          - q: "ほかに研究を助ける方法は？"
+            a: "ソフトウェア開発者でなくても、大いに助けられます。関連コミュニティに研究を共有し、他のCGMユーザーや関心のある人に伝え、わかりにくい文言や使い勝手の問題を報告し、何か協力したい場合はプロジェクトの連絡先から研究チームに連絡してください。"
+          - q: "研究デザインの全文はどこにありますか？"
+            a: "ナビゲーションバーの「研究について」ページにあり、PDFダウンロードとGitHubリポジトリへのリンクがあります。"

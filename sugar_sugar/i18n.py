@@ -7,7 +7,9 @@ from typing import Final, Iterable, Optional
 import i18n
 
 DEFAULT_LOCALE: Final[str] = "en"
-SUPPORTED_LOCALES: Final[set[str]] = {"en", "de", "uk", "ro", "ru", "zh", "fr", "es"}
+SUPPORTED_LOCALES: Final[set[str]] = {
+    "en", "de", "uk", "ro", "ru", "zh", "fr", "es", "bg", "ja", "ko",
+}
 
 
 def normalize_locale(locale: Optional[str]) -> str:

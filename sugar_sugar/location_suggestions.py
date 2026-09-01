@@ -21,6 +21,11 @@ from sugar_sugar.location_catalog import (
 MIN_QUERY_LEN: int = 2
 MAX_SUGGESTIONS: int = 8
 
+# Country names for these locales are not Latin. Pairing an English city with
+# a local country ("Kabul, アフガニスタン") is what reads as half-translated.
+# If the city itself has no locale name, keep the whole label in English.
+_UNMIXED_CITY_LOCALES: frozenset[str] = frozenset({"bg", "ja", "ko", "zh"})
+
 
 @dataclass(frozen=True)
 class PlaceEntry:
@@ -65,7 +70,13 @@ def _city_entry(spec: CitySpec) -> PlaceEntry:
     labels: dict[str, str] = {}
     for locale in LOCALES:
         city_name = spec.city.get(locale, spec.city["en"])
-        labels[locale] = f"{city_name}, {country[locale]}"
+        country_name = country[locale]
+        if (
+            locale in _UNMIXED_CITY_LOCALES
+            and city_name == spec.city["en"]
+        ):
+            country_name = spec.country
+        labels[locale] = f"{city_name}, {country_name}"
     canonical = labels["en"]
     search_texts = list(labels.values()) + list(spec.extra_search)
     search_texts.extend(spec.city.values())

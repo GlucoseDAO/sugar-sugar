@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Final
 
+from sugar_sugar.food_glossary_extra import EXTRA_PHRASES, EXTRA_UNITS, EXTRA_WORDS
+
 _LOCALES: Final[tuple[str, ...]] = ("de", "fr", "es", "ro", "ru", "uk", "zh")
 
 
@@ -692,3 +694,18 @@ UNIT_ALIASES: dict[str, str] = {
     "pckg": "pack",
     "slcie": "slice",
 }
+
+
+def _merge_extra(table: dict[str, dict[str, str]], extra: dict[str, dict[str, str]]) -> None:
+    missing = sorted(set(table) - set(extra))
+    extra_only = sorted(set(extra) - set(table))
+    if missing or extra_only:
+        raise ValueError(f"glossary extra key mismatch missing={missing[:8]} extra_only={extra_only[:8]}")
+    for key, locales in extra.items():
+        table[key].update(locales)
+
+
+_merge_extra(PHRASES, EXTRA_PHRASES)
+_merge_extra(WORDS, EXTRA_WORDS)
+_merge_extra(UNITS, EXTRA_UNITS)
+

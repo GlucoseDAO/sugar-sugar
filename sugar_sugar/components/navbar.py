@@ -13,6 +13,9 @@ LANGUAGES: list[tuple[str, str, str]] = [
     ("zh", "/assets/flags/cn.svg", "ZH"),
     ("fr", "/assets/flags/fr.svg", "FR"),
     ("es", "/assets/flags/es.svg", "ES"),
+    ("bg", "/assets/flags/bg.svg", "BG"),
+    ("ja", "/assets/flags/jp.svg", "JA"),
+    ("ko", "/assets/flags/kr.svg", "KO"),
 ]
 
 

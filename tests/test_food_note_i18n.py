@@ -76,13 +76,26 @@ def test_glossary_covers_salad_and_testdata_phrases() -> None:
         "balsamic vinegar",
     ):
         assert phrase in PHRASES
-        assert "ro" in PHRASES[phrase]
+        for loc in ("ro", "bg", "ja", "ko"):
+            assert loc in PHRASES[phrase]
     for word in ("cucumber", "celery", "asparagus", "tomato", "lettuce", "shrimp"):
         assert word in WORDS
-        assert "ro" in WORDS[word]
+        for loc in ("ro", "bg", "ja", "ko"):
+            assert loc in WORDS[word]
     for unit in ("cup", "tablespoon", "fluid ounce"):
         assert unit in UNITS
-        assert "ro" in UNITS[unit]
+        for loc in ("ro", "bg", "ja", "ko"):
+            assert loc in UNITS[unit]
+
+
+@pytest.mark.parametrize("locale", ["bg", "ja", "ko"])
+def test_new_locales_translate_testdata_foods(locale: str) -> None:
+    note = "Berry Smoothie (20.0 fluid ounce)\nChicken Leg (1.0)"
+    translated = translate_food_note(note, locale)
+    assert translated != note
+    assert "Berry Smoothie" not in translated
+    assert "Chicken Leg" not in translated
+    assert "fluid ounce" not in translated.lower()
 
 
 def test_how_it_works_keeps_teaser_and_drops_heading() -> None:
@@ -109,6 +122,9 @@ _TEASER_HORIZON_MARKERS: dict[str, str] = {
     "es": "Predice la próxima hora",
     "ro": "Prezice ora următoare",
     "zh": "预测下一小时",
+    "bg": "Предвидете следващия час",
+    "ja": "次の1時間を予測",
+    "ko": "다음 한 시간을 예측하세요",
 }
 
 

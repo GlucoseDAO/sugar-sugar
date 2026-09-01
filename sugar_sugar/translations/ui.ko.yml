@@ -1,0 +1,721 @@
+ko:
+  common:
+    app_title: "Sugar-Sugar"
+    units: "단위"
+    round_of: "%{current} / %{total} 라운드"
+    go_to_start: "시작 페이지로"
+    loading: "불러오는 중..."
+    continue: "계속"
+    game: "게임"
+    finish_exit: "종료 / 나가기"
+    the_study: "연구 소개"
+    contact_us: "문의하기"
+    video_instructions: "영상 안내"
+    faq: "자주 묻는 질문"
+    highscore: "하이스코어"
+
+  language:
+    choose: "언어"
+    en: "English"
+    de: "Deutsch"
+    uk: "Українська"
+    ro: "Română"
+    ru: "Русский"
+    zh: "中文"
+    fr: "Français"
+    es: "Español"
+    bg: "Български"
+    ja: "日本語"
+    ko: "한국어"
+
+  landing:
+    patient_consent_form_title: "연구 동의서"
+    required_consents_title: "필수 동의"
+    optional_consents_title: "선택 동의"
+    consent_upload_own_data: "선택 과제를 위해 본인의 CGM 데이터를 업로드하는 데 동의합니다."
+    tagline: "혈당 예측 실력을 시험하는 게임입니다."
+    how_it_works: "진행 방식"
+    how_it_works_teaser: "세 단계. 다음 한 시간을 예측하세요. 직감 대 센서."
+    faq_button: "자주 묻는 질문"
+    how_it_works_steps:
+      - "다음 한 시간 동안 혈당이 어떻게 움직일지 선을 그리세요"
+      - "내 선과 실제로 일어난 일을 비교하세요"
+      - "얼마나 가까웠는지 확인하세요"
+    preview: "미리보기"
+    about_study_title: "이 연구에 대하여"
+    about_study_text: "사람은 혈당이 어디로 갈지 예측할 수 있을까요? Sugar-Sugar는 그 질문을 게임으로 바꿉니다. 당뇨병이 있는 사람에게 다음 한 시간은 식사, 인슐린, 안전을 좌우할 수 있습니다. 당뇨병이 없어도 플레이할 수 있습니다. 누구나 연구에 필요한 사람의 점수를 남깁니다.\n\n이것은 독일 로스토크 대학병원 윤리위원회의 승인을 받은 실제 연구입니다. 동의서를 읽고 필수 항목에 체크해 주세요."
+    your_choices_title: "나의 선택"
+    your_choices_text: "계속하면 연구 참여에 동의하게 됩니다. 플레이 내용은 연구를 위해 저장될 수 있습니다."
+    consent_receive_results: "나중에 결과를 받고 싶습니다"
+    consent_keep_updated: "프로젝트 소식을 계속 받고 싶습니다"
+    consent_acknowledge_label: "만 18세 이상이며 이용 조건을 읽었습니다."
+    consent_gdpr_label: "동의 안내에 명시된 목적을 위해 일반 데이터 보호 규정(EU) 2016/679에 따라 개인정보를 처리하는 데 동의합니다. 데이터는 안전하게 다루어지며 무단 제3자와 공유되지 않고, 언제든지 동의를 철회할 수 있음을 이해합니다."
+    open_consent_form: "동의 안내 열기"
+    consent_required_error: "계속하려면 만 18세 이상이며 동의서를 읽었음을 확인해 주세요."
+    next_hint: "다음: 짧은 양식을 작성한 뒤 CGM 데이터를 올리거나 샘플 데이터를 사용합니다."
+    take_me_in: "시작하기"
+    games_played_so_far: "지금까지 플레이된 게임"
+    games_played_so_far_count: "지금까지 %{count}게임"
+    gamers_played_so_far_count: "지금까지 %{count}명의 플레이어"
+    games_played_completed: "그중 %{count}명이 과제를 완료"
+    completed_the_task_label: "이 과제를 완료함"
+    victors_punchline: "승자의 편에 서세요 — 무리에서 돋보이세요"
+    games_slots_line: "%{total}게임 시작, %{completed}게임 완료 — 한 사람이 여러 번 플레이할 수 있습니다"
+
+  consent_form:
+    title: "동의 안내"
+    subtitle: "계속하기 전에 이 정보를 읽어 주세요. 기본 동의 안내이며 이후 업데이트됩니다."
+    adults_only: "이 연구에 참여하려면 만 18세 이상이어야 합니다."
+    summary_title: "요약"
+    summary_bullets:
+      - "최대 12라운드의 혈당 예측 게임을 플레이합니다."
+      - "플레이 내용(예측, 정확도 지표)을 연구를 위해 저장할 수 있습니다."
+      - "본인 CGM 데이터를 올리면 게임과 연구에 사용할 수 있습니다."
+      - "참여는 자발적이며 언제든지 중단할 수 있습니다."
+    data_title: "데이터 이용"
+    data_bullets:
+      - "다른 사람의 공개 익명 데이터는 개인 센서 데이터를 올리지 않고도 사용할 수 있습니다."
+      - "파일을 올리면 민감한 건강 정보가 포함될 수 있습니다."
+      - "시작 페이지에서 선택한 대로만 데이터를 사용합니다."
+    withdraw_title: "철회"
+    withdraw_text: "브라우저 탭/창을 닫으면 언제든지 참여를 중단할 수 있습니다. 데이터 삭제를 원하면 연구 주최자에게 연락해 주세요."
+
+  about:
+    title: "Sugar-Sugar 소개"
+    body: "Sugar-Sugar는 사람이 앞으로의 혈당 추세를 얼마나 정확히 예측할 수 있는지 측정하기 위한 연구 도구입니다."
+    study_design_title: "연구 설계"
+    download_pdf_label: "연구 설계 다운로드 (PDF)"
+    pdf_original_english_note: "(영어 원문)"
+    translation_note: "아래 텍스트는 번역입니다. 영어 원문 연구 설계는 위의 PDF로 받을 수 있습니다."
+    github_link_label: "GitHub 프로젝트"
+
+  contact:
+    title: "문의하기"
+    body: "질문, 피드백, 데이터 삭제를 원하시면 아래 연락처로 연락해 주세요."
+    study_contacts_title: "연구 연락처"
+    general_email_title: "팀 공용 이메일"
+    social_title: "소셜 미디어"
+    platforms_title: "웹사이트 및 플랫폼"
+    linkedin_title: "LinkedIn"
+    col_name: "이름"
+    col_email: "이메일"
+    col_platform: "플랫폼"
+    col_link: "링크"
+    col_role: "역할"
+    open_linkedin: "프로필 열기"
+
+  demo:
+    title: "데모"
+    body: "Sugar-Sugar 혈당 예측 게임을 짧게 체험해 보세요."
+    fullscreen_video: "전체 화면으로 보기"
+
+  startup:
+    fork_me: "GitHub에서 포크"
+    required_fields_note: "* 필수 항목"
+    nickname_label: "닉네임"
+    nickname_placeholder: "선택 — 예: SugarNinja"
+    nickname_hint: "공개 하이스코어 보드에 쓸 선택 표시 이름입니다. 비워 두면 익명(플레이어 1, 플레이어 2, …)으로 남습니다. 연구 데이터에는 포함되지 않습니다."
+    email_label: "이메일"
+    email_placeholder: "이메일을 입력하세요 (결과/소식을 원할 때만 필요)"
+    age_label: "나이"
+    age_placeholder: "나이를 입력하세요"
+    age_must_be_18_error: "연구에 참여하려면 만 18세 이상이어야 합니다."
+    age_max_error: "나이는 %{max_age}를 넘을 수 없습니다."
+    diabetes_duration_exceeds_age_error: "당뇨병 유병 기간은 나이보다 길 수 없습니다."
+    cgm_duration_exceeds_age_error: "CGM 사용 기간은 나이보다 길 수 없습니다."
+    values_check_warning: "입력한 값을 확인해 주세요."
+    missing_fields: "다음을 입력해 주세요: %{fields}"
+    gender_label: "성별"
+    gender_placeholder: "성별을 선택하세요"
+    gender_male: "남성"
+    gender_female: "여성"
+    gender_na: "해당 없음"
+    cgm_label: "CGM을 사용한 적이 있나요?"
+    cgm_placeholder: "CGM 사용 여부를 선택하세요"
+    yes: "예"
+    no: "아니요"
+    cgm_duration_label: "얼마나 사용했나요?"
+    cgm_duration_placeholder: "숫자를 입력하세요"
+    cgm_duration_unit_weeks: "주"
+    cgm_duration_unit_months: "개월"
+    cgm_duration_unit_years: "년"
+    diabetic_label: "당뇨병이 있나요?"
+    diabetic_placeholder: "당뇨병 상태를 선택하세요"
+    diabetes_type_label: "당뇨병 유형"
+    diabetes_type_placeholder: "당뇨병 유형을 선택하세요"
+    diabetes_type_1: "1형"
+    diabetes_type_2: "2형"
+    diabetes_type_prediabetes: "전당뇨"
+    diabetes_type_gestational: "임신성 당뇨병"
+    diabetes_type_lada: "LADA (성인 잠복 자가면역 당뇨병)"
+    diabetes_duration_label: "당뇨병 유병 기간(년)"
+    diabetes_duration_placeholder: "연수를 입력하세요"
+    location_label: "위치"
+    location_placeholder: "위치를 입력하세요"
+    contact_prefs_title: "연락 선호"
+    contact_prefs_text: "이메일은 나중에 결과를 받거나 소식을 받겠다고 한 경우에만 필요합니다."
+    just_test_me: "일단 해보기"
+    start_prediction: "예측 시작"
+    wizard_back: "뒤로"
+    wizard_next: "다음"
+    wizard_step: "단계 %{current} / %{total}"
+    consent_gate_hint: "위의 필수 두 항목(만 18세 이상/약관 확인, 개인정보 보호 동의)에 체크해야 계속할 수 있습니다."
+    format_label: "형식"
+    format_placeholder: "옵션을 선택하세요"
+    format_a_label: "공개 데이터"
+    format_b_label: "내 데이터"
+    format_c_label: "공개 + 내 데이터"
+    format_a_label_short: "공개"
+    format_b_label_short: "내 것"
+    format_c_label_short: "혼합"
+    format_help_a: "공개 데이터 — 다른 사람의 익명 CGM 추적입니다. 업로드할 필요가 없습니다."
+    format_help_b: "내 데이터 — 본인 CSV를 올리고 본인 혈당으로 플레이합니다."
+    format_help_c: "공개 + 내 데이터 — 조합입니다. 일부 라운드는 익명 공개 추적, 일부는 본인 데이터를 씁니다."
+    format_find_data_before: "데이터를 어디서 찾아야 할지 모르겠다면 "
+    format_find_data_link: "여기서 검색하세요."
+    challenge_unknown_button: "미지에 도전"
+    challenge_unknown_button_on: "미지에 도전 — 켜짐"
+    challenge_unknown_help: "이것을 선택하면 추적의 절반은 반대 그룹에서 옵니다 — 당뇨병이 없으면 당뇨병 데이터, 있으면 비당뇨병 데이터입니다. 공개 또는 공개 + 내 데이터만 해당합니다."
+    challenge_unknown_help_nd: "이것을 선택하면 추적의 절반은 당뇨병이 있는 사람의 데이터에서 옵니다."
+    challenge_unknown_help_t1: "이것을 선택하면 추적의 절반은 당뇨병이 없는 사람의 데이터에서 옵니다."
+    paper_mention_label: "연구 후 발표되는 과학 논문에 이름을 올리고 싶습니다"
+    paper_mention_hint: "체크하고 성명을 넣으면 감사의 글에 넣습니다 — %{min_rounds}라운드 이상 플레이한 경우에만입니다."
+    paper_full_name_label: "성명"
+    paper_full_name_placeholder: "이름과 성"
+    data_usage_consent_label: "업로드한 CGM 데이터를 이 연구에 사용하는 데 동의합니다."
+    data_usage_consent_required: "계속하려면 데이터 이용 동의를 확인해 주세요."
+    import_title: "CGM 데이터 가져오기"
+    import_subtitle: "CSV 내보내기(Dexcom / Libre / Medtronic) 또는 Nightscout entries.json을 올리세요 — 식사와 인슐린 마커를 보려면 treatments.json도 함께 선택하세요. Nightscout 사이트에서 바로 가져올 수도 있습니다."
+    import_or: "— 또는 —"
+    import_upload_prompt: "끌어다 놓거나 클릭해서 CSV를 선택 — 또는 Nightscout entries.json과 treatments.json을 함께 선택"
+    import_ns_url_placeholder: "Nightscout URL (https://your-site.com)"
+    import_ns_token_placeholder: "액세스 토큰 또는 API 시크릿 (선택)"
+    import_ns_button: "Nightscout에서 가져오기"
+    import_ns_loading: "Nightscout 사이트에 연결하는 중…"
+    import_success: "%{source}에서 측정 %{count}개를 불러왔습니다. 시작할 준비가 되었습니다."
+    import_needs_consent: "가져오기 전에 위의 데이터 이용 동의에 체크해 주세요."
+    import_needs_url: "먼저 Nightscout URL을 입력해 주세요."
+    import_empty: "그 출처에서 혈당 측정이 오지 않았습니다. URL/토큰(또는 기간)을 확인하고 다시 시도해 주세요."
+    import_bad_file: "그 파일을 읽을 수 없습니다 — 표준 CGM CSV 내보내기(Dexcom / Libre / Medtronic) 또는 Nightscout entries.json을 올리고 다시 시도해 주세요."
+    import_needs_entries: "entries.json을 추가하세요 — 혈당 측정이 들어 있는 파일입니다. treatments.json과 profile.json만으로는 쓸 수 없습니다."
+    import_ignored: "이 게임에 필요 없는 %{files}는 무시했습니다."
+    import_ns_unreachable: "그 Nightscout 사이트에 닿지 못했습니다. URL과 연결을 확인한 뒤 다시 시도해 주세요."
+    import_ns_timeout: "Nightscout 사이트 응답이 너무 오래 걸렸습니다. 다시 시도해 주세요."
+    import_ns_http_error: "Nightscout 사이트가 요청을 거절했습니다(HTTP %{code}). URL과 토큰을 확인하세요."
+    import_ns_unavailable: "이 서버에서는 Nightscout 가져오기를 쓸 수 없습니다(네트워크 의존성이 없습니다)."
+    import_failed: "가져오기에 실패했습니다. 파일 또는 Nightscout 정보를 확인하고 다시 시도해 주세요."
+
+  header:
+    points_label: "표시할 점 개수:"
+    time_window_label: "시간 창 위치:"
+    upload_prompt_1: "끌어다 놓거나 "
+    upload_prompt_2: "여기에 데이터 업로드"
+    upload_button: "업로드"
+    use_example_data: "공개 데이터 사용"
+    upload_required: "업로드 필요"
+    upload_success: "%{filename}에서 데이터를 불러왔습니다. 이 데이터로 예측합니다."
+    example_data_now_using: "이제 공개 익명 데이터를 사용합니다. 맞춤 분석을 원하면 CSV를 올리세요."
+    example_data_warning: "현재 공개 익명 데이터를 사용 중입니다. 맞춤 분석을 원하면 본인 Dexcom/Libre/Medtronic CSV 또는 Nightscout entries.json을 올리세요."
+    csv_tab_label: "CSV 파일"
+    nightscout_tab_label: "Nightscout"
+    nightscout_url_placeholder: "https://your-nightscout-site.com"
+    nightscout_token_placeholder: "액세스 토큰 (선택)"
+    nightscout_load_button: "Nightscout에서 불러오기"
+    nightscout_loading: "Nightscout에서 데이터를 불러오는 중…"
+    nightscout_success: "Nightscout에서 혈당 측정 %{count}개를 불러왔습니다."
+    nightscout_error: "Nightscout에서 불러오지 못했습니다: %{error}"
+    nightscout_url_required: "Nightscout URL을 입력해 주세요."
+    nightscout_consent_required: "Nightscout 데이터를 불러오기 전에 데이터 이용 동의를 주세요."
+    current_data_source: "현재 데이터 출처:"
+    source_short: "출처:"
+    diabetic: "당뇨병"
+    non_diabetic: "비당뇨병"
+    weight_label: "체중"
+    no_carbs_note: "이 식사 시간 창에는 기록된 탄수화물 데이터가 없습니다."
+    carbs_info_note: "탄수화물 마커는 데이터셋에 포함되어 있을 때만 나타납니다. 시각을 확인하세요 — 모든 CGM 내보내기가 탄수화물을 기록하는 것은 아닙니다."
+    description_1: "혈당 예측 실력을 시험해 보세요!"
+    description_2: "그래프를 클릭하거나 선을 그려 앞으로의 혈당 값을 예측하세요."
+    description_3: "게임이 예측이 실제 측정과 얼마나 가까운지 보여 줍니다."
+    how_to_play: "플레이 방법:"
+    how_to_play_1: "1. 그래프에서 클릭하고 드래그해 예측을 추가하세요"
+    how_to_play_2: "2. 선을 이어서 그려 예측 곡선을 만드세요"
+    how_to_play_3: "3. 숨겨진 영역의 끝까지 예측을 그려 제출하세요"
+
+  prediction:
+    units_label: "단위:"
+    upload_required_alert: "이 형식은 본인 CGM 데이터가 필요합니다. 시작하려면 CSV 파일을 올려 주세요."
+    upload_only_gate: "본인 데이터만으로 플레이하기로 했습니다. 시작하려면 업로드 버튼을 누르고 파일을 선택하세요."
+    upload_mixed_gate: "혼합 모드(공개 + 본인 데이터)를 선택했습니다. 계속하려면 업로드 버튼을 누르고 CGM 파일을 선택하세요 — 이후 라운드는 공개 익명 추적과 본인 데이터가 번갈아 갑니다."
+    upload_consent_recorded: "동의가 기록되었습니다. 이제 이 세션에서 CGM 데이터를 올리고 쓸 수 있습니다."
+    no_upload_back_to_final: "올릴 CGM 데이터가 없나요? 이전 라운드 결과를 보세요"
+
+  submit:
+    progress_no_data: "숨겨진 영역의 끝까지 예측해야 제출할 수 있습니다"
+    progress_some: "끝까지 예측을 이어 가세요 (%{done}/%{total}점)"
+    progress_ready: "✓ 제출할 수 있습니다!"
+    progress_hidden_area: "숨겨진 영역에 예측을 그려야 제출할 수 있습니다"
+    submit: "제출"
+    submit_remaining: "제출 (%{done}/%{total})"
+    finish_game: "게임 끝내기"
+    finish_confirm_title: "이 게임을 나갈까요?"
+    finish_confirm_early: "%{total}라운드 중 %{current}라운드를 완료했습니다. %{min}라운드 미만은 연구에 너무 적습니다."
+    finish_confirm: "%{total}라운드 중 %{current}라운드를 완료했습니다. 정말 나갈까요?"
+    keep_playing: "계속 플레이"
+    finish_anyway: "그래도 끝내기"
+
+  mobile_warning:
+    text: "참고: Sugar-Sugar는 현재 데스크톱에 최적화되어 있습니다. 모바일 지원은 곧 제공됩니다!"
+
+  orientation:
+    title: "그리려면 휴대폰을 가로로 돌리세요"
+    subtitle: ""
+    go_fullscreen: "전체 화면"
+
+  share:
+    button_share: "내 결과 공유"
+    title: "내 Sugar-Sugar 결과"
+    title_named: "%{name}의 Sugar-Sugar 결과"
+    subtitle: "나보다 혈당을 잘 예측할 수 있나요? 해보세요!"
+    download_png: "이미지 다운로드"
+    download_png_hint: "카드를 PNG로 저장하세요. 인스타그램 스토리에 딱입니다."
+    generated_at: "생성됨"
+    play_again: "다시 플레이"
+    unknown_stamp: "미지로 들어갔다"
+    copy_link: "링크 복사"
+    copy_link_success: "링크를 복사했습니다!"
+    share_native: "공유"
+    share_as_link: "링크로 공유"
+    share_on_x: "X에 공유"
+    share_on_facebook: "Facebook에 공유"
+    share_on_whatsapp: "WhatsApp에 공유"
+    share_on_linkedin: "LinkedIn에 공유"
+    share_on_telegram: "Telegram에 공유"
+    share_on_discord: "Discord에 공유"
+    invite_text: "다음 한 시간 혈당을 %{rounds}라운드에서 %{accuracy} 정확도로 예측했습니다. 더 잘할 수 있나요?"
+    invite_text_ranked: "혈당 예측자 상위 %{percentile} — %{rounds}라운드에서 %{accuracy} 정확도. 이길 수 있나요?"
+    card_footer: "%{url}에서 플레이"
+    qr_scan_to_play: "스캔해서 플레이"
+    stats_heading: "내 스코어카드"
+    stat_mard: "MARD"
+    stat_mard_hint: "평균 절대 상대 차이"
+    stat_mae: "MAE"
+    stat_mae_hint: "평균 절대 오차"
+    stat_rmse: "RMSE"
+    stat_rmse_hint: "제곱평균제곱근 오차"
+    stat_rounds: "라운드"
+    stat_rounds_hint: "플레이한 예측 라운드"
+    stat_accuracy: "정확도"
+    stat_accuracy_hint: "실제 혈당에 얼마나 가까운지"
+    stat_ranking: "최고 순위"
+    stat_percentile: "상위 %{percentile}"
+    stat_no_ranking: "순위 없음"
+    best_rank_scope_overall: "종합"
+    og_title_ranked: "혈당 예측 상위 %{percentile} — 정확도 %{accuracy}"
+    og_title_unranked: "혈당 예측 정확도 %{accuracy} — 이길 수 있나요?"
+    expired_title: "이 공유 링크는 만료되었습니다"
+    expired_body: "이 URL의 스코어카드를 찾지 못했습니다. 라운드를 플레이하고 내 결과를 공유할 수 있습니다."
+    expired_cta: "Sugar-Sugar 플레이"
+    encouragement:
+      excellent:
+        lines:
+          - "다음 한 시간 혈당을 맞혔다 — %{rounds}라운드, 센서처럼. 네 차례야."
+          - "%{rounds}라운드에서 곡선을 다 잡았다. 따라올 수 있어? 플레이를 눌러."
+          - "거의 완벽한 예측 %{rounds}라운드. 첫 시도에 이걸 따라하진 못할걸."
+          - "%{rounds}라운드의 깨끗한 예측이 이런 모습이다. 네 것도 보여줘."
+      good:
+        lines:
+          - "단단한 주행 — %{rounds}라운드, 예측이 가까이 착지했다. 더 가까이 내릴 수 있어?"
+          - "%{rounds}라운드 선을 지켰다. 네 차례 — 뒤집어 봐."
+          - "%{rounds}라운드, 안정된 예측. 혈당 감각이 더 좋아? 보여줘."
+          - "%{rounds}라운드, 아직 곡선을 따라간다. 누가 먼저 이길까?"
+      average:
+        lines:
+          - "%{rounds}라운드째, 곡선은 계속 움직인다. 첫 시도에 내 점수를 이길 수는 없을걸."
+          - "혈당 예측은 보기보다 어렵다. %{rounds}라운드 끝 — 더 잘할 수 있어?"
+          - "이미 %{rounds}라운드. 숫자는 교활하다 — 더 잘 맞혀 봐."
+          - "%{rounds}라운드로 순위를 오르기 시작했다. 꼭대기에서 만날까?"
+      keep_practicing:
+        lines:
+          - "혈당은 겸손하게 만든다. %{rounds}라운드 끝 — 나보다 잘 맞혀 봐."
+          - "%{rounds}라운드, 아직 곡선을 배우는 중. 네 차례야."
+          - "보기보다 어렵지? %{rounds}라운드의 정직한 시도. 이겨 봐. 도전한다."
+          - "%{rounds}라운드, 선이 계속 이긴다. 더 잘 맞힐 수 있어? 보여줘."
+    synthesis:
+      title: "다음 한 시간 예측 오차"
+      x_axis: "시간 (숨겨진 다음 한 시간 시작부터의 분; 5분마다)"
+      x_axis_time: "앞선 분"
+      y_axis: "실제 대비 퍼센트 오차 (5분마다)"
+      y_axis_short: "오차"
+      legend_zero: "완벽한 예측 (0%%)"
+      legend_variability: "내 오차 — 라운드마다 한 줄"
+      dir_high: "↑ 너무 높게 맞춤"
+      dir_low: "↓ 너무 낮게 맞춤"
+      legend_error: "실제 대비 오차, 라운드마다 한 줄"
+      round_hover: "라운드"
+      caption: "색이 있는 각 선은 한 라운드이며, 플레이한 데이터 출처마다 한 패널입니다. 검은 0%% 선은 완벽한 예측입니다 — 위쪽 점은 실제 혈당보다 높게, 아래쪽 점은 낮게 예측했습니다."
+      empty: "차트 데이터가 없습니다."
+
+  chart:
+    title: "혈당 수치 (%{start} ~ %{end})"
+    source_suffix: " - 출처: %{source}"
+    x_axis: "시간"
+    y_axis_label: "혈당 수치"
+    y_axis: "혈당 수치 (%{unit})"
+    trace_glucose: "혈당 수치"
+    trace_predictions: "예측 점"
+    known_label: "알려진 구간"
+    predicted_label: "예측"
+    hover_insulin: "인슐린: %{value}u<br>%{time}"
+    event_insulin: "인슐린"
+    event_exercise: "운동"
+    event_carbohydrates: "탄수화물"
+    food_label: "식사"
+
+    draw_to_here: "여기까지 그리기"
+    prediction_complete: "선 완료"
+  metrics:
+    title: "지표"
+    prediction_accuracy: "예측 정확도"
+    placeholder_need_5: "정확도 지표를 보려면 차트에 예측을 그리세요"
+    title_accuracy_metrics: "정확도 지표"
+    no_metrics_available: "지표가 없습니다"
+    desc:
+      mae: "평균 절대 오차 — 평균적으로 몇 혈당 단위를 빗나갔는지"
+      mse: "더 큰 예측 오차를 강조합니다"
+      rmse: "MAE와 비슷하지만 큰 오차를 더 강하게 벌합니다"
+      mape: "실제 값과의 평균 퍼센트 차이"
+
+  table:
+    metric_header: "지표"
+    actual_glucose: "실제 혈당"
+    predicted: "예측"
+    absolute_error: "절대 오차"
+    relative_error_pct: "상대 오차 (%{pct})"
+
+  resume_dialog:
+    title: "다시 오신 것을 환영합니다!"
+    message: "이전 세션이 저장되어 있습니다(%{total}라운드 중 %{round}라운드). 이어서 할까요, 처음부터 할까요?"
+    message_no_round: "이전 세션이 저장되어 있습니다. 이어서 할까요, 처음부터 할까요?"
+    warning: "예측이 마음에 들지 않는다고 처음부터 다시 시작하지 마세요 — 재시작은 연구 데이터를 왜곡하고 연구 결과를 해칩니다."
+    continue_btn: "계속"
+    start_over_btn: "처음부터"
+    your_code: "이어하기 코드(다른 기기에서 계속할 때): %{code}"
+
+  resume_code:
+    landing_prompt: "새 기기에서 이어가나요? 이어하기 코드를 입력하세요:"
+    placeholder: "이어하기 코드"
+    redeem_btn: "이어하기"
+    not_found: "그 코드의 세션을 찾지 못했습니다. 확인하고 다시 시도해 주세요."
+    copy_link: "🔗 이어하기 링크 복사"
+    copied: "✓ 링크를 복사했습니다!"
+
+  restoring:
+    title: "게임을 복원하는 중…"
+    text: "저장된 세션을 다시 불러오는 중입니다. 아무 일도 없으면 아래 버튼을 쓰세요."
+
+  session_expired:
+    title: "세션 만료"
+    text: "처음부터 다시 시작해 주세요."
+
+  ending:
+    title: "예측 요약"
+    prediction_results: "예측 결과"
+    click_here_for_details: "자세한 내용은 여기를 클릭"
+    hide_details: "자세히 숨기기"
+    units_line: "단위: %{unit}"
+    next_round: "다음 라운드"
+    view_complete_analysis: "전체 분석 보기"
+    results: "결과"
+    graph_explanation: "차트는 예측한 혈당 창입니다. 주황 점선은 알려진 이력(왼쪽)과 예측한 한 시간(오른쪽)을 나눕니다. 예측은 빨간색입니다."
+    data_source_label: "데이터 출처: %{source}"
+    sensor_label: "센서"
+    round_motivation: "언제든지 멈출 수 있지만, 전체 %{total}라운드를 마치면 가장 좋은 데이터가 됩니다. 유용한 결과에는 최소 %{min_useful}라운드가 필요합니다 — 추가 라운드는 모두 도움이 됩니다!"
+    local_storage_note: "진행 상황은 이 브라우저에 로컬로 저장됩니다. 같은 브라우저라면 쉬었다가 나중에 이어서 할 수 있습니다."
+    reaction:
+      excellent:
+        - "센서급 정확도 — 이런 데이터가 연구를 정말 앞으로 밉니다!"
+        - "그 곡선을 프로처럼 읽었습니다. 드문 정밀도, 소중한 기여입니다."
+        - "거의 완벽합니다! 이 라운드는 연구의 강한 데이터 점입니다."
+        - "정확히 맞았습니다 — 연구가 필요한 바로 그것입니다."
+      good:
+        - "좋은 예측 — 연구에 또 하나의 단단한 데이터 점입니다!"
+        - "추세를 잘 잡았습니다. 데이터셋이 더 강해집니다."
+        - "단단한 예측! 직감이 진짜 신호를 내고 있습니다."
+        - "잘했습니다. 이런 일관된 라운드가 분석을 더 신뢰할 수 있게 합니다."
+      average:
+        - "나쁘지 않습니다 — 어려운 곡선. 시도는 그래도 연구에 신호를 더합니다."
+        - "괜찮은 시도입니다! 불완전한 예측도 사람의 직감을 지도로 만드는 데 도움이 됩니다."
+        - "무난한 추정입니다. 어려운 경우도 연구에 이롭습니다."
+        - "괜찮은 노력입니다 — 연구는 완벽이 아니라 직감을 측정합니다."
+      keep_practicing:
+        - "어려운 창입니다. 어려운 경우가 연구에 특히 정보가 많습니다."
+        - "맞히기 어렵습니다 — 변동이 큰 구간이 가장 많이 가르쳐 줍니다."
+        - "전문가도 놓칩니다! 그것이 바로 이 연구가 측정하는 것입니다."
+        - "너무 신경 쓰지 마세요 — 사람이 힘든 곳에서 과학이 배웁니다."
+    milestone:
+      first_round: "첫 라운드 — 이미 연구에 기여하고 있습니다!"
+      minimum_reached: "최소 기준 도달! 데이터는 과학적으로 유용합니다. 추가 라운드가 더 강하게 만듭니다."
+      all_complete: "모든 라운드 완료 — 완전한 데이터셋에 감사합니다!"
+    personal_best: "지금까지 최고의 라운드!"
+    progress:
+      minimum_goal: "최소: %{min_useful}"
+      stretch_goal: "목표: %{total}"
+      bonus_rounds: "보너스 라운드"
+
+  highscore:
+    title: "하이스코어"
+    subtitle: "예측하는 데이터로 나뉜 두 보드입니다. 비당뇨병 추적은 더 평평하고 쉬워서 당뇨병 데이터와 함께 순위를 매기지 않습니다. 끝낸 게임은 각각 자리를 지키며, 점수는 그 게임에서 해당 데이터 종류의 최고 %{min}라운드 평균 절대 오차(MAE)입니다 — 6라운드와 12라운드 게임은 같은 라운드 수로 평가됩니다. 선택기가 그 수를 정합니다. MAE는 낮을수록 좋습니다."
+    board_nondiabetic: "비당뇨병 데이터"
+    board_diabetic: "당뇨병 데이터"
+    your_place_line: "%{board}: #%{rank} / %{total} · MAE %{mae} %{unit}"
+    badge_hard_mode: "하드 모드 — 이 점수는 플레이어 본인 상태와 다른 데이터에서 나온 것입니다"
+    badge_veteran: "베테랑 — 끝낸 게임이 둘 이상입니다. 이름을 클릭하면 플레이어 통계로 갑니다."
+    legend_hard_mode: "%{badge} 하드 모드: 익숙하지 않은 데이터를 예측함 — 당뇨병이 있는 사람이 비당뇨병 데이터, 또는 그 반대"
+    legend_veteran: "%{badge} 베테랑: 끝낸 게임이 둘 이상 — 이름은 플레이어 통계 페이지로 연결됩니다"
+    floor_label: "최소 라운드 수 이상인 게임 표시"
+    floor_option: "%{min}라운드"
+    medal_bronze: "동 — 한 게임에서 6라운드 도달"
+    medal_silver: "은 — 한 게임에서 12라운드 도달"
+    medal_gold: "금 — 게임을 둘 이상 마침"
+    legend_bronze: "%{badge} 동: 한 게임에서 %{rounds}라운드 도달"
+    legend_silver: "%{badge} 은: 한 게임에서 %{rounds}라운드 도달"
+    legend_gold: "%{badge} 금: %{rounds}게임 이상 마침 — 이름은 플레이어 통계로 연결됩니다"
+    unranked_note: "끝낸 %{total}게임 중 %{count}게임은 표시되지 않습니다: 한 데이터 종류의 라운드가 %{min}개 미만입니다."
+    players_count: "플레이어 %{total}명"
+    scores_count: "점수 %{total}개"
+    games_played: "%{count}게임 플레이"
+    completed_the_task: "%{count}명이 과제 완료"
+    empty: "아직 순위권 게임이 없습니다. %{min}라운드 이상 플레이하면 보드의 첫 번째가 됩니다."
+    play_now: "지금 플레이"
+    privacy_note: "닉네임은 선택이며 공개입니다. 이메일을 준 경우, 보드는 기기 간에 결과를 알아보기 위한 일방향 해시만 저장합니다 — 주소 자체와 다른 개인 데이터는 저장하지 않습니다. 닉네임은 연구 데이터가 아닙니다."
+
+  player:
+    title: "플레이어 통계"
+    anonymous: "익명 플레이어"
+    games_count: "끝낸 게임 %{count}개"
+    games_title: "게임"
+    best_nondiabetic: "비당뇨병 데이터 최고 점수: %{mae} %{unit}"
+    best_diabetic: "당뇨병 데이터 최고 점수: %{mae} %{unit}"
+    col_format: "데이터 출처"
+    col_nondiabetic_mae: "비당뇨병 MAE (%{unit})"
+    col_diabetic_mae: "당뇨병 MAE (%{unit})"
+    col_overall_mae: "종합 MAE (%{unit})"
+    not_found: "이 주소에 플레이어 페이지가 없습니다 — 링크가 오래되었을 수 있습니다."
+    back_to_board: "하이스코어 보드로 돌아가기"
+
+  final:
+    title: "전체 분석"
+    rounds_played: "플레이한 라운드: %{played} / %{total}"
+    played_formats: "지금까지 플레이한 형식: %{formats}"
+    ranking_title: "리더보드"
+    ranking_format_line: "순위 (%{format}): %{rank} / %{total}"
+    ranking_overall_line: "종합 순위: %{rank} / %{total}"
+    your_place: "내 순위"
+    your_place_value: "#%{rank} / %{total}"
+    top_percentile: "상위 %{pct}%%"
+    your_mae: "내 MAE · %{mae} %{unit}"
+    format_ranks: "데이터 출처별"
+    top_predictors: "최고 예측자"
+    col_rank: "#"
+    col_player: "플레이어"
+    col_rounds: "라운드"
+    col_when: "언제"
+    col_mae: "MAE (%{unit})"
+    you: "나"
+    player_n: "플레이어 %{n}"
+    you_named: "%{name} (나)"
+    nickname_title: "리더보드에 표시할 이름"
+    nickname_save: "저장"
+    nickname_saved: "저장했습니다 — 보드에 이름이 표시됩니다."
+    nickname_hint: "선택이며 공개입니다. 비워 두면 익명으로 남습니다."
+    no_ranking_yet: "리더보드에 오르려면 최소 %{min}라운드를 플레이하세요."
+    per_round_metrics: "라운드별 지표"
+    start_over: "나가기"
+    journey_title: "이 서사적 여정을 마쳤습니다 — 다른 여정을 시작할까요?"
+    journey_title_done: "이 서사적 여정을 마쳤습니다 — 연구에 기여해 주셔서 감사합니다!"
+    hero_summary: "예측은 평균 %{mae} %{unit} 빗나갔습니다 — 실제 값에서 약 %{mape}%%"
+    col_round: "라운드"
+    col_points: "비교한 점"
+    stats_note: "통계용: MSE %{mse} · RMSE %{rmse} %{unit}"
+
+  switch_format:
+    title: "이것도 해볼 수 있습니다..."
+    try_a: "공개 데이터 시도 = 다른 사람의 익명 추적으로 플레이"
+    try_b: "내 데이터 시도 = 본인 데이터 사용"
+    try_c: "공개 + 내 데이터 시도 = 둘 다 사용"
+    try_a_short: "공개 데이터 시도"
+    try_b_short: "내 데이터 시도"
+    try_c_short: "공개 + 내 데이터 시도"
+    not_eligible_no_cgm: "B/C는 CGM 데이터가 있다고 한 경우에만 쓸 수 있습니다."
+
+  results_disclaimer:
+    line1: "이 점수는 연구 목적에만 쓰입니다"
+    line2: "결과와 관계없이 이 앱을 근거로 의료 결정을 바꾸지 마세요"
+    line3: "의료 결정을 내리기 전에 항상 의사와 상담하세요"
+
+  faq:
+    title: "자주 묻는 질문"
+    ask_title: "직접 질문 쓰기"
+    ask_intro: "아직 답하지 않은 것이 있거나 더 알고 싶은가요? 여기에 적어 주세요."
+    ask_placeholder: "질문을 입력하세요"
+    name_placeholder: "이름 (선택)"
+    tags_label: "태그"
+    ask_button: "질문 올리기"
+    ask_thanks: "감사합니다 — 질문이 보드에 올라갔습니다."
+    ask_empty: "먼저 질문을 작성해 주세요."
+    tag_gameplay: "플레이"
+    tag_data: "데이터"
+    tag_privacy: "개인정보"
+    tag_download: "다운로드"
+    tag_other: "기타"
+    section_participant: "참가자"
+    section_developer: "개발자"
+    reply_placeholder: "답글 쓰기"
+    reply_button: "답글"
+    board_empty: "아직 질문이 없습니다. 첫 번째가 되어 주세요."
+    board_participant_title: "참가자 질문"
+    board_developer_title: "개발자 질문"
+    sections:
+      - title: "이 연구가 중요한 이유"
+        items:
+          - q: "Sugar-Sugar는 무엇인가요?"
+            a: "Sugar-Sugar는 Dash로 만든 웹 연구 앱입니다. 혈당 예측을 인터랙티브 게임으로 바꿉니다. CGM 추적의 일부를 보고, 어떻게 이어질지 그린 뒤, 예측을 실제 값과 비교합니다. 목표는 사람이 단기 혈당 역학을 얼마나 정확히 내다볼 수 있는지 측정하는 것입니다."
+          - q: "진짜 연구인가요?"
+            a: "네. Sugar-Sugar는 실제 연구의 일부입니다. 독일 로스토크 대학의학(Universitätsmedizin Rostock) 윤리위원회의 승인을 받았습니다. 연구가 책임 있게 진행된다는 점을 알리기 위해 배경으로 적습니다."
+          - q: "당뇨병이 있는 사람에게 혈당 예측이 왜 중요한가요?"
+            a: "당뇨병이 있는 사람에게 정확한 단기 예측은 인슐린, 탄수화물, 운동, 타이밍에 대한 더 안전한 일상 결정을 도울 수 있습니다. 예측이 나아지면 위험한 고혈당과 저혈당을 줄이고 혈당 관리의 스트레스를 낮출 수 있습니다."
+          - q: "당뇨병이 없는 사람에게 혈당 예측이 왜 중요한가요?"
+            a: "혈당은 에너지, 인지, 기분, 운동 반응, 장기 건강과 연결된 핵심 대사 신호입니다. 당뇨병이 없어도 예측은 음식, 수면, 스트레스, 활동이 대사를 실시간으로 어떻게 만드는지 보여 줍니다 — 예방 건강과 생활 최적화에 유용합니다."
+          - q: "머신러닝에 사람의 정확도가 그렇게 중요한 이유는 무엇인가요?"
+            a: "현재 CGM 혈당 예측에 대한 공개된 인간 기준선이 없습니다. 정보가 있는 사람이 혈당 추세를 얼마나 잘 읽는지 모르면, ML 모델이 정말 유용한지 평가할 수 없습니다 — 아는 당뇨병 환자보다 나쁠 수도, 특정 상황에서만 나을 수도 있습니다. 이 연구는 그 기준선을 세워, 앞으로의 ML 작업을 의미 있게 비교할 수 있게 합니다."
+          - q: "사람은 차트에 안 나오는 것까지 압니다 — 식사, 수면, 스트레스, 소화, 주기. 그게 없으면 그래프 점 아닌가요?"
+            a: >-
+              CGM 그래프를 볼 때, 이미 혈당이 어디로 가는지 감각이 있습니다.
+              모든 요인을 의식적으로 나열하지 않습니다. 곡선을 보고 이미 일어나는 일을 읽습니다.
+
+
+              기록하지 않은 일도 혈당에 나타납니다.
+              식후 스파이크는 탄수화물을 입력했는지와 관계없이 식후 스파이크처럼 보입니다.
+              잔여 인슐린은 알아볼 수 있는 방식으로 곡선을 끌어내립니다.
+              혈당 선은 추적하지 않은 것까지 포함해, 일어나는 모든 일의 결과입니다.
+
+
+              또한 본인 CGM 데이터를 올리면 차트는 기록된 탄수화물, 인슐린, 운동을 마커로 보여 줍니다. 맨 혈당 선이 아닙니다.
+
+
+              주식의 “기술적 분석”과 같나요? 아닙니다.
+              주가는 군중 심리로 움직이고, 예측 자체가 시장을 움직입니다.
+              혈당은 생화학입니다. 인슐린에는 알려진 작용 곡선이 있습니다. 탄수화물은 알려진 속도로 흡수됩니다.
+              다음 한 시간은 지금 이미 움직이고 있는 것에서 대부분 이어집니다.
+
+
+              연구도 이를 확인합니다. 식사와 인슐린 입력이 있는 모델과 없는 모델을 비교한 연구에서
+              그 공변량을 더해도 단기 정확도는 나아지지 않았습니다
+              ([Daniels et al., 2022](https://pmc.ncbi.nlm.nih.gov/articles/PMC8782424/);
+              [The Maastricht Study, 2021](https://pmc.ncbi.nlm.nih.gov/articles/PMC8224858/)).
+              다음 한 시간에는 CGM 신호만으로도 정보가 충분합니다.
+
+
+              하루 전체를 모델에 설명하라고 하지 않습니다.
+              질문은 이것입니다. 화면을 보고, 혈당이 어디로 가는지 얼마나 잘 알 수 있는가.
+      - title: "연구 진행 방식"
+        items:
+          - q: "누가 참여할 수 있나요?"
+            a: "만 18세 이상이면 누구나. CGM 사용자는 특히 소중하지만, CGM이 없어도 공개 익명 데이터로 플레이할 수 있습니다."
+          - q: "어떤 CGM 기기와 형식을 지원하나요?"
+            a: "Dexcom, Libre, Medtronic CSV 내보내기와 Nightscout entries.json을 지원합니다. (Nightscout 자체 CSV 내보내기는 불가합니다 — 대부분의 데이터가 빠집니다.) CGM 기기가 없어도 쓸 수 있는 공개 익명 데이터셋도 있습니다."
+          - q: "얼마나 걸리나요?"
+            a: "각 라운드는 약 2–3분입니다. 전체 세션(12라운드)은 약 30분이지만 여러 번에 나눠 할 수 있습니다."
+          - q: "중간에 멈추고 나중에 이어서 할 수 있나요?"
+            a: "네. 게임은 진행 상황을 브라우저에 로컬 저장합니다. 12라운드가 한 번에 너무 많으면 탭을 닫고 돌아오세요 — 멈춘 곳에서 이어가라는 안내가 나옵니다. 몇 라운드라도 유용하지만, 추가 라운드는 모두 데이터 품질을 높입니다."
+          - q: "한 사람이 여러 번 플레이할 수 있나요?"
+            a: "네 — 각 플레이가 별도 세션인 한. 예측 실력은 연습으로 늘 수 있어 결과가 고정되지 않습니다. 정확도는 연속 시도에서 서서히 오를 수 있습니다. 같은 세션을 이어가는 대신 새 세션을 시작하면 시도가 구분되어, 시간에 따른 향상을 포착할 수 있습니다."
+          - q: "결과가 마음에 안 들면 다시 시작해야 하나요?"
+            a: "정확도가 마음에 안 든다고 다시 시작하지 마세요. 사람은 좋은 점수는 남기고 나쁜 점수는 버리려 하지만, 그러면 연구가 왜곡되고 과학적 타당성이 떨어집니다. 실망스러워도 진행을 초기화하기보다 다음 라운드를 이어가는 것이 가장 좋습니다."
+          - q: "정확도 지표는 무엇인가요?"
+            a: "예측한 혈당 곡선이 실제에 얼마나 가까웠는지 수량화하는 표준 예측 지표 — MAE, RMSE, MAPE — 를 씁니다. MAE는 평균 절대 오차로, 평균적으로 얼마나 빗나갔는지 알려 줍니다. RMSE는 큰 실수를 더 강하게 벌해, 예측이 크게 틀린 경우를 강조합니다. MAPE는 오차를 퍼센트로 나타내 서로 다른 혈당 범위의 성적을 비교하는 데 도움이 됩니다. 함께 쓰면 단일 점수보다 완전한 그림이 됩니다."
+          - q: "이 연구의 한계는 무엇인가요?"
+            a: >-
+              솔직히 말하겠습니다.
+
+              - **짧은 지평만.** 다음 한 시간을 예측해 달라고 합니다. 더 긴 예측은 측정하지 않은 요인이 지배하는, 훨씬 어려운 문제입니다.
+
+              - **기록된 사건은 불완전할 수 있습니다.** 차트는 CGM 앱이 기록한 것을 보여 줍니다 — 식사나 용량을 기록하지 않으면 나타나지 않고, 당신과 모델 모두 같은 불완전한 그림을 봅니다.
+
+              - **개인 맥락이 없습니다.** 실제 삶에서는 데이터에 없는 것을 압니다 — 감기가 오는 것, 곧 뛰러 갈 것, 세 번째 커피. 이 연구는 개인 지식과 분리해 차트를 읽는 능력을 측정합니다.
+
+              - **실시간 압박이 없습니다.** 차분히 예측 선을 그리는 것과 새벽 2시에 반쯤 잠든 채 용량을 결정하는 것은 다릅니다.
+
+              - **공개 데이터 대 본인 데이터.** 공개 익명 추적으로 플레이하면 본인 혈당을 예측할 때와 정확도가 다를 수 있습니다. 본인 CGM 내보내기(Dexcom, Libre, Medtronic 또는 Nightscout)를 올리길 권합니다 — 본인 패턴에 대한 개인 직감이 ML과의 비교를 흥미롭게 만드는 일부입니다.
+      - title: "CGM CSV 다운로드 방법"
+        id: download-csv
+        items:
+          - q: "휴대폰 앱에서 내보낼 수 없는 이유는 무엇인가요?"
+            a: "대부분의 CGM 휴대폰 앱은 PDF 보고서만 줍니다. 원본 CSV는 제조사 웹사이트나 xDrip+ 같은 오픈소스 앱에서 나옵니다."
+          - q: "Dexcom (Clarity)"
+            a: >-
+              1. [clarity.dexcom.com](https://clarity.dexcom.com)(미국) 또는 [clarity.dexcom.eu](https://clarity.dexcom.eu)(유럽)을 열고 Dexcom 계정으로 로그인합니다.
+
+              2. 아무 보고서를 연 뒤 위쪽 바에서 **Export**를 클릭합니다.
+
+              3. 기간(14, 30, 90일 또는 사용자 지정)을 고르고 CSV를 다운로드합니다.
+
+
+              Clarity 휴대폰 앱은 CSV를 내보낼 수 없습니다. 웹사이트를 사용하세요.
+
+
+              영상: [Clarity upload](https://www.youtube.com/watch?v=GTULvbiAkfc), [Navigating Clarity](https://www.youtube.com/watch?v=hNSeKZXV1sM), [G6 / Clarity export](https://www.youtube.com/watch?v=7v-d_FKs6Oo).
+          - q: "Abbott FreeStyle Libre (LibreView)"
+            a: >-
+              1. [libreview.com](https://www.libreview.com)을 열고 Libre 앱과 같은 계정으로 로그인합니다.
+
+              2. 왼쪽 위 **Glucose History** 아이콘(추세 물결)을 클릭합니다.
+
+              3. 오른쪽 위 **Download Glucose Data**를 클릭하고 캡차를 완료한 뒤 다운로드합니다.
+
+
+              Excel에서 열어 다시 저장하지 마세요 — 날짜가 깨질 수 있습니다. 받은 그대로 올리세요.
+
+
+              영상: [LibreView setup](https://www.youtube.com/watch?v=xBa6JJEdqcI), [TypeOneTalks export](https://www.youtube.com/watch?v=l09GPGQXOLE).
+          - q: "Medtronic (CareLink)"
+            a: >-
+              1. [carelink.minimed.com](https://carelink.minimed.com)을 열고 로그인합니다.
+
+              2. 최신 펌프(770G / 780G)는 MiniMed Mobile 앱으로 동기화됩니다. 이전 펌프는 CareLink USB 또는 Contour Next Link 업로더가 필요합니다.
+
+              3. **Reports → Data Export (CSV)**로 갑니다.
+
+
+              영상: [CareLink overview](https://www.youtube.com/watch?v=WGO1YnVJ0eo), [Uploader setup](https://www.youtube.com/watch?v=u_oC2EubVT4).
+          - q: "Glooko, Tidepool, xDrip+ 또는 Nightscout"
+            a: >-
+              **Glooko:** [my.glooko.com](https://my.glooko.com) → Summary → Export as CSV.
+
+              **Tidepool:** Settings(톱니바퀴) → Export My Data → 날짜 선택 → 다운로드.
+
+              **xDrip+:** Menu → Import/Export → Export CSV (SiDiary 형식).
+
+              **Nightscout:** 시작 화면에 사이트 URL을 붙여 넣으세요 — 파일이 필요 없습니다. 파일로 올리려면 `https://your-site/api/v1/entries.json?count=10000`을 열고 저장한 뒤 그것을 올리세요. 대부분의 데이터가 빠지는 CSV 내보내기는 쓰지 마세요.
+      - title: "데이터와 개인정보"
+        items:
+          - q: "내 데이터가 저장되나요?"
+            a: "제출을 선택하기 전까지 모든 것은 본인 브라우저에 머뭅니다. 적극적으로 동의하고 결과를 제출하지 않으면 서버로 아무것도 보내지 않습니다."
+          - q: "동의하면 어떤 데이터가 수집되나요?"
+            a: "플레이 데이터(그린 예측, 정확도 지표), 선택적으로 올린 CGM 파일, 짧은 설문(나이, CGM 경험, 당뇨병 상태 등)입니다."
+          - q: "CGM 데이터가 제3자와 공유되나요?"
+            a: "아니요. 데이터는 이 연구에만 쓰이며 판매되거나 무단 제3자와 공유되지 않습니다."
+          - q: "철회할 수 있나요?"
+            a: "네. 브라우저를 닫으면 언제든지 가능합니다. 이미 제출한 데이터를 지우려면 연구팀에 연락해 주세요."
+          - q: "누가 결과를 조작하는 것을 막는 것은 무엇인가요?"
+            a: "솔직히? 기술적으로는 아무것도 없습니다. 모든 데이터가 본인 브라우저 로컬 저장소에 있으므로, 참가자의 정직함과 선의에 전적으로 의지합니다 — 그리고 진심으로 신뢰합니다. 친구를 감탄시키려고 수상할 정도로 완벽한 예측 점수가 필요하다면, 스크린샷을 찍고 이미지 편집기로 손보거나 브라우저 DevTools로 화면의 숫자를 고치세요. 가짜 데이터를 연구에 제출하지 마세요 — 모두가 혜택을 받는 연구의 과학적 타당성을 직접 해칩니다."
+      - title: "도움과 기여"
+        items:
+          - q: "버그를 찾으면 어떻게 하나요?"
+            a: "프로젝트 GitHub [github.com/GlucoseDAO/sugar-sugar](https://github.com/GlucoseDAO/sugar-sugar)에서 이슈를 열어 주세요. 버그 제보는 앱을 개선하고 연구 경험이나 데이터 품질에 영향을 줄 수 있는 문제를 찾는 데 매우 도움이 됩니다."
+          - q: "소프트웨어 개발자입니다. 기능을 기여할 수 있나요?"
+            a: "네. 기여는 프로젝트 GitHub [github.com/GlucoseDAO/sugar-sugar](https://github.com/GlucoseDAO/sugar-sugar)에서 환영합니다. 수정, UI 개선, 더 많은 센서나 파일 형식 지원, 과학 프로토콜을 바꾸지 않고 사용성을 높이는 변경을 특히 환영합니다. 진행 중인 연구이므로 새 설문 항목이나 핵심 과제 변경처럼 중간에 연구 설계에 영향을 주는 변경은 먼저 팀과 상의해야 합니다."
+          - q: "그 외에 연구를 도울 방법은 무엇인가요?"
+            a: "소프트웨어 개발자가 아니어도 많이 도울 수 있습니다. 관련 커뮤니티에 연구를 공유하고, 다른 CGM 사용자나 관심 있는 사람에게 알리고, 불분명한 문구나 사용성 문제를 신고하고, 어떤 식으로든 협력하고 싶다면 프로젝트 연락 경로로 연구팀에 연락해 주세요."
+          - q: "전체 연구 설계는 어디서 볼 수 있나요?"
+            a: "탐색 바의 “연구 소개” 페이지에 있으며, PDF 다운로드와 GitHub 저장소 링크가 있습니다."

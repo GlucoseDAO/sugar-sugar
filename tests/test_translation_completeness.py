@@ -91,6 +91,34 @@ def test_placeholders_survive_translation(locale: str, english: dict[str, Any]) 
     assert not mismatched, f"ui.{locale}.yml placeholder mismatch: {list(mismatched)[:5]}"
 
 
+# i18nice treats `%` as interpolation. A lone `10%` raises; a leftover `%%` after
+# render shows two percent signs on the share card / ranking. Literal percent in
+# YAML must be `%%`, and `t()` must emit a single `%`.
+_LONE_PERCENT = re.compile(r"(?<!%)%(?!%|\{)")
+
+
+@pytest.mark.parametrize("locale", sorted(SUPPORTED_LOCALES))
+def test_literal_percent_is_escaped_and_renders_once(locale: str, english: dict[str, Any]) -> None:
+    translated = _locale_keys(locale)
+    lone: list[str] = []
+    leftover: list[str] = []
+    for key, en_value in english.items():
+        if not isinstance(en_value, str) or "%%" not in en_value:
+            continue
+        loc_value = translated.get(key)
+        assert isinstance(loc_value, str), f"{locale}: {key} missing while English has %%"
+        assert loc_value.count("%%") == en_value.count("%%"), f"{locale}: {key} %% count drifted"
+        if _LONE_PERCENT.search(loc_value):
+            lone.append(key)
+        kwargs = {name: 0 for name in PLACEHOLDER.findall(en_value)}
+        rendered = t(f"ui.{key}", locale=locale, **kwargs)
+        if "%%" in rendered:
+            leftover.append(key)
+        assert "%" in rendered, f"{locale}: {key} rendered without a percent sign"
+    assert not lone, f"{locale}: lone % (not %% / %{{}}) in {lone[:5]}"
+    assert not leftover, f"{locale}: t() left %% in {leftover[:5]}"
+
+
 def test_fallback_is_actually_enabled() -> None:
     """Guards the `i18n.set` trap: it nulls the fallback when it equals locale."""
     import i18n

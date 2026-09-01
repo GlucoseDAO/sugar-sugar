@@ -79,7 +79,7 @@ DEVICES: dict[str, Device] = {
 # per locale under the output root.
 LANGUAGE_SETS: dict[str, tuple[str, ...]] = {
     "english": ("en",),
-    "babylon": ("en", "de", "uk", "ro", "ru", "zh", "fr", "es"),
+    "babylon": ("en", "de", "uk", "ro", "ru", "zh", "fr", "es", "bg", "ja", "ko"),
 }
 
 

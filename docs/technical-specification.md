@@ -116,7 +116,7 @@ entry fall back to the English name in all locales.
 uv run build-locations
 ```
 
-Writes `assets/location-suggestions.<locale>.json` for all eight locales. The
+Writes `assets/location-suggestions.<locale>.json` for all supported locales. The
 on-disk assets must match Python
 (`tests/test_location_suggestions.py::test_per_locale_assets_match_python_source`).
 
