@@ -1,10 +1,11 @@
 import base64
 import gzip
 import json
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from dataclasses import dataclass
-from typing import Callable, Optional, Sequence
+from typing import Callable, Iterator, Optional, Sequence
 
 import polars as pl
 from cgm_format import FormatParser
@@ -78,6 +79,83 @@ def decode_upload_files(payload: object, filename: object) -> list[tuple[str, by
     return decoded
 
 
+_NIGHTSCOUT_ERROR_MAX: int = 180
+_HTML_MARKERS: tuple[str, ...] = ("<html", "<!doctype", "<body", "<head")
+
+
+def _looks_like_html(text: str) -> bool:
+    lower = text.lower()
+    return any(marker in lower for marker in _HTML_MARKERS)
+
+
+def _ascii_one_line(text: str) -> str:
+    """Drop newlines and non-ASCII so a leftover 🟢 cannot reach a locale log."""
+    cleaned = text.replace("\n", " ").replace("\r", " ").strip()
+    cleaned = cleaned.encode("ascii", errors="replace").decode("ascii")
+    if len(cleaned) > _NIGHTSCOUT_ERROR_MAX:
+        cleaned = cleaned[:_NIGHTSCOUT_ERROR_MAX] + "…"
+    return cleaned
+
+
+def short_nightscout_error(exc: BaseException) -> str:
+    """One-line Nightscout failure, never an HTML body or an emoji dump.
+
+    ``httpx`` embeds the response text in ``str(HTTPStatusError)``. Eliot then
+    writes that into the log; on Windows cp1252 a 🟢 in the page kills the
+    import with ``UnicodeEncodeError``. Keep the logged/UI reason short.
+    """
+    if isinstance(exc, RuntimeError) and exc.__cause__ is not None:
+        return short_nightscout_error(exc.__cause__)
+    try:
+        import httpx
+    except ImportError:
+        httpx = None  # type: ignore[assignment]
+    if httpx is not None and isinstance(exc, httpx.HTTPStatusError):
+        code = exc.response.status_code if exc.response is not None else "?"
+        return f"HTTP {code}"
+    if httpx is not None and isinstance(exc, httpx.TimeoutException):
+        return "timeout"
+    if httpx is not None and isinstance(
+        exc, (httpx.ConnectError, httpx.NetworkError)
+    ):
+        return "unreachable"
+    if isinstance(exc, UnicodeEncodeError):
+        return "encoding"
+    name = type(exc).__name__
+    text = str(exc)
+    if _looks_like_html(text):
+        return f"{name}: html error page"
+    text = _ascii_one_line(text)
+    return f"{name}: {text}" if text else name
+
+
+@contextmanager
+def utf8_path_writes() -> Iterator[None]:
+    """Force ``Path.write_text`` to UTF-8 when the caller omitted encoding.
+
+    cgm-format's Nightscout downloader does ``json.dumps(..., ensure_ascii=False)``
+    then ``Path.write_text(payload)``. On Windows that open uses cp1252, and a
+    🟢 in a treatment note raises ``UnicodeEncodeError`` after a successful
+    download. Parsing itself uses ``read_bytes``, so only the write needs this.
+    """
+    original = Path.write_text
+
+    def write_text(
+        self: Path,
+        data: str,
+        encoding: Optional[str] = None,
+        errors: Optional[str] = None,
+        newline: Optional[str] = None,
+    ) -> int:
+        return original(self, data, encoding=encoding or "utf-8", errors=errors, newline=newline)
+
+    Path.write_text = write_text  # type: ignore[method-assign]
+    try:
+        yield
+    finally:
+        Path.write_text = original
+
+
 def load_glucose_data_from_nightscout(
     base_url: str,
     *,
@@ -95,17 +173,23 @@ def load_glucose_data_from_nightscout(
     Returns:
         (glucose_df, events_df, save_path)
     """
-    with start_action(action_type=u"load_glucose_data_from_nightscout", base_url=base_url):
-        unified_df = FormatParser.from_nightscout_url(
-            base_url, token=token, api_secret=api_secret, days=days
-        )
-        glucose_df, events_df = unified_processor(unified_df).split_glucose_events(unified_df)
-        save_dir = Path(save_dir)
-        save_dir.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        save_path = save_dir / f"{timestamp}_nightscout.csv"
-        FormatParser.to_csv_file(unified_df, str(save_path))
-        return adapt_glucose_df(glucose_df), adapt_events_df(events_df), save_path
+    with start_action(action_type=u"load_glucose_data_from_nightscout", base_url=base_url) as action:
+        try:
+            with utf8_path_writes():
+                unified_df = FormatParser.from_nightscout_url(
+                    base_url, token=token, api_secret=api_secret, days=days
+                )
+                glucose_df, events_df = unified_processor(unified_df).split_glucose_events(unified_df)
+                save_dir = Path(save_dir)
+                save_dir.mkdir(parents=True, exist_ok=True)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                save_path = save_dir / f"{timestamp}_nightscout.csv"
+                FormatParser.to_csv_file(unified_df, str(save_path))
+                return adapt_glucose_df(glucose_df), adapt_events_df(events_df), save_path
+        except Exception as exc:
+            short = short_nightscout_error(exc)
+            action.log(message_type="nightscout_import_failed", error=short)
+            raise RuntimeError(short) from exc
 
 
 # How much of a file to look at before deciding it is JSON at all. No CSV export

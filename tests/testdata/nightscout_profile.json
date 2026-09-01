@@ -1,0 +1,20 @@
+[
+  {
+    "defaultProfile": "Default",
+    "startDate": "2026-01-01T00:00:00.000Z",
+    "mills": 1767225600000,
+    "units": "mg/dl",
+    "store": {
+      "Default": {
+        "dia": 6,
+        "timezone": "UTC",
+        "units": "mg/dl",
+        "carbratio": [{"time": "00:00", "value": 10, "timeAsSeconds": 0}],
+        "sens": [{"time": "00:00", "value": 40, "timeAsSeconds": 0}],
+        "basal": [{"time": "00:00", "value": 0.8, "timeAsSeconds": 0}],
+        "target_low": [{"time": "00:00", "value": 70, "timeAsSeconds": 0}],
+        "target_high": [{"time": "00:00", "value": 180, "timeAsSeconds": 0}]
+      }
+    }
+  }
+]

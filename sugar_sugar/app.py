@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, IO, List, Optional, Tuple, Union
 from functools import lru_cache
 from html import escape as html_escape
 from io import BytesIO
@@ -31,9 +31,9 @@ load_dotenv(env_path)
 # Ensure unicode (e.g. Ukrainian) is printable on Windows terminals.
 try:
     if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
     if hasattr(sys.stderr, "reconfigure"):
-        sys.stderr.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
 except Exception:
     pass
 
@@ -41,13 +41,28 @@ logs_dir = project_root / 'logs'
 logs_dir.mkdir(exist_ok=True)
 
 
+def _open_utf8_log(path: Path) -> IO[str]:
+    """Append to a log file as UTF-8 so Windows cp1252 cannot abort a request.
+
+    pycomfort's ``to_nice_file`` does ``open(path, 'a')`` with the locale codec.
+    A Nightscout HTML body that contains 🟢 then raises ``UnicodeEncodeError``
+    while Eliot writes the failed action, and that exception replaces the real
+    import error. Passing an already-open UTF-8 file skips that ``open()``.
+    """
+    return path.open("a", encoding="utf-8", errors="backslashreplace")
+
+
 def _configure_eliot_logging() -> None:
     """Install human-readable Eliot log renderers unless explicitly disabled."""
     if os.environ.get("SUGAR_SUGAR_DISABLE_NICE_LOGS") == "1":
         return
 
-    to_nice_stdout()
-    to_nice_file(logs_dir / 'sugar_sugar.json', logs_dir / 'sugar_sugar.log')
+    # Pass open UTF-8 files. A Path would be locale-opened inside pycomfort.
+    to_nice_stdout(_open_utf8_log(logs_dir / "sugar_sugar.stdout.json"))
+    to_nice_file(
+        _open_utf8_log(logs_dir / "sugar_sugar.json"),
+        _open_utf8_log(logs_dir / "sugar_sugar.log"),
+    )
 
 
 _configure_eliot_logging()
@@ -63,6 +78,7 @@ from sugar_sugar.data import (
     load_glucose_data_from_nightscout,
     load_nightscout_uploads,
     safe_upload_filename,
+    short_nightscout_error,
 )
 from sugar_sugar.config import (
     DEFAULT_POINTS,
@@ -9578,7 +9594,11 @@ def handle_nightscout_load(
                 save_dir=users_data_dir,
             )
         except Exception as exc:
-            return _no + (_error(t("ui.header.nightscout_error", locale=locale, error=str(exc))),)
+            return _no + (_error(t(
+                "ui.header.nightscout_error",
+                locale=locale,
+                error=short_nightscout_error(exc),
+            )),)
 
         points = max(MIN_POINTS, min(MAX_POINTS, DEFAULT_POINTS))
         new_df, random_start = get_random_data_window(new_full_df, points)

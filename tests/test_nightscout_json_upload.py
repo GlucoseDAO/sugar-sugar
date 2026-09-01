@@ -31,6 +31,8 @@ from sugar_sugar.data import (
     load_nightscout_uploads,
     nightscout_json_kind,
     safe_upload_filename,
+    short_nightscout_error,
+    utf8_path_writes,
 )
 
 # All three fixtures are synthetic and committed. The real Nightscout exports
@@ -281,3 +283,44 @@ def test_an_undecodable_member_does_not_sink_the_others() -> None:
 def test_saved_names_keep_json_as_json(given: object, expected: str) -> None:
     """Forcing .csv onto everything used to store entries.json as entries.json.csv."""
     assert safe_upload_filename(given) == expected
+
+
+def test_short_nightscout_error_drops_html_bodies_and_emoji() -> None:
+    """Windows cp1252 dies on 🟢 if the HTTP body reaches the log or the UI."""
+    html = "<html>Nightscout 🟢</html>" + ("x" * 80_000)
+    short = short_nightscout_error(RuntimeError(html))
+    assert "🟢" not in short
+    assert "<html" not in short.lower()
+    assert len(short) < 220
+
+
+def test_short_nightscout_error_maps_http_status() -> None:
+    import httpx
+
+    request = httpx.Request("GET", "https://example.com/api/v1/entries.json")
+    response = httpx.Response(
+        401, request=request, text="<html>🟢 unauthorized</html>" + ("y" * 2000)
+    )
+    exc = httpx.HTTPStatusError("Client error", request=request, response=response)
+    assert short_nightscout_error(exc) == "HTTP 401"
+    try:
+        raise RuntimeError("HTTP 401") from exc
+    except RuntimeError as wrapped:
+        assert short_nightscout_error(wrapped) == "HTTP 401"
+
+
+def test_utf8_log_file_can_write_the_green_circle(tmp_path: Path) -> None:
+    """pycomfort's locale ``open(path, 'a')`` is what crashed Nightscout on Windows."""
+    path = tmp_path / "sugar_sugar.log"
+    with path.open("a", encoding="utf-8", errors="backslashreplace") as handle:
+        handle.write("load_glucose_data_from_nightscout failed 🟢\n")
+    assert "🟢" in path.read_text(encoding="utf-8")
+
+
+def test_utf8_path_writes_saves_nightscout_treatment_emoji(tmp_path: Path) -> None:
+    """cgm-format's downloader calls write_text with no encoding — cp1252 dies on 🟢."""
+    target = tmp_path / "nightscout_treatments.json"
+    payload = json.dumps([{"notes": "🟢", "eventType": "Note"}], indent=2, ensure_ascii=False)
+    with utf8_path_writes():
+        target.write_text(payload)
+    assert "🟢" in target.read_text(encoding="utf-8")

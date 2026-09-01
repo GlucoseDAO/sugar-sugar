@@ -11,6 +11,7 @@
 !Nightscout_entries_synthetic.json
 !Nightscout_treatments_synthetic.json
 !Nightscout_treatments_sparse_carbs_synthetic.json
+!nightscout_profile.json
 !cgmacros/
 !cgmacros/**
 !d1namo/

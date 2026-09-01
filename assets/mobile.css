@@ -1380,13 +1380,17 @@ html.mobile-device #consent-form-page .consent-form-text {
 html.mobile-device .js-plotly-plot .xtick text {
   font-size: 8px !important;
 }
+html.mobile-device .js-plotly-plot .textpoint text {
+  font-size: 8px !important;
+}
 html.mobile-device .js-plotly-plot .ytick text,
 html.mobile-device .js-plotly-plot .legendtext {
   font-size: 9px !important;
 }
 html.route-prediction.mobile-device .js-plotly-plot .xtick text,
 html.route-prediction.mobile-device .js-plotly-plot .ytick text,
-html.route-prediction.mobile-device .js-plotly-plot .legendtext {
+html.route-prediction.mobile-device .js-plotly-plot .legendtext,
+html.route-prediction.mobile-device .js-plotly-plot .textpoint text {
   font-size: 8px !important;
 }
 

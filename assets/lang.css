@@ -116,6 +116,9 @@ html:not(.mobile-device) .js-plotly-plot .ytick text,
 html:not(.mobile-device) .js-plotly-plot .legendtext {
   font-size: 12px !important;
 }
+html:not(.mobile-device) .js-plotly-plot .textpoint text {
+  font-size: 11px !important;
+}
 
 /* Override the blanket 16px rule for Fomantic UI menus so size classes work */
 body .ui.massive.menu .item,

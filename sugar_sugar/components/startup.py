@@ -1161,13 +1161,16 @@ class StartupPage(html.Div):
             except ImportError:
                 return no_update, _import_status_msg(t("ui.startup.import_ns_unavailable", locale=locale), ok=False)
             except Exception as exc:  # network / HTTP / parse -- classify, don't leak
-                name = type(exc).__name__
-                if _httpx is not None and isinstance(exc, _httpx.HTTPStatusError):
-                    code = exc.response.status_code if getattr(exc, 'response', None) is not None else '?'
+                # load_glucose_data_from_nightscout re-raises RuntimeError(short);
+                # the httpx error (if any) is on __cause__.
+                original = exc.__cause__ or exc
+                name = type(original).__name__
+                if _httpx is not None and isinstance(original, _httpx.HTTPStatusError):
+                    code = original.response.status_code if getattr(original, 'response', None) is not None else '?'
                     return no_update, _import_status_msg(t("ui.startup.import_ns_http_error", locale=locale, code=code), ok=False)
-                if _httpx is not None and isinstance(exc, _httpx.TimeoutException) or 'Timeout' in name:
+                if _httpx is not None and isinstance(original, _httpx.TimeoutException) or 'Timeout' in name:
                     return no_update, _import_status_msg(t("ui.startup.import_ns_timeout", locale=locale), ok=False)
-                if (_httpx is not None and isinstance(exc, (_httpx.ConnectError, _httpx.NetworkError))) \
+                if (_httpx is not None and isinstance(original, (_httpx.ConnectError, _httpx.NetworkError))) \
                         or any(k in name for k in ('Connect', 'Network', 'Resolve', 'Proxy')):
                     return no_update, _import_status_msg(t("ui.startup.import_ns_unreachable", locale=locale), ok=False)
                 return no_update, _import_status_msg(t("ui.startup.import_failed", locale=locale), ok=False)

@@ -88,6 +88,13 @@ Hard-won rules:
   entries with another's treatments. `load_nightscout_json_data` takes an explicit optional
   treatments path instead, and the profile file is not a third input — cgm-format downloads it
   and discards it.
+- **Windows Nightscout URL import: wrap `from_nightscout_url` in `utf8_path_writes`.**
+  cgm-format dumps treatments with `ensure_ascii=False` then `Path.write_text(payload)`
+  with no encoding. On Windows that is cp1252; a 🟢 in a note (real iAPS/Nightscout
+  data) raises `UnicodeEncodeError` after a successful download and the UI says
+  `encoding`. Parsing uses `read_bytes`, so only the write needs UTF-8. Do not wait
+  for an upstream bump — `data.py` owns this wrap. Locked down by
+  `tests/test_nightscout_json_upload.py`::`test_utf8_path_writes_saves_nightscout_treatment_emoji`.
 - **The Nightscout *URL* import needs cgm-format >= 0.12.2, which is the floor.** On 0.12.0 it
   was dead for any real instance: `_parse_nightscout_treatments_json` built a frame with no
   schema, so a treatment field null for the first 100 records inferred as dtype `Null` and the
@@ -179,29 +186,37 @@ Hard-won rules:
 ### Event markers are visible in the predicted hour; glucose is not
 
 `hide_last_hour` withholds the **glucose trace** of the hour being predicted. It
-must not withhold the **event markers** in it — meals, insulin or exercise. A
-BIG IDEAs window put a meal a few minutes past the divider, the marker was
-clipped, and the player drew a flat line into a post-meal rise they had no way to
-see coming. The clipping did not withhold a hint, it made the displayed history
-misleading, and it biased the very error the study measures. Nobody predicts
-their own glucose without knowing when they ate, dosed or exercised.
+must not withhold **meal and exercise markers** in it. A BIG IDEAs window put a
+meal a few minutes past the divider, the marker was clipped, and the player drew
+a flat line into a post-meal rise they had no way to see coming. The clipping
+did not withhold a hint, it made the displayed history misleading, and it biased
+the very error the study measures. Nobody predicts their own glucose without
+knowing when they ate or exercised.
 
 `visible_food_photo_events` (`cgmacros.py`) therefore spans the whole window, and
 `cluster_visible_food_events` / `meal_food_bubble_children` no longer take a
 `hide_last_hour` argument at all — an ignored parameter is how the clipping would
-come back. All three marker kinds show during the round: the FOOD speech bubble
-plus guide line (photo/note meals), the apple icon (plain carb events), the
-syringe, and the exercise star.
+come back. During the round the FOOD speech bubble plus guide line (photo/note
+meals), the apple icon (plain carb events), and the exercise star all stay
+visible.
 
-**What must stay hidden is the y-value.** Markers are normally placed at the
-event's glucose height; past the boundary that *is* the answer.
+**Insulin is the exception.** A dose is drawn as a filled circle **on the
+glucose curve** (size scales with units, clamped 8–22 px for 1–10 U), a smaller
+syringe at the plot base, and a dotted connector between them. That circle *is*
+the glucose value, so insulin past the divider is withheld on `/prediction` and
+only appears on the results chart (`hide_last_hour=False`). On mobile the unit
+label (`4u`) sits next to the circle in the same 8px tick font as the HH:MM
+stamps.
+
+**What must stay hidden is the y-value.** Meal/exercise markers are normally
+placed at the event's glucose height; past the boundary that *is* the answer.
 `_add_event_markers` pins them to `_HIDDEN_MARKER_Y_FRAC` of the y-span instead —
 a single "topside" rail they stack along — and `_draw_hidden_marker_guides` draws
-a dotted vertical **in each event's own colour** (a syringe must not be announced
-by a green meal line) so the timing still reads off the axis. Note exercise was
-never boundary-gated at all, so before this its star sat at the true hidden
-glucose value and could be read straight off the y-axis. Locked down by
-`tests/test_food_marker_prediction_area.py`.
+a dotted vertical **in each event's own colour** (an apple must not be announced
+by an orange exercise line) so the timing still reads off the axis. Note
+exercise was never boundary-gated at all, so before this its star sat at the
+true hidden glucose value and could be read straight off the y-axis. Locked
+down by `tests/test_food_marker_prediction_area.py`.
 
 ### The playing chart says where the line has to end
 

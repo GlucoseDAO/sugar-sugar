@@ -2,7 +2,7 @@ import base64
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 from datetime import datetime
 
 import plotly.graph_objs as go
@@ -47,6 +47,19 @@ _FOOD_CLUSTER_X_GAP: float = 1.8
 # the y-axis span. Deliberately not the meal's real glucose value -- that is the
 # number the player is being asked to predict.
 _HIDDEN_MARKER_Y_FRAC: float = 0.88
+# Dose-scaled insulin circle on the glucose curve. 1 U → min px, 10 U+ → max px.
+_INSULIN_CIRCLE_MIN_PX: int = 8
+_INSULIN_CIRCLE_MAX_PX: int = 22
+_INSULIN_DOSE_MIN_U: float = 1.0
+_INSULIN_DOSE_MAX_U: float = 10.0
+# Vertical gap (as a fraction of the y-span) when two doses share a timestamp.
+# Circles and syringes stack one above the other; x stays on the injection time.
+_INSULIN_STACK_Y_FRAC: float = 0.06
+# Same 5-minute cell only. 1.0 is the next CGM reading (5 min later); a wider
+# window stacked 19:31 onto 19:36 and left the later circle floating off the line.
+_INSULIN_OVERLAP_X: float = 0.5
+# Neighbours this close (5–7 min) share a label column — alternate above/below.
+_INSULIN_LABEL_CLUSTER_X: float = 1.5
 FOOD_COMPOSITE_MAX: int = 6
 _FOOD_COMPOSITE_PREFIX: str = "composite:"
 
@@ -218,8 +231,64 @@ def meal_food_bubble_children(
 
 _ASSETS_IMAGES = Path(__file__).resolve().parents[2] / "assets" / "images"
 
-# Insulin / carbs: SVG layout images (plotly.js ignores custom path:// markers).
-_ICON_EVENT_TYPES: frozenset[str] = frozenset({"Insulin", "Carbohydrates"})
+# Carb apples still use SVG layout images (plotly.js ignores custom path://
+# markers). Insulin is a filled circle on the curve plus a smaller syringe at
+# the plot base — see ``_add_insulin_markers``.
+_ICON_EVENT_TYPES: frozenset[str] = frozenset({"Carbohydrates"})
+
+
+def _insulin_circle_size(dose: float) -> int:
+    """Map an insulin dose (U) onto a clamped circle diameter in pixels."""
+    span = _INSULIN_DOSE_MAX_U - _INSULIN_DOSE_MIN_U
+    fraction = (float(dose) - _INSULIN_DOSE_MIN_U) / span
+    fraction = max(0.0, min(1.0, fraction))
+    size = _INSULIN_CIRCLE_MIN_PX + fraction * (
+        _INSULIN_CIRCLE_MAX_PX - _INSULIN_CIRCLE_MIN_PX
+    )
+    return int(round(size))
+
+
+def _insulin_compact_label(dose: float) -> str:
+    """Short mobile label next to the dose circle, e.g. ``4u`` / ``2.5u``."""
+    return f"{dose:g}u"
+
+
+def _insulin_label_positions(
+    marks: Sequence[dict[str, Any]],
+    *,
+    y_min: float,
+    y_max: float,
+) -> list[str]:
+    """Place ``Nu`` above or below the circle so neighbours stay readable.
+
+    Isolated doses sit above unless they are near the y ceiling. A run of
+    neighbours (Δx ≤ ``_INSULIN_LABEL_CLUSTER_X``) alternates, same idea as
+    stacked circles: if there is no room above, start below.
+    """
+    if not marks:
+        return []
+    y_span = max(y_max - y_min, 1.0)
+    indexed = list(enumerate(marks))
+    ordered = sorted(indexed, key=lambda item: float(item[1]["x"]))
+    clusters: list[list[tuple[int, dict[str, Any]]]] = []
+    for item in ordered:
+        if (
+            clusters
+            and abs(float(item[1]["x"]) - float(clusters[-1][-1][1]["x"]))
+            <= _INSULIN_LABEL_CLUSTER_X
+        ):
+            clusters[-1].append(item)
+        else:
+            clusters.append([item])
+
+    positions: list[str] = [""] * len(marks)
+    for cluster in clusters:
+        first_y = float(cluster[0][1]["glucose_y"])
+        start_below = first_y > y_max - 0.18 * y_span
+        for i, (orig_i, _mark) in enumerate(cluster):
+            below = start_below if len(cluster) == 1 else ((i % 2 == 1) != start_below)
+            positions[orig_i] = "bottom center" if below else "top center"
+    return positions
 
 # Finish-line marker on the playing chart: amber while the hidden hour is still
 # unfinished, green once the drawn line reaches its last point.
@@ -250,14 +319,12 @@ class GlucoseChart(html.Div):
         "Insulin": {
             "icon": "syringe.svg",
             "color": "#7b1fa2",
-            # On-plot size in x-index units / fraction of y-range. 2026-08-20:
-            # the landscape chart grew vertically, which made the old 2.7×0.105
-            # syringe look like a speck — these values are ~1.6× that.
-            "icon_size_x": 4.4,
-            "icon_size_y_frac": 0.17,
+            # Base-of-plot syringe. The dose itself is the filled circle on the
+            # glucose curve; this icon only marks the end of the dotted line.
+            "icon_size_x": 2.4,
+            "icon_size_y_frac": 0.09,
             "legend_sizex": 0.07,
             "legend_sizey": 0.14,
-            "hover_size": 56,
         },
         "Exercise": {
             "symbol": "star",
@@ -761,23 +828,26 @@ class GlucoseChart(html.Div):
         return x_pos, glucose_value
 
     def _add_event_markers(self, figure: go.Figure, *, locale: str) -> None:
-        """Adds event markers (insulin syringe, exercise, carb apple) to the figure.
+        """Adds event markers (insulin, exercise, carb apple) to the figure.
 
-        Insulin/carbs use SVG ``layout_image`` markers (plotly.js does not render
-        custom ``path://`` symbols from Python).
+        Carbs use SVG ``layout_image`` apples (plotly.js does not render custom
+        ``path://`` symbols from Python). Insulin is a dose-scaled filled circle
+        on the glucose curve plus a smaller syringe at the plot base, joined by
+        a dotted line — see ``_add_insulin_markers``.
 
-        On the prediction page (``hide_last_hour``) **every event marker stays
-        visible in the predicted hour** — meals, insulin and exercise alike. A
-        player always knows when they ate, dosed or exercised; hiding it made
-        them draw a flat line into an excursion they had no way to see coming,
-        which does not withhold a hint so much as make the displayed history
-        misleading.
+        On the prediction page (``hide_last_hour``) **meal and exercise markers
+        stay visible in the predicted hour**. A player always knows when they
+        ate or exercised; hiding those made them draw a flat line into an
+        excursion they had no way to see coming.
 
-        A marker past the boundary is pinned to a neutral rail near the top of
-        the plot instead of sitting at its true glucose height, which would hand
-        over the very value being predicted, and gets a dotted guide line in its
-        own event colour so its timing is unambiguous without the glucose trace
-        behind it.
+        Insulin is the exception: the circle sits on the true glucose value, so
+        drawing it in the hidden hour would hand over the answer. Doses past
+        the boundary wait for the results chart (``hide_last_hour=False``).
+
+        A meal/exercise marker past the boundary is pinned to a neutral rail
+        near the top of the plot instead of sitting at its true glucose height,
+        and gets a dotted guide line in its own event colour so its timing is
+        unambiguous without the glucose trace behind it.
         """
         if self._current_events.height == 0:
             return
@@ -803,61 +873,53 @@ class GlucoseChart(html.Div):
         # read as "not a glucose value", low enough to leave room for stacking.
         hidden_marker_y = y_min + _HIDDEN_MARKER_Y_FRAC * y_span
 
-        # Collect insulin/carb icons first so near-identical x positions can stack.
+        insulin_legend = self._add_insulin_markers(
+            figure,
+            window_events,
+            known_end_idx=known_end_idx,
+            locale=locale,
+            legend_name=legend_name_by_type["Insulin"],
+        )
+
+        # Collect carb apples so near-identical x positions can stack.
         icon_markers: list[dict[str, Any]] = []
         hidden_marker_guides: list[tuple[float, str]] = []
-        for event_type in ("Insulin", "Carbohydrates"):
-            style = self.EVENT_STYLES[event_type]
-            events = window_events.filter(pl.col("event_type") == event_type)
-            if event_type == "Insulin":
-                events = events.filter(
-                    pl.col("insulin_value").is_not_null() & (pl.col("insulin_value") != 0)
-                )
-            if events.height == 0:
+        style = self.EVENT_STYLES["Carbohydrates"]
+        events = window_events.filter(pl.col("event_type") == "Carbohydrates")
+        for event_time in events.get_column("time") if events.height > 0 else []:
+            x_pos, glucose_value = self._event_xy_for_time(event_time)
+            past_boundary = self.hide_last_hour and x_pos > float(known_end_idx)
+            if past_boundary:
+                # Never place it at the hidden glucose value -- that is the answer.
+                glucose_value = hidden_marker_y
+            event_row = events.filter(pl.col("time") == event_time)
+            photo = (
+                str(event_row.get_column("photo_path")[0] or "").strip()
+                if "photo_path" in events.columns
+                else ""
+            )
+            note = (
+                str(event_row.get_column("food_note")[0] or "").strip()
+                if "food_note" in events.columns
+                else ""
+            )
+            if photo or note:
                 continue
-            for event_time in events.get_column("time"):
-                x_pos, glucose_value = self._event_xy_for_time(event_time)
-                past_boundary = self.hide_last_hour and x_pos > float(known_end_idx)
-                if past_boundary:
-                    # Never place it at the hidden glucose value -- that is the answer.
-                    glucose_value = hidden_marker_y
-                event_row = events.filter(pl.col("time") == event_time)
-                if event_type == "Carbohydrates":
-                    photo = (
-                        str(event_row.get_column("photo_path")[0] or "").strip()
-                        if "photo_path" in events.columns
-                        else ""
-                    )
-                    note = (
-                        str(event_row.get_column("food_note")[0] or "").strip()
-                        if "food_note" in events.columns
-                        else ""
-                    )
-                    if photo or note:
-                        continue
-                if event_type == "Insulin":
-                    hover = t(
-                        "ui.chart.hover_insulin",
-                        locale=locale,
-                        value=event_row.get_column("insulin_value")[0],
-                        time=event_time.strftime("%H:%M"),
-                    )
-                else:
-                    hover = (
-                        f"{legend_name_by_type[event_type]}"
-                        f"<br>{event_time.strftime('%H:%M')}"
-                    )
-                if past_boundary:
-                    hidden_marker_guides.append((x_pos, str(style["color"])))
-                icon_markers.append(
-                    {
-                        "event_type": event_type,
-                        "x": x_pos,
-                        "y": glucose_value,
-                        "hover": hover,
-                        "style": style,
-                    }
-                )
+            hover = (
+                f"{legend_name_by_type['Carbohydrates']}"
+                f"<br>{event_time.strftime('%H:%M')}"
+            )
+            if past_boundary:
+                hidden_marker_guides.append((x_pos, str(style["color"])))
+            icon_markers.append(
+                {
+                    "event_type": "Carbohydrates",
+                    "x": x_pos,
+                    "y": glucose_value,
+                    "hover": hover,
+                    "style": style,
+                }
+            )
 
         self._draw_hidden_marker_guides(figure, hidden_marker_guides)
         self._stack_icon_markers(icon_markers, y_span=y_span, y_max=y_max)
@@ -908,7 +970,166 @@ class GlucoseChart(html.Div):
             )
 
         self._draw_hidden_marker_guides(figure, hidden_exercise_guides)
-        self._add_icon_legend(figure, icon_legend_entries)
+        self._add_icon_legend(figure, insulin_legend + icon_legend_entries)
+
+    def _add_insulin_markers(
+        self,
+        figure: go.Figure,
+        window_events: pl.DataFrame,
+        *,
+        known_end_idx: int,
+        locale: str,
+        legend_name: str,
+    ) -> list[tuple[str, str, str]]:
+        """Dose-scaled circle on the curve, syringe at the base, dotted connector.
+
+        Circles sit at the interpolated glucose value so they mark the exact
+        injection. On the prediction page doses past ``known_end_idx`` are
+        omitted — that y *is* the answer. Results charts draw every dose.
+        """
+        style = self.EVENT_STYLES["Insulin"]
+        events = window_events.filter(pl.col("event_type") == "Insulin")
+        events = events.filter(
+            pl.col("insulin_value").is_not_null() & (pl.col("insulin_value") != 0)
+        )
+        if events.height == 0:
+            return []
+
+        y_min, _y_max = self._calculate_y_axis_range()
+        y_span = max(_y_max - y_min, 1.0)
+        icon_size_x = float(style["icon_size_x"])
+        icon_size_y = y_span * float(style["icon_size_y_frac"])
+        base_y = y_min + 0.5 * icon_size_y
+        color = str(style["color"])
+        icon_uri = _svg_data_uri(str(style["icon"]))
+        compact = bool(getattr(self, "_compact_layout", False))
+
+        marks: list[dict[str, Any]] = []
+        times = events.get_column("time")
+        doses = events.get_column("insulin_value")
+        for i in range(events.height):
+            event_time = times[i]
+            x_pos, glucose_y = self._event_xy_for_time(event_time)
+            if self.hide_last_hour and x_pos > float(known_end_idx):
+                continue
+            dose = float(doses[i])
+            hover = t(
+                "ui.chart.hover_insulin",
+                locale=locale,
+                value=dose,
+                time=event_time.strftime("%H:%M"),
+            )
+            marks.append(
+                {
+                    "x": x_pos,
+                    "glucose_y": glucose_y,
+                    "syringe_x": x_pos,
+                    "syringe_y": base_y,
+                    "dose": dose,
+                    "hover": hover,
+                }
+            )
+
+        if not marks:
+            return []
+
+        self._stack_overlapping_insulin(
+            marks,
+            circle_step=y_span * _INSULIN_STACK_Y_FRAC,
+            syringe_step=icon_size_y,
+            y_max=_y_max,
+        )
+
+        for mark in marks:
+            figure.add_shape(
+                type="line",
+                x0=float(mark["x"]),
+                x1=float(mark["syringe_x"]),
+                y0=float(mark["glucose_y"]),
+                y1=float(mark["syringe_y"]),
+                xref="x",
+                yref="y",
+                line=dict(color=color, width=1.5, dash="dot"),
+                layer="below",
+            )
+            figure.add_layout_image(
+                dict(
+                    source=icon_uri,
+                    x=float(mark["syringe_x"]),
+                    y=float(mark["syringe_y"]),
+                    xref="x",
+                    yref="y",
+                    sizex=icon_size_x,
+                    sizey=icon_size_y,
+                    xanchor="center",
+                    yanchor="middle",
+                    sizing="contain",
+                    layer="above",
+                )
+            )
+
+        x_positions = [float(m["x"]) for m in marks]
+        y_positions = [float(m["glucose_y"]) for m in marks]
+        sizes = [_insulin_circle_size(float(m["dose"])) for m in marks]
+        hover_texts = [str(m["hover"]) for m in marks]
+        labels = [_insulin_compact_label(float(m["dose"])) for m in marks]
+        text_positions = _insulin_label_positions(marks, y_min=y_min, y_max=_y_max)
+        figure.add_trace(
+            go.Scatter(
+                x=x_positions,
+                y=y_positions,
+                mode="markers+text" if compact else "markers",
+                name=legend_name,
+                showlegend=False,
+                marker=dict(
+                    symbol="circle",
+                    size=sizes,
+                    color=color,
+                    line=dict(width=1, color="white"),
+                ),
+                text=labels if compact else None,
+                textposition=text_positions if compact else None,
+                textfont=dict(size=8, color=color) if compact else None,
+                hovertext=hover_texts,
+                hoverinfo="text",
+            )
+        )
+        return [(icon_uri, legend_name, "Insulin")]
+
+    @staticmethod
+    def _stack_overlapping_insulin(
+        marks: list[dict[str, Any]],
+        *,
+        circle_step: float,
+        syringe_step: float,
+        y_max: float,
+    ) -> None:
+        """Stack overlapping dose circles and syringes one above the other.
+
+        Mutates ``glucose_y`` and ``syringe_y``. Circle ``x`` stays on the
+        injection time so the column still reads as that moment.
+        """
+        if len(marks) < 2:
+            return
+        ordered = sorted(marks, key=lambda m: float(m["x"]))
+        stacks: list[list[dict[str, Any]]] = []
+        for mark in ordered:
+            if stacks and abs(float(mark["x"]) - float(stacks[-1][0]["x"])) <= _INSULIN_OVERLAP_X:
+                stacks[-1].append(mark)
+            else:
+                stacks.append([mark])
+        for stack in stacks:
+            if len(stack) < 2:
+                continue
+            curve_y = float(stack[0]["glucose_y"])
+            base_syringe_y = float(stack[0]["syringe_y"])
+            direction = 1.0
+            if curve_y + (len(stack) - 1) * circle_step + circle_step * 0.5 > y_max:
+                direction = -1.0
+            for i, mark in enumerate(stack):
+                mark["glucose_y"] = curve_y + direction * i * circle_step
+                mark["syringe_y"] = base_syringe_y + i * syringe_step
+                mark["syringe_x"] = float(mark["x"])
 
     @staticmethod
     def _draw_hidden_marker_guides(
@@ -919,7 +1140,7 @@ class GlucoseChart(html.Div):
 
         Without the glucose trace behind it an icon on the neutral rail reads as
         floating; the line ties it to a time on the axis. Each is drawn in its
-        own event colour so a syringe is not announced by a green meal line.
+        own event colour so an apple is not announced by an orange exercise line.
         """
         for x_pos, color in guides:
             figure.add_shape(
@@ -964,10 +1185,11 @@ class GlucoseChart(html.Div):
         y_span: float,
         y_max: float,
     ) -> None:
-        """Offset overlapping insulin/carb icons so they stack vertically in place.
+        """Offset overlapping carb apples so they stack vertically in place.
 
         Mutates each marker's ``y`` (display position). Markers whose x positions
-        fall within ~half an icon width are treated as one stack.
+        fall within ~half an icon width are treated as one stack. Insulin is
+        drawn separately (circle on the curve, syringe at the base).
         """
         if len(markers) < 2:
             return
@@ -1151,7 +1373,7 @@ class GlucoseChart(html.Div):
             prediction_boundary: Index of the first *predicted* point. When
                 supplied a vertical dashed line is drawn there and both regions
                 are labelled. Results figures keep ``hide_last_hour=False`` so
-                insulin/carb markers appear across the full window.
+                insulin circles and carb markers appear across the full window.
             compact: Mobile-tight margins and hour ticks. ``None`` follows the
                 current request User-Agent; tests should pass explicitly.
         """
