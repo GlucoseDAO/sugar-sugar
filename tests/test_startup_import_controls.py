@@ -97,23 +97,29 @@ def _ordered_ids(node: Any) -> list[str]:
     return found
 
 
-def test_nightscout_url_comes_before_csv_upload() -> None:
+def test_official_csv_comes_before_nightscout_url() -> None:
     ids = _ordered_ids(import_controls_children("en"))
-    assert ids.index("startup-ns-url") < ids.index("startup-upload-data")
-    assert ids.index("startup-ns-import") < ids.index("startup-upload-data")
+    assert ids.index("startup-upload-data") < ids.index("startup-ns-url")
+    assert ids.index("startup-ns-import") < ids.index("startup-import-json-backup")
 
 
-def test_import_subtitle_prefers_nightscout_url() -> None:
+def test_import_copy_puts_json_last_as_backup() -> None:
     children = import_controls_children("en")
     subtitle = next(
         node
         for node in children
         if getattr(node, "id", None) == "startup-import-subtitle"
     )
-    text = str(subtitle.children)
-    assert "Nightscout site URL" in text
-    assert "leaves some of that out" in text
-    assert "entries.json" not in text
+    backup = next(
+        node
+        for node in children
+        if getattr(node, "id", None) == "startup-import-json-backup"
+    )
+    assert str(subtitle.children).startswith("Upload an official CSV")
+    assert "Nightscout site URL" in str(subtitle.children)
+    assert "entries.json" not in str(subtitle.children)
+    assert "backup" in str(backup.children)
+    assert "entries.json" in str(backup.children)
 
 
 def test_upload_accepts_several_files(startup_page: Any) -> None:

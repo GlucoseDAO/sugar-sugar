@@ -192,9 +192,10 @@ ko:
     data_usage_consent_label: "업로드한 CGM 데이터를 이 연구에 사용하는 데 동의합니다."
     data_usage_consent_required: "계속하려면 데이터 이용 동의를 확인해 주세요."
     import_title: "CGM 데이터 가져오기"
-    import_subtitle: "Nightscout 사이트 URL을 쓰는 것이 가장 좋습니다 — 혈당과 식사·인슐린 마커를 함께 가져옵니다. 내려받은 Nightscout JSON은 일부가 빠집니다. URL이 없으면 Dexcom, Libre 또는 Medtronic CSV를 올리세요."
-    import_or: "Nightscout URL이 없나요? 대신 CSV를 올리세요:"
-    import_upload_prompt: "끌어다 놓거나 클릭해서 Dexcom, Libre 또는 Medtronic CSV를 선택"
+    import_subtitle: "Dexcom, Libre 또는 Medtronic의 공식 CSV를 올리거나 Nightscout 사이트 URL을 사용하세요."
+    import_or: "또는 Nightscout URL을 사용:"
+    import_upload_prompt: "끌어다 놓거나 클릭해서 Dexcom, Libre 또는 Medtronic 공식 CSV를 선택"
+    import_json_backup: "Nightscout JSON(entries.json, 있으면 treatments.json)은 URL을 쓸 수 없을 때의 백업입니다. 이 형식은 일부 데이터가 빠집니다."
     import_ns_url_placeholder: "Nightscout URL (https://your-site.com)"
     import_ns_token_placeholder: "액세스 토큰 또는 API 시크릿 (선택)"
     import_ns_button: "Nightscout에서 가져오기"
@@ -222,7 +223,7 @@ ko:
     upload_required: "업로드 필요"
     upload_success: "%{filename}에서 데이터를 불러왔습니다. 이 데이터로 예측합니다."
     example_data_now_using: "이제 공개 익명 데이터를 사용합니다. 맞춤 분석을 원하면 CSV를 올리세요."
-    example_data_warning: "현재 공개 익명 데이터를 사용 중입니다. 맞춤 분석에는 Nightscout URL을, 없으면 Dexcom/Libre/Medtronic CSV를 쓰세요."
+    example_data_warning: "현재 공개 익명 데이터를 사용 중입니다. 맞춤 분석에는 Dexcom/Libre/Medtronic 공식 CSV 또는 Nightscout URL을 쓰세요."
     csv_tab_label: "CSV 파일"
     nightscout_tab_label: "Nightscout"
     nightscout_url_placeholder: "https://your-nightscout-site.com"
@@ -705,7 +706,7 @@ ko:
 
               **xDrip+:** Menu → Import/Export → Export CSV (SiDiary 형식).
 
-              **Nightscout:** 시작 화면에 사이트 URL을 붙여 넣으세요 — 그것이 완전한 가져오기입니다(혈당과 식사·인슐린). 내려받은 Nightscout JSON이나 CSV는 일부가 빠집니다. URL이 없으면 Dexcom, Libre 또는 Medtronic에서 CSV를 내보내세요.
+              **Nightscout:** 시작 화면에 사이트 URL을 붙여 넣거나 Dexcom / Libre / Medtronic 공식 CSV를 올리세요. 내려받은 Nightscout JSON은 백업일 뿐이며 일부 데이터가 빠집니다.
       - title: "데이터와 개인정보"
         items:
           - q: "내 데이터가 저장되나요?"

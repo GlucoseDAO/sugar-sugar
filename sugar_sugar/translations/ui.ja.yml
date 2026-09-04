@@ -192,9 +192,10 @@ ja:
     data_usage_consent_label: "アップロードしたCGMデータをこの研究に使うことに同意します。"
     data_usage_consent_required: "続けるには、データの利用同意を確認してください。"
     import_title: "CGMデータを取り込む"
-    import_subtitle: "NightscoutのサイトURLを使うのが最善です — 血糖に加えて食事とインスリンのマーカーも取り込めます。ダウンロードしたNightscoutのJSONはその一部が欠けます。URLがない場合は、Dexcom、Libre、またはMedtronicのCSVをアップロードしてください。"
-    import_or: "NightscoutのURLがない場合は、代わりにCSVをアップロード："
-    import_upload_prompt: "ドラッグ＆ドロップするかクリックして、Dexcom / Libre / MedtronicのCSVを選ぶ"
+    import_subtitle: "Dexcom、Libre、またはMedtronicの公式CSVをアップロードするか、NightscoutのサイトURLを使ってください。"
+    import_or: "またはNightscoutのURLを使う："
+    import_upload_prompt: "ドラッグ＆ドロップするかクリックして、Dexcom / Libre / Medtronicの公式CSVを選ぶ"
+    import_json_backup: "NightscoutのJSON（entries.json、あればtreatments.jsonも）はURLが使えないときの予備です。この形式では一部のデータが欠けます。"
     import_ns_url_placeholder: "Nightscout URL（https://your-site.com）"
     import_ns_token_placeholder: "アクセストークンまたはAPIシークレット（任意）"
     import_ns_button: "Nightscoutから取り込む"
@@ -222,7 +223,7 @@ ja:
     upload_required: "アップロードが必要です"
     upload_success: "%{filename} からデータを読み込みました。このデータで予測します。"
     example_data_now_using: "公開の匿名データを使用中です。個別分析にはCSVをアップロードしてください。"
-    example_data_warning: "現在は公開の匿名データを使っています。個別分析にはNightscoutのURL、なければDexcom/Libre/MedtronicのCSVを使ってください。"
+    example_data_warning: "現在は公開の匿名データを使っています。個別分析には公式のDexcom/Libre/Medtronic CSV、またはNightscoutのURLを使ってください。"
     csv_tab_label: "CSVファイル"
     nightscout_tab_label: "Nightscout"
     nightscout_url_placeholder: "https://your-nightscout-site.com"
@@ -705,7 +706,7 @@ ja:
 
               **xDrip+:** Menu → Import/Export → Export CSV（SiDiary形式）。
 
-              **Nightscout:** スタート画面にサイトURLを貼り付けてください — それが完全な取り込みです（血糖に加えて食事とインスリン）。ダウンロードしたNightscoutのJSONやCSVはその一部が欠けます。URLがない場合は、Dexcom、Libre、またはMedtronicからCSVを書き出してください。
+              **Nightscout:** スタート画面にサイトURLを貼り付けるか、Dexcom / Libre / Medtronicの公式CSVをアップロードしてください。ダウンロードしたNightscoutのJSONは予備であり、一部のデータが欠けます。
       - title: "データとプライバシー"
         items:
           - q: "自分のデータは保存されますか？"

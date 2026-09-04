@@ -187,9 +187,10 @@ zh:
     data_usage_consent_required: "请确认数据使用同意以继续。"
     consent_gate_hint: "请先勾选上方两个必选项（18 岁以上／已阅读条款，以及数据保护同意），然后继续。"
     import_title: "导入您的 CGM 数据"
-    import_subtitle: "优先使用你的 Nightscout 站点网址 — 可以拉取血糖以及进餐和胰岛素标记。下载的 Nightscout JSON 会漏掉一部分。如果没有 Nightscout 网址，请改上传 Dexcom、Libre 或 Medtronic 的 CSV。"
-    import_or: "没有 Nightscout 网址？改上传 CSV："
-    import_upload_prompt: "拖放或点击选择 Dexcom、Libre 或 Medtronic 的 CSV"
+    import_subtitle: "上传 Dexcom、Libre 或 Medtronic 的官方 CSV，或使用你的 Nightscout 站点网址。"
+    import_or: "或者使用 Nightscout 网址："
+    import_upload_prompt: "拖放或点击选择 Dexcom、Libre 或 Medtronic 的官方 CSV"
+    import_json_backup: "Nightscout JSON（entries.json，如有再加 treatments.json）只是备用：无法使用网址时才用，该格式会漏掉一些数据。"
     import_ns_url_placeholder: "Nightscout 网址（https://您的站点.com）"
     import_ns_token_placeholder: "访问令牌或 API secret（可选）"
     import_ns_button: "从 Nightscout 导入"
@@ -217,7 +218,7 @@ zh:
     upload_required: "需要上传"
     upload_success: "已成功从 %{filename} 加载数据。此数据将用于预测。"
     example_data_now_using: "现在使用公开匿名数据。上传 CSV 文件进行个性化分析。"
-    example_data_warning: "目前正在使用公开匿名数据。优先使用 Nightscout 网址，或 Dexcom/Libre/Medtronic CSV，进行个性化分析。"
+    example_data_warning: "目前正在使用公开匿名数据。请上传 Dexcom/Libre/Medtronic 官方 CSV，或使用 Nightscout 网址，进行个性化分析。"
     csv_tab_label: "CSV 文件"
     nightscout_tab_label: "Nightscout"
     nightscout_url_placeholder: "https://your-nightscout-site.com"
@@ -689,7 +690,7 @@ zh:
 
               **xDrip+：** 菜单 → Import/Export → Export CSV（SiDiary 格式）。
 
-              **Nightscout：** 在开始页粘贴你的站点 URL — 这是完整导入（血糖以及进餐和胰岛素标记）。下载的 Nightscout JSON 或 CSV 会漏掉一部分。如果没有 Nightscout 网址，请改从 Dexcom、Libre 或 Medtronic 导出 CSV。
+              **Nightscout：** 在开始页粘贴你的站点 URL，或上传 Dexcom / Libre / Medtronic 官方 CSV。下载的 Nightscout JSON 只是备用，会漏掉一些数据。
       - title: "数据与隐私"
         items:
           - q: "我的数据会被存储吗？"

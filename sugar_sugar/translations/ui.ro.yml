@@ -188,9 +188,10 @@ ro:
     data_usage_consent_required: "Te rugăm să confirmi consimțământul pentru utilizarea datelor ca să continui."
     consent_gate_hint: "Bifează mai sus ambele căsuțe obligatorii (18+ / am citit termenii și consimțământul privind protecția datelor) pentru a continua."
     import_title: "Importă-ți datele CGM"
-    import_subtitle: "Folosește URL-ul site-ului Nightscout — aduce glucoza plus marcajele de mese și insulină. Un JSON Nightscout descărcat omite o parte din astea. Dacă n-ai URL Nightscout, încarcă un CSV Dexcom, Libre sau Medtronic."
-    import_or: "Fără URL Nightscout? Încarcă un CSV:"
-    import_upload_prompt: "Trage și plasează sau apasă pentru a selecta un CSV Dexcom, Libre sau Medtronic"
+    import_subtitle: "Încarcă un CSV oficial de la Dexcom, Libre sau Medtronic, sau folosește URL-ul site-ului Nightscout."
+    import_or: "Sau folosește URL-ul Nightscout:"
+    import_upload_prompt: "Trage și plasează sau apasă pentru a selecta un CSV oficial Dexcom, Libre sau Medtronic"
+    import_json_backup: "JSON-ul Nightscout (entries.json, plus treatments.json dacă îl ai) e doar o rezervă dacă nu poți folosi un URL — acel format omite date."
     import_ns_url_placeholder: "URL Nightscout (https://site-ul-tau.com)"
     import_ns_token_placeholder: "Token de acces sau API secret (opțional)"
     import_ns_button: "Importă din Nightscout"
@@ -218,7 +219,7 @@ ro:
     upload_required: "Este necesară încărcarea"
     upload_success: "Datele din %{filename} au fost încărcate cu succes. Aceste date vor fi folosite pentru predicții."
     example_data_now_using: "Acum se folosesc date exemplu. Încarcă un fișier CSV pentru o analiză personalizată."
-    example_data_warning: "În prezent se folosesc date publice anonimizate. Folosește URL-ul Nightscout, sau un CSV Dexcom/Libre/Medtronic, pentru o analiză personalizată."
+    example_data_warning: "În prezent se folosesc date publice anonimizate. Încarcă un CSV oficial Dexcom/Libre/Medtronic, sau folosește URL-ul Nightscout, pentru o analiză personalizată."
     csv_tab_label: "Fișier CSV"
     nightscout_tab_label: "Nightscout"
     nightscout_url_placeholder: "https://site-ul-tau-nightscout.com"
@@ -702,7 +703,7 @@ ro:
 
               **xDrip+:** Meniu → Import/Export → Export CSV (format SiDiary).
 
-              **Nightscout:** lipește URL-ul site-ului pe ecranul de start — ăsta e importul complet (glucoză plus mese și insulină). Un JSON sau CSV Nightscout descărcat omite o parte din astea. Dacă n-ai URL Nightscout, exportă un CSV de la Dexcom, Libre sau Medtronic.
+              **Nightscout:** lipește URL-ul site-ului pe ecranul de start, sau încarcă un CSV oficial Dexcom / Libre / Medtronic. Un JSON Nightscout descărcat e doar o rezervă — omite date.
       - title: "Date și confidențialitate"
         items:
           - q: "Sunt stocate datele mele?"

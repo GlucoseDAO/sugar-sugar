@@ -189,9 +189,10 @@ fr:
     data_usage_consent_required: "Merci de confirmer ton consentement à l'utilisation des données pour continuer."
     consent_gate_hint: "Coche ci-dessus les deux cases obligatoires (18+ / conditions lues, et consentement à la protection des données) pour continuer."
     import_title: "Importe tes données CGM"
-    import_subtitle: "Préfère l'URL de ton site Nightscout — elle récupère la glycémie plus les repères de repas et d'insuline. Un fichier JSON Nightscout téléchargé en omet une partie. Sans URL Nightscout, téléverse plutôt un CSV Dexcom, Libre ou Medtronic."
-    import_or: "Pas d'URL Nightscout ? Téléverse un CSV à la place :"
-    import_upload_prompt: "Glisse-dépose ou touche pour choisir un CSV Dexcom, Libre ou Medtronic"
+    import_subtitle: "Téléverse un CSV officiel Dexcom, Libre ou Medtronic, ou utilise l'URL de ton site Nightscout."
+    import_or: "Ou utilise ton URL Nightscout :"
+    import_upload_prompt: "Glisse-dépose ou touche pour choisir un CSV officiel Dexcom, Libre ou Medtronic"
+    import_json_backup: "Le JSON Nightscout (entries.json, plus treatments.json si tu l'as) n'est qu'un secours si tu ne peux pas utiliser une URL — ce format omet des données."
     import_ns_url_placeholder: "URL Nightscout (https://ton-site.com)"
     import_ns_token_placeholder: "Jeton d'accès ou API secret (facultatif)"
     import_ns_button: "Importer depuis Nightscout"
@@ -219,7 +220,7 @@ fr:
     upload_required: "Téléversement requis"
     upload_success: "Données chargées avec succès depuis %{filename}. Ces données seront utilisées pour les prédictions."
     example_data_now_using: "Données publiques anonymisées en cours d'utilisation. Téléverse un fichier CSV pour une analyse personnalisée."
-    example_data_warning: "Données publiques anonymisées actuellement utilisées. Préfère l'URL Nightscout, sinon un CSV Dexcom/Libre/Medtronic, pour une analyse personnalisée."
+    example_data_warning: "Données publiques anonymisées actuellement utilisées. Téléverse un CSV officiel Dexcom/Libre/Medtronic, ou utilise ton URL Nightscout, pour une analyse personnalisée."
     csv_tab_label: "Fichier CSV"
     nightscout_tab_label: "Nightscout"
     nightscout_url_placeholder: "https://ton-site-nightscout.com"
@@ -703,7 +704,7 @@ fr:
 
               **xDrip+ :** Menu → Import/Export → Export CSV (format SiDiary).
 
-              **Nightscout :** colle l'URL de ton site sur l'écran de démarrage — c'est l'import complet (glycémie plus repas et insuline). Un JSON ou un CSV Nightscout téléchargé en omet une partie. Sans URL Nightscout, exporte plutôt un CSV Dexcom, Libre ou Medtronic.
+              **Nightscout :** colle l'URL de ton site sur l'écran de démarrage, ou téléverse un CSV officiel Dexcom / Libre / Medtronic. Un JSON Nightscout téléchargé n'est qu'un secours — il omet des données.
       - title: "Données et confidentialité"
         items:
           - q: "Mes données sont-elles stockées ?"

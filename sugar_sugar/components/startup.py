@@ -106,11 +106,11 @@ def stamp_upload_data_consent(user_info: dict[str, Any]) -> dict[str, Any]:
 
 
 def import_controls_children(locale: str) -> list[Any]:
-    """Startup-stage 'import your CGM data' block: Nightscout URL, then CSV.
+    """Startup-stage 'import your CGM data' block: official CSV, or Nightscout URL.
 
-    Nightscout URL is first because it pulls glucose plus treatments. A
-    downloaded Nightscout JSON/CSV leaves markers out, so the file picker is
-    the fallback for manufacturer CSVs when the player has no site URL.
+    Manufacturer CSV is first. Nightscout URL is the other first-class path.
+    Downloaded Nightscout JSON is only mentioned last as a backup — it omits
+    some markers — and still lands on the same upload box.
 
     Rendered inside the data-usage-consent container (revealed for formats B/C).
     Uses dedicated ``startup-*`` ids so it never clashes with the /prediction
@@ -133,6 +133,23 @@ def import_controls_children(locale: str) -> list[Any]:
             id='startup-import-subtitle',
             style={'fontSize': '13px', 'color': '#64748b', 'marginBottom': '10px', 'lineHeight': '1.4'},
         ),
+        dcc.Upload(
+            id='startup-upload-data',
+            multiple=True,
+            accept='.csv,.json,text/csv,application/json',
+            children=html.Div(t("ui.startup.import_upload_prompt", locale=locale), id='startup-upload-prompt'),
+            style={
+                'width': '100%', 'minHeight': '56px', 'display': 'flex',
+                'alignItems': 'center', 'justifyContent': 'center', 'textAlign': 'center',
+                'padding': '10px', 'borderWidth': '2px', 'borderStyle': 'dashed',
+                'borderColor': '#2185d0', 'borderRadius': '8px', 'color': '#2185d0',
+                'cursor': 'pointer', 'backgroundColor': '#f8fbff', 'boxSizing': 'border-box',
+            },
+        ),
+        html.Div(
+            t("ui.startup.import_or", locale=locale),
+            style={'color': '#475569', 'fontSize': '13px', 'margin': '12px 0 8px', 'fontWeight': '600'},
+        ),
         dcc.Input(
             id='startup-ns-url', type='url',
             placeholder=t("ui.startup.import_ns_url_placeholder", locale=locale),
@@ -149,23 +166,9 @@ def import_controls_children(locale: str) -> list[Any]:
             n_clicks=0, style={'width': '100%', 'marginBottom': '8px'},
         ),
         html.Div(
-            t("ui.startup.import_or", locale=locale),
-            style={'color': '#475569', 'fontSize': '13px', 'margin': '12px 0 8px', 'fontWeight': '600'},
-        ),
-        dcc.Upload(
-            id='startup-upload-data',
-            # Still accepts Nightscout JSON siblings if someone already has them;
-            # the copy no longer steers people there.
-            multiple=True,
-            accept='.csv,.json,text/csv,application/json',
-            children=html.Div(t("ui.startup.import_upload_prompt", locale=locale), id='startup-upload-prompt'),
-            style={
-                'width': '100%', 'minHeight': '56px', 'display': 'flex',
-                'alignItems': 'center', 'justifyContent': 'center', 'textAlign': 'center',
-                'padding': '10px', 'borderWidth': '2px', 'borderStyle': 'dashed',
-                'borderColor': '#2185d0', 'borderRadius': '8px', 'color': '#2185d0',
-                'cursor': 'pointer', 'backgroundColor': '#f8fbff', 'boxSizing': 'border-box',
-            },
+            t("ui.startup.import_json_backup", locale=locale),
+            id='startup-import-json-backup',
+            style={'fontSize': '12px', 'color': '#64748b', 'marginTop': '8px', 'lineHeight': '1.4'},
         ),
         dcc.Loading(
             html.Div(id='startup-import-status', style={'marginTop': '4px', 'fontSize': '15px', 'lineHeight': '1.4'}),
