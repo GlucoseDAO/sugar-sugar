@@ -749,14 +749,25 @@ html.mobile-device .mobile-nav-bar {
 /* Wizard Next button: when the consent gate disables it, make it obviously
    inert (grey + not-allowed), not a dimmed-but-still-blue Fomantic button that
    reads as "clickable but broken". The className is swapped to
-   `startup-next-disabled` by gate_mobile_consent_step. */
+   `startup-next-disabled` by gate_mobile_consent_step. The native HTML
+   `disabled` attribute is NOT used: Fomantic's `:disabled { pointer-events:
+   none !important }` sticks on Samsung Internet after React removes disabled,
+   so a blue Next absorbs no taps. Visual-only class; the callback no-ops. */
 /* Tap feedback: a wizard tap that registers must LOOK like it registered.
    Without this a missed tap and a slow one are indistinguishable, which is how
    "pressed it a few times, zero reaction" got read as a freeze. */
-html.mobile-device #startup-next:not(:disabled):active,
+html.mobile-device #startup-next:not(.startup-next-disabled):active,
 html.mobile-device #startup-prev:not(:disabled):active {
   transform: scale(0.98);
   filter: brightness(0.9);
+}
+
+/* Always receive taps, even when the visual gate is on (callback no-ops)
+   and even if a stale client still stamped `disabled`. Samsung Internet. */
+#startup-next,
+#startup-prev {
+  pointer-events: auto !important;
+  touch-action: manipulation;
 }
 
 html.mobile-device #startup-next.startup-next-disabled,
@@ -767,6 +778,7 @@ html.mobile-device #startup-next:disabled {
   cursor: not-allowed !important;
   opacity: 1 !important;
   box-shadow: none !important;
+  pointer-events: auto !important;
 }
 
 html.mobile-device .mobile-nav-burger {
@@ -917,11 +929,69 @@ html.mobile-device #landing-page .how-it-works-step {
 }
 
 html.mobile-device #startup-next:disabled,
-html.mobile-device #startup-next[disabled] {
+html.mobile-device #startup-next[disabled],
+html.mobile-device #startup-next.startup-next-disabled {
   background: #9ca3af !important;
   color: #ffffff !important;
   cursor: not-allowed !important;
   opacity: 0.75 !important;
+  pointer-events: auto !important;
+}
+
+/* Consent iframe on the wizard: Samsung Internet has ignored CSS min() on
+   srcdoc iframes and painted the frame over the checkboxes + Next below.
+   Pin a real height and keep the iframe below the controls in z-order. */
+html.mobile-device #consent-notice-scroll {
+  position: relative;
+  z-index: 0;
+}
+html.mobile-device #consent-notice-scroll iframe {
+  display: block !important;
+  width: 100% !important;
+  height: 360px !important;
+  max-height: 45vh !important;
+  overflow: auto !important;
+  position: relative !important;
+  z-index: 0 !important;
+}
+
+/* Native checkboxes, finger-sized. Bootstrap's appearance:none custom box
+   misses taps on Samsung Internet (the painted square is not the input). */
+html.mobile-device #startup-page #consent-acknowledge,
+html.mobile-device #startup-page #consent-gdpr,
+html.mobile-device #startup-page #consent-upload-own-data,
+html.mobile-device #startup-page #consent-receive-results,
+html.mobile-device #startup-page #consent-keep-updated,
+html.mobile-device #startup-wizard-nav {
+  position: relative;
+  z-index: 2;
+}
+html.mobile-device #startup-page .form-check {
+  min-height: 48px;
+  padding: 10px 4px;
+  align-items: center !important;
+}
+html.mobile-device #startup-page input[type="checkbox"] {
+  appearance: auto !important;
+  -webkit-appearance: checkbox !important;
+  width: 24px !important;
+  min-width: 24px !important;
+  height: 24px !important;
+  margin: 0 !important;
+}
+html.mobile-device #startup-page .form-check-label {
+  flex: 1 1 auto !important;
+  display: block !important;
+  padding: 10px 8px !important;
+  font-size: 16px !important;
+}
+
+html.mobile-device #startup-wizard-nav {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  background: #fff;
+  padding: 12px 0 calc(12px + env(safe-area-inset-bottom, 0px));
 }
 
 /* The desktop validation callback rewrites #landing-continue's inline width to

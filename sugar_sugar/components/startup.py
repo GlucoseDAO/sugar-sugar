@@ -1,6 +1,7 @@
 from dash import html, dcc
 from dash.dependencies import Input, Output, State
 from dash import no_update
+from dash.exceptions import PreventUpdate
 import dash
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -500,6 +501,64 @@ def validate_startup_form(
         form_complete=form_complete,
         _locale=locale,
     )
+
+
+def wizard_next_is_allowed(
+    *,
+    step: int,
+    acknowledge_value: Optional[list[str]],
+    gdpr_value: Optional[list[str]],
+    email: Optional[str],
+    age: Optional[int | float],
+    gender: Optional[str],
+    uses_cgm: Optional[bool],
+    cgm_duration: Optional[int | float],
+    cgm_duration_unit: Optional[str],
+    is_diabetic: Optional[bool],
+    diabetic_type: Optional[str],
+    diabetes_duration: Optional[int | float],
+    location: Optional[str],
+    format_value: Optional[str],
+    data_usage_consent: Optional[list[str]],
+    user_info: Optional[dict[str, Any]],
+    locale: Optional[str],
+) -> bool:
+    """Whether the mobile wizard Next control may advance from ``step``.
+
+    The HTML ``disabled`` attribute is deliberately not used for this gate.
+    Fomantic's ``.ui.button:disabled { pointer-events: none !important }`` plus
+    Samsung Internet's failure to restore hit-testing after React removes
+    ``disabled`` swallows taps: the button turns blue and the click never
+    reaches Dash. Visual gating stays on the ``startup-next-disabled`` class;
+    ``navigate_startup_wizard`` reads this predicate (via a store) and no-ops.
+    """
+    if step <= 0:
+        return bool(
+            acknowledge_value
+            and "ack" in acknowledge_value
+            and gdpr_value
+            and "gdpr" in gdpr_value
+        )
+    if 1 <= step <= 4:
+        return validate_startup_form(
+            email=email,
+            age=age,
+            gender=gender,
+            format_value=format_value,
+            data_usage_consent=data_usage_consent,
+            is_diabetic=is_diabetic,
+            diabetic_type=diabetic_type,
+            diabetes_duration=diabetes_duration,
+            location=location,
+            uses_cgm=uses_cgm,
+            cgm_duration=cgm_duration,
+            wants_contact=_wants_contact_from_user_info(user_info),
+            locale=locale,
+            wizard_step=step,
+            prior_upload_consent=prior_upload_data_consent(user_info),
+            cgm_duration_unit=cgm_duration_unit,
+        ).step_complete
+    return True
 
 
 def _step_hint_children(
@@ -1535,7 +1594,8 @@ class StartupPage(html.Div):
             [Input('startup-prev', 'n_clicks'),
              Input('startup-next', 'n_clicks')],
             [State('startup-step', 'data'),
-             State('interface-language', 'data')],
+             State('interface-language', 'data'),
+             State('startup-next-allowed', 'data')],
             prevent_initial_call=True,
         )
         def navigate_startup_wizard(
@@ -1543,10 +1603,15 @@ class StartupPage(html.Div):
             next_clicks: Optional[int],
             current_step: Optional[int],
             interface_language: Optional[str],
+            next_allowed: Optional[bool],
         ) -> tuple[Any, ...]:
             trigger = dash.callback_context.triggered_id
             step = int(current_step or 0)
             if trigger == 'startup-next':
+                # Class-only gate: the button stays a real <button> so Samsung
+                # Internet can deliver the tap. Refuse here if the store says no.
+                if not next_allowed:
+                    raise PreventUpdate
                 step = min(step + 1, WIZARD_STEPS - 1)
             elif trigger == 'startup-prev':
                 step = max(step - 1, 0)
@@ -1562,12 +1627,13 @@ class StartupPage(html.Div):
                 _wizard_progress_children(step, interface_language),
             )
 
-        # The consent gate must run on initial mobile render so the first Next
-        # button starts disabled until the required consent actions are complete.
+        # Visual + store gate.  Must NOT write ``startup-next.disabled``: a
+        # native disabled <button> that later becomes enabled is un-tappable on
+        # Samsung Internet (Fomantic ``pointer-events: none !important`` sticks).
         @app.callback(
-            [Output('startup-next', 'disabled'),
-             Output('startup-next', 'className'),
-             Output('startup-consent-hint', 'style')],
+            [Output('startup-next', 'className'),
+             Output('startup-consent-hint', 'style'),
+             Output('startup-next-allowed', 'data')],
             [Input('consent-acknowledge', 'value'),
              Input('consent-gdpr', 'value'),
              Input('startup-step', 'data'),
@@ -1605,7 +1671,7 @@ class StartupPage(html.Div):
             data_usage_consent: Optional[list[str]],
             user_info: Optional[dict[str, Any]],
             interface_language: Optional[str],
-        ) -> tuple[bool, str, dict[str, str]]:
+        ) -> tuple[str, dict[str, str], bool]:
             step = int(current_step or 0)
             # On step 0 the hint keeps its box when it is not shown
             # (`visibility`, not `display`).  Collapsing it moved the nav row up
@@ -1618,39 +1684,32 @@ class StartupPage(html.Div):
             }
             hint_reserved = {**hint_shown, 'visibility': 'hidden'}
             hint_hidden = {'display': 'none'}
+            allowed = wizard_next_is_allowed(
+                step=step,
+                acknowledge_value=acknowledge_value,
+                gdpr_value=gdpr_value,
+                email=email,
+                age=age,
+                gender=gender,
+                uses_cgm=uses_cgm,
+                cgm_duration=cgm_duration,
+                cgm_duration_unit=cgm_duration_unit,
+                is_diabetic=is_diabetic,
+                diabetic_type=diabetic_type,
+                diabetes_duration=diabetes_duration,
+                location=location,
+                format_value=format_value,
+                data_usage_consent=data_usage_consent,
+                user_info=user_info,
+                locale=interface_language,
+            )
             if step == 0:
-                blocked = not (
-                    bool(acknowledge_value and 'ack' in acknowledge_value) and
-                    bool(gdpr_value and 'gdpr' in gdpr_value)
-                )
-                if blocked:
-                    return True, "ui button startup-next-disabled", hint_shown
-                return False, "ui blue button", hint_reserved
-
-            if 1 <= step <= 4:
-                wants_contact = _wants_contact_from_user_info(user_info)
-                step_validation = validate_startup_form(
-                    email=email,
-                    age=age,
-                    gender=gender,
-                    format_value=format_value,
-                    data_usage_consent=data_usage_consent,
-                    is_diabetic=is_diabetic,
-                    diabetic_type=diabetic_type,
-                    diabetes_duration=diabetes_duration,
-                    location=location,
-                    uses_cgm=uses_cgm,
-                    cgm_duration=cgm_duration,
-                    wants_contact=wants_contact,
-                    locale=interface_language,
-                    wizard_step=step,
-                    prior_upload_consent=prior_upload_data_consent(user_info),
-                    cgm_duration_unit=cgm_duration_unit,
-                )
-                if not step_validation.step_complete:
-                    return True, "ui button startup-next-disabled", hint_hidden
-
-            return False, "ui blue button", hint_hidden
+                if not allowed:
+                    return "ui button startup-next-disabled", hint_shown, False
+                return "ui blue button", hint_reserved, True
+            if not allowed:
+                return "ui button startup-next-disabled", hint_hidden, False
+            return "ui blue button", hint_hidden, True
 
         app.clientside_callback(
             """
@@ -2009,11 +2068,15 @@ class StartupPageMobile(html.Div):
                 html.Button(
                     t("ui.startup.wizard_next", locale=locale),
                     id='startup-next',
-                    className="ui blue button",
-                    disabled=True,
+                    className="ui button startup-next-disabled",
+                    # Never mount this as HTML-disabled. Samsung Internet keeps
+                    # Fomantic's pointer-events:none after Dash removes disabled,
+                    # so a blue Next absorbs no taps. The class is visual only;
+                    # navigate_startup_wizard reads startup-next-allowed.
                     style=_wizard_nav_btn_style(visible=True),
                 ),
             ],
+            id='startup-wizard-nav',
             style={'display': 'flex', 'gap': '12px', 'marginTop': '20px'},
             disable_n_clicks=True,
         )
@@ -2048,9 +2111,12 @@ class StartupPageMobile(html.Div):
         )
 
         super().__init__(
-            children=[card],
+            children=[
+                card,
+                dcc.Store(id='startup-next-allowed', data=False, storage_type='memory'),
+            ],
             id=self.component_id,
-            style={'padding': '14px 12px 32px', 'backgroundColor': '#f5f5f5', 'minHeight': '100vh'},
+            style={'padding': '14px 12px 80px', 'backgroundColor': '#f5f5f5', 'minHeight': '100vh'},
             disable_n_clicks=True,
         )
 
