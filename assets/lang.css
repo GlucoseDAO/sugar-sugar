@@ -807,6 +807,15 @@ body .ui.large.menu {
   color: #0d47a1;
 }
 
+.info-page .ui.segment img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 12px 0;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 8px;
+}
+
 .demo-fullscreen-button.ui.button {
   margin-top: 16px;
 }

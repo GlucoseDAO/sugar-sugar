@@ -166,8 +166,15 @@ ro:
     format_help_a: "Date publice — curbe CGM anonimizate de la alte persoane. Nu trebuie să încarci nimic."
     format_help_b: "Datele mele — încarcă propriul CSV și joacă pe glucoza ta."
     format_help_c: "Date publice + datele mele — o combinație. Unele runde folosesc curbe publice anonimizate, altele pe ale tale."
-    format_find_data_before: "Dacă nu știi de unde să-ți iei datele, "
-    format_find_data_link: "caută aici."
+    format_find_data_intro: "Senzori populari — exportă un CSV de la:"
+    format_find_dexcom_us: "Dexcom (SUA)"
+    format_find_dexcom_eu: "Dexcom (Europa)"
+    format_find_libre: "Libre"
+    format_find_medtronic: "Medtronic"
+    format_find_faq_before: "Pașii detaliați pentru acești senzori sunt în "
+    format_find_faq_link: "FAQ"
+    format_find_faq_after: "."
+    format_find_others: "Pentru alți senzori trebuie să cauți singur."
     challenge_unknown_button: "Provoacă necunoscutul"
     challenge_unknown_button_on: "Necunoscutul e activ"
     challenge_unknown_help: "Dacă bifezi, jumătate din curbe vor veni din grupul opus — date de la persoane cu diabet dacă nu ai diabet, și invers. Doar pentru Publice sau Publice + datele mele."
@@ -181,9 +188,9 @@ ro:
     data_usage_consent_required: "Te rugăm să confirmi consimțământul pentru utilizarea datelor ca să continui."
     consent_gate_hint: "Bifează mai sus ambele căsuțe obligatorii (18+ / am citit termenii și consimțământul privind protecția datelor) pentru a continua."
     import_title: "Importă-ți datele CGM"
-    import_subtitle: "Încarcă un export CSV (Dexcom / Libre / Medtronic) sau fișierul entries.json de la Nightscout — selectează și treatments.json ca să primești marcaje pentru mese și insulină. Ori preia datele direct de pe site-ul tău Nightscout."
-    import_or: "— sau —"
-    import_upload_prompt: "Trage și plasează sau apasă pentru a selecta un CSV — ori alege împreună entries.json și treatments.json de la Nightscout"
+    import_subtitle: "Folosește URL-ul site-ului Nightscout — aduce glucoza plus marcajele de mese și insulină. Un JSON Nightscout descărcat omite o parte din astea. Dacă n-ai URL Nightscout, încarcă un CSV Dexcom, Libre sau Medtronic."
+    import_or: "Fără URL Nightscout? Încarcă un CSV:"
+    import_upload_prompt: "Trage și plasează sau apasă pentru a selecta un CSV Dexcom, Libre sau Medtronic"
     import_ns_url_placeholder: "URL Nightscout (https://site-ul-tau.com)"
     import_ns_token_placeholder: "Token de acces sau API secret (opțional)"
     import_ns_button: "Importă din Nightscout"
@@ -211,7 +218,7 @@ ro:
     upload_required: "Este necesară încărcarea"
     upload_success: "Datele din %{filename} au fost încărcate cu succes. Aceste date vor fi folosite pentru predicții."
     example_data_now_using: "Acum se folosesc date exemplu. Încarcă un fișier CSV pentru o analiză personalizată."
-    example_data_warning: "În prezent se folosesc date exemplu. Încarcă propriul CSV Dexcom/Libre/Medtronic — sau entries.json de la Nightscout — pentru o analiză personalizată."
+    example_data_warning: "În prezent se folosesc date publice anonimizate. Folosește URL-ul Nightscout, sau un CSV Dexcom/Libre/Medtronic, pentru o analiză personalizată."
     csv_tab_label: "Fișier CSV"
     nightscout_tab_label: "Nightscout"
     nightscout_url_placeholder: "https://site-ul-tau-nightscout.com"
@@ -653,9 +660,11 @@ ro:
             a: >-
               1. Deschide [clarity.dexcom.com](https://clarity.dexcom.com) (SUA) sau [clarity.dexcom.eu](https://clarity.dexcom.eu) (Europa) și autentifică-te cu contul Dexcom.
 
-              2. Deschide orice raport, apoi apasă **Export** în bara de sus.
+              2. Pe pagina Overview, trebuie să apeși **pictograma de export din colțul din dreapta-sus** al tabloului (ultima pictogramă din rând, lângă intervalul de date — arată ca un tabel). Nu există un buton Export în meniul de sus.
 
-              3. Alege un interval (14, 30, 90 de zile sau personalizat) și descarcă CSV-ul.
+              ![Apasă pictograma de export din colțul din dreapta-sus în Dexcom Clarity](/assets/images/dexcom_instruction.jpg)
+
+              3. În fereastra **Export your data**, alege un interval (14, 30, 90 de zile sau personalizat) și apasă **Export** ca să descarci CSV-ul.
 
 
               Aplicația Clarity de pe telefon nu poate exporta CSV — folosește site-ul.
@@ -693,7 +702,7 @@ ro:
 
               **xDrip+:** Meniu → Import/Export → Export CSV (format SiDiary).
 
-              **Nightscout:** lipește URL-ul site-ului pe ecranul de start — nu ai nevoie de fișier. Dacă preferi să încarci un fișier, deschide `https://site-ul-tau/api/v1/entries.json?count=10000`, salvează-l și încarcă-l pe acela — nu exportul CSV, căruia îi lipsesc majoritatea datelor.
+              **Nightscout:** lipește URL-ul site-ului pe ecranul de start — ăsta e importul complet (glucoză plus mese și insulină). Un JSON sau CSV Nightscout descărcat omite o parte din astea. Dacă n-ai URL Nightscout, exportă un CSV de la Dexcom, Libre sau Medtronic.
       - title: "Date și confidențialitate"
         items:
           - q: "Sunt stocate datele mele?"

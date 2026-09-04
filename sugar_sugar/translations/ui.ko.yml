@@ -171,8 +171,15 @@ ko:
     format_help_a: "공개 데이터 — 다른 사람의 익명 CGM 추적입니다. 업로드할 필요가 없습니다."
     format_help_b: "내 데이터 — 본인 CSV를 올리고 본인 혈당으로 플레이합니다."
     format_help_c: "공개 + 내 데이터 — 조합입니다. 일부 라운드는 익명 공개 추적, 일부는 본인 데이터를 씁니다."
-    format_find_data_before: "데이터를 어디서 찾아야 할지 모르겠다면 "
-    format_find_data_link: "여기서 검색하세요."
+    format_find_data_intro: "많이 쓰는 센서 — 다음에서 CSV를 내보내세요:"
+    format_find_dexcom_us: "Dexcom (미국)"
+    format_find_dexcom_eu: "Dexcom (유럽)"
+    format_find_libre: "Libre"
+    format_find_medtronic: "Medtronic"
+    format_find_faq_before: "이 센서들의 자세한 내보내기 단계는 "
+    format_find_faq_link: "자주 묻는 질문"
+    format_find_faq_after: "에 있습니다."
+    format_find_others: "다른 센서는 직접 찾아봐야 합니다."
     challenge_unknown_button: "미지에 도전"
     challenge_unknown_button_on: "미지에 도전 — 켜짐"
     challenge_unknown_help: "이것을 선택하면 추적의 절반은 반대 그룹에서 옵니다 — 당뇨병이 없으면 당뇨병 데이터, 있으면 비당뇨병 데이터입니다. 공개 또는 공개 + 내 데이터만 해당합니다."
@@ -185,9 +192,9 @@ ko:
     data_usage_consent_label: "업로드한 CGM 데이터를 이 연구에 사용하는 데 동의합니다."
     data_usage_consent_required: "계속하려면 데이터 이용 동의를 확인해 주세요."
     import_title: "CGM 데이터 가져오기"
-    import_subtitle: "CSV 내보내기(Dexcom / Libre / Medtronic) 또는 Nightscout entries.json을 올리세요 — 식사와 인슐린 마커를 보려면 treatments.json도 함께 선택하세요. Nightscout 사이트에서 바로 가져올 수도 있습니다."
-    import_or: "— 또는 —"
-    import_upload_prompt: "끌어다 놓거나 클릭해서 CSV를 선택 — 또는 Nightscout entries.json과 treatments.json을 함께 선택"
+    import_subtitle: "Nightscout 사이트 URL을 쓰는 것이 가장 좋습니다 — 혈당과 식사·인슐린 마커를 함께 가져옵니다. 내려받은 Nightscout JSON은 일부가 빠집니다. URL이 없으면 Dexcom, Libre 또는 Medtronic CSV를 올리세요."
+    import_or: "Nightscout URL이 없나요? 대신 CSV를 올리세요:"
+    import_upload_prompt: "끌어다 놓거나 클릭해서 Dexcom, Libre 또는 Medtronic CSV를 선택"
     import_ns_url_placeholder: "Nightscout URL (https://your-site.com)"
     import_ns_token_placeholder: "액세스 토큰 또는 API 시크릿 (선택)"
     import_ns_button: "Nightscout에서 가져오기"
@@ -215,7 +222,7 @@ ko:
     upload_required: "업로드 필요"
     upload_success: "%{filename}에서 데이터를 불러왔습니다. 이 데이터로 예측합니다."
     example_data_now_using: "이제 공개 익명 데이터를 사용합니다. 맞춤 분석을 원하면 CSV를 올리세요."
-    example_data_warning: "현재 공개 익명 데이터를 사용 중입니다. 맞춤 분석을 원하면 본인 Dexcom/Libre/Medtronic CSV 또는 Nightscout entries.json을 올리세요."
+    example_data_warning: "현재 공개 익명 데이터를 사용 중입니다. 맞춤 분석에는 Nightscout URL을, 없으면 Dexcom/Libre/Medtronic CSV를 쓰세요."
     csv_tab_label: "CSV 파일"
     nightscout_tab_label: "Nightscout"
     nightscout_url_placeholder: "https://your-nightscout-site.com"
@@ -656,9 +663,11 @@ ko:
             a: >-
               1. [clarity.dexcom.com](https://clarity.dexcom.com)(미국) 또는 [clarity.dexcom.eu](https://clarity.dexcom.eu)(유럽)을 열고 Dexcom 계정으로 로그인합니다.
 
-              2. 아무 보고서를 연 뒤 위쪽 바에서 **Export**를 클릭합니다.
+              2. Overview 페이지에서 대시보드 **오른쪽 위 모서리의 내보내기 아이콘**을 클릭해야 합니다(날짜 범위 옆 줄의 마지막 아이콘 — 스프레드시트처럼 보입니다). 위쪽 메뉴에는 Export 버튼이 없습니다.
 
-              3. 기간(14, 30, 90일 또는 사용자 지정)을 고르고 CSV를 다운로드합니다.
+              ![Dexcom Clarity 오른쪽 위 모서리의 내보내기 아이콘을 클릭하세요](/assets/images/dexcom_instruction.jpg)
+
+              3. **Export your data** 창에서 기간(14, 30, 90일 또는 사용자 지정)을 고른 뒤 **Export**를 눌러 CSV를 다운로드합니다.
 
 
               Clarity 휴대폰 앱은 CSV를 내보낼 수 없습니다. 웹사이트를 사용하세요.
@@ -696,7 +705,7 @@ ko:
 
               **xDrip+:** Menu → Import/Export → Export CSV (SiDiary 형식).
 
-              **Nightscout:** 시작 화면에 사이트 URL을 붙여 넣으세요 — 파일이 필요 없습니다. 파일로 올리려면 `https://your-site/api/v1/entries.json?count=10000`을 열고 저장한 뒤 그것을 올리세요. 대부분의 데이터가 빠지는 CSV 내보내기는 쓰지 마세요.
+              **Nightscout:** 시작 화면에 사이트 URL을 붙여 넣으세요 — 그것이 완전한 가져오기입니다(혈당과 식사·인슐린). 내려받은 Nightscout JSON이나 CSV는 일부가 빠집니다. URL이 없으면 Dexcom, Libre 또는 Medtronic에서 CSV를 내보내세요.
       - title: "데이터와 개인정보"
         items:
           - q: "내 데이터가 저장되나요?"

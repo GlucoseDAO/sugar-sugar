@@ -165,8 +165,15 @@ zh:
     format_help_a: "公开数据 — 其他人的匿名 CGM 曲线。不用上传任何文件。"
     format_help_b: "我的数据 — 上传你自己的 CSV，用自己的血糖来玩。"
     format_help_c: "公开 + 我的数据 — 两者结合。有的回合用公开匿名曲线，有的用你的。"
-    format_find_data_before: "如果不知道去哪里找自己的数据，"
-    format_find_data_link: "点这里查找。"
+    format_find_data_intro: "常见传感器 — 从这里导出 CSV："
+    format_find_dexcom_us: "Dexcom（美国）"
+    format_find_dexcom_eu: "Dexcom（欧洲）"
+    format_find_libre: "Libre"
+    format_find_medtronic: "Medtronic"
+    format_find_faq_before: "这些传感器的详细导出步骤见"
+    format_find_faq_link: "常见问题"
+    format_find_faq_after: "。"
+    format_find_others: "其他传感器需要你自己搜索。"
     challenge_unknown_button: "挑战未知"
     challenge_unknown_button_on: "未知已开启"
     challenge_unknown_help: "勾选后，一半曲线将来自对面一组：无糖尿病则用糖尿病数据，有糖尿病则用非糖尿病数据。仅适用于“公开”或“公开 + 我的数据”。"
@@ -180,9 +187,9 @@ zh:
     data_usage_consent_required: "请确认数据使用同意以继续。"
     consent_gate_hint: "请先勾选上方两个必选项（18 岁以上／已阅读条款，以及数据保护同意），然后继续。"
     import_title: "导入您的 CGM 数据"
-    import_subtitle: "上传 CSV 导出文件（Dexcom / Libre / Medtronic），或您的 Nightscout entries.json — 同时选中 treatments.json 即可获得进餐和胰岛素标记。也可以直接从您的 Nightscout 站点拉取数据。"
-    import_or: "— 或 —"
-    import_upload_prompt: "拖放或点击选择 CSV 文件 — 也可同时选择 Nightscout 的 entries.json 和 treatments.json"
+    import_subtitle: "优先使用你的 Nightscout 站点网址 — 可以拉取血糖以及进餐和胰岛素标记。下载的 Nightscout JSON 会漏掉一部分。如果没有 Nightscout 网址，请改上传 Dexcom、Libre 或 Medtronic 的 CSV。"
+    import_or: "没有 Nightscout 网址？改上传 CSV："
+    import_upload_prompt: "拖放或点击选择 Dexcom、Libre 或 Medtronic 的 CSV"
     import_ns_url_placeholder: "Nightscout 网址（https://您的站点.com）"
     import_ns_token_placeholder: "访问令牌或 API secret（可选）"
     import_ns_button: "从 Nightscout 导入"
@@ -210,7 +217,7 @@ zh:
     upload_required: "需要上传"
     upload_success: "已成功从 %{filename} 加载数据。此数据将用于预测。"
     example_data_now_using: "现在使用公开匿名数据。上传 CSV 文件进行个性化分析。"
-    example_data_warning: "目前正在使用公开匿名数据。上传您自己的 Dexcom/Libre/Medtronic CSV 文件，或 Nightscout 的 entries.json，进行个性化分析。"
+    example_data_warning: "目前正在使用公开匿名数据。优先使用 Nightscout 网址，或 Dexcom/Libre/Medtronic CSV，进行个性化分析。"
     csv_tab_label: "CSV 文件"
     nightscout_tab_label: "Nightscout"
     nightscout_url_placeholder: "https://your-nightscout-site.com"
@@ -640,9 +647,11 @@ zh:
             a: >-
               1. 打开 [clarity.dexcom.com](https://clarity.dexcom.com)（美国）或 [clarity.dexcom.eu](https://clarity.dexcom.eu)（欧洲），用 Dexcom 账号登录。
 
-              2. 打开任意报告，点击顶部的 **Export**。
+              2. 在 Overview 页面，必须点击仪表盘**右上角的导出图标**（日期范围旁边那一排的最后一个图标，看起来像电子表格）。顶部菜单里没有 Export 按钮。
 
-              3. 选择时间范围（14、30、90 天或自定义），下载 CSV。
+              ![点击 Dexcom Clarity 右上角的导出图标](/assets/images/dexcom_instruction.jpg)
+
+              3. 在 **Export your data** 对话框中选择时间范围（14、30、90 天或自定义），再点击 **Export** 下载 CSV。
 
 
               Clarity 手机 App 无法导出 CSV — 请用网页。
@@ -680,7 +689,7 @@ zh:
 
               **xDrip+：** 菜单 → Import/Export → Export CSV（SiDiary 格式）。
 
-              **Nightscout：** 在开始页粘贴你的站点 URL — 不需要文件。若想改为上传文件，请打开 `https://你的站点/api/v1/entries.json?count=10000`，保存后上传该文件 — 不要用 CSV 导出，它会丢失大部分数据。
+              **Nightscout：** 在开始页粘贴你的站点 URL — 这是完整导入（血糖以及进餐和胰岛素标记）。下载的 Nightscout JSON 或 CSV 会漏掉一部分。如果没有 Nightscout 网址，请改从 Dexcom、Libre 或 Medtronic 导出 CSV。
       - title: "数据与隐私"
         items:
           - q: "我的数据会被存储吗？"

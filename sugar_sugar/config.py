@@ -108,5 +108,6 @@ DASH_DEBUG: bool = _env_bool("DASH_DEBUG", DEBUG_MODE)
 # 40: Best-N scoring restored on the class boards.
 # 43: Bulgarian, Japanese, and Korean locales (navbar + i18n + location assets).
 # 46: Wizard Next no longer uses HTML disabled (Samsung Internet tap swallow).
-DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "46"))
+# 47: Dexcom FAQ export screenshot (top-right icon, not a top-bar Export button).
+DEPLOY_BUILD: int = int(os.getenv("DEPLOY_BUILD", "47"))
 

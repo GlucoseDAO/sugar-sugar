@@ -17,6 +17,7 @@ from sugar_sugar.components.startup import (
     WIZARD_STEPS,
     StartupPage,
     StartupPageMobile,
+    import_controls_children,
 )
 from sugar_sugar.i18n import setup_i18n
 
@@ -75,6 +76,44 @@ def startup_page(request: pytest.FixtureRequest) -> Any:
 def test_import_controls_exist_on_both_builders(startup_page: Any) -> None:
     missing = IMPORT_CONTROL_IDS - _ids(startup_page)
     assert not missing, f"import section is dead; missing: {sorted(missing)}"
+
+
+def _ordered_ids(node: Any) -> list[str]:
+    if isinstance(node, (list, tuple)):
+        found: list[str] = []
+        for child in node:
+            found.extend(_ordered_ids(child))
+        return found
+    found = []
+    node_id = getattr(node, "id", None)
+    if isinstance(node_id, str):
+        found.append(node_id)
+    children = getattr(node, "children", None)
+    if isinstance(children, (list, tuple)):
+        for child in children:
+            found.extend(_ordered_ids(child))
+    elif children is not None and not isinstance(children, str):
+        found.extend(_ordered_ids(children))
+    return found
+
+
+def test_nightscout_url_comes_before_csv_upload() -> None:
+    ids = _ordered_ids(import_controls_children("en"))
+    assert ids.index("startup-ns-url") < ids.index("startup-upload-data")
+    assert ids.index("startup-ns-import") < ids.index("startup-upload-data")
+
+
+def test_import_subtitle_prefers_nightscout_url() -> None:
+    children = import_controls_children("en")
+    subtitle = next(
+        node
+        for node in children
+        if getattr(node, "id", None) == "startup-import-subtitle"
+    )
+    text = str(subtitle.children)
+    assert "Nightscout site URL" in text
+    assert "leaves some of that out" in text
+    assert "entries.json" not in text
 
 
 def test_upload_accepts_several_files(startup_page: Any) -> None:

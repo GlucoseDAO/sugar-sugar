@@ -4,7 +4,7 @@ from dash import no_update
 from dash.exceptions import PreventUpdate
 import dash
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Final, Optional
 # DEBUG_MODE will be imported dynamically to get the latest value
 from sugar_sugar.components.landing import consent_controls_children
 from sugar_sugar.components.submit import _is_mobile_ua
@@ -106,12 +106,15 @@ def stamp_upload_data_consent(user_info: dict[str, Any]) -> dict[str, Any]:
 
 
 def import_controls_children(locale: str) -> list[Any]:
-    """Startup-stage 'import your CGM data' block: CSV upload + Nightscout fetch.
+    """Startup-stage 'import your CGM data' block: Nightscout URL, then CSV.
 
-    Rendered inside the data-usage-consent container (revealed for formats B/C), so
-    the user can bring their data in on the roomy startup screen instead of the
-    cramped prediction page. Uses dedicated ``startup-*`` ids so it never clashes
-    with the /prediction upload (id ``upload-data``). The import callbacks write
+    Nightscout URL is first because it pulls glucose plus treatments. A
+    downloaded Nightscout JSON/CSV leaves markers out, so the file picker is
+    the fallback for manufacturer CSVs when the player has no site URL.
+
+    Rendered inside the data-usage-consent container (revealed for formats B/C).
+    Uses dedicated ``startup-*`` ids so it never clashes with the /prediction
+    upload (id ``upload-data``). The import callbacks write
     ``uploaded_data_path`` into ``user-info-store``; the game picks it up from there.
     """
     _input_style: dict[str, str] = {
@@ -127,26 +130,8 @@ def import_controls_children(locale: str) -> list[Any]:
         ),
         html.Div(
             t("ui.startup.import_subtitle", locale=locale),
+            id='startup-import-subtitle',
             style={'fontSize': '13px', 'color': '#64748b', 'marginBottom': '10px', 'lineHeight': '1.4'},
-        ),
-        dcc.Upload(
-            id='startup-upload-data',
-            # A Nightscout export is up to three sibling files (entries /
-            # treatments / profile); every other CGM export is one.
-            multiple=True,
-            accept='.csv,.json,text/csv,application/json',
-            children=html.Div(t("ui.startup.import_upload_prompt", locale=locale), id='startup-upload-prompt'),
-            style={
-                'width': '100%', 'minHeight': '56px', 'display': 'flex',
-                'alignItems': 'center', 'justifyContent': 'center', 'textAlign': 'center',
-                'padding': '10px', 'borderWidth': '2px', 'borderStyle': 'dashed',
-                'borderColor': '#2185d0', 'borderRadius': '8px', 'color': '#2185d0',
-                'cursor': 'pointer', 'backgroundColor': '#f8fbff', 'boxSizing': 'border-box',
-            },
-        ),
-        html.Div(
-            t("ui.startup.import_or", locale=locale),
-            style={'textAlign': 'center', 'color': '#94a3b8', 'fontSize': '13px', 'margin': '10px 0'},
         ),
         dcc.Input(
             id='startup-ns-url', type='url',
@@ -162,6 +147,25 @@ def import_controls_children(locale: str) -> list[Any]:
             t("ui.startup.import_ns_button", locale=locale),
             id='startup-ns-import', type='button', className='ui blue button',
             n_clicks=0, style={'width': '100%', 'marginBottom': '8px'},
+        ),
+        html.Div(
+            t("ui.startup.import_or", locale=locale),
+            style={'color': '#475569', 'fontSize': '13px', 'margin': '12px 0 8px', 'fontWeight': '600'},
+        ),
+        dcc.Upload(
+            id='startup-upload-data',
+            # Still accepts Nightscout JSON siblings if someone already has them;
+            # the copy no longer steers people there.
+            multiple=True,
+            accept='.csv,.json,text/csv,application/json',
+            children=html.Div(t("ui.startup.import_upload_prompt", locale=locale), id='startup-upload-prompt'),
+            style={
+                'width': '100%', 'minHeight': '56px', 'display': 'flex',
+                'alignItems': 'center', 'justifyContent': 'center', 'textAlign': 'center',
+                'padding': '10px', 'borderWidth': '2px', 'borderStyle': 'dashed',
+                'borderColor': '#2185d0', 'borderRadius': '8px', 'color': '#2185d0',
+                'cursor': 'pointer', 'backgroundColor': '#f8fbff', 'boxSizing': 'border-box',
+            },
         ),
         dcc.Loading(
             html.Div(id='startup-import-status', style={'marginTop': '4px', 'fontSize': '15px', 'lineHeight': '1.4'}),
@@ -342,6 +346,47 @@ def paper_mention_children(locale: str) -> html.Div:
     )
 
 
+# Manufacturer portals for the popular sensors. The FAQ has the export
+# steps; other sensors are not documented there. Hostnames are the visible
+# link text so a player can open the site without leaving startup.
+SENSOR_EXPORT_SITES: Final[tuple[tuple[str, str, str], ...]] = (
+    ("ui.startup.format_find_dexcom_us", "https://clarity.dexcom.com", "clarity.dexcom.com"),
+    ("ui.startup.format_find_dexcom_eu", "https://clarity.dexcom.eu", "clarity.dexcom.eu"),
+    ("ui.startup.format_find_libre", "https://www.libreview.com", "libreview.com"),
+    ("ui.startup.format_find_medtronic", "https://carelink.minimed.com", "carelink.minimed.com"),
+)
+
+_FORMAT_FIND_LINK_STYLE: dict[str, str] = {
+    "fontWeight": "800",
+    "color": "#1565c0",
+    "textDecoration": "underline",
+    "overflowWrap": "anywhere",
+}
+
+
+def _sensor_export_link_children(locale: str) -> list[Any]:
+    nodes: list[Any] = []
+    for index, (label_key, href, host) in enumerate(SENSOR_EXPORT_SITES):
+        if index:
+            nodes.append(html.Span(" · ", disable_n_clicks=True))
+        nodes.append(
+            html.Span(
+                f"{t(label_key, locale=locale)}: ",
+                disable_n_clicks=True,
+            )
+        )
+        nodes.append(
+            html.A(
+                host,
+                href=href,
+                target="_blank",
+                rel="noopener noreferrer",
+                style=_FORMAT_FIND_LINK_STYLE,
+            )
+        )
+    return nodes
+
+
 def format_help_children(locale: str) -> list[Any]:
     return [
         html.Div(t("ui.startup.format_help_a", locale=locale), style={'marginBottom': '6px'}),
@@ -349,15 +394,32 @@ def format_help_children(locale: str) -> list[Any]:
         html.Div(t("ui.startup.format_help_c", locale=locale), style={'marginBottom': '8px'}),
         html.Div(
             [
-                t("ui.startup.format_find_data_before", locale=locale),
-                dcc.Link(
-                    t("ui.startup.format_find_data_link", locale=locale),
-                    href="/faq#download-csv",
-                    style={
-                        'fontWeight': '800',
-                        'color': '#1565c0',
-                        'textDecoration': 'underline',
-                    },
+                html.Div(
+                    t("ui.startup.format_find_data_intro", locale=locale),
+                    disable_n_clicks=True,
+                ),
+                html.Div(
+                    _sensor_export_link_children(locale),
+                    style={"marginTop": "4px"},
+                    disable_n_clicks=True,
+                ),
+                html.Div(
+                    [
+                        t("ui.startup.format_find_faq_before", locale=locale),
+                        dcc.Link(
+                            t("ui.startup.format_find_faq_link", locale=locale),
+                            href="/faq#download-csv",
+                            style=_FORMAT_FIND_LINK_STYLE,
+                        ),
+                        t("ui.startup.format_find_faq_after", locale=locale),
+                    ],
+                    style={"marginTop": "4px"},
+                    disable_n_clicks=True,
+                ),
+                html.Div(
+                    t("ui.startup.format_find_others", locale=locale),
+                    style={"marginTop": "4px"},
+                    disable_n_clicks=True,
                 ),
             ],
         ),

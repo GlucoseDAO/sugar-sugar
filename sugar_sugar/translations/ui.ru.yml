@@ -165,8 +165,15 @@ ru:
     format_help_a: "Публичные данные — анонимизированные записи глюкозы других людей. Ничего загружать не нужно."
     format_help_b: "Мои данные — загрузи свой CSV и играй на своей глюкозе."
     format_help_c: "Публичные + мои данные — комбинация. Часть раундов на чужих публичных данных, часть на твоих."
-    format_find_data_before: "Если не знаешь, где взять свои данные, "
-    format_find_data_link: "ищи здесь."
+    format_find_data_intro: "Популярные сенсоры — скачай CSV отсюда:"
+    format_find_dexcom_us: "Dexcom (США)"
+    format_find_dexcom_eu: "Dexcom (Европа)"
+    format_find_libre: "Libre"
+    format_find_medtronic: "Medtronic"
+    format_find_faq_before: "Подробные шаги экспорта для этих сенсоров — в "
+    format_find_faq_link: "FAQ"
+    format_find_faq_after: "."
+    format_find_others: "Для других сенсоров придётся искать самостоятельно."
     challenge_unknown_button: "Брось вызов неизвестному"
     challenge_unknown_button_on: "Неизвестное включено"
     challenge_unknown_help: "Если отметить, половина кривых будет от противоположной группы — диабетические данные, если диабета нет, и недиабетические, если есть. Только для «Публичные» или «Публичные + мои данные»."
@@ -180,9 +187,9 @@ ru:
     data_usage_consent_required: "Пожалуйста, подтверди согласие на использование данных, чтобы продолжить."
     consent_gate_hint: "Отметь выше оба обязательных пункта (18+ / условия прочитаны и согласие на защиту данных), чтобы продолжить."
     import_title: "Импорт твоих данных CGM"
-    import_subtitle: "Загрузи CSV-экспорт (Dexcom / Libre / Medtronic) или свой entries.json из Nightscout — выбери вместе с ним treatments.json, чтобы получить отметки еды и инсулина. Либо забери данные прямо со своего сайта Nightscout."
-    import_or: "— или —"
-    import_upload_prompt: "Перетащи файл или нажми, чтобы выбрать CSV — либо выбери сразу entries.json и treatments.json из Nightscout"
+    import_subtitle: "Лучше URL твоего сайта Nightscout — так подтянутся глюкоза плюс отметки еды и инсулина. Скачанный Nightscout JSON часть этого теряет. Если URL нет, загрузи CSV от Dexcom, Libre или Medtronic."
+    import_or: "Нет URL Nightscout? Загрузи CSV:"
+    import_upload_prompt: "Перетащи файл или нажми, чтобы выбрать CSV Dexcom, Libre или Medtronic"
     import_ns_url_placeholder: "URL Nightscout (https://твой-сайт.com)"
     import_ns_token_placeholder: "Токен доступа или API secret (необязательно)"
     import_ns_button: "Импортировать из Nightscout"
@@ -210,7 +217,7 @@ ru:
     upload_required: "Требуется загрузка"
     upload_success: "Данные из %{filename} успешно загружены. Эти данные будут использоваться для предсказаний."
     example_data_now_using: "Сейчас используются публичные анонимизированные данные. Загрузи CSV-файл для персонального анализа."
-    example_data_warning: "Сейчас используются публичные анонимизированные данные. Загрузи свой CSV-файл Dexcom/Libre/Medtronic — или свой entries.json из Nightscout — для персонального анализа."
+    example_data_warning: "Сейчас используются публичные анонимизированные данные. Лучше URL Nightscout, иначе CSV Dexcom/Libre/Medtronic, для персонального анализа."
     csv_tab_label: "CSV-файл"
     nightscout_tab_label: "Nightscout"
     nightscout_url_placeholder: "https://your-nightscout-site.com"
@@ -652,9 +659,11 @@ ru:
             a: >-
               1. Открой [clarity.dexcom.com](https://clarity.dexcom.com) (США) или [clarity.dexcom.eu](https://clarity.dexcom.eu) (Европа) и войди в аккаунт Dexcom.
 
-              2. Открой любой отчёт и нажми **Export** сверху.
+              2. На странице Overview нужно нажать **значок экспорта в правом верхнем углу** панели (последний значок в ряду рядом с датами — он похож на таблицу). Кнопки Export в верхнем меню нет.
 
-              3. Выбери период (14, 30, 90 дней или свой) и скачай CSV.
+              ![Нажми значок экспорта в правом верхнем углу Dexcom Clarity](/assets/images/dexcom_instruction.jpg)
+
+              3. В окне **Export your data** выбери период (14, 30, 90 дней или свой) и нажми **Export**, чтобы скачать CSV.
 
 
               Приложение Clarity не умеет экспортировать CSV — используй сайт.
@@ -692,7 +701,7 @@ ru:
 
               **xDrip+:** Меню → Import/Export → Export CSV (формат SiDiary).
 
-              **Nightscout:** вставь URL своего сайта на экране старта — файл не нужен. Если хочешь загрузить файл, открой `https://твой-сайт/api/v1/entries.json?count=10000`, сохрани его и загрузи именно его — не CSV-экспорт, в котором теряется большая часть данных.
+              **Nightscout:** вставь URL своего сайта на экране старта — это полный импорт (глюкоза плюс еда и инсулин). Скачанный Nightscout JSON или CSV часть этого теряет. Если URL нет, экспортируй CSV из Dexcom, Libre или Medtronic.
       - title: "Данные и конфиденциальность"
         items:
           - q: "Сохраняются ли мои данные?"

@@ -166,8 +166,15 @@ de:
     format_help_a: "Öffentliche Daten — anonymisierte CGM-Verläufe anderer Personen. Du musst nichts hochladen."
     format_help_b: "Meine Daten — lade deine eigene CSV hoch und spiele mit deiner eigenen Glukose."
     format_help_c: "Öffentliche + meine Daten — eine Kombination. Manche Runden nutzen anonymisierte öffentliche Verläufe, manche deine."
-    format_find_data_before: "Wenn du nicht weißt, wo du deine Daten findest, "
-    format_find_data_link: "suche hier."
+    format_find_data_intro: "Beliebte Sensoren — exportiere eine CSV von:"
+    format_find_dexcom_us: "Dexcom (USA)"
+    format_find_dexcom_eu: "Dexcom (Europa)"
+    format_find_libre: "Libre"
+    format_find_medtronic: "Medtronic"
+    format_find_faq_before: "Ausführliche Exportschritte für diese Sensoren stehen in der "
+    format_find_faq_link: "FAQ"
+    format_find_faq_after: "."
+    format_find_others: "Für andere Sensoren musst du selbst suchen."
     challenge_unknown_button: "Fordere das Unbekannte heraus"
     challenge_unknown_button_on: "Unbekanntes herausgefordert"
     challenge_unknown_help: "Wenn du das auswählst, kommt die Hälfte der Kurven von der anderen Gruppe — diabetische Daten ohne Diabetes, nicht-diabetische Daten mit Diabetes. Nur bei Öffentlich oder Öffentlich + meine Daten."
@@ -181,9 +188,9 @@ de:
     data_usage_consent_required: "Bitte bestätige die Einwilligung zur Datennutzung, um fortzufahren."
     consent_gate_hint: "Setze oben beide Pflichthäkchen (18+ / Bedingungen gelesen und Datenschutz-Einwilligung), um fortzufahren."
     import_title: "Importiere deine CGM-Daten"
-    import_subtitle: "Lade einen CSV-Export hoch (Dexcom / Libre / Medtronic) oder deine Nightscout-entries.json — wähle treatments.json gleich mit aus, um Mahlzeiten- und Insulinmarkierungen zu bekommen. Oder hole die Daten direkt von deiner Nightscout-Seite."
-    import_or: "— oder —"
-    import_upload_prompt: "Ziehe eine CSV hierher oder tippe zum Auswählen — oder wähle deine Nightscout-entries.json und treatments.json zusammen"
+    import_subtitle: "Am besten deine Nightscout-URL — damit kommen Glukose plus Mahlzeiten- und Insulinmarkierungen. Eine heruntergeladene Nightscout-JSON lässt davon etwas weg. Ohne Nightscout-URL lade stattdessen eine Dexcom-, Libre- oder Medtronic-CSV hoch."
+    import_or: "Keine Nightscout-URL? Lade stattdessen eine CSV hoch:"
+    import_upload_prompt: "Ziehe eine Dexcom-, Libre- oder Medtronic-CSV hierher oder tippe zum Auswählen"
     import_ns_url_placeholder: "Nightscout-URL (https://deine-seite.com)"
     import_ns_token_placeholder: "Zugriffstoken oder API-Secret (optional)"
     import_ns_button: "Von Nightscout importieren"
@@ -211,7 +218,7 @@ de:
     upload_required: "Upload erforderlich"
     upload_success: "Daten aus %{filename} wurden erfolgreich geladen. Diese Daten werden für Vorhersagen verwendet."
     example_data_now_using: "Jetzt werden Beispieldaten verwendet. Lade eine CSV‑Datei für eine personalisierte Analyse hoch."
-    example_data_warning: "Aktuell werden Beispieldaten verwendet. Lade deine eigene Dexcom/Libre/Medtronic‑CSV — oder deine Nightscout‑entries.json — für eine personalisierte Analyse hoch."
+    example_data_warning: "Aktuell werden öffentliche anonymisierte Daten verwendet. Am besten deine Nightscout-URL, sonst eine Dexcom/Libre/Medtronic-CSV, für eine personalisierte Analyse."
     csv_tab_label: "CSV-Datei"
     nightscout_tab_label: "Nightscout"
     nightscout_url_placeholder: "https://your-nightscout-site.com"
@@ -653,9 +660,11 @@ de:
             a: >-
               1. Öffne [clarity.dexcom.com](https://clarity.dexcom.com) (USA) oder [clarity.dexcom.eu](https://clarity.dexcom.eu) (Europa) und melde dich mit deinem Dexcom-Konto an.
 
-              2. Öffne einen beliebigen Bericht und klicke oben auf **Export**.
+              2. Auf der Übersichtsseite musst du das **Export-Symbol oben rechts** im Dashboard anklicken (das letzte Symbol in der Reihe neben dem Zeitraum — es sieht aus wie eine Tabelle). Es gibt keinen Export-Button in der oberen Menüleiste.
 
-              3. Wähle einen Zeitraum (14, 30, 90 Tage oder benutzerdefiniert) und lade die CSV herunter.
+              ![Klicke oben rechts auf das Export-Symbol in Dexcom Clarity](/assets/images/dexcom_instruction.jpg)
+
+              3. Im Dialog **Export your data** wähle einen Zeitraum (14, 30, 90 Tage oder benutzerdefiniert) und klicke auf **Export**, um die CSV herunterzuladen.
 
 
               Die Clarity-App kann keine CSV exportieren — nutze die Website.
@@ -693,7 +702,7 @@ de:
 
               **xDrip+:** Menü → Import/Export → Export CSV (SiDiary-Format).
 
-              **Nightscout:** füge deine Seiten-URL auf der Startseite ein — keine Datei nötig. Wenn du stattdessen eine Datei hochladen willst: öffne `https://deine-seite/api/v1/entries.json?count=10000`, speichere sie und lade diese hoch — nicht den CSV-Export, dem die meisten Daten fehlen.
+              **Nightscout:** füge deine Seiten-URL auf der Startseite ein — das ist der vollständige Import (Glukose plus Mahlzeiten- und Insulinmarkierungen). Eine heruntergeladene Nightscout-JSON oder -CSV lässt davon etwas weg. Ohne Nightscout-URL exportiere stattdessen eine CSV von Dexcom, Libre oder Medtronic.
       - title: "Daten und Datenschutz"
         items:
           - q: "Werden meine Daten gespeichert?"
