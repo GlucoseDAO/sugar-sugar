@@ -6,7 +6,9 @@ import pytest
 
 from pathlib import Path
 
-from sugar_sugar.app import create_faq_page
+from dash import html
+
+from sugar_sugar.app import create_faq_page, faq_answer_children
 from sugar_sugar.components.startup import SENSOR_EXPORT_SITES, format_help_children
 from sugar_sugar.i18n import SUPPORTED_LOCALES, setup_i18n, t, t_raw
 
@@ -143,3 +145,24 @@ def test_dexcom_faq_english_explains_the_top_right_icon() -> None:
     assert "export icon in the top-right corner" in answer
     assert "There is no Export button in the top menu" in answer
     assert "click **Export** in the top bar" not in answer
+
+
+def test_faq_answer_lifts_markdown_image_to_html_img() -> None:
+    kids = faq_answer_children(
+        "Before.\n\n![alt text](/assets/images/dexcom_instruction.jpg)\n\nAfter."
+    )
+    images = [node for node in kids if isinstance(node, html.Img)]
+    assert len(images) == 1
+    assert images[0].src == DEXCOM_EXPORT_SCREENSHOT
+    assert images[0].alt == "alt text"
+
+
+@pytest.mark.parametrize("locale", list(SUPPORTED_LOCALES))
+def test_faq_page_renders_dexcom_screenshot(locale: str) -> None:
+    layout = create_faq_page(locale=locale)
+    images = [
+        node
+        for node in _walk_nodes(layout)
+        if isinstance(node, html.Img) and getattr(node, "src", None) == DEXCOM_EXPORT_SCREENSHOT
+    ]
+    assert images, f"Dexcom screenshot missing from FAQ layout for {locale}"

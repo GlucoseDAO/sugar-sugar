@@ -12,6 +12,7 @@ from datetime import datetime
 import time
 from pathlib import Path
 import math
+import re
 import base64
 import dash_bootstrap_components as dbc
 import os
@@ -3623,6 +3624,52 @@ def faq_board_children(*, locale: str) -> list[Any]:
     ]
 
 
+_FAQ_MARKDOWN_IMAGE: re.Pattern[str] = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
+
+
+def faq_answer_children(text: str) -> list[Any]:
+    """Render FAQ markdown, lifting ``![alt](src)`` into real ``html.Img`` tags.
+
+    ``dcc.Markdown`` (react-markdown) can drop images, so the Dexcom Clarity
+    screenshot never reached the page. Server-side ``html.Img`` always does.
+    """
+    body = str(text or "")
+    parts: list[Any] = []
+    cursor = 0
+    for match in _FAQ_MARKDOWN_IMAGE.finditer(body):
+        before = body[cursor : match.start()].strip()
+        if before:
+            parts.append(
+                dcc.Markdown(before, link_target="_blank", style={"marginBottom": "0"})
+            )
+        parts.append(
+            html.Img(
+                src=match.group(2),
+                alt=match.group(1),
+                className="faq-instruction-image",
+                style={
+                    "maxWidth": "100%",
+                    "height": "auto",
+                    "display": "block",
+                    "margin": "12px 0",
+                    "border": "1px solid rgba(15, 23, 42, 0.12)",
+                    "borderRadius": "8px",
+                },
+            )
+        )
+        cursor = match.end()
+    rest = body[cursor:].strip()
+    if rest:
+        parts.append(
+            dcc.Markdown(rest, link_target="_blank", style={"marginBottom": "0"})
+        )
+    if not parts:
+        parts.append(
+            dcc.Markdown(body, link_target="_blank", style={"marginBottom": "0"})
+        )
+    return parts
+
+
 def create_faq_page(*, locale: str) -> html.Div:
     from sugar_sugar.faq_board import faq_board_enabled
 
@@ -3639,10 +3686,9 @@ def create_faq_page(*, locale: str) -> html.Div:
                             style={"marginBottom": "6px"},
                             disable_n_clicks=True,
                         ),
-                        dcc.Markdown(
-                            item["a"],
-                            link_target="_blank",
-                            style={"marginBottom": "0"},
+                        html.Div(
+                            faq_answer_children(str(item.get("a") or "")),
+                            disable_n_clicks=True,
                         ),
                     ],
                     className="ui segment",
