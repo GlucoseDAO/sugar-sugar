@@ -295,7 +295,7 @@ def resolve_generic_source_path(source_name: str) -> Path | None:
     name = Path(str(source_name or "")).name
     if not name:
         return None
-    for source in discover_generic_dataset_sources() + discover_legacy_generic_sources():
+    for source in all_generic_dataset_sources():
         if source.source_name == name:
             return source.csv_path
     return None
@@ -484,6 +484,39 @@ def window_is_continuous(
         return True
     largest_gap = window_df.get_column("time").sort().diff().dt.total_minutes().max()
     return largest_gap is None or largest_gap <= gap_minutes
+
+
+def _time_glucose_keys(df: pl.DataFrame) -> pl.DataFrame:
+    return df.select(
+        pl.col("time").cast(pl.Datetime("us")).dt.truncate("1s").alias("time"),
+        pl.col("gl").round(1).alias("gl"),
+    )
+
+
+def window_in_dataset(window_df: pl.DataFrame, dataset_df: pl.DataFrame) -> bool:
+    """True when every ``(time, gl)`` row of the window is a row of the dataset.
+
+    This is what ties a round to its file: the values a round saves are the
+    window's ``gl``, so the file it names must hold those rows. Times compare to
+    the second (the window store keeps no sub-seconds), glucose to 0.1 mg/dL,
+    the precision the round's actual values are saved at.
+    """
+    if window_df.is_empty():
+        return False
+    window = _time_glucose_keys(window_df)
+    matched = window.join(_time_glucose_keys(dataset_df), on=["time", "gl"], how="semi")
+    return matched.height == window.height
+
+
+def all_generic_dataset_sources() -> list[GenericDatasetSource]:
+    """Every public source a round can name: both corpora plus example.csv and LOOP."""
+    seen: set[str] = set()
+    sources: list[GenericDatasetSource] = []
+    for source in discover_generic_dataset_sources() + discover_legacy_generic_sources():
+        if source.source_name not in seen:
+            seen.add(source.source_name)
+            sources.append(source)
+    return sources
 
 
 def _candidate_start_indices(row_count: int, points: int) -> list[int]:

@@ -263,6 +263,30 @@ Continuity is deliberately **derived from timestamps, not a stamped `sequence_id
 frame must stay exactly `["time", "gl", "prediction", "age", "user_id"]`, or frames loaded from disk
 and frames reconstructed from a `dcc.Store` would have different shapes.
 
+### A round is named after the file that holds its window
+
+The study analysis rebuilds each played window from the file a round's `data_source_name` names, so
+that name must be the file whose values the round saved. 69 rounds in `prediction_statistics.csv`
+failed this. All of them were saved before 2026-08-15, when `per_round_metrics` had no per-round
+source and the run row named only the *last* round's file. A Format A run drew several LOOP subjects
+and `example.csv`, and a Format C run alternated public and own data, so every other round inherited
+the wrong file, or own data was called `example.csv`.
+
+Two rules keep this from coming back:
+
+- **`append_round_from_window` checks the name against the window** (`round_source_for_window`). The
+  window (`current-window-df`) and the name (`user-info-store`) are different stores, and not every
+  writer updates both: `initialize_data_on_url_change` and `handle_example_data_button` leave the name
+  to the chained `sync_data_source_into_user_info`, while `handle_time_slider` re-slices from the file
+  `user_info` names. If the claimed file does not hold the window's `(time, gl)` rows
+  (`subject_sources.window_in_dataset`), the round takes the file that does (the upload, then every
+  public source), or an empty name. Never a guess.
+- **A round without its own name inherits the run's name only in Format B**
+  (`submit._round_source_name`). In A and C the run name is another round's file.
+
+Locked down by `tests/test_round_source_matches_values.py`, which replays the stale-slider sequence
+through the real callbacks and checks every saved round's `real_values` against the named file.
+
 ## Known Dash pitfalls
 
 ### `allow_duplicate` hashes the INPUTS, so same-trigger writers collide

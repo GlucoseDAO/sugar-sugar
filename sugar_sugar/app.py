@@ -177,6 +177,7 @@ from sugar_sugar.generic_sources_metadata import (
 )
 from sugar_sugar.prediction_window_context import should_show_no_carbs_note
 from sugar_sugar.subject_sources import (
+    all_generic_dataset_sources,
     collect_generic_round_history,
     generic_round_window_from_df,
     generic_window_slice_key,
@@ -184,6 +185,7 @@ from sugar_sugar.subject_sources import (
     generic_intervention_for_user,
     pick_unique_generic_window,
     resolve_generic_source_path,
+    window_in_dataset,
     window_is_continuous,
 )
 from sugar_sugar.contact_info import load_contact_info
@@ -1104,6 +1106,71 @@ def load_dataset(path: Path) -> Tuple[pl.DataFrame, pl.DataFrame]:
     names), so the resolved absolute path is a safe cache key with no mtime check.
     """
     return _load_dataset_cached(str(Path(path).resolve()))
+
+
+def _claimed_round_dataset(info: Dict[str, Any]) -> Optional[Path]:
+    """The file ``info`` says the current window comes from, if it is on disk."""
+    if bool(info.get("is_example_data", True)):
+        return resolve_generic_source_path(str(info.get("data_source_name") or ""))
+    uploaded = info.get("uploaded_data_path")
+    if uploaded and Path(str(uploaded)).is_file():
+        return Path(str(uploaded))
+    return None
+
+
+def _round_source_candidates(info: Dict[str, Any]) -> list[tuple[str, bool, Path]]:
+    """Every file a window could come from: the player's upload, then each public source."""
+    candidates: list[tuple[str, bool, Path]] = []
+    uploaded = info.get("uploaded_data_path")
+    if uploaded and Path(str(uploaded)).is_file():
+        upload_name = str(info.get("uploaded_data_filename") or "uploaded.csv")
+        candidates.append((upload_name, False, Path(str(uploaded))))
+    for source in all_generic_dataset_sources():
+        candidates.append((source.source_name, True, source.csv_path))
+    return candidates
+
+
+def round_source_for_window(
+    info: Dict[str, Any],
+    window_df: pl.DataFrame,
+) -> tuple[str, bool, bool]:
+    """``(data_source_name, is_example_data, claim_held)`` for the file holding ``window_df``.
+
+    A round's values are the window's ``gl`` (``current-window-df``), but its name
+    used to be copied from ``user_info['data_source_name']``, a different store.
+    Not every writer updates the two together: ``initialize_data_on_url_change``
+    and ``handle_example_data_button`` leave ``user-info-store`` to the chained
+    ``sync_data_source_into_user_info``, and ``handle_time_slider`` re-slices the
+    window from whatever file ``user_info`` names. A stale read there puts one
+    file's values under another file's name, which is what the study CSV then
+    recorded.
+
+    So the name is checked against the window where the round is captured: the
+    claimed file first, then the player's upload and every public source. When no
+    file holds the window the name is left blank rather than guessed. A claim that
+    cannot be checked (its file is not on disk) is kept.
+    """
+    claimed_name = str(info.get("data_source_name", "example.csv") or "")
+    claimed_example = bool(info.get("is_example_data", True))
+    claimed_path = _claimed_round_dataset(info)
+    if claimed_path is None and claimed_name:
+        return claimed_name, claimed_example, True
+    if claimed_path is not None and window_in_dataset(window_df, load_dataset(claimed_path)[0]):
+        return claimed_name, claimed_example, True
+    with start_action(
+        action_type=u"round_source_mismatch",
+        claimed_source=claimed_name,
+        claimed_is_example=claimed_example,
+    ) as action:
+        claimed_resolved = claimed_path.resolve() if claimed_path is not None else None
+        for name, is_example, path in _round_source_candidates(info):
+            if path.resolve() == claimed_resolved:
+                continue
+            if window_in_dataset(window_df, load_dataset(path)[0]):
+                action.log(message_type="round_source_found", source_name=name, is_example=is_example)
+                return name, is_example, False
+        action.log(message_type="round_source_not_found")
+    return "", claimed_example, False
 
 
 # Load initial data for session storage.
@@ -7473,6 +7540,13 @@ def append_round_from_window(
     info['current_round_number'] = round_number
     window_times = current_df.get_column('time').dt.strftime('%Y-%m-%d %H:%M:%S').to_list()
     info['window_times'] = window_times
+    # Name the round after the file that holds the window it scores, not after
+    # whatever user-info-store last said (see round_source_for_window).
+    source_name, is_example, claim_held = round_source_for_window(info, current_df)
+    if source_name and not claim_held:
+        # The session named the wrong file; /ending and the run row read these.
+        info['data_source_name'] = source_name
+        info['is_example_data'] = is_example
     round_info: dict[str, Any] = {
         'round_number': round_number,
         'prediction_window_start': info['prediction_window_start'],
@@ -7480,13 +7554,14 @@ def append_round_from_window(
         'prediction_table_data': prediction_table_data,
         'window_times': window_times,
         'format': str(info.get('format') or ''),
-        'is_example_data': bool(info.get('is_example_data', True)),
-        'data_source_name': str(info.get('data_source_name', 'example.csv')),
+        'is_example_data': is_example,
+        'data_source_name': source_name,
     }
     # Window fingerprint for every format: A (generic subject), B (own file),
     # and C (alternating). Prefer the key stamped when a generic window was
-    # selected; never reuse that key on an own-data round (stale after A→B).
-    if round_info['is_example_data'] and info.get('current_generic_slice_key'):
+    # selected; never reuse that key on an own-data round (stale after A→B),
+    # nor when the window turned out not to be the one the session picked.
+    if round_info['is_example_data'] and claim_held and info.get('current_generic_slice_key'):
         round_info['generic_slice_key'] = str(info['current_generic_slice_key'])
     else:
         round_info['generic_slice_key'] = generic_window_slice_key(current_df)

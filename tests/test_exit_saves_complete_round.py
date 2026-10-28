@@ -124,14 +124,14 @@ def test_append_round_keeps_generic_slice_key_for_format_c_odd_round() -> None:
             "rounds": [],
             "format": "C",
             "is_example_data": True,
-            "data_source_name": "D1NAMO-002.csv",
+            "data_source_name": "example.csv",
             "current_generic_slice_key": "picked-generic-key",
         },
         window,
         0,
     )
     round_info = info["rounds"][0]
-    assert round_info["data_source_name"] == "D1NAMO-002.csv"
+    assert round_info["data_source_name"] == "example.csv"
     assert round_info["is_example_data"] is True
     assert round_info["generic_slice_key"] == "picked-generic-key"
 

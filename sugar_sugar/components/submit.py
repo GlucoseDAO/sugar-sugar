@@ -53,9 +53,19 @@ def _is_mobile_ua(ua: Optional[str]) -> bool:
     return any(keyword in lc for keyword in _MOBILE_UA_KEYWORDS)
 
 
-def _round_source_name(round_info: dict[str, Any], fallback: str = "") -> str:
-    """Prefer the source captured on the round; fall back to the run-level name."""
-    return str(round_info.get("data_source_name") or fallback or "")
+def _round_source_name(round_info: dict[str, Any], fallback: str = "", *, run_format: str = "") -> str:
+    """The source captured on the round; the run-level name only for a Format B run.
+
+    The run-level name is the *last* round's source. Rounds captured before
+    per-round tracking (2026-08-15) carry no name of their own, and in Format A
+    (several public files per run) or C (public and own data alternating) that
+    last name belongs to another round: 69 such rounds were later scored against
+    a file that does not hold their values. Only a Format B run is one file.
+    """
+    own = round_info.get("data_source_name")
+    if own:
+        return str(own)
+    return str(fallback or "") if run_format == "B" else ""
 
 
 def _per_round_metric_entry(
@@ -65,6 +75,7 @@ def _per_round_metric_entry(
     round_info: Optional[dict[str, Any]] = None,
     fallback_source: str = "",
     fallback_is_example: bool = True,
+    run_format: str = "",
 ) -> dict[str, Any]:
     """One ``per_round_metrics`` row, including the dataset used for that round.
 
@@ -84,7 +95,7 @@ def _per_round_metric_entry(
         "mse": metrics["mse"],
         "rmse": metrics["rmse"],
         "mape": metrics["mape"],
-        "data_source_name": _round_source_name(info, fallback_source),
+        "data_source_name": _round_source_name(info, fallback_source, run_format=run_format),
         "is_example_data": is_example,
         "generic_slice_key": str(info.get("generic_slice_key") or ""),
     }
@@ -725,6 +736,7 @@ class SubmitComponent(html.Div):
             times: list[str],
             fallback_source: str,
             fallback_is_example: bool,
+            run_format: str,
         ) -> dict[str, Any]:
             """Metadata needed to trace one result back to its source window."""
             table_data = round_info.get('prediction_table_data') or []
@@ -743,7 +755,7 @@ class SubmitComponent(html.Div):
             return {
                 "round_number": round_number,
                 "format": str(round_info.get("format") or version),
-                "data_source_name": _round_source_name(round_info, fallback_source),
+                "data_source_name": _round_source_name(round_info, fallback_source, run_format=run_format),
                 "is_example_data": is_example,
                 "generic_slice_key": str(round_info.get("generic_slice_key") or ""),
                 "prediction_window_start_index": int(
@@ -771,6 +783,7 @@ class SubmitComponent(html.Div):
                     round_info=round_info,
                     fallback_source=str(user_info.get('data_source_name', '')),
                     fallback_is_example=bool(user_info.get('is_example_data', True)),
+                    run_format=version,
                 ))
                 window_size = int(round_info.get('prediction_window_size') or 0)
                 times = _resolve_round_times(round_info, window_size) if window_size > 0 else []
@@ -780,6 +793,7 @@ class SubmitComponent(html.Div):
                     times=times,
                     fallback_source=str(user_info.get('data_source_name', '')),
                     fallback_is_example=bool(user_info.get('is_example_data', True)),
+                    run_format=version,
                 ))
         elif user_info.get('prediction_table_data'):
             table_data = user_info.get('prediction_table_data', []) or []
@@ -790,6 +804,7 @@ class SubmitComponent(html.Div):
                 round_info=user_info,
                 fallback_source=str(user_info.get('data_source_name', '')),
                 fallback_is_example=bool(user_info.get('is_example_data', True)),
+                run_format=version,
             ))
             window_size = int(user_info.get('prediction_window_size') or 0)
             times = _resolve_round_times(user_info, window_size) if window_size > 0 else []
@@ -799,6 +814,7 @@ class SubmitComponent(html.Div):
                 times=times,
                 fallback_source=str(user_info.get('data_source_name', '')),
                 fallback_is_example=bool(user_info.get('is_example_data', True)),
+                run_format=version,
             ))
 
         overall_table_data = _build_aggregate_table_data(rounds) if rounds else (user_info.get('prediction_table_data', []) or [])
@@ -998,6 +1014,7 @@ class SubmitComponent(html.Div):
                     round_info=round_info,
                     fallback_source=source_name,
                     fallback_is_example=is_example,
+                    run_format=run_format,
                 ))
                 window_size = int(round_info.get('prediction_window_size') or 0)
                 times = _resolve_round_times(round_info, window_size) if window_size > 0 else []
@@ -1007,6 +1024,7 @@ class SubmitComponent(html.Div):
                     times=times,
                     fallback_source=source_name,
                     fallback_is_example=is_example,
+                    run_format=run_format,
                 ))
                 if len(table_data) < 2 or window_size <= 0:
                     continue
