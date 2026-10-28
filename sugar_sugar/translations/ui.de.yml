@@ -55,7 +55,7 @@ de:
     games_played_completed: "davon haben %{count} die Aufgabe abgeschlossen"
     completed_the_task_label: "davon haben die Aufgabe abgeschlossen"
     victors_punchline: "Gehöre zu den Siegern — hebe dich von der Menge ab"
-    games_slots_line: "%{total} Spiele gestartet, %{completed} beendet — eine Person kann mehrmals spielen"
+    games_slots_line: "%{total} Spiele gespielt, %{completed} beendet — eine Person kann mehrmals spielen"
 
   about:
     title: "Über Sugar-Sugar"

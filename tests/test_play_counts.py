@@ -100,7 +100,7 @@ def test_landing_counter_mentions_completers_and_the_punchline(
     assert children[2].children == "of them completed the task"
     assert "Be part of the victors" in children[3].children
     assert children[4].children == (
-        "2 games started, 1 finished — one person can play several times"
+        "2 games played, 1 finished — one person can play several times"
     )
     assert children[4].className == "games-played-slots"
 

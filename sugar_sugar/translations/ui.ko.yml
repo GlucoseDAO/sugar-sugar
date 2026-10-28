@@ -60,7 +60,7 @@ ko:
     games_played_completed: "그중 %{count}명이 과제를 완료"
     completed_the_task_label: "이 과제를 완료함"
     victors_punchline: "승자의 편에 서세요 — 무리에서 돋보이세요"
-    games_slots_line: "%{total}게임 시작, %{completed}게임 완료 — 한 사람이 여러 번 플레이할 수 있습니다"
+    games_slots_line: "%{total}게임 플레이, %{completed}게임 완료 — 한 사람이 여러 번 플레이할 수 있습니다"
 
   consent_form:
     title: "동의 안내"

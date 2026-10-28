@@ -55,7 +55,7 @@ uk:
     games_played_completed: "з них %{count} завершили завдання"
     completed_the_task_label: "з них завершили завдання"
     victors_punchline: "Стань серед переможців — виділися з натовпу"
-    games_slots_line: "%{total} ігор почато, %{completed} завершено — одна людина може зіграти кілька разів"
+    games_slots_line: "%{total} ігор зіграно, %{completed} завершено — одна людина може зіграти кілька разів"
 
   about:
     title: "Про Sugar-Sugar"

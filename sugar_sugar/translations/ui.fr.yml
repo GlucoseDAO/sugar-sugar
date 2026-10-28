@@ -57,7 +57,7 @@ fr:
     games_played_completed: "dont %{count} ont terminé la tâche"
     completed_the_task_label: "d'entre eux ont terminé la tâche"
     victors_punchline: "Rejoins les vainqueurs — démarque-toi de la foule"
-    games_slots_line: "%{total} parties commencées, %{completed} terminées — une personne peut jouer plusieurs fois"
+    games_slots_line: "%{total} parties jouées, %{completed} terminées — une personne peut jouer plusieurs fois"
 
   consent_form:
     title: "Avis de consentement"

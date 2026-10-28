@@ -55,7 +55,7 @@ zh:
     games_played_completed: "其中 %{count} 人完成了任务"
     completed_the_task_label: "其中完成了任务"
     victors_punchline: "加入胜者行列——从人群中脱颖而出"
-    games_slots_line: "共开始 %{total} 局，完成 %{completed} 局——同一人可以玩多次"
+    games_slots_line: "共玩了 %{total} 局，完成 %{completed} 局——同一人可以玩多次"
 
   consent_form:
     title: "同意通知"

@@ -55,7 +55,7 @@ en:
     games_played_completed: "out of which %{count} completed the task"
     completed_the_task_label: "of them completed the task"
     victors_punchline: "Be part of the victors — stand out of the crowd"
-    games_slots_line: "%{total} games started, %{completed} finished — one person can play several times"
+    games_slots_line: "%{total} games played, %{completed} finished — one person can play several times"
 
   consent_form:
     title: "Consent notice"

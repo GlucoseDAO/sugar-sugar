@@ -55,7 +55,7 @@ ru:
     games_played_completed: "из них %{count} завершили задание"
     completed_the_task_label: "из них завершили задание"
     victors_punchline: "Стань одним из победителей — выделись из толпы"
-    games_slots_line: "%{total} игр начато, %{completed} завершено — один человек может сыграть несколько раз"
+    games_slots_line: "%{total} игр сыграно, %{completed} завершено — один человек может сыграть несколько раз"
 
   consent_form:
     title: "Уведомление о согласии"

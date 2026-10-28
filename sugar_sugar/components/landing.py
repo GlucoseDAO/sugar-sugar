@@ -102,8 +102,9 @@ def count_ranking_slots(
 ) -> tuple[int, int]:
     """``(all slots, completed slots)`` in the overall ranking CSV.
 
-    A slot is one finished-game row. Completers here means ``rounds_played``
-    reached ``min_rounds`` — the same floor the leaderboard uses.
+    A slot is one game saved to the ranking. That happens on Submit, so a game
+    started without a submitted round is not a slot. Completers here means
+    ``rounds_played`` reached ``min_rounds`` — the same floor the leaderboard uses.
     """
     path = ranking_path or _PREDICTION_RANKING_CSV
     if not path.exists() or path.stat().st_size == 0:

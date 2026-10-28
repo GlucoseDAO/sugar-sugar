@@ -60,7 +60,7 @@ bg:
     games_played_completed: "от които %{count} завършиха задачата"
     completed_the_task_label: "от тях завършиха задачата"
     victors_punchline: "Бъдете сред победителите — откроете се от тълпата"
-    games_slots_line: "%{total} започнати игри, %{completed} завършени — един човек може да играе няколко пъти"
+    games_slots_line: "%{total} изиграни игри, %{completed} завършени — един човек може да играе няколко пъти"
 
   consent_form:
     title: "Съобщение за съгласие"

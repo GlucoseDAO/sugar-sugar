@@ -60,7 +60,7 @@ ja:
     games_played_completed: "そのうち %{count} 人が課題を完了"
     completed_the_task_label: "が課題を完了"
     victors_punchline: "トップを目指して、一歩先へ踏み出そう！"
-    games_slots_line: "%{total} ゲーム開始、%{completed} 完了 — 1人が何度でもプレイできます"
+    games_slots_line: "%{total} ゲームプレイ、%{completed} 完了 — 1人が何度でもプレイできます"
 
   consent_form:
     title: "説明文書"

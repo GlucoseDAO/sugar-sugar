@@ -57,7 +57,7 @@ es:
     games_played_completed: "de las cuales %{count} completaron la tarea"
     completed_the_task_label: "de ellos completaron la tarea"
     victors_punchline: "Únete a los vencedores — destaca entre la multitud"
-    games_slots_line: "%{total} partidas empezadas, %{completed} terminadas — una persona puede jugar varias veces"
+    games_slots_line: "%{total} partidas jugadas, %{completed} terminadas — una persona puede jugar varias veces"
 
   consent_form:
     title: "Aviso de consentimiento"

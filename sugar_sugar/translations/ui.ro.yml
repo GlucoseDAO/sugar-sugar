@@ -55,7 +55,7 @@ ro:
     games_played_completed: "dintre care %{count} au finalizat sarcina"
     completed_the_task_label: "dintre ei au finalizat sarcina"
     victors_punchline: "Fii printre învingători — ieși în evidență din mulțime"
-    games_slots_line: "%{total} jocuri începute, %{completed} finalizate — o persoană poate juca de mai multe ori"
+    games_slots_line: "%{total} jocuri jucate, %{completed} finalizate — o persoană poate juca de mai multe ori"
 
   about:
     title: "Despre Sugar-Sugar"
